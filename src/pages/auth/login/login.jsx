@@ -53,35 +53,26 @@ const featureCards = [
     {
         id: "support",
         iconSrc: icon3,
-        iconClassName: "relative w-5 h-4",
+        iconClassName: "w-5 h-4 object-contain",
         wrapperClassName:
-            "relative row-[1_/_2] col-[1_/_2] w-full h-[73px] flex items-center gap-3 p-4 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        textWrapperClassName: "relative w-[85.08px] h-[19.5px]",
+            "bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d] p-3 flex items-center gap-2 h-[73px] w-full min-w-0",
         label: "Phản hồi 24/7",
     },
     {
         id: "accuracy",
         iconSrc: icon4,
-        iconClassName: "relative w-[18px] h-[18px]",
+        iconClassName: "w-[18px] h-[18px] object-contain",
         wrapperClassName:
-            "col-[2_/_3] relative row-[1_/_2] w-full h-[73px] flex items-center gap-[11.99px] p-4 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        textWrapperClassName: "relative w-[105.42px] h-[19.5px] mr-[-11.74px]",
+            "bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d] p-3 flex items-center gap-2 h-[73px] w-full min-w-0",
         label: "Dữ liệu chính xác",
     },
     {
         id: "saving",
         iconSrc: icon5,
-        iconClassName: "relative w-[17px] h-[16.99px]",
+        iconClassName: "w-[17px] h-[17px] object-contain",
         wrapperClassName:
-            "col-[3_/_4] relative row-[1_/_2] w-full h-[73px] flex items-center gap-[11.99px] p-4 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        textWrapperClassName: "relative w-[118.66px] h-[39px] mr-[-23.98px]",
-        label: (
-            <>
-                Tiết kiệm năng
-                <br />
-                lượng
-            </>
-        ),
+            "bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d] p-3 flex items-center gap-2 h-[73px] w-full min-w-0",
+        label: "Tiết kiệm năng lượng",
     },
 ];
 
@@ -176,28 +167,27 @@ const Login = () => {
     };
 
     return (
-        <main className="bg-white w-full min-w-[1440px] h-[1024px] relative overflow-hidden">
+        <main className="bg-white w-full min-h-screen relative overflow-hidden flex items-center justify-center py-12 lg:py-0">
             <img
-                className="absolute top-0 left-0 w-[405px] h-[374px]"
+                className="absolute top-0 left-0 w-[405px] h-[374px] pointer-events-none opacity-50 lg:opacity-100"
                 alt=""
                 aria-hidden="true"
                 src={backgroundDecorativeElements2}
             />
             <img
-                className="absolute top-0 left-[13px] w-[445px] h-[370px]"
+                className="absolute top-0 left-[13px] w-[445px] h-[370px] pointer-events-none opacity-50 lg:opacity-100"
                 alt=""
                 aria-hidden="true"
                 src={backgroundDecorativeElements}
             />
-            <div className="flex w-full items-center justify-center p-6 absolute top-[119px] left-0">
-                <div className="absolute h-[10.27%] top-[25.00%] right-0 w-24 bg-[#e55cff] rounded-full blur-2xl opacity-20" />
-                <div className="absolute w-[32.79%] h-[53.47%] top-[21.53%] left-[42.21%] bg-[#0099ff] rounded-full blur-2xl opacity-20" />
+            <div className="flex flex-col lg:flex-row w-full items-center justify-center p-6 gap-12 lg:gap-16 z-10">
+                <div className="absolute h-[10.27%] top-[25.00%] right-0 w-24 bg-[#e55cff] rounded-full blur-2xl opacity-20 pointer-events-none" />
+                <div className="absolute w-[32.79%] h-[53.47%] top-[21.53%] left-[42.21%] bg-[#0099ff] rounded-full blur-2xl opacity-20 pointer-events-none" />
                 <section
-                    className="flex w-[588px] h-[692.83px] items-start relative"
+                    className="flex w-full max-w-[480px] items-start relative"
                     aria-label="Đăng nhập hệ thống"
                 >
-                    <div className="flex flex-col max-w-[480px] w-[480px] items-start gap-[31px] p-10 relative self-stretch bg-white rounded-2xl border border-solid border-[#d4e0ed4c]">
-                        <div className="absolute w-full h-full top-0 left-0 bg-[#ffffff01] rounded-2xl shadow-[0px_20px_25px_-5px_#4767880d,0px_10px_15px_-3px_#4767881a,0px_4px_6px_-1px_#4767881a]" />
+                    <div className="flex flex-col w-full items-start gap-[31px] p-6 sm:p-10 relative bg-white rounded-2xl border border-solid border-[#d4e0ed4c] shadow-[0px_20px_25px_-5px_#4767880d,0px_10px_15px_-3px_#4767881a,0px_4px_6px_-1px_#4767881a]">
                         <header className="flex flex-col items-start gap-2 relative self-stretch w-full flex-[0_0_auto] bg-transparent">
                             <div className="self-stretch w-full flex-[0_0_auto] flex flex-col items-start relative">
                                 <h1 className="relative flex items-center self-stretch mt-[-1.00px] [font-family:'Montserrat-SemiBold',Helvetica] font-semibold text-neutral-950 text-[38px] tracking-[0] leading-[46.0px]">
@@ -232,11 +222,11 @@ const Login = () => {
                         )}
 
                         <form
-                            className="flex flex-col w-[399px] h-auto items-start gap-6 relative"
+                            className="flex flex-col w-full h-auto items-start gap-6 relative"
                             onSubmit={handleSubmit}
                         >
                             <div className="flex flex-col items-end gap-2 relative self-stretch w-full flex-[0_0_auto]">
-                                <div className="flex flex-col w-[394px] items-start pt-0 pb-[0.8px] px-0 relative flex-[0_0_auto]">
+                                <div className="flex flex-col w-full items-start pt-0 pb-[0.8px] px-0 relative flex-[0_0_auto]">
                                     <label
                                         className="relative flex items-center w-fit mt-[-1.00px] [font-family:'Montserrat-Medium',Helvetica] font-medium text-[#424655] text-xs tracking-[0] leading-[16.8px] whitespace-nowrap"
                                         htmlFor={emailId}
@@ -378,7 +368,7 @@ const Login = () => {
                     </div>
                 </section>
                 <section
-                    className="flex flex-col w-[587px] items-start gap-8 relative"
+                    className="hidden lg:flex flex-col w-[587px] items-start gap-8 relative"
                     aria-label="Giới thiệu giải pháp"
                 >
                     <div className="relative w-[586.75px] h-[737.44px]">
@@ -449,10 +439,10 @@ const Login = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-3 grid-rows-[73px] w-[518px] h-[73px] gap-6 absolute top-[644px] left-6">
+                        <div className="grid grid-cols-3 w-[518px] h-[73px] gap-4 absolute top-[644px] left-6">
                             {featureCards.map((card) => (
                                 <div key={card.id} className={card.wrapperClassName}>
-                                    <div className="inline-flex flex-col items-start relative flex-[0_0_auto]">
+                                    <div className="flex-shrink-0 flex items-center justify-center">
                                         <img
                                             className={card.iconClassName}
                                             alt=""
@@ -460,10 +450,10 @@ const Login = () => {
                                             src={card.iconSrc}
                                         />
                                     </div>
-                                    <div className={card.textWrapperClassName}>
-                                        <div className="absolute -top-px left-0 h-5 [font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[13px] tracking-[0] leading-[19.5px] whitespace-nowrap flex items-center">
+                                    <div className="flex-grow min-w-0">
+                                        <span className="[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words">
                                             {card.label}
-                                        </div>
+                                        </span>
                                     </div>
                                 </div>
                             ))}
