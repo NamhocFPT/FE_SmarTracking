@@ -16,7 +16,7 @@ const BookMeeting = () => {
     // Form states
     const [title, setTitle] = useState('');
     const [selectedRoomId, setSelectedRoomId] = useState('');
-    const [meetingDate, setMeetingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [meetingDate, setMeetingDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('10:00');
     const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
@@ -195,6 +195,24 @@ const BookMeeting = () => {
     const handleSearchRooms = async () => {
         setSearchingRooms(true);
         setErrorMsg('');
+
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        if (meetingDate < todayStr) {
+            setErrorMsg('Ngày họp không được trong quá khứ.');
+            setSearchingRooms(false);
+            return;
+        }
+
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        const startTotal = sh * 60 + sm;
+        const endTotal = eh * 60 + em;
+        if (startTotal >= endTotal) {
+            setErrorMsg('Giờ bắt đầu phải trước giờ kết thúc.');
+            setSearchingRooms(false);
+            return;
+        }
+
         try {
             const bookingsRes = await getRoomBookings();
             let latestBookings = [];
@@ -342,16 +360,27 @@ const BookMeeting = () => {
         setConflictInfo(null);
         setAlternativeRooms([]);
 
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        if (meetingDate < todayStr) {
+            setErrorMsg('Ngày họp không được trong quá khứ.');
+            return;
+        }
+
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        const startTotal = sh * 60 + sm;
+        const endTotal = eh * 60 + em;
+        if (startTotal >= endTotal) {
+            setErrorMsg('Giờ bắt đầu phải trước giờ kết thúc.');
+            return;
+        }
+
         if (!title.trim()) {
             setErrorMsg('Vui lòng nhập tiêu đề cuộc họp.');
             return;
         }
         if (!selectedRoomId) {
             setErrorMsg('Vui lòng chọn phòng họp.');
-            return;
-        }
-        if (meetingDuration <= 0) {
-            setErrorMsg('Giờ kết thúc phải sau giờ bắt đầu.');
             return;
         }
 
@@ -531,6 +560,7 @@ const BookMeeting = () => {
                                     <input
                                         type="date"
                                         value={meetingDate}
+                                        min={new Date().toLocaleDateString('en-CA')}
                                         onChange={(e) => {
                                             setMeetingDate(e.target.value);
                                             setSelectedRoomId('');
