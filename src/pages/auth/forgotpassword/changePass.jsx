@@ -1,6 +1,7 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { confirmPasswordReset } from "../../../service/authService";
+import AuthFormSkeleton from "../../../component/Skeleton/AuthFormSkeleton";
 import backgroundDecorativeElements from "../../../assets/images/background-decorative-elements.svg";
 import icon2 from "../../../assets/icons/icon-2.svg";
 import icon3 from "../../../assets/icons/icon-3.svg";
@@ -73,6 +74,9 @@ export const ChangePass = () => {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+    // Initial skeleton loading state
+    const [initialLoading, setInitialLoading] = useState(true);
+
     // API interaction states
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -84,6 +88,14 @@ export const ChangePass = () => {
     const [confirmPasswordError, setConfirmPasswordError] = useState(null);
 
     const strength = useMemo(() => getPasswordStrength(newPassword), [newPassword]);
+
+    // Show skeleton briefly on mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setInitialLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, []);
 
     const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
     const isMinLengthMet = newPassword.length >= 8;
@@ -175,6 +187,11 @@ export const ChangePass = () => {
             setLoading(false);
         }
     };
+
+    // Show skeleton while loading
+    if (initialLoading) {
+        return <AuthFormSkeleton variant="changepass" />;
+    }
 
     return (
         <main className="flex flex-col min-h-screen items-center justify-center relative bg-[linear-gradient(0deg,rgba(246,250,255,1)_0%,rgba(246,250,255,1)_100%),linear-gradient(0deg,rgba(255,255,255,1)_0%,rgba(255,255,255,1)_100%)] overflow-x-hidden py-12 lg:py-0">
