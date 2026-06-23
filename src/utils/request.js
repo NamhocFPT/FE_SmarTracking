@@ -26,7 +26,13 @@ const onRefreshed = (token) => {
 
 // Check if an endpoint is public
 const isPublicEndpoint = (path) => {
-    const publicPaths = ['/auth/login', '/auth/reset-password', '/auth/forgot-password'];
+    const publicPaths = [
+        '/auth/login',
+        '/auth/reset-password',
+        '/auth/forgot-password',
+        '/auth/password-reset/otp',
+        '/auth/password-reset/confirm'
+    ];
     // Normalize path (remove leading/trailing slashes for check)
     const normalizedPath = path.startsWith('/') ? path : '/' + path;
     return publicPaths.some(p => normalizedPath.startsWith(p));
