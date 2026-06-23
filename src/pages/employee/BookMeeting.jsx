@@ -248,6 +248,41 @@ const BookMeeting = () => {
 
             if (overlappingBookings.length === 0) {
                 perfect.push(room);
+            } else {
+                const candidates = overlappingBookings.filter(b => {
+                    const bEnd = new Date(b.reserved_end_time || b.end_time);
+                    const diffMs = bEnd.getTime() - reqStart.getTime();
+                    return diffMs > 0 && diffMs <= 10 * 60 * 1000;
+                });
+
+                if (candidates.length > 0) {
+                    candidates.sort((a, b) => {
+                        const aEnd = new Date(a.reserved_end_time || a.end_time).getTime();
+                        const bEnd = new Date(b.reserved_end_time || b.end_time).getTime();
+                        return bEnd - aEnd;
+                    });
+                    
+                    const targetBooking = candidates[0];
+                    const bEnd = new Date(targetBooking.reserved_end_time || targetBooking.end_time);
+                    const suggestedStart = bEnd;
+                    const suggestedEnd = new Date(suggestedStart.getTime() + durationMs);
+
+                    const hasOtherOverlap = roomBookings.some(b => {
+                        if (b.id === targetBooking.id) return false;
+                        const oStart = new Date(b.reserved_start_time || b.start_time);
+                        const oEnd = new Date(b.reserved_end_time || b.end_time);
+                        return oStart < suggestedEnd && oEnd > suggestedStart;
+                    });
+
+                    if (!hasOtherOverlap) {
+                        suggested.push({
+                            ...room,
+                            suggestedStartTime: suggestedStart,
+                            suggestedEndTime: suggestedEnd,
+                            conflictingBooking: targetBooking
+                        });
+                    }
+                }
             }
         });
 
