@@ -1,29 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-    Clock, Users, CheckCircle, Play, FileText, Settings,
-    Camera, AlertTriangle, ArrowLeft, ChevronRight, Mic, Volume2, Globe, FileVideo
+    Clock, Users, Play, FileText, Settings,
+    ArrowLeft, ChevronRight, Mic, Volume2, Globe, FileVideo
 } from 'lucide-react';
-import { getMeetingById, checkInMeeting, startMeeting } from '../../service/employeeServices';
+import { getMeetingById, startMeeting } from '../../service/employeeServices';
 
 const EmployeeInMeeting = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const videoRef = useRef(null);
-    const streamRef = useRef(null);
 
     // States
     const [loading, setLoading] = useState(true);
     const [meeting, setMeeting] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
 
-    // Flow states: 'checkin' | 'console'
-    const [stage, setStage] = useState('checkin');
-    
-    // Check-in states
-    const [isCheckingIn, setIsCheckingIn] = useState(false);
-    const [checkInSuccess, setCheckInSuccess] = useState(false);
-    const [cameraPermission, setCameraPermission] = useState(false);
+    // Flow states: 'console'
+    const [stage] = useState('console');
 
     // Live Meeting States
     const [meetingStarted, setMeetingStarted] = useState(false);
@@ -114,73 +107,7 @@ const EmployeeInMeeting = () => {
         }
     };
 
-    // Camera setup for check-in
-    useEffect(() => {
-        if (stage === 'checkin') {
-            startCamera();
-        }
-        return () => stopCamera();
-    }, [stage]);
 
-    const startCamera = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 320 } });
-            streamRef.current = stream;
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
-            setCameraPermission(true);
-        } catch {
-            setCameraPermission(false);
-        }
-    };
-
-    const stopCamera = () => {
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
-    };
-
-    const triggerFaceCheckIn = async () => {
-        setIsCheckingIn(true);
-        setCheckInSuccess(false);
-
-        // Simulate 2-second AI vector generation match check
-        setTimeout(async () => {
-            try {
-                const payload = {
-                    photoFileId: 'mock-captured-checkin-file-uuid',
-                    checkedInAt: new Date().toISOString()
-                };
-                
-                const res = await checkInMeeting(meeting.id, payload);
-                if (res?.success) {
-                    handleSuccessfulCheckIn();
-                } else {
-                    // Local fallback behavior (success)
-                    handleSuccessfulCheckIn();
-                }
-            } catch {
-                handleSuccessfulCheckIn();
-            }
-        }, 2000);
-    };
-
-    const handleSuccessfulCheckIn = () => {
-        setCheckInSuccess(true);
-        setIsCheckingIn(false);
-        stopCamera();
-        
-        // Update attendance status locally
-        setAttendanceList(prev => 
-            prev.map(p => p.id === currentUser?.id ? { ...p, checkedIn: true, checkInTime: new Date().toLocaleTimeString('vi-VN'), status: 'present' } : p)
-        );
-
-        setTimeout(() => {
-            setStage('console');
-        }, 1500);
-    };
 
     // Live Meeting Timers
     useEffect(() => {
@@ -277,73 +204,7 @@ const EmployeeInMeeting = () => {
                 )}
             </div>
 
-            {/* STAGE 1: Face Check-in */}
-            {stage === 'checkin' && (
-                <div className="max-w-md mx-auto bg-white p-8 rounded-2xl border border-platinum-tint shadow-sm-2 flex flex-col items-center text-center space-y-6">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center flex-shrink-0">
-                        <Camera className="w-6 h-6" />
-                    </div>
 
-                    <div className="space-y-1">
-                        <h2 className="text-base font-bold text-midnight-indigo">Điểm danh khuôn mặt nhận diện</h2>
-                        <p className="text-xs text-slate-blue">Sử dụng sinh trắc học FaceID để ghi nhận attendance cuộc họp</p>
-                    </div>
-
-                    {/* Camera simulation frame */}
-                    <div className="relative w-56 h-56 rounded-full overflow-hidden border-4 border-action-blue/20 bg-slate-900 shadow-inner flex items-center justify-center">
-                        {cameraPermission ? (
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-cover scale-x-[-1]"
-                            />
-                        ) : (
-                            <div className="text-white text-xs p-4 flex flex-col items-center gap-2">
-                                <AlertTriangle className="w-8 h-8 text-amber-500" />
-                                <span>Không có quyền camera. Sử dụng quét mô phỏng.</span>
-                            </div>
-                        )}
-                        
-                        <div className="absolute inset-0 border-[8px] border-white/5 pointer-events-none rounded-full flex items-center justify-center">
-                            <div className="absolute inset-1.5 border border-dashed border-action-blue/30 rounded-full animate-pulse-ring" />
-                        </div>
-                    </div>
-
-                    <div className="w-full space-y-2">
-                        {isCheckingIn ? (
-                            <button
-                                disabled
-                                className="w-full py-2.5 bg-action-blue/80 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
-                            >
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Đang so khớp sinh trắc học...
-                            </button>
-                        ) : checkInSuccess ? (
-                            <div className="w-full py-2.5 bg-green-50 border border-green-200 text-green-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
-                                <CheckCircle className="w-4.5 h-4.5" /> Check-in thành công!
-                            </div>
-                        ) : (
-                            <button
-                                onClick={triggerFaceCheckIn}
-                                className="w-full py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                            >
-                                Quét FaceID Điểm Danh
-                            </button>
-                        )}
-                        
-                        {!checkInSuccess && (
-                            <button
-                                onClick={() => setStage('console')}
-                                className="w-full py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-all"
-                            >
-                                Bỏ qua điểm danh (Kháng nghị thủ công)
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* STAGE 2: Console */}
             {stage === 'console' && (
