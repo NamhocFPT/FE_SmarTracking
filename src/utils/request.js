@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8080/api/v1';
+const API_BASE_URL = 'http://localhost:5000'; // Using json-server mock DB port
 
 // Token storage helpers
 export const getAccessToken = () => localStorage.getItem('accessToken');
@@ -169,6 +169,14 @@ const handleResponse = async (response) => {
                 requestId: requestId
             },
             requestId: requestId
+        };
+    }
+
+    // Mock API Adapter: json-server returns direct objects/arrays. Wrap them.
+    if (result && typeof result.success === 'undefined') {
+        return {
+            success: true,
+            data: result
         };
     }
 
