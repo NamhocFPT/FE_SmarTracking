@@ -14,6 +14,15 @@ export const getRooms = async (params = {}) => {
 };
 
 /**
+ * Get all room bookings
+ * @param {object} params
+ */
+export const getRoomBookings = async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return await get(`/room_bookings${query ? `?${query}` : ''}`);
+};
+
+/**
  * Get users (for inviting participants)
  * @param {object} params - { page, limit }
  */

@@ -87,7 +87,34 @@ export const getPendingMeetingRequests = async (params = {}) => {
     // We try to call /meeting_requests first, and if it fails or doesn't match, the app is prepared.
     // In JSON server, it is /meeting_requests. In API Contract, it is /meeting-requests
     try {
-        return await get(`/meeting_requests${query ? `?${query}` : ''}`);
+        let res = await get(`/meeting_requests${query ? `?${query}` : ''}`);
+        
+        // Mock DB Adapter: Map room_name and requested_by_name if missing
+        if (res?.success && res.data && Array.isArray(res.data)) {
+            try {
+                const [roomsRes, usersRes] = await Promise.all([
+                    get('/rooms'),
+                    get('/users')
+                ]);
+                const rooms = roomsRes?.data || [];
+                const users = usersRes?.data || [];
+                
+                res.data = res.data.map(req => {
+                    if (!req.room_name && req.target_room_id) {
+                        const room = rooms.find(r => r.id === req.target_room_id);
+                        if (room) req.room_name = room.room_name || room.roomName;
+                    }
+                    if (!req.requested_by_name && req.requested_by) {
+                        const user = users.find(u => u.id === req.requested_by);
+                        if (user) req.requested_by_name = user.full_name || user.fullName;
+                    }
+                    return req;
+                });
+            } catch (e) {
+                // Ignore errors from relation mapping
+            }
+        }
+        return res;
     } catch {
         return await get(`/meeting-requests${query ? `?${query}` : ''}`);
     }
