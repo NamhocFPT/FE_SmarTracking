@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { requestPasswordResetOtp } from "../../../service/authService";
+import AuthFormSkeleton from "../../../component/Skeleton/AuthFormSkeleton";
 import backgroundDecorativeElements from "../../../assets/images/background-decorative-elements.svg";
 import icon2 from "../../../assets/icons/icon-2.svg";
 import icon3 from "../../../assets/icons/icon-3.svg";
@@ -71,6 +72,9 @@ export const VerifyOTP = () => {
     const [requestId, setRequestId] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
 
+    // Initial skeleton loading state
+    const [initialLoading, setInitialLoading] = useState(true);
+
     // Client-side validations
     const [otpError, setOtpError] = useState(null);
 
@@ -84,7 +88,16 @@ export const VerifyOTP = () => {
             setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
             setExpiryTime((prev) => (prev > 0 ? prev - 1 : 0));
         }, 1000);
-        return () => clearInterval(timer);
+
+        // Show skeleton briefly on mount
+        const skeletonTimer = setTimeout(() => {
+            setInitialLoading(false);
+        }, 500);
+
+        return () => {
+            clearInterval(timer);
+            clearTimeout(skeletonTimer);
+        };
     }, [email, navigate]);
 
     const otpCode = useMemo(() => otpValues.join(""), [otpValues]);
@@ -281,6 +294,11 @@ export const VerifyOTP = () => {
             setLoading(false);
         }
     };
+
+    // Show skeleton while loading
+    if (initialLoading) {
+        return <AuthFormSkeleton variant="otp" />;
+    }
 
     return (
         <main className="flex flex-col min-h-screen items-center justify-center relative bg-[linear-gradient(0deg,rgba(246,250,255,1)_0%,rgba(246,250,255,1)_100%),linear-gradient(0deg,rgba(255,255,255,1)_0%,rgba(255,255,255,1)_100%)] overflow-x-hidden py-12 lg:py-0">
