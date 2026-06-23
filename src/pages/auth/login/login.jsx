@@ -1,7 +1,8 @@
-import { useId, useState } from "react";
-import { Link } from "react-router-dom";
-import { setTokens } from "../../../utils/request";
+import { useId, useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { setTokens, getAccessToken } from "../../../utils/request";
 import { login as authLogin } from "../../../service/authService";
+import LoginSkeleton from "../../../component/Skeleton/LoginSkeleton";
 import backgroundDecorativeElements from "../../../assets/images/background-decorative-elements.svg";
 import backgroundDecorativeElements2 from "../../../assets/images/background-decorative-elements-2.svg";
 import icon2 from "../../../assets/icons/icon-2.svg";
@@ -98,7 +99,29 @@ const featureCards = [
     },
 ];
 
+/**
+ * Determines redirect path based on user roles from API response.
+ * API returns: user.roles: string[] (e.g. ["ADMIN"], ["MANAGER"], ["EMPLOYEE"])
+ */
+const getRedirectPathByRoles = (roles) => {
+    if (!roles || !Array.isArray(roles) || roles.length === 0) {
+        return '/employee';
+    }
+    const normalizedRoles = roles.map(r => (typeof r === 'string' ? r : r.roleCode || r.role_code || '').toUpperCase());
+    if (normalizedRoles.includes('SYSTEM_ADMIN') || normalizedRoles.includes('ADMIN')) {
+        return '/system-admin';
+    }
+    if (normalizedRoles.includes('BUSINESS_ADMIN')) {
+        return '/business-admin';
+    }
+    if (normalizedRoles.includes('MANAGER')) {
+        return '/manager';
+    }
+    return '/employee';
+};
+
 const Login = () => {
+    const navigate = useNavigate();
     const emailId = useId();
     const passwordId = useId();
     const rememberId = useId();
@@ -107,6 +130,9 @@ const Login = () => {
     const [password, setPassword] = useState("");
     const [rememberLogin, setRememberLogin] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    // Initial skeleton loading state (check existing session)
+    const [initialLoading, setInitialLoading] = useState(true);
 
     // API interaction states
     const [loading, setLoading] = useState(false);
@@ -117,6 +143,37 @@ const Login = () => {
     // Client-side validation states (E1)
     const [emailError, setEmailError] = useState(null);
     const [passwordError, setPasswordError] = useState(null);
+
+    // Check for existing session on mount — show skeleton while checking
+    useEffect(() => {
+        const token = getAccessToken();
+        if (token) {
+            // User already has a token, try to get stored user info and redirect
+            try {
+                const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+                if (storedUser && storedUser.roles) {
+                    const redirectPath = getRedirectPathByRoles(storedUser.roles);
+                    navigate(redirectPath, { replace: true });
+                    return;
+                }
+            } catch (e) {
+                // Invalid stored user, continue to login
+            }
+        }
+
+        // Load remembered email
+        const remembered = localStorage.getItem('rememberedEmail');
+        if (remembered) {
+            setEmail(remembered);
+            setRememberLogin(true);
+        }
+
+        // Small delay for skeleton to show smoothly, then reveal the form
+        const timer = setTimeout(() => {
+            setInitialLoading(false);
+        }, 600);
+        return () => clearTimeout(timer);
+    }, [navigate]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -171,9 +228,10 @@ const Login = () => {
 
                 setSuccessMsg("Đăng nhập thành công! Đang chuyển hướng...");
                 
-                // Redirect user to the app dashboard based on role or fallback to home
+                // Redirect user to the app dashboard based on role
+                const redirectPath = getRedirectPathByRoles(user?.roles);
                 setTimeout(() => {
-                    window.location.href = "/";
+                    navigate(redirectPath, { replace: true });
                 }, 1500);
             }
         } catch (err) {
@@ -187,6 +245,11 @@ const Login = () => {
             setLoading(false);
         }
     };
+
+    // Show skeleton while initial session check is in progress
+    if (initialLoading) {
+        return <LoginSkeleton />;
+    }
 
     return (
         <main className="bg-white w-full min-h-screen relative overflow-hidden flex items-center justify-center py-12 lg:py-0">

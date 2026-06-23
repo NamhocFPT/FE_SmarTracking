@@ -26,16 +26,6 @@ export const logout = async () => {
 
 
 /**
- * Đặt lại mật khẩu mới (Reset Password)
- * @param {string} token
- * @param {string} newPassword
- * @returns {Promise<object>} response envelope
- */
-export const resetPassword = async (token, newPassword) => {
-    return await post('/auth/password-reset/otp', { token, newPassword }, { isPublic: true });
-};
-
-/**
  * Yêu cầu mã OTP đặt lại mật khẩu (UC-AUTH-03)
  * @param {string} email
  * @returns {Promise<object>} response envelope
@@ -73,14 +63,5 @@ export const changePassword = async (currentPassword, newPassword, confirmPasswo
  */
 export const getCurrentUser = async () => {
     return await get('/auth/me');
-};
-
-/**
- * Xác thực token reset mật khẩu có hợp lệ không
- * @param {string} token
- * @returns {Promise<object>} response envelope
- */
-export const verifyResetToken = async (token) => {
-    return await post('/auth/verify-reset-token', { token }, { isPublic: true });
 };
 
