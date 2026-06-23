@@ -21,7 +21,7 @@ const BookMeeting = () => {
     const [endTime, setEndTime] = useState('10:00');
     const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
     const [recordingEnabled, setRecordingEnabled] = useState(false);
-    
+    const [audioRecordingEnabled, setAudioRecordingEnabled] = useState(false);
     const [pdpaConsent, setPdpaConsent] = useState(false);
 
     // Agenda states
@@ -363,7 +363,7 @@ const BookMeeting = () => {
         }
 
         // PDPA check
-        if (recordingEnabled && !pdpaConsent) {
+        if ((recordingEnabled || audioRecordingEnabled) && !pdpaConsent) {
             setErrorMsg('Bạn phải đồng ý với cam kết bảo vệ dữ liệu cá nhân (PDPA) khi bật tính năng ghi âm hoặc ghi hình.');
             return;
         }
@@ -399,7 +399,7 @@ const BookMeeting = () => {
                 setSelectedParticipantIds([]);
                 setAgendaList([]);
                 setRecordingEnabled(false);
-                
+                setAudioRecordingEnabled(false);
                 setPdpaConsent(false);
                 setCurrentStep(1);
                 setSearchPerformed(false);
@@ -962,6 +962,26 @@ const BookMeeting = () => {
                                                 checked={recordingEnabled}
                                                 onChange={(e) => {
                                                     setRecordingEnabled(e.target.checked);
+                                                    if (!e.target.checked && !audioRecordingEnabled) setPdpaConsent(false);
+                                                }}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                                        </label>
+                                    </div>
+
+                                    {/* Audio Recording */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-platinum-tint/40">
+                                        <div className="flex items-center gap-2">
+                                            <Mic className="w-4 h-4 text-slate-blue" />
+                                            <span className="text-sm font-semibold text-midnight-indigo">Ghi âm cuộc họp</span>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={audioRecordingEnabled}
+                                                onChange={(e) => {
+                                                    setAudioRecordingEnabled(e.target.checked);
                                                     if (!e.target.checked && !recordingEnabled) setPdpaConsent(false);
                                                 }}
                                                 className="sr-only peer"
@@ -970,11 +990,9 @@ const BookMeeting = () => {
                                         </label>
                                     </div>
 
-                                    
-
                                     {/* PDPA Consent */}
                                     <AnimatePresence>
-                                        {recordingEnabled && (
+                                        {(recordingEnabled || audioRecordingEnabled) && (
                                             <motion.div
                                                 initial={{ opacity: 0, height: 0 }}
                                                 animate={{ opacity: 1, height: 'auto' }}
