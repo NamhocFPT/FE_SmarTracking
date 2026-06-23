@@ -1,6 +1,7 @@
-import { useId, useState } from "react";
+import { useId, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { requestPasswordResetOtp } from "../../../service/authService";
+import AuthFormSkeleton from "../../../component/Skeleton/AuthFormSkeleton";
 import backgroundDecorativeElements from "../../../assets/images/background-decorative-elements.svg";
 import icon2 from "../../../assets/icons/icon-2.svg";
 import icon3 from "../../../assets/icons/icon-3.svg";
@@ -52,6 +53,9 @@ const ForgotPassword = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState("");
 
+    // Initial skeleton loading state
+    const [initialLoading, setInitialLoading] = useState(true);
+
     // API interaction states
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -60,6 +64,14 @@ const ForgotPassword = () => {
 
     // Client-side validation state
     const [emailError, setEmailError] = useState(null);
+
+    // Show skeleton briefly on mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setInitialLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -115,6 +127,11 @@ const ForgotPassword = () => {
             setLoading(false);
         }
     };
+
+    // Show skeleton while loading
+    if (initialLoading) {
+        return <AuthFormSkeleton variant="forgot" />;
+    }
 
     return (
         <main className="flex flex-col min-h-screen items-center justify-center relative bg-[linear-gradient(0deg,rgba(246,250,255,1)_0%,rgba(246,250,255,1)_100%),linear-gradient(0deg,rgba(255,255,255,1)_0%,rgba(255,255,255,1)_100%)] overflow-x-hidden py-12 lg:py-0">
