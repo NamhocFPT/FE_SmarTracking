@@ -36,13 +36,35 @@ export const resetPassword = async (token, newPassword) => {
 };
 
 /**
- * Đổi mật khẩu mới (Change Password)
- * @param {string} oldPassword
- * @param {string} newPassword
+ * Yêu cầu mã OTP đặt lại mật khẩu (UC-AUTH-03)
+ * @param {string} email
  * @returns {Promise<object>} response envelope
  */
-export const changePassword = async (oldPassword, newPassword) => {
-    return await post('/auth/change-password', { oldPassword, newPassword });
+export const requestPasswordResetOtp = async (email) => {
+    return await post('/auth/password-reset/otp', { email }, { isPublic: true });
+};
+
+/**
+ * Xác nhận đặt lại mật khẩu với mã OTP (UC-AUTH-03)
+ * @param {string} email
+ * @param {string} otp
+ * @param {string} newPassword
+ * @param {string} confirmPassword
+ * @returns {Promise<object>} response envelope
+ */
+export const confirmPasswordReset = async (email, otp, newPassword, confirmPassword) => {
+    return await post('/auth/password-reset/confirm', { email, otp, newPassword, confirmPassword }, { isPublic: true });
+};
+
+/**
+ * UC-AUTH-04 Thay đổi mật khẩu đăng nhập
+ * @param {string} currentPassword
+ * @param {string} newPassword
+ * @param {string} confirmPassword
+ * @returns {Promise<object>} response envelope
+ */
+export const changePassword = async (currentPassword, newPassword, confirmPassword) => {
+    return await post('/auth/me/password', { currentPassword, newPassword, confirmPassword });
 };
 
 /**
