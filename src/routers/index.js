@@ -5,6 +5,7 @@ import { ChangePass } from '../pages/auth/forgotpassword/changePass';
 import Error403 from '../pages/Error/403';
 import Error404 from '../pages/Error/404';
 import Error500 from '../pages/Error/500';
+import ProtectedRoute from './ProtectedRoute';
 
 // SystemAdmin Layout + Pages
 import SystemAdminLayout from '../pages/systemAdmin/layout/SystemAdminLayout';
@@ -14,6 +15,7 @@ import AuditLogs from '../pages/systemAdmin/AuditLogs';
 import SystemSettings from '../pages/systemAdmin/SystemSettings';
 import Profile from '../pages/shared/Profile';
 import Notifications from '../pages/systemAdmin/Notifications';
+import AvatarSubmissionsReview from '../pages/systemAdmin/AvatarSubmissionsReview';
 
 // BusinessAdmin Layout + Pages
 import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLayout';
@@ -67,7 +69,11 @@ export const router = [
     // ========== SystemAdmin Routes (protected) ==========
     {
         path: '/system-admin',
-        element: <SystemAdminLayout />,
+        element: (
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'ADMIN']}>
+                <SystemAdminLayout />
+            </ProtectedRoute>
+        ),
         children: [
             {
                 index: true,
@@ -93,13 +99,21 @@ export const router = [
                 path: 'notifications',
                 element: <Notifications />
             },
+            {
+                path: 'avatar-submissions',
+                element: <AvatarSubmissionsReview />
+            },
         ]
     },
 
     // ========== BusinessAdmin Routes (protected) ==========
     {
         path: '/business-admin',
-        element: <BusinessAdminLayout />,
+        element: (
+            <ProtectedRoute allowedRoles={['BUSINESS_ADMIN']}>
+                <BusinessAdminLayout />
+            </ProtectedRoute>
+        ),
         children: [
             {
                 index: true,
@@ -139,7 +153,11 @@ export const router = [
     // ========== Manager Routes (protected) ==========
     {
         path: '/manager',
-        element: <ManagerLayout />,
+        element: (
+            <ProtectedRoute allowedRoles={['MANAGER']}>
+                <ManagerLayout />
+            </ProtectedRoute>
+        ),
         children: [
             {
                 index: true,
@@ -179,7 +197,11 @@ export const router = [
     // ========== Employee Routes (protected) ==========
     {
         path: '/employee',
-        element: <EmployeeLayout />,
+        element: (
+            <ProtectedRoute allowedRoles={['EMPLOYEE']}>
+                <EmployeeLayout />
+            </ProtectedRoute>
+        ),
         children: [
             {
                 index: true,
