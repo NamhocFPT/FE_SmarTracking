@@ -554,16 +554,24 @@ const ManagerHomePage = () => {
                                 <div>
                                     <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
                                         <Sliders className="w-5 h-5 text-action-blue" />
-                                        Danh sách yêu cầu chờ duyệt
+                                        Yêu cầu chờ duyệt mới nhất
                                     </h2>
-                                    <p className="text-xs text-slate-blue mt-1">Các yêu cầu từ nhân sự cần duyệt đặt phòng họp</p>
+                                    <p className="text-xs text-slate-blue mt-1">Các yêu cầu mới từ nhân sự cần duyệt đặt phòng họp</p>
                                 </div>
-                                <button
-                                    onClick={() => fetchPendingRequests()}
-                                    className="p-2 text-slate-blue hover:text-action-blue rounded-lg hover:bg-cloud-mist transition-colors"
-                                >
-                                    <RefreshCw className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-2.5">
+                                    <button
+                                        onClick={() => navigate('/manager/meeting-approvals')}
+                                        className="px-3.5 py-1.5 bg-action-blue/10 hover:bg-action-blue text-action-blue hover:text-white rounded-xl text-xs font-bold transition-all"
+                                    >
+                                        Quản lý chi tiết
+                                    </button>
+                                    <button
+                                        onClick={() => fetchPendingRequests()}
+                                        className="p-2 text-slate-blue hover:text-action-blue rounded-lg hover:bg-cloud-mist transition-colors"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -585,7 +593,7 @@ const ManagerHomePage = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {pendingRequests.map(req => {
+                                            {pendingRequests.slice(0, 5).map(req => {
                                                 const hasConflict = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
                                                 return (
                                                     <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/20 transition-colors">
@@ -639,6 +647,18 @@ const ManagerHomePage = () => {
                                     </table>
                                 )}
                             </div>
+
+                            {pendingRequests.length > 5 && (
+                                <div className="p-4 bg-cloud-mist/10 border-t border-platinum-tint/60 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/manager/meeting-approvals')}
+                                        className="text-xs font-bold text-action-blue hover:text-midnight-indigo flex items-center justify-center gap-1 mx-auto transition-colors"
+                                    >
+                                        Xem và xử lý thêm {pendingRequests.length - 5} yêu cầu khác <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </motion.div>
                 ) : (
@@ -958,7 +978,7 @@ const ManagerHomePage = () => {
             {/* Approval Modal */}
             <AnimatePresence>
                 {approvalModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -1010,7 +1030,7 @@ const ManagerHomePage = () => {
             {/* Rejection Modal */}
             <AnimatePresence>
                 {rejectionModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
