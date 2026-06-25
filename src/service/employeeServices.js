@@ -85,6 +85,14 @@ export const getUserById = async (userId) => {
 };
 
 /**
+ * Lấy hồ sơ công khai của user
+ * @param {number|string} userId
+ */
+export const getUserPublicProfile = async (userId) => {
+    return await get(`/users/${userId}/public-profile`);
+};
+
+/**
  * UC-AM-12: Cập nhật thông tin cá nhân (self)
  * @param {object} data - { fullName, phoneNumber, avatarFileId }
  */
