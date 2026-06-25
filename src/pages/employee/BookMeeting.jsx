@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Calendar, Clock, Users, ShieldAlert, Video, Mic, Plus, Trash2, Check, AlertTriangle, ArrowLeft, Info, HelpCircle, Search, ChevronRight, CheckCircle2, X, FileSpreadsheet, Upload, Download, Paperclip
 } from 'lucide-react';
-import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers, getUserById } from '../../service/employeeServices';
+import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers, getUserById, getUserPublicProfile } from '../../service/employeeServices';
 import { getDepartments } from '../../service/businessAdminServices';
 import * as XLSX from 'xlsx';
 
@@ -19,7 +19,7 @@ const getInitialTimes = () => {
     const later = new Date(now.getTime() + 60 * 60 * 1000);
     let eh = String(later.getHours()).padStart(2, '0');
     let em = String(later.getMinutes()).padStart(2, '0');
-    
+
     // If end time wrapped around to next day, cap it at 23:59
     if (later.getDate() !== now.getDate()) {
         eh = '23';
@@ -98,7 +98,7 @@ const BookMeeting = () => {
         setLoadingDetail(true);
         setDetailError(null);
         try {
-            const res = await getUserById(userId);
+            const res = await getUserPublicProfile(userId);
             if (res?.success && res.data) {
                 setUserDetail(res.data);
             } else {
@@ -260,8 +260,8 @@ const BookMeeting = () => {
         setErrorMsg('');
         setAgendaList(prev => [
             ...prev,
-            { 
-                title: newAgendaTitle, 
+            {
+                title: newAgendaTitle,
                 durationMin: duration,
                 file: newAgendaFile ? { name: newAgendaFile.name, size: newAgendaFile.size } : null
             }
@@ -304,13 +304,13 @@ const BookMeeting = () => {
             { "Email": "minh.pv@smrmpts.com", "Trong công ty": "✓", "Ngoài công ty": "✗" }
         ];
         const ws = XLSX.utils.json_to_sheet(data);
-        
+
         ws['!cols'] = [
             { wch: 32 },
             { wch: 16 },
             { wch: 16 }
         ];
-        
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Danh sách khách mời");
         XLSX.writeFile(wb, "SmarTracking_Template_Import.xlsx");
@@ -319,7 +319,7 @@ const BookMeeting = () => {
     const handleExcelImport = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
+
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
@@ -328,23 +328,23 @@ const BookMeeting = () => {
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
                 const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-                
+
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 const isCheckMark = (val) => {
                     const v = String(val).trim().toLowerCase();
                     return v === '✓' || v === '✔' || v === 'x' || v === 'yes' || v === '1' || v === 'true' || v === '☑';
                 };
-                
+
                 const parsed = rows.map((row, index) => {
-                    const rowNumber = index + 2; 
+                    const rowNumber = index + 2;
                     const keys = Object.keys(row);
                     const emailKey = keys.find(k => k.toLowerCase().includes('email') || k.toLowerCase().includes('thư điện tử'));
                     const internalKey = keys.find(k => k.toLowerCase().includes('trong') && k.toLowerCase().includes('công ty'));
                     const externalKey = keys.find(k => k.toLowerCase().includes('ngoài') && k.toLowerCase().includes('công ty'));
                     const legacyTypeKey = keys.find(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('loại') || k.toLowerCase().includes('loai'));
-                    
+
                     const email = emailKey ? String(row[emailKey]).trim() : '';
-                    
+
                     let error = '';
                     if (!email) {
                         error = `Dòng ${rowNumber}: Cột Email bị trống`;
@@ -353,14 +353,14 @@ const BookMeeting = () => {
                     } else if (!emailRegex.test(email)) {
                         error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
                     }
-                    
+
                     let type = 'external';
                     if (internalKey !== undefined || externalKey !== undefined) {
                         const internalVal = internalKey ? row[internalKey] : '';
                         const externalVal = externalKey ? row[externalKey] : '';
                         const isInternalChecked = isCheckMark(internalVal);
                         const isExternalChecked = isCheckMark(externalVal);
-                        
+
                         if (isInternalChecked && isExternalChecked) {
                             error = error || `Dòng ${rowNumber}: Không thể đánh dấu cả "Trong công ty" và "Ngoài công ty" cùng lúc`;
                         } else if (!isInternalChecked && !isExternalChecked) {
@@ -378,10 +378,10 @@ const BookMeeting = () => {
                     } else {
                         type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
                     }
-                    
+
                     return { email, type, error, rowNumber };
                 });
-                
+
                 setImportPreview(parsed);
             } catch (err) {
                 console.error('Failed to parse excel file', err);
@@ -395,25 +395,25 @@ const BookMeeting = () => {
         if (!manualEmails.trim()) return;
         const emailList = manualEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e !== '');
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        
+
         const parsed = emailList.map((email, index) => {
             const rowNumber = index + 1;
             let error = '';
-            
+
             if (!email.includes('@')) {
                 error = `Dòng ${rowNumber}: Email "${email}" thiếu ký tự '@'`;
             } else if (!emailRegex.test(email)) {
                 error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
             }
-            
+
             let type = manualType;
             if (type === 'auto') {
                 type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
             }
-            
+
             return { email, type, error, rowNumber };
         });
-        
+
         setImportPreview(parsed);
     };
 
@@ -426,10 +426,10 @@ const BookMeeting = () => {
 
         let internalMatchedCount = 0;
         let externalAddedCount = 0;
-        
+
         const newSelectedIds = [...selectedParticipantIds];
         const newExternal = [...externalParticipants];
-        
+
         importPreview.forEach(item => {
             if (item.type === 'internal') {
                 const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
@@ -462,13 +462,13 @@ const BookMeeting = () => {
                 externalAddedCount++;
             }
         });
-        
+
         setSelectedParticipantIds(newSelectedIds);
         setExternalParticipants(newExternal);
         setShowImportModal(false);
         setImportPreview([]);
         setManualEmails("");
-        
+
         setSuccessMessage(`Đã import thành công: chọn ${internalMatchedCount} nhân viên công ty và thêm ${externalAddedCount} khách ngoài.`);
         setTimeout(() => setSuccessMessage(''), 5000);
     };
@@ -529,7 +529,7 @@ const BookMeeting = () => {
         if (expectedAttendeeCount) payload.expectedAttendeeCount = Number(expectedAttendeeCount);
         if (capacityExceeded && capacityOverrideConfirmed) payload.capacityOverrideConfirmed = true;
         if (selectedParticipantIds.length > 0) payload.participantUserIds = selectedParticipantIds;
-        
+
         if (externalParticipants.length > 0) {
             payload.externalParticipants = externalParticipants.map(p => ({
                 fullName: p.fullName || p.email.split('@')[0],
@@ -584,7 +584,7 @@ const BookMeeting = () => {
             if (subWarnings.length > 0) {
                 msg += ` (Lưu ý: lưu ${subWarnings.join(', ')} thất bại, vui lòng cập nhật lại ở trang chi tiết cuộc họp.)`;
             }
-            
+
             let homePath = '/employee';
             if (currentUser?.role === 'Manager') {
                 homePath = '/manager';
@@ -672,11 +672,10 @@ const BookMeeting = () => {
             {/* Visual Step Progress Indicator */}
             <div className="flex items-center justify-center gap-4 py-2 border-b border-platinum-tint/30 mb-2">
                 <div className="flex items-center gap-2">
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        currentStep === 1
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStep === 1
                             ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
                             : 'bg-emerald-500 text-white'
-                    }`}>
+                        }`}>
                         {currentStep > 1 ? <Check className="w-4 h-4" /> : '1'}
                     </span>
                     <span className={`text-sm font-bold ${currentStep === 1 ? 'text-midnight-indigo' : 'text-slate-blue'}`}>
@@ -685,11 +684,10 @@ const BookMeeting = () => {
                 </div>
                 <div className="w-16 h-0.5 bg-platinum-tint rounded" />
                 <div className="flex items-center gap-2">
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        currentStep === 2
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStep === 2
                             ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
                             : 'bg-cloud-mist border border-platinum-tint text-slate-blue'
-                    }`}>
+                        }`}>
                         2
                     </span>
                     <span className={`text-sm font-bold ${currentStep === 2 ? 'text-midnight-indigo' : 'text-slate-blue'}`}>
@@ -830,11 +828,10 @@ const BookMeeting = () => {
                                                 <div
                                                     key={room.id}
                                                     onClick={() => handleSelectRoom(room)}
-                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${
-                                                        isSelected
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${isSelected
                                                             ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15'
                                                             : 'bg-white border-platinum-tint hover:border-action-blue/50 hover:bg-cloud-mist/50'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <div>
                                                         <div className="flex justify-between items-start">
@@ -978,11 +975,10 @@ const BookMeeting = () => {
                                         <h3 className="font-bold text-sm text-midnight-indigo uppercase tracking-wider flex items-center gap-2">
                                             <Users className="w-4 h-4 text-royal-amethyst" /> Mời khách tham gia
                                         </h3>
-                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-                                            (selectedParticipantIds.length + externalParticipants.length + 1) > (selectedRoom?.capacity || 0)
+                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${(selectedParticipantIds.length + externalParticipants.length + 1) > (selectedRoom?.capacity || 0)
                                                 ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse'
                                                 : 'bg-cloud-mist text-slate-blue'
-                                        }`}>
+                                            }`}>
                                             Đã mời: {selectedParticipantIds.length + externalParticipants.length + 1} / {selectedRoom?.capacity || 0} người
                                         </span>
                                     </div>
@@ -1034,20 +1030,35 @@ const BookMeeting = () => {
                                                                             toggleParticipant(user.id);
                                                                             setSearchEmail('');
                                                                         }}
-                                                                        className="p-3 hover:bg-cloud-mist/30 cursor-pointer flex items-center justify-between text-slate-blue transition-colors"
+                                                                        className="p-2.5 hover:bg-action-blue/[0.03] cursor-pointer flex items-center justify-between text-slate-blue transition-colors gap-3 min-w-0"
                                                                     >
-                                                                        <div className="space-y-0.5">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <p className="text-sm font-semibold text-midnight-indigo">{user.fullName || user.full_name}</p>
-                                                                                {deptCode && (
-                                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue">
-                                                                                        {deptCode}
-                                                                                    </span>
+                                                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                                            {/* Mini Avatar in dropdown */}
+                                                                            <div className="w-8 h-8 rounded-full overflow-hidden border border-platinum-tint flex-shrink-0 bg-gradient-to-tr from-action-blue to-cyan-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                                                                {user.avatarUrl ? (
+                                                                                    <img src={user.avatarUrl} alt={user.fullName || user.full_name} className="w-full h-full object-cover" />
+                                                                                ) : (
+                                                                                    (user.fullName || user.full_name || 'U').charAt(0).toUpperCase()
                                                                                 )}
                                                                             </div>
-                                                                            <p className="text-[11px] opacity-75">{user.email}</p>
+                                                                            <div className="space-y-0.5 min-w-0 flex-1">
+                                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                                    <p className="text-sm font-semibold text-midnight-indigo truncate" title={user.fullName || user.full_name}>
+                                                                                        {user.fullName || user.full_name}
+                                                                                    </p>
+                                                                                    {deptCode && (
+                                                                                        <span 
+                                                                                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue shrink-0 max-w-[85px] truncate"
+                                                                                            title={deptCode}
+                                                                                        >
+                                                                                            {deptCode}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <p className="text-[11px] opacity-75 truncate" title={user.email}>{user.email}</p>
+                                                                            </div>
                                                                         </div>
-                                                                        <Plus className="w-4 h-4 text-action-blue opacity-60 hover:opacity-100 animate-pulse" />
+                                                                        <Plus className="w-4 h-4 text-action-blue opacity-60 hover:opacity-100 shrink-0" />
                                                                     </div>
                                                                 );
                                                             })
@@ -1084,37 +1095,54 @@ const BookMeeting = () => {
                                                             <div
                                                                 key={user.id}
                                                                 onClick={() => toggleParticipant(user.id)}
-                                                                className="p-3 rounded-xl border border-action-blue bg-blue-50/20 text-midnight-indigo font-semibold shadow-sm flex items-center justify-between cursor-pointer select-none transition-all hover:bg-rose-50/30 hover:border-rose-300 hover:text-rose-700 group"
+                                                                className="p-3 rounded-2xl border border-action-blue/20 bg-action-blue/[0.02] text-midnight-indigo shadow-sm flex items-center justify-between cursor-pointer select-none transition-all duration-200 hover:bg-rose-50/40 hover:border-rose-200 hover:shadow group gap-3 min-w-0"
+                                                                title="Nhấp để xóa người tham gia này"
                                                             >
-                                                                <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                                                     {/* Avatar */}
                                                                     <div
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             handleOpenUserDetail(user.id);
                                                                         }}
-                                                                        className="w-10 h-10 rounded-full overflow-hidden border border-platinum-tint flex-shrink-0 bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-extrabold text-sm hover:scale-105 transition-transform"
-                                                                        title="Xem chi tiết"
+                                                                        className="relative w-10 h-10 rounded-full overflow-hidden border border-action-blue/10 flex-shrink-0 bg-gradient-to-tr from-action-blue to-cyan-500 text-white flex items-center justify-center font-extrabold text-sm hover:scale-105 hover:shadow transition-all group/avatar cursor-pointer"
+                                                                        title="Xem thông tin chi tiết"
                                                                     >
                                                                         {user.avatarUrl ? (
                                                                             <img src={user.avatarUrl} alt={user.fullName || user.full_name} className="w-full h-full object-cover" />
                                                                         ) : (
                                                                             (user.fullName || user.full_name || 'U').charAt(0).toUpperCase()
                                                                         )}
+                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-all duration-200">
+                                                                            <Info className="w-3.5 h-3.5 text-white" />
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <p className="text-sm font-semibold">{user.fullName || user.full_name}</p>
+                                                                    <div className="space-y-0.5 min-w-0 flex-1">
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                            <span 
+                                                                                className="text-sm font-semibold text-midnight-indigo group-hover:text-rose-950 transition-colors truncate"
+                                                                                title={user.fullName || user.full_name}
+                                                                            >
+                                                                                {user.fullName || user.full_name}
+                                                                            </span>
                                                                             {deptCode && (
-                                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700">
+                                                                                <span 
+                                                                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700 transition-colors shrink-0 max-w-[85px] truncate"
+                                                                                    title={deptCode}
+                                                                                >
                                                                                     {deptCode}
                                                                                 </span>
                                                                             )}
                                                                         </div>
-                                                                        <p className="text-[11px] opacity-80">{user.email}</p>
+                                                                        <p 
+                                                                            className="text-[11px] font-normal text-slate-blue/80 group-hover:text-rose-700/60 transition-colors truncate"
+                                                                            title={user.email}
+                                                                        >
+                                                                            {user.email}
+                                                                        </p>
                                                                     </div>
                                                                 </div>
-                                                                <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all group-hover:bg-rose-600 group-hover:border-rose-600">
+                                                                <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all duration-200 shrink-0 group-hover:bg-rose-600 group-hover:border-rose-600 shadow-sm">
                                                                     <Check className="w-3 h-3 block group-hover:hidden" />
                                                                     <X className="w-3 h-3 hidden group-hover:block" />
                                                                 </div>
@@ -1135,20 +1163,21 @@ const BookMeeting = () => {
                                                 {externalParticipants.map((ext) => (
                                                     <div
                                                         key={ext.id}
-                                                        className={`flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border text-xs font-medium transition-colors ${
-                                                            ext.isCompanyUnmatched
+                                                        className={`flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border text-xs font-medium transition-colors max-w-full min-w-0 ${ext.isCompanyUnmatched
                                                                 ? 'bg-amber-50 text-amber-800 border-amber-200'
                                                                 : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                                        }`}
+                                                            }`}
                                                     >
-                                                        <span>{ext.email}</span>
-                                                        <span className="text-[10px] px-1 py-0.2 bg-white/70 rounded-full font-bold">
+                                                        <span className="truncate max-w-[150px] sm:max-w-[200px]" title={ext.email}>
+                                                            {ext.email}
+                                                        </span>
+                                                        <span className="text-[10px] px-1 py-0.2 bg-white/70 rounded-full font-bold shrink-0">
                                                             {ext.isCompanyUnmatched ? 'Chưa khớp NV' : 'Khách ngoài'}
                                                         </span>
                                                         <button
                                                             type="button"
                                                             onClick={() => setExternalParticipants(prev => prev.filter(p => p.id !== ext.id))}
-                                                            className="p-0.5 rounded-full hover:bg-black/10 transition-colors"
+                                                            className="p-0.5 rounded-full hover:bg-black/10 transition-colors shrink-0"
                                                         >
                                                             <X className="w-3.5 h-3.5" />
                                                         </button>
@@ -1201,7 +1230,7 @@ const BookMeeting = () => {
                                                 <Plus className="w-4 h-4" /> Thêm
                                             </button>
                                         </div>
-                                        
+
                                         {/* Agenda Item Document Upload */}
                                         <div className="flex items-center gap-3 w-full">
                                             <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-platinum-tint hover:border-action-blue bg-cloud-mist/20 hover:bg-blue-50/20 text-slate-blue hover:text-action-blue rounded-xl text-xs font-bold cursor-pointer transition-all flex-1 justify-center select-none">
@@ -1461,323 +1490,321 @@ const BookMeeting = () => {
 
             {/* Import Participants Modal (combined feature with backdrop blur) */}
             {showImportModal && ReactDOM.createPortal(
-            <AnimatePresence>
-                {showImportModal && (
-                    <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/15 backdrop-blur-xl">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white rounded-2xl border border-platinum-tint shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]"
-                        >
-                            {/* Modal Header */}
-                            <div className="flex items-center justify-between p-5 border-b border-cloud-mist bg-cloud-mist/20">
-                                <div className="flex items-center gap-2">
-                                    <FileSpreadsheet className="w-5 h-5 text-action-blue" />
-                                    <h3 className="font-bold text-base text-midnight-indigo">Import danh sách khách mời</h3>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowImportModal(false);
-                                        setImportPreview([]);
-                                        setManualEmails('');
-                                    }}
-                                    className="p-1.5 hover:bg-cloud-mist rounded-lg text-slate-blue hover:text-midnight-indigo transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            {/* Modal Body */}
-                            <div className="p-6 overflow-y-auto space-y-5 flex-1">
-                                {/* Tab selection */}
-                                <div className="flex border-b border-platinum-tint">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setImportMethod('manual');
-                                            setImportPreview([]);
-                                        }}
-                                        className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${
-                                            importMethod === 'manual'
-                                                ? 'border-action-blue text-action-blue'
-                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
-                                        }`}
-                                    >
-                                        Nhập thủ công
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setImportMethod('excel');
-                                            setImportPreview([]);
-                                        }}
-                                        className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${
-                                            importMethod === 'excel'
-                                                ? 'border-action-blue text-action-blue'
-                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
-                                        }`}
-                                    >
-                                        Nhập từ file Excel
-                                    </button>
-                                </div>
-
-                                {importMethod === 'manual' ? (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">
-                                                Nhập danh sách Email *
-                                            </label>
-                                            <textarea
-                                                value={manualEmails}
-                                                onChange={(e) => setManualEmails(e.target.value)}
-                                                rows="4"
-                                                placeholder="Ví dụ: email1@company.com, email2@gmail.com, email3@company.com&#10;(Hỗ trợ ngăn cách bằng dấu phẩy, chấm phẩy hoặc xuống dòng)"
-                                                className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
-                                            />
-                                        </div>
-                                        
-                                        <div className="flex flex-wrap items-center gap-4">
-                                            <span className="text-xs font-semibold text-slate-blue">Phân loại email nhập vào:</span>
-                                            <div className="flex items-center gap-4">
-                                                <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
-                                                    <input
-                                                        type="radio"
-                                                        name="manualType"
-                                                        value="auto"
-                                                        checked={manualType === 'auto'}
-                                                        onChange={() => setManualType('auto')}
-                                                        className="text-action-blue focus:ring-action-blue"
-                                                    />
-                                                    Tự động nhận diện
-                                                </label>
-                                                <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
-                                                    <input
-                                                        type="radio"
-                                                        name="manualType"
-                                                        value="internal"
-                                                        checked={manualType === 'internal'}
-                                                        onChange={() => setManualType('internal')}
-                                                        className="text-action-blue focus:ring-action-blue"
-                                                    />
-                                                    Trong công ty (Nội bộ)
-                                                </label>
-                                                <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
-                                                    <input
-                                                        type="radio"
-                                                        name="manualType"
-                                                        value="external"
-                                                        checked={manualType === 'external'}
-                                                        onChange={() => setManualType('external')}
-                                                        className="text-action-blue focus:ring-action-blue"
-                                                    />
-                                                    Ngoài công ty (Khách ngoài)
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex justify-end">
-                                            <button
-                                                type="button"
-                                                onClick={handleManualImport}
-                                                disabled={!manualEmails.trim()}
-                                                className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all"
-                                            >
-                                                Xem trước danh sách
-                                            </button>
-                                        </div>
+                <AnimatePresence>
+                    {showImportModal && (
+                        <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/15 backdrop-blur-xl">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="bg-white rounded-2xl border border-platinum-tint shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                            >
+                                {/* Modal Header */}
+                                <div className="flex items-center justify-between p-5 border-b border-cloud-mist bg-cloud-mist/20">
+                                    <div className="flex items-center gap-2">
+                                        <FileSpreadsheet className="w-5 h-5 text-action-blue" />
+                                        <h3 className="font-bold text-base text-midnight-indigo">Import danh sách khách mời</h3>
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {/* Download template banner */}
-                                        <div className="flex justify-between items-center bg-blue-50/40 border border-blue-100 p-3.5 rounded-xl">
-                                            <div className="space-y-0.5">
-                                                <h4 className="text-xs font-bold text-midnight-indigo flex items-center gap-1.5">
-                                                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Tải file Excel mẫu:
-                                                </h4>
-                                                <p className="text-[10.5px] text-slate-blue">Sử dụng file mẫu có cấu trúc định dạng chuẩn phục vụ import khách mời.</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowImportModal(false);
+                                            setImportPreview([]);
+                                            setManualEmails('');
+                                        }}
+                                        className="p-1.5 hover:bg-cloud-mist rounded-lg text-slate-blue hover:text-midnight-indigo transition-colors"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Modal Body */}
+                                <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                                    {/* Tab selection */}
+                                    <div className="flex border-b border-platinum-tint">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setImportMethod('manual');
+                                                setImportPreview([]);
+                                            }}
+                                            className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${importMethod === 'manual'
+                                                    ? 'border-action-blue text-action-blue'
+                                                    : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                                }`}
+                                        >
+                                            Nhập thủ công
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setImportMethod('excel');
+                                                setImportPreview([]);
+                                            }}
+                                            className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${importMethod === 'excel'
+                                                    ? 'border-action-blue text-action-blue'
+                                                    : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                                }`}
+                                        >
+                                            Nhập từ file Excel
+                                        </button>
+                                    </div>
+
+                                    {importMethod === 'manual' ? (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">
+                                                    Nhập danh sách Email *
+                                                </label>
+                                                <textarea
+                                                    value={manualEmails}
+                                                    onChange={(e) => setManualEmails(e.target.value)}
+                                                    rows="4"
+                                                    placeholder="Ví dụ: email1@company.com, email2@gmail.com, email3@company.com&#10;(Hỗ trợ ngăn cách bằng dấu phẩy, chấm phẩy hoặc xuống dòng)"
+                                                    className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
+                                                />
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={downloadSampleExcel}
-                                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
-                                            >
-                                                <Download className="w-3.5 h-3.5" /> Tải file mẫu
-                                            </button>
-                                        </div>
 
-                                        <div className="p-5 border-2 border-dashed border-platinum-tint hover:border-action-blue/50 rounded-2xl flex flex-col items-center justify-center bg-cloud-mist/10 relative transition-all group">
-                                            <input
-                                                type="file"
-                                                accept=".xlsx, .xls"
-                                                onChange={handleExcelImport}
-                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                            />
-                                            <Upload className="w-8 h-8 text-slate-blue/60 group-hover:text-action-blue transition-colors mb-2" />
-                                            <p className="text-xs font-bold text-midnight-indigo">Click để chọn hoặc kéo thả file Excel vào đây</p>
-                                            <p className="text-[10px] text-slate-blue mt-1">Hỗ trợ file định dạng .xlsx, .xls</p>
-                                        </div>
+                                            <div className="flex flex-wrap items-center gap-4">
+                                                <span className="text-xs font-semibold text-slate-blue">Phân loại email nhập vào:</span>
+                                                <div className="flex items-center gap-4">
+                                                    <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
+                                                        <input
+                                                            type="radio"
+                                                            name="manualType"
+                                                            value="auto"
+                                                            checked={manualType === 'auto'}
+                                                            onChange={() => setManualType('auto')}
+                                                            className="text-action-blue focus:ring-action-blue"
+                                                        />
+                                                        Tự động nhận diện
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
+                                                        <input
+                                                            type="radio"
+                                                            name="manualType"
+                                                            value="internal"
+                                                            checked={manualType === 'internal'}
+                                                            onChange={() => setManualType('internal')}
+                                                            className="text-action-blue focus:ring-action-blue"
+                                                        />
+                                                        Trong công ty (Nội bộ)
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
+                                                        <input
+                                                            type="radio"
+                                                            name="manualType"
+                                                            value="external"
+                                                            checked={manualType === 'external'}
+                                                            onChange={() => setManualType('external')}
+                                                            className="text-action-blue focus:ring-action-blue"
+                                                        />
+                                                        Ngoài công ty (Khách ngoài)
+                                                    </label>
+                                                </div>
+                                            </div>
 
-                                        <div className="p-3.5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-1.5">
-                                            <h4 className="text-xs font-bold text-midnight-indigo flex items-center gap-1.5">
-                                                <Info className="w-3.5 h-3.5 text-action-blue" /> Hướng dẫn định dạng cột Excel:
-                                            </h4>
-                                            <p className="text-[11px] text-slate-blue leading-relaxed">
-                                                Hệ thống sẽ quét file Excel và đọc các cột:
-                                            </p>
-                                            <ul className="list-disc pl-4 text-[11px] text-slate-blue space-y-0.5">
-                                                <li>Cột <strong>Email</strong>: Chứa địa chỉ email của người tham gia.</li>
-                                                <li>Cột <strong>Trong công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là nhân viên nội bộ, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
-                                                <li>Cột <strong>Ngoài công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là khách ngoài, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
-                                                <li className="text-[10px] italic text-slate-blue/70">Nếu cả 2 cột đều bỏ trống, hệ thống sẽ tự nhận diện theo đuôi email.</li>
-                                            </ul>
-                                            
-                                            {/* Mini preview table */}
-                                            <div className="mt-2 border border-blue-100 rounded-lg overflow-hidden">
-                                                <table className="w-full text-[10.5px] text-center">
+                                            <div className="flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleManualImport}
+                                                    disabled={!manualEmails.trim()}
+                                                    className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all"
+                                                >
+                                                    Xem trước danh sách
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {/* Download template banner */}
+                                            <div className="flex justify-between items-center bg-blue-50/40 border border-blue-100 p-3.5 rounded-xl">
+                                                <div className="space-y-0.5">
+                                                    <h4 className="text-xs font-bold text-midnight-indigo flex items-center gap-1.5">
+                                                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Tải file Excel mẫu:
+                                                    </h4>
+                                                    <p className="text-[10.5px] text-slate-blue">Sử dụng file mẫu có cấu trúc định dạng chuẩn phục vụ import khách mời.</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={downloadSampleExcel}
+                                                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+                                                >
+                                                    <Download className="w-3.5 h-3.5" /> Tải file mẫu
+                                                </button>
+                                            </div>
+
+                                            <div className="p-5 border-2 border-dashed border-platinum-tint hover:border-action-blue/50 rounded-2xl flex flex-col items-center justify-center bg-cloud-mist/10 relative transition-all group">
+                                                <input
+                                                    type="file"
+                                                    accept=".xlsx, .xls"
+                                                    onChange={handleExcelImport}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                />
+                                                <Upload className="w-8 h-8 text-slate-blue/60 group-hover:text-action-blue transition-colors mb-2" />
+                                                <p className="text-xs font-bold text-midnight-indigo">Click để chọn hoặc kéo thả file Excel vào đây</p>
+                                                <p className="text-[10px] text-slate-blue mt-1">Hỗ trợ file định dạng .xlsx, .xls</p>
+                                            </div>
+
+                                            <div className="p-3.5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-1.5">
+                                                <h4 className="text-xs font-bold text-midnight-indigo flex items-center gap-1.5">
+                                                    <Info className="w-3.5 h-3.5 text-action-blue" /> Hướng dẫn định dạng cột Excel:
+                                                </h4>
+                                                <p className="text-[11px] text-slate-blue leading-relaxed">
+                                                    Hệ thống sẽ quét file Excel và đọc các cột:
+                                                </p>
+                                                <ul className="list-disc pl-4 text-[11px] text-slate-blue space-y-0.5">
+                                                    <li>Cột <strong>Email</strong>: Chứa địa chỉ email của người tham gia.</li>
+                                                    <li>Cột <strong>Trong công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là nhân viên nội bộ, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
+                                                    <li>Cột <strong>Ngoài công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là khách ngoài, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
+                                                    <li className="text-[10px] italic text-slate-blue/70">Nếu cả 2 cột đều bỏ trống, hệ thống sẽ tự nhận diện theo đuôi email.</li>
+                                                </ul>
+
+                                                {/* Mini preview table */}
+                                                <div className="mt-2 border border-blue-100 rounded-lg overflow-hidden">
+                                                    <table className="w-full text-[10.5px] text-center">
+                                                        <thead>
+                                                            <tr className="bg-blue-50/60 text-slate-blue font-bold">
+                                                                <th className="py-1.5 px-2 text-left">Email</th>
+                                                                <th className="py-1.5 px-2">Trong công ty</th>
+                                                                <th className="py-1.5 px-2">Ngoài công ty</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="text-slate-blue/80">
+                                                            <tr className="border-t border-blue-50">
+                                                                <td className="py-1 px-2 text-left">nhanvien@smrmpts.com</td>
+                                                                <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
+                                                                <td className="py-1 px-2 text-rose-400">✗</td>
+                                                            </tr>
+                                                            <tr className="border-t border-blue-50">
+                                                                <td className="py-1 px-2 text-left">khachngoai@gmail.com</td>
+                                                                <td className="py-1 px-2 text-rose-400">✗</td>
+                                                                <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Preview Section */}
+                                    {importPreview.length > 0 && (
+                                        <div className="space-y-2 border-t border-platinum-tint/50 pt-4">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="text-xs font-bold text-midnight-indigo">
+                                                    Xem trước dữ liệu import ({importPreview.length} dòng):
+                                                </h4>
+                                                {importPreview.some(p => p.error) && (
+                                                    <span className="text-[10px] bg-rose-50 border border-rose-200 text-rose-600 px-2 py-0.5 rounded-lg font-bold animate-pulse">
+                                                        Phát hiện dòng dữ liệu bị lỗi! Vui lòng kiểm tra lại.
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="border border-platinum-tint rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+                                                <table className="w-full text-left text-xs border-collapse">
                                                     <thead>
-                                                        <tr className="bg-blue-50/60 text-slate-blue font-bold">
-                                                            <th className="py-1.5 px-2 text-left">Email</th>
-                                                            <th className="py-1.5 px-2">Trong công ty</th>
-                                                            <th className="py-1.5 px-2">Ngoài công ty</th>
+                                                        <tr className="bg-cloud-mist/50 border-b border-platinum-tint font-bold text-slate-blue">
+                                                            <th className="p-3">Email</th>
+                                                            <th className="p-3 text-center">Trong công ty</th>
+                                                            <th className="p-3 text-center">Ngoài công ty</th>
+                                                            <th className="p-3 text-right">Trạng thái đối khớp / Lỗi</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="text-slate-blue/80">
-                                                        <tr className="border-t border-blue-50">
-                                                            <td className="py-1 px-2 text-left">nhanvien@smrmpts.com</td>
-                                                            <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
-                                                            <td className="py-1 px-2 text-rose-400">✗</td>
-                                                        </tr>
-                                                        <tr className="border-t border-blue-50">
-                                                            <td className="py-1 px-2 text-left">khachngoai@gmail.com</td>
-                                                            <td className="py-1 px-2 text-rose-400">✗</td>
-                                                            <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
-                                                        </tr>
+                                                    <tbody>
+                                                        {importPreview.map((item, idx) => {
+                                                            const isInternal = item.type === 'internal';
+                                                            const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
+
+                                                            let matchStatus = 'Khách ngoài công ty';
+                                                            let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+
+                                                            if (isInternal) {
+                                                                if (foundUser) {
+                                                                    matchStatus = `Nhân viên: ${foundUser.fullName || foundUser.full_name}`;
+                                                                    badgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
+                                                                } else {
+                                                                    matchStatus = 'Không thấy NV (Coi là khách)';
+                                                                    badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
+                                                                }
+                                                            }
+
+                                                            if (item.error) {
+                                                                matchStatus = 'Lỗi định dạng';
+                                                                badgeClass = 'bg-red-50 text-red-700 border-red-100';
+                                                            }
+
+                                                            return (
+                                                                <tr key={idx} className={`border-b border-platinum-tint/50 hover:bg-cloud-mist/20 transition-colors ${item.error ? 'bg-rose-50/20' : ''}`}>
+                                                                    <td className="p-3 font-medium text-midnight-indigo">
+                                                                        <span className={item.error ? 'text-rose-600 font-semibold' : ''}>{item.email || '(Để trống)'}</span>
+                                                                        {item.error && (
+                                                                            <span className="block text-[10px] text-rose-500 font-bold mt-0.5">{item.error}</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-3 text-center">
+                                                                        <span className={`text-sm font-bold ${isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
+                                                                            {isInternal ? '✓' : '✗'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-3 text-center">
+                                                                        <span className={`text-sm font-bold ${!isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
+                                                                            {!isInternal ? '✓' : '✗'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-3 text-right">
+                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeClass}`}>
+                                                                            {matchStatus}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
 
-                                {/* Preview Section */}
-                                {importPreview.length > 0 && (
-                                    <div className="space-y-2 border-t border-platinum-tint/50 pt-4">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="text-xs font-bold text-midnight-indigo">
-                                                Xem trước dữ liệu import ({importPreview.length} dòng):
-                                            </h4>
-                                            {importPreview.some(p => p.error) && (
-                                                <span className="text-[10px] bg-rose-50 border border-rose-200 text-rose-600 px-2 py-0.5 rounded-lg font-bold animate-pulse">
-                                                    Phát hiện dòng dữ liệu bị lỗi! Vui lòng kiểm tra lại.
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="border border-platinum-tint rounded-xl overflow-hidden max-h-52 overflow-y-auto">
-                                            <table className="w-full text-left text-xs border-collapse">
-                                                <thead>
-                                                    <tr className="bg-cloud-mist/50 border-b border-platinum-tint font-bold text-slate-blue">
-                                                        <th className="p-3">Email</th>
-                                                        <th className="p-3 text-center">Trong công ty</th>
-                                                        <th className="p-3 text-center">Ngoài công ty</th>
-                                                        <th className="p-3 text-right">Trạng thái đối khớp / Lỗi</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {importPreview.map((item, idx) => {
-                                                        const isInternal = item.type === 'internal';
-                                                        const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
-                                                        
-                                                        let matchStatus = 'Khách ngoài công ty';
-                                                        let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                                                        
-                                                        if (isInternal) {
-                                                            if (foundUser) {
-                                                                matchStatus = `Nhân viên: ${foundUser.fullName || foundUser.full_name}`;
-                                                                badgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
-                                                            } else {
-                                                                matchStatus = 'Không thấy NV (Coi là khách)';
-                                                                badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
-                                                            }
-                                                        }
-                                                        
-                                                        if (item.error) {
-                                                            matchStatus = 'Lỗi định dạng';
-                                                            badgeClass = 'bg-red-50 text-red-700 border-red-100';
-                                                        }
-                                                        
-                                                        return (
-                                                            <tr key={idx} className={`border-b border-platinum-tint/50 hover:bg-cloud-mist/20 transition-colors ${item.error ? 'bg-rose-50/20' : ''}`}>
-                                                                <td className="p-3 font-medium text-midnight-indigo">
-                                                                    <span className={item.error ? 'text-rose-600 font-semibold' : ''}>{item.email || '(Để trống)'}</span>
-                                                                    {item.error && (
-                                                                        <span className="block text-[10px] text-rose-500 font-bold mt-0.5">{item.error}</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-3 text-center">
-                                                                    <span className={`text-sm font-bold ${isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
-                                                                        {isInternal ? '✓' : '✗'}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="p-3 text-center">
-                                                                    <span className={`text-sm font-bold ${!isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
-                                                                        {!isInternal ? '✓' : '✗'}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="p-3 text-right">
-                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeClass}`}>
-                                                                        {matchStatus}
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Modal Footer */}
-                            <div className="p-5 border-t border-cloud-mist bg-cloud-mist/10 flex items-center justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowImportModal(false);
-                                        setImportPreview([]);
-                                        setManualEmails('');
-                                    }}
-                                    className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
-                                >
-                                    Hủy bỏ
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleConfirmImport}
-                                    disabled={importPreview.length === 0 || importPreview.some(p => p.error !== '')}
-                                    className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                                >
-                                    Xác nhận thêm ({importPreview.length})
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-            , document.body)}
+                                {/* Modal Footer */}
+                                <div className="p-5 border-t border-cloud-mist bg-cloud-mist/10 flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowImportModal(false);
+                                            setImportPreview([]);
+                                            setManualEmails('');
+                                        }}
+                                        className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
+                                    >
+                                        Hủy bỏ
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleConfirmImport}
+                                        disabled={importPreview.length === 0 || importPreview.some(p => p.error !== '')}
+                                        className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                    >
+                                        Xác nhận thêm ({importPreview.length})
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+                , document.body)}
 
             {selectedDetailUserId && ReactDOM.createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
                             <h3 className="font-bold text-midnight-indigo">Chi tiết thông tin nhân viên</h3>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setSelectedDetailUserId(null);
                                     setUserDetail(null);
-                                }} 
+                                }}
                                 className="text-slate-blue hover:text-midnight-indigo"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1813,7 +1840,7 @@ const BookMeeting = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                         <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
                                             <span className="text-xs text-slate-blue block mb-0.5">Họ tên</span>
-                                            <span className="font-semibold text-midnight-indigo">{userDetail.fullName || userDetail.full_name || "Chưa thiết lập"}</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.fullName || "Chưa thiết lập"}</span>
                                         </div>
                                         <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
                                             <span className="text-xs text-slate-blue block mb-0.5">Email</span>
@@ -1824,59 +1851,11 @@ const BookMeeting = () => {
                                             <span className="font-semibold text-midnight-indigo">{userDetail.employeeCode || "Chưa thiết lập"}</span>
                                         </div>
                                         <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Số điện thoại</span>
-                                            <span className="font-semibold text-midnight-indigo">{userDetail.phoneNumber || userDetail.phone || "Chưa cung cấp"}</span>
-                                        </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
                                             <span className="text-xs text-slate-blue block mb-0.5">Phòng ban</span>
                                             <span className="font-semibold text-midnight-indigo">
-                                                {userDetail.department?.departmentName || userDetail.department?.name || userDetail.departments?.[0]?.name || "Chưa phân bổ"}
+                                                {userDetail.department?.departmentName || "Chưa phân bổ"}
                                             </span>
                                         </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Chức danh / Vị trí</span>
-                                            <span className="font-semibold text-midnight-indigo">{userDetail.positionTitle || "Chưa thiết lập"}</span>
-                                        </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Quản lý trực tiếp</span>
-                                            <span className="font-semibold text-midnight-indigo">{userDetail.directManager?.fullName || "Không có"}</span>
-                                        </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Vai trò hệ thống</span>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {userDetail.roles && userDetail.roles.length > 0 ? (
-                                                    userDetail.roles.map(r => (
-                                                        <span key={r.id} className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue border border-blue-100 rounded-full font-semibold">
-                                                            {r.roleName || r.name}
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-xs text-slate-blue italic">Chưa phân quyền</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Trạng thái tài khoản</span>
-                                            <span className={`inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold mt-1 ${
-                                                userDetail.accountStatus === "active" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
-                                            }`}>
-                                                {userDetail.accountStatus === "active" ? "Hoạt động" : "Bị khóa"}
-                                            </span>
-                                        </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Hồ sơ khuôn mặt (FaceID)</span>
-                                            <span className={`inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold mt-1 ${
-                                                userDetail.hasFaceProfile ? "bg-green-50 text-green-700 border border-green-200" : "bg-amber-50 text-amber-700 border border-amber-200"
-                                            }`}>
-                                                {userDetail.hasFaceProfile ? "Đã hợp lệ" : "Chưa đăng ký"}
-                                            </span>
-                                        </div>
-                                        {userDetail.lastLoginAt && (
-                                            <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30 sm:col-span-2">
-                                                <span className="text-xs text-slate-blue block mb-0.5">Đăng nhập cuối</span>
-                                                <span className="font-semibold text-midnight-indigo">{new Date(userDetail.lastLoginAt).toLocaleString("vi-VN")}</span>
-                                            </div>
-                                        )}
                                     </div>
                                 </>
                             ) : (
