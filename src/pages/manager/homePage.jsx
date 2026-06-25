@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import {
     Calendar, Clock, AlertTriangle, Sliders, CheckCircle2, XCircle, TrendingUp,
-    FileText, ArrowRight, RefreshCw, PieChart as PieIcon, Download
+    FileText, ArrowRight, RefreshCw, PieChart as PieIcon, Download, CheckCircle
 } from 'lucide-react';
 import {
     getPendingMeetingRequests,
@@ -41,6 +42,26 @@ const itemVariants = {
 };
 
 const ManagerHomePage = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [successToast, setSuccessToast] = useState('');
+
+    useEffect(() => {
+        if (location.state?.successMessage) {
+            setSuccessToast(location.state.successMessage);
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location, navigate]);
+
+    useEffect(() => {
+        if (successToast) {
+            const timer = setTimeout(() => {
+                setSuccessToast('');
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successToast]);
+
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'analytics'
     const [loadingOverview, setLoadingOverview] = useState(true);
     const [loadingAnalytics, setLoadingAnalytics] = useState(false);
@@ -60,43 +81,19 @@ const ManagerHomePage = () => {
     const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
     const [submittingAction, setSubmittingAction] = useState(false);
 
-    const fetchPendingRequests = useCallback(async (deptId) => {
+    const fetchPendingRequests = useCallback(async () => {
         setLoadingOverview(true);
         try {
-            const res = await getPendingMeetingRequests({ departmentId: deptId || undefined });
+            const res = await getPendingMeetingRequests({ approvalStatus: 'pending' });
             if (res?.success) {
                 setPendingRequests(res.data || []);
             } else {
-                // Fallback mock pending requests
-                setPendingRequests([
-                    {
-                        id: 'req-mock-1',
-                        request_code: 'REQ-260610-002',
-                        meeting_id: 'meet-mock-1',
-                        requested_by_name: 'Nguyễn Thị Minh',
-                        requested_at: '2026-06-10T08:30:00.000Z',
-                        room_name: 'Phòng Athena 102',
-                        requested_start_time: '2026-06-12T10:00:00.000+07:00',
-                        requested_end_time: '2026-06-12T11:30:00.000+07:00',
-                        conflict_summary_json: { overlapping_meetings_count: 0, room_available: true },
-                        request_payload_json: { title: "Họp Định Hướng Kế Hoạch Sprint 3" }
-                    },
-                    {
-                        id: 'req-mock-2',
-                        request_code: 'REQ-260610-003',
-                        meeting_id: 'meet-mock-2',
-                        requested_by_name: 'Phạm Thanh Sơn',
-                        requested_at: '2026-06-10T10:15:00.000Z',
-                        room_name: 'Phòng Zeus 201',
-                        requested_start_time: '2026-06-13T14:00:00.000+07:00',
-                        requested_end_time: '2026-06-13T15:30:00.000+07:00',
-                        conflict_summary_json: { overlapping_meetings_count: 1, room_available: false },
-                        request_payload_json: { title: "Review Giao Diện Bản Thử Nghiệm" }
-                    }
-                ]);
+                setPendingRequests([]);
+                setError(res?.message || 'Không thể tải danh sách yêu cầu chờ duyệt.');
             }
-        } catch {
+        } catch (err) {
             setPendingRequests([]);
+            setError(err?.error?.message || 'Không thể tải danh sách yêu cầu chờ duyệt.');
         } finally {
             setLoadingOverview(false);
         }
@@ -347,7 +344,7 @@ const ManagerHomePage = () => {
             } catch {
                 // silent
             }
-            fetchPendingRequests(deptId);
+            fetchPendingRequests();
         };
         loadContext();
     }, [fetchPendingRequests]);
@@ -366,6 +363,21 @@ const ManagerHomePage = () => {
             animate="show"
             className="space-y-8"
         >
+            {/* Success Toast */}
+            <AnimatePresence>
+                {successToast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -50, scale: 0.9, x: '-50%' }}
+                        animate={{ opacity: 1, y: 16, scale: 1, x: '-50%' }}
+                        exit={{ opacity: 0, y: -20, scale: 0.9, x: '-50%' }}
+                        className="fixed top-4 left-1/2 z-50 px-5 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-800 text-sm font-semibold"
+                    >
+                        <CheckCircle className="w-5 h-5 text-emerald-600 animate-bounce" />
+                        <span>{successToast}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Banner Greeting */}
             <motion.div variants={itemVariants}>
                 <DashboardBanner roleName="Manager" />
@@ -547,7 +559,7 @@ const ManagerHomePage = () => {
                                     <p className="text-xs text-slate-blue mt-1">Các yêu cầu từ nhân sự cần duyệt đặt phòng họp</p>
                                 </div>
                                 <button
-                                    onClick={() => currentUser && fetchPendingRequests(currentUser.departmentId)}
+                                    onClick={() => fetchPendingRequests()}
                                     className="p-2 text-slate-blue hover:text-action-blue rounded-lg hover:bg-cloud-mist transition-colors"
                                 >
                                     <RefreshCw className="w-4 h-4" />
@@ -574,17 +586,17 @@ const ManagerHomePage = () => {
                                         </thead>
                                         <tbody>
                                             {pendingRequests.map(req => {
-                                                const hasConflict = req.conflict_summary_json?.overlapping_meetings_count > 0;
+                                                const hasConflict = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
                                                 return (
                                                     <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/20 transition-colors">
-                                                        <td className="p-4 font-mono text-xs text-midnight-indigo font-bold">{req.request_code}</td>
+                                                        <td className="p-4 font-mono text-xs text-midnight-indigo font-bold">{req.requestCode}</td>
                                                         <td className="p-4 font-semibold text-midnight-indigo">
-                                                            {req.request_payload_json?.title || 'Cuộc họp phòng ban'}
+                                                            {req.meeting?.title || 'Cuộc họp phòng ban'}
                                                         </td>
-                                                        <td className="p-4 text-slate-blue font-medium">{req.requested_by_name || 'Nhân viên'}</td>
-                                                        <td className="p-4 font-medium text-midnight-indigo">{req.room_name}</td>
+                                                        <td className="p-4 text-slate-blue font-medium">{req.requestedBy?.fullName || 'Nhân viên'}</td>
+                                                        <td className="p-4 font-medium text-midnight-indigo">{req.targetRoom?.roomName}</td>
                                                         <td className="p-4 text-xs text-slate-blue font-medium">
-                                                            {new Date(req.requested_start_time).toLocaleString('vi-VN')}
+                                                            {new Date(req.requestedStartTime).toLocaleString('vi-VN')}
                                                         </td>
                                                         <td className="p-4">
                                                             {hasConflict ? (
@@ -955,7 +967,7 @@ const ManagerHomePage = () => {
                         >
                             <h3 className="text-base font-bold text-midnight-indigo mb-2">Phê duyệt yêu cầu đặt phòng</h3>
                             <p className="text-xs text-slate-blue mb-4">
-                                Bạn chuẩn bị phê duyệt yêu cầu <strong className="text-midnight-indigo">{selectedRequest.request_code}</strong> cho cuộc họp <strong>"{selectedRequest.request_payload_json?.title}"</strong>.
+                                Bạn chuẩn bị phê duyệt yêu cầu <strong className="text-midnight-indigo">{selectedRequest.requestCode}</strong> cho cuộc họp <strong>"{selectedRequest.meeting?.title}"</strong>.
                             </p>
 
                             <div className="space-y-3">
@@ -1007,7 +1019,7 @@ const ManagerHomePage = () => {
                         >
                             <h3 className="text-base font-bold text-red-600 mb-2">Từ chối yêu cầu đặt phòng</h3>
                             <p className="text-xs text-slate-blue mb-4">
-                                Vui lòng nhập lý do từ chối chi tiết cho yêu cầu <strong className="text-midnight-indigo">{selectedRequest.request_code}</strong>.
+                                Vui lòng nhập lý do từ chối chi tiết cho yêu cầu <strong className="text-midnight-indigo">{selectedRequest.requestCode}</strong>.
                             </p>
 
                             <div className="space-y-3">
