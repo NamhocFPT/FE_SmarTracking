@@ -9,6 +9,26 @@ import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, g
 import { getDepartments } from '../../service/businessAdminServices';
 import * as XLSX from 'xlsx';
 
+const getInitialTimes = () => {
+    const now = new Date();
+    const sh = String(now.getHours()).padStart(2, '0');
+    const sm = String(now.getMinutes()).padStart(2, '0');
+    const start = `${sh}:${sm}`;
+
+    // Default end time is 1 hour later
+    const later = new Date(now.getTime() + 60 * 60 * 1000);
+    let eh = String(later.getHours()).padStart(2, '0');
+    let em = String(later.getMinutes()).padStart(2, '0');
+    
+    // If end time wrapped around to next day, cap it at 23:59
+    if (later.getDate() !== now.getDate()) {
+        eh = '23';
+        em = '59';
+    }
+    const end = `${eh}:${em}`;
+    return { start, end };
+};
+
 const BookMeeting = () => {
     const navigate = useNavigate();
     const [currentUser, setCurrentUser] = useState(null);
@@ -17,12 +37,13 @@ const BookMeeting = () => {
     const [currentStep, setCurrentStep] = useState(1);
 
     // Form states
+    const initialTimes = getInitialTimes();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [selectedRoomId, setSelectedRoomId] = useState('');
     const [meetingDate, setMeetingDate] = useState(new Date().toLocaleDateString('en-CA'));
-    const [startTime, setStartTime] = useState('09:00');
-    const [endTime, setEndTime] = useState('10:00');
+    const [startTime, setStartTime] = useState(initialTimes.start);
+    const [endTime, setEndTime] = useState(initialTimes.end);
     const [expectedAttendeeCount, setExpectedAttendeeCount] = useState('');
     const [capacityOverrideConfirmed, setCapacityOverrideConfirmed] = useState(false);
     const [recordingEnabled, setRecordingEnabled] = useState(false);
@@ -157,9 +178,10 @@ const BookMeeting = () => {
         setSearchingRooms(true);
         setErrorMsg('');
 
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        if (meetingDate < todayStr) {
-            setErrorMsg('Ngày họp không được trong quá khứ.');
+        const now = new Date();
+        const selectedStart = new Date(`${meetingDate}T${startTime}:00`);
+        if (selectedStart < now) {
+            setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
             setSearchingRooms(false);
             return;
         }
@@ -432,9 +454,10 @@ const BookMeeting = () => {
         setConflictInfo(null);
         setAlternativeRooms([]);
 
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        if (meetingDate < todayStr) {
-            setErrorMsg('Ngày họp không được trong quá khứ.');
+        const now = new Date();
+        const selectedStart = new Date(`${meetingDate}T${startTime}:00`);
+        if (selectedStart < now) {
+            setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
             return;
         }
 
