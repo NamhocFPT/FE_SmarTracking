@@ -555,7 +555,7 @@ const ManagerMeetingDetail = () => {
             {/* MODAL 1: Edit Meeting */}
             <AnimatePresence>
                 {isEditModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -655,7 +655,7 @@ const ManagerMeetingDetail = () => {
             {/* MODAL 2: Manage Agenda */}
             <AnimatePresence>
                 {isAgendaModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -733,7 +733,7 @@ const ManagerMeetingDetail = () => {
             {/* MODAL 3: Cancel Confirm */}
             <AnimatePresence>
                 {isCancelConfirmOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
