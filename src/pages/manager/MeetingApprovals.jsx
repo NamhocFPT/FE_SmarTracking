@@ -65,8 +65,8 @@ const MeetingApprovals = () => {
                 q: searchVal.trim() || undefined,
                 from: fromDate || undefined,
                 to: toDate || undefined,
-                sortBy: 'requestedStartTime',
-                sortOrder: 'DESC'
+                sortBy: 'requested_at',
+                sortOrder: 'desc'
             };
             const res = await getPendingMeetingRequests(params);
             if (res?.success) {
