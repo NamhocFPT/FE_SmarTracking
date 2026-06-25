@@ -759,7 +759,7 @@ const UserManagement = () => {
 
             {/* CREATE MODAL */}
             {isCreateModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Tạo người dùng mới</h3>
@@ -855,7 +855,7 @@ const UserManagement = () => {
 
             {/* EDIT MODAL */}
             {isEditModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Chỉnh sửa thông tin</h3>
@@ -947,7 +947,7 @@ const UserManagement = () => {
 
             {/* IMPORT MODAL (WITH ERROR FEEDBACK & TEMPLATE DOWNLOAD) */}
             {isImportModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-lg w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
@@ -1040,7 +1040,7 @@ const UserManagement = () => {
 
             {/* USER LOGS MODAL */}
             {isLogsModalOpen && selectedUser && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-lg w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
@@ -1093,7 +1093,7 @@ const UserManagement = () => {
 
             {/* DETAIL MODAL (UC-AM-10) */}
             {isDetailModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-2xl w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Chi tiết hồ sơ tài khoản</h3>

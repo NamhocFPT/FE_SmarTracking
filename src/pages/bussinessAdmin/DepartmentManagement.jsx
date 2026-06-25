@@ -703,7 +703,7 @@ const DepartmentManagement = () => {
 
             {/* CREATE DEPT MODAL */}
             {isCreateModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo text-base">Tạo phòng ban mới</h3>
@@ -758,7 +758,7 @@ const DepartmentManagement = () => {
 
             {/* EDIT DEPT MODAL */}
             {isEditModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo text-base">Chỉnh sửa thông tin phòng ban</h3>
@@ -811,7 +811,7 @@ const DepartmentManagement = () => {
 
             {/* DEPARTMENT MEMBERS MODAL (WITH COMPLETE USER MANAGEMENT ACTIONS) */}
             {isMembersModalOpen && selectedDept && createPortal(
-                <div className="fixed inset-0 z-40 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
@@ -1010,7 +1010,7 @@ const DepartmentManagement = () => {
 
             {/* INTEGRATED USER CREATE MODAL */}
             {isUserCreateModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo text-base">Tạo người dùng mới</h3>
@@ -1101,7 +1101,7 @@ const DepartmentManagement = () => {
 
             {/* INTEGRATED USER EDIT MODAL */}
             {isUserEditModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo text-base">Chỉnh sửa thông tin thành viên</h3>
@@ -1188,7 +1188,7 @@ const DepartmentManagement = () => {
 
             {/* INTEGRATED USER AUDIT LOGS MODAL */}
             {isUserLogsModalOpen && selectedUser && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
@@ -1241,7 +1241,7 @@ const DepartmentManagement = () => {
 
             {/* INTEGRATED USER DETAIL MODAL */}
             {isUserDetailModalOpen && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo text-base">Chi tiết hồ sơ tài khoản</h3>
