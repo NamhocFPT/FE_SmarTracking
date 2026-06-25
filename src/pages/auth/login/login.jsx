@@ -137,7 +137,7 @@ const Login = () => {
     // API interaction states
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [successMsg, setSuccessMsg] = useState(null);
+    const [redirecting, setRedirecting] = useState(false);
 
     // Client-side validation states (E1)
     const [emailError, setEmailError] = useState(null);
@@ -182,7 +182,6 @@ const Login = () => {
         setEmailError(null);
         setPasswordError(null);
         setError(null);
-        setSuccessMsg(null);
 
         if (!email.trim()) {
             setEmailError("Vui lòng nhập email");
@@ -224,13 +223,13 @@ const Login = () => {
                     localStorage.removeItem("rememberedEmail");
                 }
 
-                setSuccessMsg("Đăng nhập thành công! Đang chuyển hướng...");
+                setRedirecting(true);
                 
                 // Redirect user to the app dashboard based on role
                 const redirectPath = getRedirectPathByRoles(user?.roles);
                 setTimeout(() => {
                     navigate(redirectPath, { replace: true });
-                }, 1500);
+                }, 1200);
             }
         } catch (err) {
             // Handle error response matching backend envelope
@@ -244,6 +243,25 @@ const Login = () => {
     // Show skeleton while initial session check is in progress
     if (initialLoading) {
         return <LoginSkeleton />;
+    }
+
+    // Fullscreen loading overlay after successful login
+    if (redirecting) {
+        return (
+            <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white">
+                <div className="flex flex-col items-center gap-6">
+                    {/* Spinner */}
+                    <div className="relative w-16 h-16">
+                        <div className="absolute inset-0 rounded-full border-4 border-[#d4e0ed]" />
+                        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#006bff] animate-spin" />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-lg font-semibold text-[#0B3558]">Đăng nhập thành công!</p>
+                        <p className="text-sm text-[#476788] mt-1">Đang chuyển hướng đến trang chủ...</p>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -294,12 +312,7 @@ const Login = () => {
                             </div>
                         )}
 
-                        {/* Success Message */}
-                        {successMsg && (
-                            <div className="w-full z-10 p-3 text-sm text-green-800 bg-green-50 rounded-lg border border-green-200" role="alert">
-                                <div>{successMsg}</div>
-                            </div>
-                        )}
+
 
                         <form
                             className="flex flex-col w-full h-auto items-start gap-6 relative"
