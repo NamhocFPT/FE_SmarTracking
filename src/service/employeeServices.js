@@ -1,11 +1,21 @@
-import { get, post, patch } from '../utils/request';
+import { get, post, patch, put } from '../utils/request';
 
 // ============================================================
 // EMPLOYEE APIs (UC-SM-01 ~ UC-SM-03)
 // ============================================================
 
 /**
- * Get available meeting rooms
+ * Get rooms available in a given time range (server-side conflict check)
+ * @param {object} params - { startTime, endTime, minCapacity } (startTime/endTime: ISO8601)
+ */
+export const getAvailableRooms = async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return await get(`/rooms/available${query ? `?${query}` : ''}`);
+};
+
+/**
+ * @deprecated Backend chưa có endpoint list phòng (GET /rooms). Dùng cho các trang ngoài
+ * phạm vi luồng booking (MeetingDetail.jsx); KHÔNG dùng trong BookMeeting.jsx (xem getAvailableRooms).
  * @param {object} params - { page, limit }
  */
 export const getRooms = async (params = {}) => {
@@ -14,17 +24,8 @@ export const getRooms = async (params = {}) => {
 };
 
 /**
- * Get all room bookings
- * @param {object} params
- */
-export const getRoomBookings = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/room_bookings${query ? `?${query}` : ''}`);
-};
-
-/**
- * Get users (for inviting participants)
- * @param {object} params - { page, limit }
+ * Tìm kiếm/lấy danh sách rút gọn nhân viên nội bộ (dùng cho autocomplete chọn participants)
+ * @param {object} params - { page, limit, search }
  */
 export const getUsers = async (params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -33,10 +34,37 @@ export const getUsers = async (params = {}) => {
 
 /**
  * Create a new meeting / Book a meeting room
- * @param {object} data - Meeting booking payload
+ * @param {object} data - Meeting booking payload (CreateMeetingDto)
  */
 export const createMeeting = async (data) => {
     return await post('/meetings', data);
+};
+
+/**
+ * Tạo cấu hình ghi âm/ghi hình cho cuộc họp (gọi sau khi tạo họp thành công)
+ * @param {string} meetingId
+ * @param {object} data - { enableVideo, enableAudio, consentRequired, ... }
+ */
+export const addRecordingConfig = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/recording-config`, data);
+};
+
+/**
+ * Ghi đè toàn bộ chương trình họp (agenda) - atomic replace
+ * @param {string} meetingId
+ * @param {Array<{title: string, plannedDurationMinutes: number, description?: string, ownerId?: string}>} items
+ */
+export const replaceAgendas = async (meetingId, items) => {
+    return await put(`/meetings/${meetingId}/agendas`, { items });
+};
+
+/**
+ * Thêm thành viên nội bộ vào cuộc họp (sau khi tạo họp)
+ * @param {string} meetingId
+ * @param {object} data - { userId, overrideWarnings?, warningToken? }
+ */
+export const addInternalParticipant = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/participants/internal`, data);
 };
 
 /**
