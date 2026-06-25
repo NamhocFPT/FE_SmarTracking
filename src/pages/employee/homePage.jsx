@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
@@ -28,6 +28,26 @@ const itemVariants = {
 
 const EmployeeHomePage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const [successToast, setSuccessToast] = useState('');
+
+    useEffect(() => {
+        if (location.state?.successMessage) {
+            setSuccessToast(location.state.successMessage);
+            // Clear the state so it doesn't show again on refresh
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location, navigate]);
+
+    useEffect(() => {
+        if (successToast) {
+            const timer = setTimeout(() => {
+                setSuccessToast('');
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successToast]);
+
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'analytics'
     
     // Overview states
@@ -126,6 +146,21 @@ const EmployeeHomePage = () => {
             animate="show"
             className="space-y-8"
         >
+            {/* Success Toast */}
+            <AnimatePresence>
+                {successToast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -50, scale: 0.9, x: '-50%' }}
+                        animate={{ opacity: 1, y: 16, scale: 1, x: '-50%' }}
+                        exit={{ opacity: 0, y: -20, scale: 0.9, x: '-50%' }}
+                        className="fixed top-4 left-1/2 z-50 px-5 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-800 text-sm font-semibold"
+                    >
+                        <CheckCircle className="w-5 h-5 text-emerald-600 animate-bounce" />
+                        <span>{successToast}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Banner Greeting */}
             <motion.div variants={itemVariants}>
                 <DashboardBanner roleName="Employee" />
