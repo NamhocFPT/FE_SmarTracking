@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -63,6 +64,16 @@ const BookMeeting = () => {
     const [manualEmails, setManualEmails] = useState('');
     const [manualType, setManualType] = useState('auto'); // 'auto', 'internal', 'external'
     const [importPreview, setImportPreview] = useState([]);
+
+    // Lock body scroll when import modal is open
+    useEffect(() => {
+        if (showImportModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [showImportModal]);
 
     useEffect(() => {
         try {
@@ -1383,9 +1394,10 @@ const BookMeeting = () => {
             </AnimatePresence>
 
             {/* Import Participants Modal (combined feature with backdrop blur) */}
+            {showImportModal && ReactDOM.createPortal(
             <AnimatePresence>
                 {showImportModal && (
-                    <div className="fixed inset-0 w-full h-full z-50 flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/15 backdrop-blur-xl">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -1688,6 +1700,7 @@ const BookMeeting = () => {
                     </div>
                 )}
             </AnimatePresence>
+            , document.body)}
         </div>
     );
 };
