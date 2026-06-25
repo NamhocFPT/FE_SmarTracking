@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
+import AvatarReminderModal from '../../../component/AvatarReminder/AvatarReminderModal';
 
 /**
  * Navigation items cho BusinessAdmin role
@@ -216,6 +217,7 @@ const BusinessAdminLayout = () => {
             {/* ========== MAIN CONTENT ========== */}
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 lg:px-12 py-6">
                 <Outlet />
+                <AvatarReminderModal />
             </main>
 
             {/* ========== FOOTER ========== */}
