@@ -137,7 +137,6 @@ const Login = () => {
     // API interaction states
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [requestId, setRequestId] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
 
     // Client-side validation states (E1)
@@ -184,7 +183,6 @@ const Login = () => {
         setPasswordError(null);
         setError(null);
         setSuccessMsg(null);
-        setRequestId(null);
 
         if (!email.trim()) {
             setEmailError("Vui lòng nhập email");
@@ -235,12 +233,9 @@ const Login = () => {
                 }, 1500);
             }
         } catch (err) {
-            console.error("Login Error:", err);
             // Handle error response matching backend envelope
-            const message = err.error?.message || "Đăng nhập không thành công. Vui lòng kiểm tra lại.";
-            const reqId = err.requestId || err.error?.requestId || "N/A";
+            const message = err.error?.message || "Email hoặc mật khẩu không đúng. Vui lòng thử lại.";
             setError(message);
-            setRequestId(reqId);
         } finally {
             setLoading(false);
         }
@@ -286,16 +281,16 @@ const Login = () => {
                             </div>
                         </header>
 
-                        {/* Error Alert Box with Audit Trace Request ID */}
+                        {/* Error Alert Box */}
                         {error && (
-                            <div className="w-full z-10 p-3 text-sm text-red-800 bg-red-50 rounded-lg border border-red-200" role="alert">
-                                <div className="font-semibold">Lỗi đăng nhập</div>
-                                <div>{error}</div>
-                                {requestId && (
-                                    <div className="text-[10px] text-red-500 mt-1 font-mono">
-                                        RequestId: {requestId}
-                                    </div>
-                                )}
+                            <div className="w-full z-10 p-4 text-sm rounded-xl border flex items-start gap-3 bg-red-50 border-red-200 text-red-700" role="alert">
+                                <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                                <div>
+                                    <div className="font-semibold">Đăng nhập thất bại</div>
+                                    <div className="mt-0.5">{error}</div>
+                                </div>
                             </div>
                         )}
 
