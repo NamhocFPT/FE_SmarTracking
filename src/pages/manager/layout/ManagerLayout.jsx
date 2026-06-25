@@ -6,6 +6,7 @@ import AvatarReminderModal from '../../../component/AvatarReminder/AvatarReminde
 
 const navigationItems = [
     { label: 'Trang chủ', to: '/manager', end: true },
+    { label: 'Quản lý lịch họp', to: '/manager/meeting-approvals' },
     { label: 'Lịch cá nhân', to: '/manager/schedule' },
     { label: 'Đăng ký họp', to: '/manager/book' }
 ];
