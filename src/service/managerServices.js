@@ -74,89 +74,42 @@ export const getManagerNoShowStats = async (params = {}) => {
 // ============================================================
 
 /**
- * Fetch pending meeting requests that need manager approval
- * Supports both real backend and json-server db.json queries
+ * Fetch meeting requests pending manager approval
+ * Contract: GET /meeting-requests (MeetingRequestQueryDto - camelCase, whitelist-only params)
+ * @param {object} params - { approvalStatus, page, limit, requestType, targetRoomId, requestedById, from, to, q, sortBy, sortOrder }
  */
 export const getPendingMeetingRequests = async (params = {}) => {
-    const queryParams = { ...params };
-    // JSON-Server format queries
-    queryParams['approval_status'] = 'pending';
-    
-    const query = new URLSearchParams(queryParams).toString();
-    
-    // We try to call /meeting_requests first, and if it fails or doesn't match, the app is prepared.
-    // In JSON server, it is /meeting_requests. In API Contract, it is /meeting-requests
-    try {
-        let res = await get(`/meeting_requests${query ? `?${query}` : ''}`);
-        
-        // Mock DB Adapter: Map room_name and requested_by_name if missing
-        if (res?.success && res.data && Array.isArray(res.data)) {
-            try {
-                const [roomsRes, usersRes] = await Promise.all([
-                    get('/rooms'),
-                    get('/users')
-                ]);
-                const rooms = roomsRes?.data || [];
-                const users = usersRes?.data || [];
-                
-                res.data = res.data.map(req => {
-                    if (!req.room_name && req.target_room_id) {
-                        const room = rooms.find(r => r.id === req.target_room_id);
-                        if (room) req.room_name = room.room_name || room.roomName;
-                    }
-                    if (!req.requested_by_name && req.requested_by) {
-                        const user = users.find(u => u.id === req.requested_by);
-                        if (user) req.requested_by_name = user.full_name || user.fullName;
-                    }
-                    return req;
-                });
-            } catch (e) {
-                // Ignore errors from relation mapping
-            }
-        }
-        return res;
-    } catch {
-        return await get(`/meeting-requests${query ? `?${query}` : ''}`);
-    }
+    const query = new URLSearchParams({
+        approvalStatus: params.approvalStatus || 'pending',
+        page: params.page || 1,
+        limit: params.limit || 20,
+        ...(params.requestType && { requestType: params.requestType }),
+        ...(params.targetRoomId && { targetRoomId: params.targetRoomId }),
+        ...(params.requestedById && { requestedById: params.requestedById }),
+        ...(params.from && { from: params.from }),
+        ...(params.to && { to: params.to }),
+        ...(params.q && { q: params.q }),
+        ...(params.sortBy && { sortBy: params.sortBy }),
+        ...(params.sortOrder && { sortOrder: params.sortOrder }),
+    }).toString();
+
+    return await get(`/meeting-requests?${query}`);
 };
 
 /**
  * UC-SM-05: Approve meeting room request
+ * Contract: POST /meeting-requests/{id}/approve { decisionNote }
  */
 export const approveMeetingRequest = async (requestId, decisionNote = '') => {
-    try {
-        // Contract API endpoint: POST /meeting-requests/{id}/approve
-        return await post(`/meeting-requests/${requestId}/approve`, {
-            decisionNote
-        });
-    } catch (err) {
-        // Fallback to mock json-server PATCH
-        return await patch(`/meeting_requests/${requestId}`, {
-            approval_status: 'approved',
-            notes: decisionNote || 'Đã phê duyệt',
-            decision_at: new Date().toISOString()
-        });
-    }
+    return await post(`/meeting-requests/${requestId}/approve`, { decisionNote });
 };
 
 /**
  * UC-SM-06: Reject meeting room request
+ * Contract: POST /meeting-requests/{id}/reject { rejectionReason }
  */
 export const rejectMeetingRequest = async (requestId, rejectionReason = '') => {
-    try {
-        // Contract API endpoint: POST /meeting-requests/{id}/reject
-        return await post(`/meeting-requests/${requestId}/reject`, {
-            rejectionReason
-        });
-    } catch (err) {
-        // Fallback to mock json-server PATCH
-        return await patch(`/meeting_requests/${requestId}`, {
-            approval_status: 'rejected',
-            rejection_reason: rejectionReason,
-            notes: rejectionReason,
-            decision_at: new Date().toISOString()
-        });
-    }
+    return await post(`/meeting-requests/${requestId}/reject`, { rejectionReason });
 };
 
 /**
