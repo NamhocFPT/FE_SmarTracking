@@ -5,7 +5,7 @@ const ERROR_MAP = {
     AVATAR_FILE_REQUIRED: 'Vui lòng chọn một ảnh để tải lên.',
     AVATAR_FILE_TOO_LARGE: 'Ảnh vượt quá dung lượng cho phép (tối đa 5MB).',
     AVATAR_FILE_TYPE_INVALID: 'Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, WEBP.',
-    AVATAR_CONSENT_REQUIRED: 'Bạn cần đồng ý cho phép sử dụng ảnh trước khi tiếp tục.',
+    AVATAR_CONSENT_REQUIRED: 'Bạn cần đồng ý cho phép sử dụng ảnh cho mục đích nhận diện khuôn mặt trước khi tiếp tục.',
     ACCOUNT_NOT_ACTIVE: 'Tài khoản của bạn hiện không ở trạng thái hoạt động.',
     AVATAR_ALREADY_PENDING_REVIEW: 'Ảnh đại diện của bạn đang chờ duyệt, vui lòng đợi kết quả trước khi nộp ảnh khác.',
     AVATAR_STORAGE_FAILED: 'Không thể lưu ảnh vào hệ thống lưu trữ. Vui lòng thử lại.',
@@ -17,6 +17,45 @@ const mapError = (code) => ERROR_MAP[code] || 'Đã xảy ra lỗi hệ thống.
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE = 5 * 1024 * 1024;
 
+const validateMagicBytes = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = (e) => {
+            if (e.target.readyState !== FileReader.DONE) {
+                resolve(false);
+                return;
+            }
+            const arr = new Uint8Array(e.target.result);
+            if (arr.length < 4) {
+                resolve(false);
+                return;
+            }
+            // PNG check: 89 50 4E 47
+            if (arr[0] === 0x89 && arr[1] === 0x50 && arr[2] === 0x4E && arr[3] === 0x47) {
+                resolve(true);
+                return;
+            }
+            // JPEG check: FF D8 FF
+            if (arr[0] === 0xFF && arr[1] === 0xD8 && arr[2] === 0xFF) {
+                resolve(true);
+                return;
+            }
+            // WEBP check: RIFF at 0-3, WEBP at 8-11
+            if (arr.length >= 12) {
+                const isRiff = arr[0] === 0x52 && arr[1] === 0x49 && arr[2] === 0x46 && arr[3] === 0x46; // RIFF
+                const isWebp = arr[8] === 0x57 && arr[9] === 0x45 && arr[10] === 0x42 && arr[11] === 0x50; // WEBP
+                if (isRiff && isWebp) {
+                    resolve(true);
+                    return;
+                }
+            }
+            resolve(false);
+        };
+        const blob = file.slice(0, 12);
+        reader.readAsArrayBuffer(blob);
+    });
+};
+
 const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -24,16 +63,29 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
 
-    const handleFileSelect = (e) => {
+    const handleFileSelect = async (e) => {
         const f = e.target.files?.[0];
         if (!f) return;
 
         if (!ALLOWED_TYPES.includes(f.type)) {
             setError('Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, WEBP.');
+            setFile(null);
+            setPreviewUrl(null);
             return;
         }
         if (f.size > MAX_SIZE) {
             setError('Ảnh vượt quá dung lượng cho phép (tối đa 5MB).');
+            setFile(null);
+            setPreviewUrl(null);
+            return;
+        }
+
+        // Validate magic bytes
+        const isValid = await validateMagicBytes(f);
+        if (!isValid) {
+            setError('Tệp không phải là ảnh JPG, PNG hoặc WEBP hợp lệ (xác thực magic bytes thất bại).');
+            setFile(null);
+            setPreviewUrl(null);
             return;
         }
 
@@ -48,7 +100,7 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
             return;
         }
         if (!consentAgreed) {
-            setError('Bạn cần đồng ý cho phép sử dụng ảnh trước khi tiếp tục.');
+            setError('Bạn cần đồng ý cho phép sử dụng ảnh cho mục đích nhận diện khuôn mặt trước khi tiếp tục.');
             return;
         }
 
@@ -116,7 +168,7 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
                     className="mt-0.5 w-4 h-4 rounded border-steel-gray text-action-blue focus:ring-action-blue/30"
                 />
                 <span className="text-xs text-slate-blue leading-relaxed">
-                    Tôi đồng ý cho phép SmarTracking sử dụng ảnh này cho mục đích nhận diện và hiển thị hồ sơ.
+                    Tôi đồng ý cho phép SmarTracking sử dụng ảnh này cho mục đích nhận diện khuôn mặt (bắt buộc).
                 </span>
             </label>
 
