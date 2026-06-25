@@ -1,0 +1,784 @@
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import {
+    Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, RefreshCw, 
+    Search, Eye, ArrowLeft, Info, X, ChevronLeft, ChevronRight, Users, FileText
+} from 'lucide-react';
+import {
+    getPendingMeetingRequests,
+    approveMeetingRequest,
+    rejectMeetingRequest
+} from '../../service/managerServices';
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.05 }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
+};
+
+const MeetingApprovals = () => {
+    const navigate = useNavigate();
+    
+    // List & pagination states
+    const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [successMsg, setSuccessMsg] = useState(null);
+    
+    // Filter states
+    const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'all'
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchVal, setSearchVal] = useState(''); // Triggered on search submit
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const limit = 10;
+
+    // Modal states
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+    const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
+    const [decisionNote, setDecisionNote] = useState('');
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [submittingAction, setSubmittingAction] = useState(false);
+
+    // Fetch meeting requests
+    const fetchRequests = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const params = {
+                approvalStatus: statusFilter === 'all' ? undefined : statusFilter,
+                page: currentPage,
+                limit: limit,
+                q: searchVal.trim() || undefined,
+                from: fromDate || undefined,
+                to: toDate || undefined,
+                sortBy: 'requestedStartTime',
+                sortOrder: 'DESC'
+            };
+            const res = await getPendingMeetingRequests(params);
+            if (res?.success) {
+                const dataItems = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+                setRequests(dataItems);
+                
+                // Read pagination meta
+                const meta = res.meta || res.data?.meta;
+                if (meta) {
+                    setTotalPages(meta.totalPages || Math.ceil((meta.total || 0) / limit) || 1);
+                    setTotalCount(meta.total || 0);
+                } else {
+                    setTotalPages(1);
+                    setTotalCount(dataItems.length);
+                }
+            } else {
+                setRequests([]);
+                setError(res?.message || 'Không thể tải danh sách yêu cầu.');
+            }
+        } catch (err) {
+            setRequests([]);
+            setError(err?.error?.message || 'Có lỗi xảy ra khi kết nối máy chủ.');
+        } finally {
+            setLoading(false);
+        }
+    }, [statusFilter, currentPage, searchVal, fromDate, toDate]);
+
+    useEffect(() => {
+        fetchRequests();
+    }, [fetchRequests]);
+
+    // Close toast messages
+    useEffect(() => {
+        if (successMsg) {
+            const t = setTimeout(() => setSuccessMsg(null), 4000);
+            return () => clearTimeout(t);
+        }
+    }, [successMsg]);
+
+    useEffect(() => {
+        if (error) {
+            const t = setTimeout(() => setError(null), 5000);
+            return () => clearTimeout(t);
+        }
+    }, [error]);
+
+    // Handle tab change
+    const handleTabChange = (status) => {
+        setStatusFilter(status);
+        setCurrentPage(1); // Reset page on tab change
+    };
+
+    // Apply Search
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        setSearchVal(searchQuery);
+        setCurrentPage(1);
+    };
+
+    // Reset Filters
+    const handleResetFilters = () => {
+        setSearchQuery('');
+        setSearchVal('');
+        setFromDate('');
+        setToDate('');
+        setCurrentPage(1);
+    };
+
+    // Actions
+    const handleApprove = async () => {
+        if (!selectedRequest) return;
+        setSubmittingAction(true);
+        setError(null);
+        try {
+            const res = await approveMeetingRequest(selectedRequest.id, decisionNote);
+            if (res?.success) {
+                setSuccessMsg('Phê duyệt yêu cầu đặt phòng họp thành công!');
+                setApprovalModalOpen(false);
+                setDetailModalOpen(false);
+                setDecisionNote('');
+                setSelectedRequest(null);
+                fetchRequests();
+            } else {
+                setError(res?.message || 'Thao tác phê duyệt thất bại.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
+        } finally {
+            setSubmittingAction(false);
+        }
+    };
+
+    const handleReject = async () => {
+        if (!selectedRequest) return;
+        if (!rejectionReason.trim()) {
+            setError('Lý do từ chối là bắt buộc.');
+            return;
+        }
+        setSubmittingAction(true);
+        setError(null);
+        try {
+            const res = await rejectMeetingRequest(selectedRequest.id, rejectionReason);
+            if (res?.success) {
+                setSuccessMsg('Đã từ chối yêu cầu đặt phòng họp.');
+                setRejectionModalOpen(false);
+                setDetailModalOpen(false);
+                setRejectionReason('');
+                setSelectedRequest(null);
+                fetchRequests();
+            } else {
+                setError(res?.message || 'Thao tác từ chối thất bại.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
+        } finally {
+            setSubmittingAction(false);
+        }
+    };
+
+    // Format durations
+    const formatDuration = (start, end) => {
+        if (!start || !end) return '';
+        const durationMs = new Date(end) - new Date(start);
+        const mins = Math.floor(durationMs / 60000);
+        const hours = Math.floor(mins / 60);
+        const remainingMins = mins % 60;
+        if (hours > 0) {
+            return `${hours} giờ ${remainingMins > 0 ? `${remainingMins} phút` : ''}`;
+        }
+        return `${mins} phút`;
+    };
+
+    return (
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-6 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-2"
+        >
+            {/* Header & Back Button */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-platinum-tint pb-4">
+                <div>
+                    <button
+                        onClick={() => navigate('/manager')}
+                        className="inline-flex items-center gap-1.5 text-slate-blue hover:text-midnight-indigo font-bold text-sm mb-2 transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" /> Quay lại Trang chủ
+                    </button>
+                    <h1 className="text-xl md:text-2xl font-extrabold text-midnight-indigo leading-tight">
+                        Quản lý lịch họp & Phê duyệt
+                    </h1>
+                    <p className="text-xs text-slate-blue mt-1 leading-relaxed">
+                        Danh sách đầy đủ và chi tiết các yêu cầu phê duyệt đặt phòng họp của phòng ban.
+                    </p>
+                </div>
+                <button
+                    onClick={() => fetchRequests()}
+                    className="p-2.5 bg-white border border-platinum-tint hover:bg-cloud-mist rounded-xl text-slate-blue hover:text-midnight-indigo transition-all shadow-sm flex items-center justify-center gap-2 text-xs font-bold self-stretch sm:self-auto shrink-0"
+                >
+                    <RefreshCw className="w-4 h-4" /> Tải lại danh sách
+                </button>
+            </div>
+
+            {/* Toasts / Alert Messages */}
+            <AnimatePresence>
+                {successMsg && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm flex items-center justify-between shadow-sm animate-pulse-soft"
+                    >
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                            <span className="font-semibold">{successMsg}</span>
+                        </div>
+                        <button onClick={() => setSuccessMsg(null)} className="text-emerald-500 font-bold hover:text-emerald-700 p-1">✕</button>
+                    </motion.div>
+                )}
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm flex items-center justify-between shadow-sm"
+                    >
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-red-600" />
+                            <span className="font-semibold">{error}</span>
+                        </div>
+                        <button onClick={() => setError(null)} className="text-rose-500 font-bold hover:text-rose-700 p-1">✕</button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Filters panel */}
+            <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm space-y-4">
+                <form onSubmit={handleSearchSubmit} className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-end justify-between">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">
+                        {/* Search keyword */}
+                        <div className="relative">
+                            <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1.5">Từ khóa tìm kiếm</label>
+                            <div className="relative">
+                                <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-blue/60" />
+                                <input
+                                    type="text"
+                                    placeholder="Tên cuộc họp, người tạo..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
+                                />
+                            </div>
+                        </div>
+
+                        {/* From Date */}
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1.5">Từ ngày</label>
+                            <input
+                                type="date"
+                                value={fromDate}
+                                onChange={(e) => setFromDate(e.target.value)}
+                                className="w-full px-3.5 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
+                            />
+                        </div>
+
+                        {/* To Date */}
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1.5">Đến ngày</label>
+                            <input
+                                type="date"
+                                value={toDate}
+                                onChange={(e) => setToDate(e.target.value)}
+                                className="w-full px-3.5 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2.5 justify-end shrink-0">
+                        <button
+                            type="button"
+                            onClick={handleResetFilters}
+                            className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist rounded-xl text-xs font-bold text-slate-blue transition-all"
+                        >
+                            Đặt lại bộ lọc
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-5 py-2 bg-action-blue hover:bg-action-blue/90 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                        >
+                            <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                        </button>
+                    </div>
+                </form>
+            </motion.div>
+
+            {/* Status tabs */}
+            <motion.div variants={itemVariants} className="flex border-b border-platinum-tint gap-1 bg-white p-1 rounded-xl border border-platinum-tint/80 shadow-sm w-max">
+                {[
+                    { key: 'pending', label: 'Chờ phê duyệt' },
+                    { key: 'approved', label: 'Đã phê duyệt' },
+                    { key: 'rejected', label: 'Đã từ chối' },
+                    { key: 'all', label: 'Tất cả yêu cầu' }
+                ].map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => handleTabChange(tab.key)}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                            statusFilter === tab.key
+                                ? 'bg-action-blue text-white shadow-sm'
+                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </motion.div>
+
+            {/* Main Requests Table Card */}
+            <motion.div variants={itemVariants} className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    {loading ? (
+                        <div className="p-16 flex flex-col items-center justify-center text-slate-blue gap-3">
+                            <div className="w-9 h-9 border-3 border-action-blue border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs font-bold">Đang tải danh sách yêu cầu đặt lịch họp...</span>
+                        </div>
+                    ) : requests.length === 0 ? (
+                        <div className="p-16 text-center text-slate-blue font-medium flex flex-col items-center gap-2.5">
+                            <FileText className="w-10 h-10 text-platinum-tint" />
+                            <span className="text-sm">Không tìm thấy yêu cầu đặt lịch họp nào phù hợp với bộ lọc hiện tại.</span>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse min-w-[900px]">
+                            <thead>
+                                <tr className="border-b border-platinum-tint bg-cloud-mist/20 text-xs font-bold text-slate-blue uppercase">
+                                    <th className="p-4 w-32">Mã yêu cầu</th>
+                                    <th className="p-4">Tiêu đề cuộc họp</th>
+                                    <th className="p-4">Người tạo</th>
+                                    <th className="p-4">Phòng họp</th>
+                                    <th className="p-4">Thời gian họp</th>
+                                    <th className="p-4 w-32">Độ trùng lịch</th>
+                                    <th className="p-4 w-32">Trạng thái</th>
+                                    <th className="p-4 text-right w-44">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {requests.map(req => {
+                                    const hasConflict = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+                                    return (
+                                        <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/10 transition-colors">
+                                            {/* Code */}
+                                            <td className="p-4 font-mono text-xs text-midnight-indigo font-bold whitespace-nowrap">
+                                                {req.requestCode}
+                                            </td>
+                                            
+                                            {/* Title */}
+                                            <td className="p-4 font-semibold text-midnight-indigo max-w-xs truncate" title={req.meeting?.title || 'Đăt lịch phòng họp'}>
+                                                {req.meeting?.title || 'Đăt lịch phòng họp'}
+                                            </td>
+                                            
+                                            {/* Requester */}
+                                            <td className="p-4 text-slate-blue font-medium whitespace-nowrap">
+                                                {req.requestedBy?.fullName || 'Nhân viên'}
+                                                <span className="block text-[10px] opacity-75">{req.requestedBy?.email}</span>
+                                            </td>
+                                            
+                                            {/* Room */}
+                                            <td className="p-4 font-medium text-midnight-indigo whitespace-nowrap">
+                                                {req.targetRoom?.roomName || 'N/A'}
+                                                <span className="block text-[10px] text-slate-blue font-normal">{req.targetRoom?.siteName || 'Khu vực'}</span>
+                                            </td>
+                                            
+                                            {/* Time */}
+                                            <td className="p-4 text-xs text-slate-blue font-medium whitespace-nowrap">
+                                                <span className="block font-bold text-midnight-indigo/90">
+                                                    {new Date(req.requestedStartTime).toLocaleDateString('vi-VN')}
+                                                </span>
+                                                <span className="block text-[10px] mt-0.5 text-slate-blue font-semibold">
+                                                    {new Date(req.requestedStartTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(req.requestedEndTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </td>
+                                            
+                                            {/* Conflict Indicator */}
+                                            <td className="p-4 whitespace-nowrap">
+                                                {hasConflict ? (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                                                        <AlertTriangle className="w-3 h-3 text-red-600 animate-pulse" />
+                                                        Bị trùng lịch
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-250">
+                                                        Không trùng
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            {/* Status Badge */}
+                                            <td className="p-4 whitespace-nowrap">
+                                                {req.approvalStatus === 'pending' && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-600 border border-amber-200 uppercase tracking-wider">
+                                                        Chờ duyệt
+                                                    </span>
+                                                )}
+                                                {req.approvalStatus === 'approved' && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase tracking-wider">
+                                                        Đã duyệt
+                                                    </span>
+                                                )}
+                                                {req.approvalStatus === 'rejected' && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-50 text-rose-600 border border-rose-200 uppercase tracking-wider">
+                                                        Từ chối
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="p-4 text-right flex justify-end gap-1.5 items-center">
+                                                {/* View Detail icon always */}
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedRequest(req);
+                                                        setDetailModalOpen(true);
+                                                    }}
+                                                    className="p-1.5 text-slate-blue hover:text-action-blue hover:bg-cloud-mist/50 rounded-lg transition-colors"
+                                                    title="Chi tiết yêu cầu"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+
+                                                {req.approvalStatus === 'pending' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedRequest(req);
+                                                                setApprovalModalOpen(true);
+                                                            }}
+                                                            className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                            title="Phê duyệt"
+                                                        >
+                                                            <CheckCircle2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedRequest(req);
+                                                                setRejectionModalOpen(true);
+                                                            }}
+                                                            className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Từ chối"
+                                                        >
+                                                            <XCircle className="w-4 h-4" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                {/* Pagination Controls */}
+                {!loading && totalPages > 1 && (
+                    <div className="p-4 bg-cloud-mist/20 border-t border-platinum-tint flex items-center justify-between text-xs font-semibold text-slate-blue select-none">
+                        <span>Hiển thị kết quả từ {((currentPage - 1) * limit) + 1} - {Math.min(currentPage * limit, totalCount)} trên {totalCount} yêu cầu</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1.5 bg-white border border-platinum-tint rounded-lg flex items-center gap-1 hover:bg-cloud-mist hover:text-midnight-indigo disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-slate-blue transition-all"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" /> Trang trước
+                            </button>
+                            <span className="flex items-center px-2">Trang {currentPage} / {totalPages}</span>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 bg-white border border-platinum-tint rounded-lg flex items-center gap-1 hover:bg-cloud-mist hover:text-midnight-indigo disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-slate-blue transition-all"
+                            >
+                                Trang sau <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </motion.div>
+
+            {/* MODALS */}
+            {/* 1. Request Detail Modal */}
+            <AnimatePresence>
+                {detailModalOpen && selectedRequest && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl border border-platinum-tint shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                        >
+                            {/* Modal Header */}
+                            <div className="p-5 border-b border-platinum-tint flex justify-between items-center bg-cloud-mist/40 shrink-0">
+                                <div>
+                                    <span className="text-[10px] font-mono font-extrabold text-action-blue tracking-wider bg-blue-50 px-2 py-0.5 rounded border border-blue-150">
+                                        YÊU CẦU: {selectedRequest.requestCode}
+                                    </span>
+                                    <h3 className="text-base font-bold text-midnight-indigo mt-1">Chi tiết yêu cầu đặt phòng họp</h3>
+                                </div>
+                                <button
+                                    onClick={() => setDetailModalOpen(false)}
+                                    className="p-1 rounded-full text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60 transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Modal Content - Scrollable */}
+                            <div className="p-6 overflow-y-auto space-y-6 text-left">
+                                {/* Basic Info Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 bg-cloud-mist/20 rounded-xl border border-platinum-tint/60 space-y-2">
+                                        <h4 className="text-[11px] font-bold text-slate-blue uppercase tracking-wider">Thông tin chung cuộc họp</h4>
+                                        <div className="text-xs space-y-1 text-midnight-indigo">
+                                            <p className="font-semibold text-sm">{selectedRequest.meeting?.title || 'Cuộc họp nội bộ'}</p>
+                                            {selectedRequest.meeting?.description && (
+                                                <p className="text-[11px] text-slate-blue italic line-clamp-2 mt-1">{selectedRequest.meeting?.description}</p>
+                                            )}
+                                            <p className="pt-1 flex items-center gap-1.5 text-slate-blue">
+                                                <Calendar className="w-3.5 h-3.5 text-action-blue" />
+                                                <span>Ngày {new Date(selectedRequest.requestedStartTime).toLocaleDateString('vi-VN')}</span>
+                                            </p>
+                                            <p className="flex items-center gap-1.5 text-slate-blue">
+                                                <Clock className="w-3.5 h-3.5 text-action-blue" />
+                                                <span>
+                                                    {new Date(selectedRequest.requestedStartTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedRequest.requestedEndTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ({formatDuration(selectedRequest.requestedStartTime, selectedRequest.requestedEndTime)})
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 bg-cloud-mist/20 rounded-xl border border-platinum-tint/60 space-y-2">
+                                        <h4 className="text-[11px] font-bold text-slate-blue uppercase tracking-wider">Phòng họp & Sức chứa</h4>
+                                        <div className="text-xs space-y-1.5 text-midnight-indigo">
+                                            <p className="font-bold text-sm text-action-blue">{selectedRequest.targetRoom?.roomName}</p>
+                                            <p className="text-[11px] text-slate-blue">{selectedRequest.targetRoom?.siteName || 'Khu vực chính'}</p>
+                                            <p className="font-semibold">Sức chứa tối đa: <span className="text-midnight-indigo font-bold">{selectedRequest.targetRoom?.capacity} người</span></p>
+                                            <p className="text-[10px] text-slate-blue">Camera: {selectedRequest.targetRoom?.hasCamera ? 'Có' : 'Không'} • Micro: {selectedRequest.targetRoom?.hasMicrophone ? 'Có' : 'Không'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Requester Details */}
+                                <div className="p-4 bg-blue-50/10 rounded-xl border border-blue-100/60 space-y-2">
+                                    <h4 className="text-[11px] font-bold text-action-blue uppercase tracking-wider">Người tạo yêu cầu</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-midnight-indigo">
+                                        <p><strong className="text-slate-blue font-semibold">Họ tên:</strong> {selectedRequest.requestedBy?.fullName}</p>
+                                        <p><strong className="text-slate-blue font-semibold">Hòm thư:</strong> {selectedRequest.requestedBy?.email}</p>
+                                        {selectedRequest.requestedBy?.employeeCode && (
+                                            <p><strong className="text-slate-blue font-semibold">Mã nhân viên:</strong> {selectedRequest.requestedBy?.employeeCode}</p>
+                                        )}
+                                        {selectedRequest.requestedBy?.department?.departmentName && (
+                                            <p><strong className="text-slate-blue font-semibold">Phòng ban:</strong> {selectedRequest.requestedBy?.department?.departmentName}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Conflict Alerts */}
+                                {selectedRequest.approvalStatus === 'pending' && (
+                                    <div className={`p-4 rounded-xl border flex gap-3 ${
+                                        selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
+                                            ? 'bg-rose-50 border-rose-200 text-rose-800'
+                                            : 'bg-emerald-50 border-emerald-250 text-emerald-800'
+                                    }`}>
+                                        <AlertTriangle className={`w-5 h-5 shrink-0 ${
+                                            selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked' ? 'text-red-600 animate-pulse' : 'text-emerald-600'
+                                        }`} />
+                                        <div className="text-xs space-y-1">
+                                            <p className="font-bold">
+                                                {selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
+                                                    ? 'Cảnh báo trùng lịch phòng họp!'
+                                                    : 'Phòng họp trống trong khung giờ này'}
+                                            </p>
+                                            <p className="leading-relaxed opacity-90">
+                                                {selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
+                                                    ? 'Khung giờ này đã được đăng ký hoặc có lịch họp trùng lắp cùng phòng họp. Vui lòng cân nhắc từ chối hoặc sắp xếp phương án khác.'
+                                                    : 'Không phát hiện bất kì lịch họp trùng nào cho phòng họp Apollo này trong khung giờ được yêu cầu.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Approval/Rejection Log (For approved/rejected status) */}
+                                {selectedRequest.approvalStatus !== 'pending' && (
+                                    <div className={`p-4 rounded-xl border space-y-2 ${
+                                        selectedRequest.approvalStatus === 'approved'
+                                            ? 'bg-emerald-50/20 border-emerald-100 text-emerald-850'
+                                            : 'bg-rose-50/20 border-rose-100 text-rose-850'
+                                    }`}>
+                                        <h4 className="text-[11px] font-bold uppercase tracking-wider">
+                                            Lịch sử xét duyệt ({selectedRequest.approvalStatus === 'approved' ? 'Đã duyệt' : 'Đã từ chối'})
+                                        </h4>
+                                        <div className="text-xs space-y-1 text-midnight-indigo">
+                                            {selectedRequest.decisionDate && (
+                                                <p><strong className="opacity-75">Ngày xử lý:</strong> {new Date(selectedRequest.decisionDate).toLocaleString('vi-VN')}</p>
+                                            )}
+                                            {selectedRequest.approvedBy?.fullName && (
+                                                <p><strong className="opacity-75">Người xử lý:</strong> {selectedRequest.approvedBy?.fullName}</p>
+                                            )}
+                                            {selectedRequest.approvalStatus === 'approved' && selectedRequest.decisionNote && (
+                                                <p className="bg-white/60 p-2.5 rounded-lg mt-1 border border-emerald-100/50"><strong className="opacity-80">Ghi chú duyệt:</strong> {selectedRequest.decisionNote}</p>
+                                            )}
+                                            {selectedRequest.approvalStatus === 'rejected' && selectedRequest.rejectionReason && (
+                                                <p className="bg-white/60 p-2.5 rounded-lg mt-1 border border-rose-100/50"><strong className="opacity-80">Lý do từ chối:</strong> {selectedRequest.rejectionReason}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 flex justify-end gap-2.5 shrink-0">
+                                <button
+                                    onClick={() => setDetailModalOpen(false)}
+                                    className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist text-xs font-bold text-midnight-indigo rounded-xl transition-all"
+                                >
+                                    Đóng
+                                </button>
+                                
+                                {selectedRequest.approvalStatus === 'pending' && (
+                                    <>
+                                        <button
+                                            onClick={() => setRejectionModalOpen(true)}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
+                                        >
+                                            <XCircle className="w-4 h-4" /> Từ chối yêu cầu
+                                        </button>
+                                        <button
+                                            onClick={() => setApprovalModalOpen(true)}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
+                                        >
+                                            <CheckCircle2 className="w-4 h-4" /> Phê duyệt yêu cầu
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* 2. Approve Confirmation Modal */}
+            <AnimatePresence>
+                {approvalModalOpen && selectedRequest && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl border border-platinum-tint shadow-lg w-full max-w-md p-6"
+                        >
+                            <h3 className="text-base font-bold text-midnight-indigo mb-2">Xác nhận phê duyệt đặt phòng</h3>
+                            <p className="text-xs text-slate-blue mb-4 leading-relaxed">
+                                Bạn chuẩn bị phê duyệt yêu cầu <strong className="text-midnight-indigo font-mono">{selectedRequest.requestCode}</strong> cho cuộc họp <strong>"{selectedRequest.meeting?.title}"</strong>.
+                            </p>
+
+                            <div className="space-y-4 text-left">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Ghi chú phê duyệt (Tùy chọn)</label>
+                                    <textarea
+                                        value={decisionNote}
+                                        onChange={(e) => setDecisionNote(e.target.value)}
+                                        rows={3}
+                                        placeholder="Nhập ghi chú phê duyệt gửi tới người yêu cầu..."
+                                        className="w-full p-3 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue text-midnight-indigo"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-2.5 pt-2 border-t border-platinum-tint/40">
+                                    <button
+                                        onClick={() => {
+                                            setApprovalModalOpen(false);
+                                            setDecisionNote('');
+                                        }}
+                                        className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist rounded-xl text-xs font-bold text-slate-blue transition-colors"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        onClick={handleApprove}
+                                        disabled={submittingAction}
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                    >
+                                        {submittingAction && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                                        Xác nhận phê duyệt
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* 3. Reject Confirmation Modal */}
+            <AnimatePresence>
+                {rejectionModalOpen && selectedRequest && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl border border-platinum-tint shadow-lg w-full max-w-md p-6"
+                        >
+                            <h3 className="text-base font-bold text-red-600 mb-2">Từ chối yêu cầu đặt phòng</h3>
+                            <p className="text-xs text-slate-blue mb-4 leading-relaxed">
+                                Vui lòng nhập lý do từ chối cụ thể cho yêu cầu <strong className="text-midnight-indigo font-mono">{selectedRequest.requestCode}</strong>.
+                            </p>
+
+                            <div className="space-y-4 text-left">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Lý do từ chối (Bắt buộc)</label>
+                                    <textarea
+                                        value={rejectionReason}
+                                        onChange={(e) => setRejectionReason(e.target.value)}
+                                        rows={3}
+                                        placeholder="Nhập lý do từ chối..."
+                                        className="w-full p-3 border border-red-200 focus:border-red-500 rounded-xl text-xs focus:outline-none text-midnight-indigo font-medium"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-2.5 pt-2 border-t border-platinum-tint/40">
+                                    <button
+                                        onClick={() => {
+                                            setRejectionModalOpen(false);
+                                            setRejectionReason('');
+                                        }}
+                                        className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist rounded-xl text-xs font-bold text-slate-blue transition-colors"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        onClick={handleReject}
+                                        disabled={submittingAction || !rejectionReason.trim()}
+                                        className="px-4 py-2 bg-red-600 hover:bg-red-750 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                    >
+                                        {submittingAction && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                                        Xác nhận từ chối
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </motion.div>
+    );
+};
+
+export default MeetingApprovals;
