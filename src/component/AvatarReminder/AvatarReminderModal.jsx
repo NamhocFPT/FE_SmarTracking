@@ -83,7 +83,7 @@ const AvatarReminderModal = () => {
         : 'Bạn chưa nộp ảnh đại diện';
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
             <div className="bg-white rounded-2xl shadow-sm-2 w-full max-w-md overflow-hidden animate-fade-in-up">
                 {/* Header */}
                 <div className="px-6 pt-5 pb-2 flex items-start justify-between">
