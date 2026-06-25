@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Calendar, Clock, Users, ShieldAlert, Video, Mic, Plus, Trash2, Check, AlertTriangle, ArrowLeft, Info, HelpCircle, Search, ChevronRight, CheckCircle2
+    Calendar, Clock, Users, ShieldAlert, Video, Mic, Plus, Trash2, Check, AlertTriangle, ArrowLeft, Info, HelpCircle, Search, ChevronRight, CheckCircle2, X, FileSpreadsheet, Upload, Download, Paperclip
 } from 'lucide-react';
-import { getRooms, getUsers, createMeeting, getRoomBookings } from '../../service/employeeServices';
+import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers } from '../../service/employeeServices';
+import { getDepartments } from '../../service/businessAdminServices';
+import * as XLSX from 'xlsx';
 
 const BookMeeting = () => {
     const navigate = useNavigate();
@@ -15,32 +17,36 @@ const BookMeeting = () => {
 
     // Form states
     const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
     const [selectedRoomId, setSelectedRoomId] = useState('');
     const [meetingDate, setMeetingDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('10:00');
-    const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
+    const [expectedAttendeeCount, setExpectedAttendeeCount] = useState('');
+    const [capacityOverrideConfirmed, setCapacityOverrideConfirmed] = useState(false);
     const [recordingEnabled, setRecordingEnabled] = useState(false);
     const [audioRecordingEnabled, setAudioRecordingEnabled] = useState(false);
     const [pdpaConsent, setPdpaConsent] = useState(false);
+
+    // Participants states (Internal and External)
+    const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
+    const [externalParticipants, setExternalParticipants] = useState([]);
 
     // Agenda states
     const [agendaList, setAgendaList] = useState([]);
     const [newAgendaTitle, setNewAgendaTitle] = useState('');
     const [newAgendaDuration, setNewAgendaDuration] = useState('15');
+    const [newAgendaFile, setNewAgendaFile] = useState(null);
 
     // Data lists
-    const [rooms, setRooms] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [users, setUsers] = useState([]);
-    const [bookings, setBookings] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
 
-    // Filter/matching states
+    // Search and availability states
     const [availableRooms, setAvailableRooms] = useState([]);
-    const [suggestedRooms, setSuggestedRooms] = useState([]);
     const [searchingRooms, setSearchingRooms] = useState(false);
     const [searchPerformed, setSearchPerformed] = useState(false);
-    const [timeAdjustedMessage, setTimeAdjustedMessage] = useState('');
 
     // Feedback states
     const [submitting, setSubmitting] = useState(false);
@@ -48,6 +54,15 @@ const BookMeeting = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const [conflictInfo, setConflictInfo] = useState(null);
     const [alternativeRooms, setAlternativeRooms] = useState([]);
+
+    // Import modal states
+    const [searchEmail, setSearchEmail] = useState('');
+    const [searchFocused, setSearchFocused] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importMethod, setImportMethod] = useState('manual'); // 'manual' or 'excel'
+    const [manualEmails, setManualEmails] = useState('');
+    const [manualType, setManualType] = useState('auto'); // 'auto', 'internal', 'external'
+    const [importPreview, setImportPreview] = useState([]);
 
     useEffect(() => {
         try {
@@ -61,33 +76,18 @@ const BookMeeting = () => {
 
         const fetchData = async () => {
             try {
-                const [roomsRes, usersRes, bookingsRes] = await Promise.all([
-                    getRooms(),
-                    getUsers(),
-                    getRoomBookings()
+                const [usersRes, deptsRes] = await Promise.all([
+                    getUsers({ limit: 1000 }),
+                    getDepartments().catch(err => {
+                        console.error('Failed to load departments', err);
+                        return { success: false };
+                    })
                 ]);
-
-                let fetchedRooms = [];
-                let fetchedBookings = [];
-
-                if (roomsRes?.success) {
-                    fetchedRooms = roomsRes.data || [];
-                    setRooms(fetchedRooms);
-                } else {
-                    // Fallback mock rooms
-                    fetchedRooms = [
-                        { id: 'room-1', roomName: 'Phòng Apollo 101', capacity: 10, siteName: 'Tòa nhà A', departmentRestricted: false },
-                        { id: 'room-2', roomName: 'Phòng Athena 102', capacity: 15, siteName: 'Tòa nhà A', departmentRestricted: false },
-                        { id: 'room-3', roomName: 'Phòng Zeus 201', capacity: 30, siteName: 'Tòa nhà B', departmentRestricted: true, departmentId: 'dept-it' },
-                        { id: 'room-4', roomName: 'Phòng Huddle 302', capacity: 5, siteName: 'Tòa nhà B', departmentRestricted: false }
-                    ];
-                    setRooms(fetchedRooms);
-                }
 
                 if (usersRes?.success) {
                     setUsers(usersRes.data || []);
                 } else {
-                    // Fallback mock users
+                    // Fallback mock users for local mapping if needed
                     setUsers([
                         { id: 'user-1', fullName: 'Lê Hoàng Hải', email: 'hai.lh@smrmpts.com' },
                         { id: 'user-2', fullName: 'Nguyễn Thị Minh', email: 'minh.nt@smrmpts.com' },
@@ -96,74 +96,19 @@ const BookMeeting = () => {
                     ]);
                 }
 
-                if (bookingsRes?.success) {
-                    fetchedBookings = bookingsRes.data || [];
-                    setBookings(fetchedBookings);
-                }
-
-                // Initial matching with default times
-                const reqStart = new Date(`${meetingDate}T${startTime}:00`);
-                const reqEnd = new Date(`${meetingDate}T${endTime}:00`);
-                if (!isNaN(reqStart.getTime()) && !isNaN(reqEnd.getTime()) && reqStart < reqEnd) {
-                    const perfect = [];
-                    const suggested = [];
-                    const durationMs = reqEnd.getTime() - reqStart.getTime();
-
-                    fetchedRooms.forEach(room => {
-                        const roomBookings = fetchedBookings.filter(b => b.room_id === room.id && b.status !== 'cancelled' && b.status !== 'rejected');
-                        const overlappingBookings = roomBookings.filter(b => {
-                            const bStart = new Date(b.reserved_start_time || b.start_time);
-                            const bEnd = new Date(b.reserved_end_time || b.end_time);
-                            return bStart < reqEnd && bEnd > reqStart;
-                        });
-
-                        if (overlappingBookings.length === 0) {
-                            perfect.push(room);
-                        } else {
-                            const candidates = overlappingBookings.filter(b => {
-                                const bEnd = new Date(b.reserved_end_time || b.end_time);
-                                const diffMs = bEnd.getTime() - reqStart.getTime();
-                                return diffMs > 0 && diffMs <= 10 * 60 * 1000;
-                            });
-
-                            if (candidates.length > 0) {
-                                candidates.sort((a, b) => {
-                                    const aEnd = new Date(a.reserved_end_time || a.end_time).getTime();
-                                    const bEnd = new Date(b.reserved_end_time || b.end_time).getTime();
-                                    return bEnd - aEnd;
-                                });
-                                
-                                const targetBooking = candidates[0];
-                                const bEnd = new Date(targetBooking.reserved_end_time || targetBooking.end_time);
-                                const suggestedStart = bEnd;
-                                const suggestedEnd = new Date(suggestedStart.getTime() + durationMs);
-
-                                const hasOtherOverlap = roomBookings.some(b => {
-                                    if (b.id === targetBooking.id) return false;
-                                    const oStart = new Date(b.reserved_start_time || b.start_time);
-                                    const oEnd = new Date(b.reserved_end_time || b.end_time);
-                                    return oStart < suggestedEnd && oEnd > suggestedStart;
-                                });
-
-                                if (!hasOtherOverlap) {
-                                    suggested.push({
-                                        ...room,
-                                        suggestedStartTime: suggestedStart,
-                                        suggestedEndTime: suggestedEnd,
-                                        conflictingBooking: targetBooking
-                                    });
-                                }
-                            }
-                        }
-                    });
-
-                    setAvailableRooms(perfect);
-                    setSuggestedRooms(suggested);
-                    setSearchPerformed(true);
+                if (deptsRes?.success) {
+                    setDepartments(deptsRes.data || []);
+                } else {
+                    setDepartments([
+                        { id: 'dept-1', department_code: 'IT', department_name: 'Phòng Công nghệ thông tin' },
+                        { id: 'dept-2', department_code: 'HR', department_name: 'Phòng Nhân sự' },
+                        { id: 'dept-3', department_code: 'SALES', department_name: 'Phòng Kinh doanh' },
+                        { id: 'dept-4', department_code: 'RND', department_name: 'Phòng Nghiên cứu & Phát triển' }
+                    ]);
                 }
             } catch (err) {
-                console.error('Error fetching data', err);
-                setErrorMsg('Không thể tải danh sách phòng họp hoặc nhân sự.');
+                console.error('Error fetching initial data', err);
+                setErrorMsg('Không thể tải danh sách phòng ban hoặc nhân sự.');
             } finally {
                 setLoadingData(false);
             }
@@ -172,7 +117,7 @@ const BookMeeting = () => {
         fetchData();
     }, []);
 
-    const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+    const selectedRoom = availableRooms.find(r => r.id === selectedRoomId);
 
     const getMeetingDurationMinutes = () => {
         if (!startTime || !endTime) return 0;
@@ -186,11 +131,16 @@ const BookMeeting = () => {
     const meetingDuration = getMeetingDurationMinutes();
     const agendaTotalDuration = agendaList.reduce((acc, curr) => acc + Number(curr.durationMin), 0);
 
-    const formatTime = (date) => {
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-    };
+    const actualAttendeeCount = selectedParticipantIds.length + externalParticipants.length + 1; // +1 cho host
+    const capacityExceeded = !!selectedRoom && (
+        (!!expectedAttendeeCount && Number(expectedAttendeeCount) > selectedRoom.capacity)
+        || actualAttendeeCount > selectedRoom.capacity
+    );
+
+    const buildIsoRange = () => ({
+        isoStart: new Date(`${meetingDate}T${startTime}:00`).toISOString(),
+        isoEnd: new Date(`${meetingDate}T${endTime}:00`).toISOString(),
+    });
 
     const handleSearchRooms = async () => {
         setSearchingRooms(true);
@@ -205,120 +155,37 @@ const BookMeeting = () => {
 
         const [sh, sm] = startTime.split(':').map(Number);
         const [eh, em] = endTime.split(':').map(Number);
-        const startTotal = sh * 60 + sm;
-        const endTotal = eh * 60 + em;
-        if (startTotal >= endTotal) {
+        if (sh * 60 + sm >= eh * 60 + em) {
             setErrorMsg('Giờ bắt đầu phải trước giờ kết thúc.');
             setSearchingRooms(false);
             return;
         }
 
         try {
-            const bookingsRes = await getRoomBookings();
-            let latestBookings = [];
-            if (bookingsRes?.success) {
-                latestBookings = bookingsRes.data || [];
-                setBookings(latestBookings);
+            const { isoStart, isoEnd } = buildIsoRange();
+            const params = { startTime: isoStart, endTime: isoEnd };
+            if (expectedAttendeeCount) params.minCapacity = expectedAttendeeCount;
+
+            const res = await getAvailableRooms(params);
+            if (res?.success) {
+                setAvailableRooms(res.data || []);
+            } else {
+                setAvailableRooms([]);
+                setErrorMsg(res?.message || 'Không thể tải danh sách phòng trống.');
             }
-            performMatching(latestBookings.length > 0 ? latestBookings : bookings);
-            setSearchPerformed(true);
         } catch (err) {
-            console.error('Error fetching bookings', err);
-            setErrorMsg('Không thể tải lịch đặt phòng hiện tại. Sử dụng dữ liệu cũ.');
-            performMatching(bookings);
-            setSearchPerformed(true);
+            console.error('Error fetching available rooms', err);
+            setAvailableRooms([]);
+            setErrorMsg(err?.error?.message || 'Không thể tải danh sách phòng trống hiện tại.');
         } finally {
+            setSearchPerformed(true);
             setSearchingRooms(false);
         }
     };
 
-    const performMatching = (currentBookings) => {
-        if (!meetingDate || !startTime || !endTime) {
-            setErrorMsg('Vui lòng chọn ngày và giờ họp.');
-            return;
-        }
-
-        const reqStart = new Date(`${meetingDate}T${startTime}:00`);
-        const reqEnd = new Date(`${meetingDate}T${endTime}:00`);
-        
-        if (isNaN(reqStart.getTime()) || isNaN(reqEnd.getTime())) {
-            setErrorMsg('Định dạng ngày giờ không hợp lệ.');
-            return;
-        }
-
-        if (reqStart >= reqEnd) {
-            setErrorMsg('Giờ kết thúc phải sau giờ bắt đầu.');
-            return;
-        }
-
-        const durationMs = reqEnd.getTime() - reqStart.getTime();
-
-        const perfect = [];
-        const suggested = [];
-
-        rooms.forEach(room => {
-            const roomBookings = currentBookings.filter(b => b.room_id === room.id && b.status !== 'cancelled' && b.status !== 'rejected');
-            const overlappingBookings = roomBookings.filter(b => {
-                const bStart = new Date(b.reserved_start_time || b.start_time);
-                const bEnd = new Date(b.reserved_end_time || b.end_time);
-                return bStart < reqEnd && bEnd > reqStart;
-            });
-
-            if (overlappingBookings.length === 0) {
-                perfect.push(room);
-            } else {
-                const candidates = overlappingBookings.filter(b => {
-                    const bEnd = new Date(b.reserved_end_time || b.end_time);
-                    const diffMs = bEnd.getTime() - reqStart.getTime();
-                    return diffMs > 0 && diffMs <= 10 * 60 * 1000;
-                });
-
-                if (candidates.length > 0) {
-                    candidates.sort((a, b) => {
-                        const aEnd = new Date(a.reserved_end_time || a.end_time).getTime();
-                        const bEnd = new Date(b.reserved_end_time || b.end_time).getTime();
-                        return bEnd - aEnd;
-                    });
-                    
-                    const targetBooking = candidates[0];
-                    const bEnd = new Date(targetBooking.reserved_end_time || targetBooking.end_time);
-                    const suggestedStart = bEnd;
-                    const suggestedEnd = new Date(suggestedStart.getTime() + durationMs);
-
-                    const hasOtherOverlap = roomBookings.some(b => {
-                        if (b.id === targetBooking.id) return false;
-                        const oStart = new Date(b.reserved_start_time || b.start_time);
-                        const oEnd = new Date(b.reserved_end_time || b.end_time);
-                        return oStart < suggestedEnd && oEnd > suggestedStart;
-                    });
-
-                    if (!hasOtherOverlap) {
-                        suggested.push({
-                            ...room,
-                            suggestedStartTime: suggestedStart,
-                            suggestedEndTime: suggestedEnd,
-                            conflictingBooking: targetBooking
-                        });
-                    }
-                }
-            }
-        });
-
-        setAvailableRooms(perfect);
-        setSuggestedRooms(suggested);
-    };
-
-    const handleSelectRoom = (room, isSuggested) => {
+    const handleSelectRoom = (room) => {
         setSelectedRoomId(room.id);
-        if (isSuggested) {
-            const newStartStr = formatTime(room.suggestedStartTime);
-            const newEndStr = formatTime(room.suggestedEndTime);
-            setStartTime(newStartStr);
-            setEndTime(newEndStr);
-            setTimeAdjustedMessage(`Đã tự động dời khung giờ họp thành ${newStartStr} - ${newEndStr} (theo giờ trống của phòng ${room.roomName || room.room_name}).`);
-        } else {
-            setTimeAdjustedMessage('');
-        }
+        setCapacityOverrideConfirmed(false);
     };
 
     const handleAddAgenda = () => {
@@ -334,23 +201,217 @@ const BookMeeting = () => {
         setErrorMsg('');
         setAgendaList(prev => [
             ...prev,
-            {
-                title: newAgendaTitle,
+            { 
+                title: newAgendaTitle, 
                 durationMin: duration,
-                orderIndex: prev.length
+                file: newAgendaFile ? { name: newAgendaFile.name, size: newAgendaFile.size } : null
             }
         ]);
         setNewAgendaTitle('');
+        setNewAgendaFile(null);
     };
 
     const handleRemoveAgenda = (index) => {
-        setAgendaList(prev => prev.filter((_, i) => i !== index).map((item, idx) => ({ ...item, orderIndex: idx })));
+        setAgendaList(prev => prev.filter((_, i) => i !== index));
     };
 
     const toggleParticipant = (userId) => {
-        setSelectedParticipantIds(prev => 
+        setSelectedParticipantIds(prev =>
             prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
         );
+    };
+
+    const getUserDeptCode = (user) => {
+        const uDept = departments.find(d => d.id === user.departmentId || d.id === user.department_id);
+        return uDept ? uDept.department_code || uDept.department_name : '';
+    };
+
+    const getFilteredUsers = () => {
+        const deptId = currentUser?.departmentId || currentUser?.department_id;
+        if (!searchEmail.trim()) {
+            if (!deptId) return users.filter(u => u.id !== currentUser?.id);
+            return users.filter(u => (u.departmentId === deptId || u.department_id === deptId) && u.id !== currentUser?.id);
+        }
+        return users.filter(u =>
+            u.email && u.email.toLowerCase().includes(searchEmail.toLowerCase().trim()) && u.id !== currentUser?.id
+        );
+    };
+
+    // --- Import guest actions ---
+    const downloadSampleExcel = () => {
+        const data = [
+            { "Email": "hai.lh@smrmpts.com", "Trong công ty": "✓", "Ngoài công ty": "✗" },
+            { "Email": "guest_external@gmail.com", "Trong công ty": "✗", "Ngoài công ty": "✓" },
+            { "Email": "minh.pv@smrmpts.com", "Trong công ty": "✓", "Ngoài công ty": "✗" }
+        ];
+        const ws = XLSX.utils.json_to_sheet(data);
+        
+        ws['!cols'] = [
+            { wch: 32 },
+            { wch: 16 },
+            { wch: 16 }
+        ];
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Danh sách khách mời");
+        XLSX.writeFile(wb, "SmarTracking_Template_Import.xlsx");
+    };
+
+    const handleExcelImport = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+                
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const isCheckMark = (val) => {
+                    const v = String(val).trim().toLowerCase();
+                    return v === '✓' || v === '✔' || v === 'x' || v === 'yes' || v === '1' || v === 'true' || v === '☑';
+                };
+                
+                const parsed = rows.map((row, index) => {
+                    const rowNumber = index + 2; 
+                    const keys = Object.keys(row);
+                    const emailKey = keys.find(k => k.toLowerCase().includes('email') || k.toLowerCase().includes('thư điện tử'));
+                    const internalKey = keys.find(k => k.toLowerCase().includes('trong') && k.toLowerCase().includes('công ty'));
+                    const externalKey = keys.find(k => k.toLowerCase().includes('ngoài') && k.toLowerCase().includes('công ty'));
+                    const legacyTypeKey = keys.find(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('loại') || k.toLowerCase().includes('loai'));
+                    
+                    const email = emailKey ? String(row[emailKey]).trim() : '';
+                    
+                    let error = '';
+                    if (!email) {
+                        error = `Dòng ${rowNumber}: Cột Email bị trống`;
+                    } else if (!email.includes('@')) {
+                        error = `Dòng ${rowNumber}: Email "${email}" thiếu ký tự '@'`;
+                    } else if (!emailRegex.test(email)) {
+                        error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
+                    }
+                    
+                    let type = 'external';
+                    if (internalKey !== undefined || externalKey !== undefined) {
+                        const internalVal = internalKey ? row[internalKey] : '';
+                        const externalVal = externalKey ? row[externalKey] : '';
+                        const isInternalChecked = isCheckMark(internalVal);
+                        const isExternalChecked = isCheckMark(externalVal);
+                        
+                        if (isInternalChecked && isExternalChecked) {
+                            error = error || `Dòng ${rowNumber}: Không thể đánh dấu cả "Trong công ty" và "Ngoài công ty" cùng lúc`;
+                        } else if (!isInternalChecked && !isExternalChecked) {
+                            type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                        } else {
+                            type = isInternalChecked ? 'internal' : 'external';
+                        }
+                    } else if (legacyTypeKey) {
+                        const typeVal = String(row[legacyTypeKey]).toLowerCase().trim();
+                        if (typeVal.includes('trong') || typeVal.includes('internal') || typeVal.includes('nội bộ') || typeVal === 'in') {
+                            type = 'internal';
+                        } else if (!typeVal) {
+                            type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                        }
+                    } else {
+                        type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                    }
+                    
+                    return { email, type, error, rowNumber };
+                });
+                
+                setImportPreview(parsed);
+            } catch (err) {
+                console.error('Failed to parse excel file', err);
+                alert('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const handleManualImport = () => {
+        if (!manualEmails.trim()) return;
+        const emailList = manualEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e !== '');
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        const parsed = emailList.map((email, index) => {
+            const rowNumber = index + 1;
+            let error = '';
+            
+            if (!email.includes('@')) {
+                error = `Dòng ${rowNumber}: Email "${email}" thiếu ký tự '@'`;
+            } else if (!emailRegex.test(email)) {
+                error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
+            }
+            
+            let type = manualType;
+            if (type === 'auto') {
+                type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+            }
+            
+            return { email, type, error, rowNumber };
+        });
+        
+        setImportPreview(parsed);
+    };
+
+    const handleConfirmImport = () => {
+        const hasErrors = importPreview.some(item => item.error !== '');
+        if (hasErrors) {
+            alert('Vui lòng loại bỏ hoặc sửa các dòng bị lỗi trước khi xác nhận.');
+            return;
+        }
+
+        let internalMatchedCount = 0;
+        let externalAddedCount = 0;
+        
+        const newSelectedIds = [...selectedParticipantIds];
+        const newExternal = [...externalParticipants];
+        
+        importPreview.forEach(item => {
+            if (item.type === 'internal') {
+                const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
+                if (foundUser) {
+                    if (!newSelectedIds.includes(foundUser.id)) {
+                        newSelectedIds.push(foundUser.id);
+                    }
+                    internalMatchedCount++;
+                } else {
+                    if (!newExternal.some(e => e.email.toLowerCase() === item.email.toLowerCase())) {
+                        newExternal.push({
+                            id: `ext-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                            email: item.email,
+                            fullName: item.email.split('@')[0],
+                            isExternal: true,
+                            isCompanyUnmatched: true
+                        });
+                    }
+                    externalAddedCount++;
+                }
+            } else {
+                if (!newExternal.some(e => e.email.toLowerCase() === item.email.toLowerCase())) {
+                    newExternal.push({
+                        id: `ext-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                        email: item.email,
+                        fullName: item.email.split('@')[0],
+                        isExternal: true
+                    });
+                }
+                externalAddedCount++;
+            }
+        });
+        
+        setSelectedParticipantIds(newSelectedIds);
+        setExternalParticipants(newExternal);
+        setShowImportModal(false);
+        setImportPreview([]);
+        setManualEmails("");
+        
+        setSuccessMessage(`Đã import thành công: chọn ${internalMatchedCount} nhân viên công ty và thêm ${externalAddedCount} khách ngoài.`);
+        setTimeout(() => setSuccessMessage(''), 5000);
     };
 
     const handleSubmit = async (e) => {
@@ -368,9 +429,7 @@ const BookMeeting = () => {
 
         const [sh, sm] = startTime.split(':').map(Number);
         const [eh, em] = endTime.split(':').map(Number);
-        const startTotal = sh * 60 + sm;
-        const endTotal = eh * 60 + em;
-        if (startTotal >= endTotal) {
+        if (sh * 60 + sm >= eh * 60 + em) {
             setErrorMsg('Giờ bắt đầu phải trước giờ kết thúc.');
             return;
         }
@@ -384,10 +443,11 @@ const BookMeeting = () => {
             return;
         }
 
-        // BR1 (Capacity constraint)
-        const totalPeople = selectedParticipantIds.length + 1; // +1 for the host
-        if (selectedRoom && totalPeople > selectedRoom.capacity) {
-            setErrorMsg(`Phòng họp "${selectedRoom.roomName || selectedRoom.room_name}" chỉ chứa tối đa ${selectedRoom.capacity} người, nhưng cuộc họp có ${totalPeople} người tham gia (bao gồm người tổ chức).`);
+        if (capacityExceeded && !capacityOverrideConfirmed) {
+            const countLabel = expectedAttendeeCount && Number(expectedAttendeeCount) > actualAttendeeCount
+                ? expectedAttendeeCount
+                : actualAttendeeCount;
+            setErrorMsg(`Số người dự kiến (${countLabel}) vượt quá sức chứa phòng "${selectedRoom?.roomName || selectedRoom?.room_name}" (${selectedRoom?.capacity} người). Vui lòng tick xác nhận vượt sức chứa hoặc chọn phòng khác.`);
             return;
         }
 
@@ -397,52 +457,119 @@ const BookMeeting = () => {
             return;
         }
 
-        const scheduledStart = new Date(`${meetingDate}T${startTime}:00`).toISOString();
-        const scheduledEnd = new Date(`${meetingDate}T${endTime}:00`).toISOString();
+        const { isoStart, isoEnd } = buildIsoRange();
 
         const payload = {
             title,
+            startTime: isoStart,
+            endTime: isoEnd,
             roomId: selectedRoomId,
-            scheduledStart,
-            scheduledEnd,
-            participantIds: selectedParticipantIds,
-            recordingEnabled,
-            audioRecordingEnabled,
-            agenda: agendaList
         };
+        if (description.trim()) payload.description = description.trim();
+        if (expectedAttendeeCount) payload.expectedAttendeeCount = Number(expectedAttendeeCount);
+        if (capacityExceeded && capacityOverrideConfirmed) payload.capacityOverrideConfirmed = true;
+        if (selectedParticipantIds.length > 0) payload.participantUserIds = selectedParticipantIds;
+        
+        if (externalParticipants.length > 0) {
+            payload.externalParticipants = externalParticipants.map(p => ({
+                fullName: p.fullName || p.email.split('@')[0],
+                email: p.email,
+                ...(p.organization ? { organization: p.organization } : {})
+            }));
+        }
 
         setSubmitting(true);
         try {
             const res = await createMeeting(payload);
-            if (res?.success) {
-                const isAutoApproved = currentUser?.role === 'Manager' || currentUser?.role === 'BusinessAdmin' || currentUser?.role === 'SystemAdmin';
-                if (isAutoApproved) {
-                    setSuccessMessage('Đặt phòng họp thành công! Lịch họp đã được lên lịch.');
-                } else {
-                    setSuccessMessage('Đăng ký đặt phòng họp thành công! Yêu cầu của bạn đã được gửi tới Quản lý phê duyệt.');
-                }
-                
-                // Clear form and reset to step 1
-                setTitle('');
-                setSelectedRoomId('');
-                setSelectedParticipantIds([]);
-                setAgendaList([]);
-                setRecordingEnabled(false);
-                setAudioRecordingEnabled(false);
-                setPdpaConsent(false);
-                setCurrentStep(1);
-                setSearchPerformed(false);
-                setTimeAdjustedMessage('');
-            } else {
-                throw new Error(res?.message || 'Conflict or general error');
+            if (!res?.success) {
+                const failure = new Error(res?.message || 'Tạo cuộc họp thất bại.');
+                failure.error = { message: res?.message || 'Tạo cuộc họp thất bại.' };
+                throw failure;
             }
+
+            const meetingId = res.data?.id;
+            const subWarnings = [];
+
+            if (meetingId && (recordingEnabled || audioRecordingEnabled)) {
+                try {
+                    await addRecordingConfig(meetingId, {
+                        enableVideo: recordingEnabled,
+                        enableAudio: audioRecordingEnabled,
+                        consentRequired: pdpaConsent,
+                    });
+                } catch (subErr) {
+                    console.error('Failed to save recording config', subErr);
+                    subWarnings.push('cấu hình ghi âm/ghi hình');
+                }
+            }
+
+            if (meetingId && agendaList.length > 0) {
+                try {
+                    await replaceAgendas(meetingId, agendaList.map(item => ({
+                        title: item.title,
+                        plannedDurationMinutes: Number(item.durationMin),
+                        fileName: item.file ? item.file.name : null,
+                        fileSize: item.file ? item.file.size : null
+                    })));
+                } catch (subErr) {
+                    console.error('Failed to save agenda', subErr);
+                    subWarnings.push('chương trình họp (agenda)');
+                }
+            }
+
+            const isScheduled = res.data?.status === 'scheduled';
+            let msg = isScheduled
+                ? 'Đặt phòng họp thành công! Lịch họp đã được lên lịch.'
+                : 'Đăng ký đặt phòng họp thành công! Yêu cầu của bạn đã được gửi tới Quản lý phê duyệt.';
+            if (subWarnings.length > 0) {
+                msg += ` (Lưu ý: lưu ${subWarnings.join(', ')} thất bại, vui lòng cập nhật lại ở trang chi tiết cuộc họp.)`;
+            }
+            
+            let homePath = '/employee';
+            if (currentUser?.role === 'Manager') {
+                homePath = '/manager';
+            } else if (currentUser?.role === 'BusinessAdmin') {
+                homePath = '/business-admin';
+            } else if (currentUser?.role === 'SystemAdmin') {
+                homePath = '/system-admin';
+            }
+
+            // Clear form and reset
+            setTitle('');
+            setDescription('');
+            setSelectedRoomId('');
+            setExpectedAttendeeCount('');
+            setCapacityOverrideConfirmed(false);
+            setSelectedParticipantIds([]);
+            setExternalParticipants([]);
+            setSearchEmail('');
+            setAgendaList([]);
+            setRecordingEnabled(false);
+            setAudioRecordingEnabled(false);
+            setPdpaConsent(false);
+            setCurrentStep(1);
+            setSearchPerformed(false);
+            setAvailableRooms([]);
+
+            // Redirect to homepage with successMessage state
+            navigate(homePath, { state: { successMessage: msg } });
         } catch (err) {
             console.error('Booking failed', err);
-            const alts = rooms.filter(r => r.id !== selectedRoomId && r.capacity >= totalPeople);
-            setConflictInfo({
-                message: 'Rất tiếc, phòng họp này hoặc người tham dự đã bị trùng lịch trong khung giờ được chọn. Vui lòng chọn phòng khác hoặc điều chỉnh khung giờ.'
-            });
-            setAlternativeRooms(alts);
+            const message = err?.error?.message
+                || 'Rất tiếc, phòng họp này hoặc người tham dự đã bị trùng lịch trong khung giờ được chọn. Vui lòng chọn phòng khác hoặc điều chỉnh khung giờ.';
+            setConflictInfo({ message });
+
+            try {
+                const { isoStart, isoEnd } = buildIsoRange();
+                const params = { startTime: isoStart, endTime: isoEnd };
+                if (expectedAttendeeCount) params.minCapacity = expectedAttendeeCount;
+                const altRes = await getAvailableRooms(params);
+                const alts = (altRes?.data || []).filter(r => r.id !== selectedRoomId);
+                setAlternativeRooms(alts);
+            } catch (altErr) {
+                console.error('Failed to fetch alternative rooms', altErr);
+                setAlternativeRooms([]);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -450,10 +577,12 @@ const BookMeeting = () => {
 
     const handleSelectAlternativeRoom = (roomId) => {
         setSelectedRoomId(roomId);
+        setCapacityOverrideConfirmed(false);
         setConflictInfo(null);
         setAlternativeRooms([]);
-        setTimeAdjustedMessage('');
     };
+
+    const isManagerOrAdmin = currentUser?.role === 'Manager' || currentUser?.role === 'BusinessAdmin' || currentUser?.role === 'SystemAdmin';
 
     if (loadingData) {
         return (
@@ -463,8 +592,6 @@ const BookMeeting = () => {
             </div>
         );
     }
-
-    const isManagerOrAdmin = currentUser?.role === 'Manager' || currentUser?.role === 'BusinessAdmin' || currentUser?.role === 'SystemAdmin';
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -486,8 +613,8 @@ const BookMeeting = () => {
             <div className="flex items-center justify-center gap-4 py-2 border-b border-platinum-tint/30 mb-2">
                 <div className="flex items-center gap-2">
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        currentStep === 1 
-                            ? 'bg-action-blue text-white ring-4 ring-action-blue/15' 
+                        currentStep === 1
+                            ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
                             : 'bg-emerald-500 text-white'
                     }`}>
                         {currentStep > 1 ? <Check className="w-4 h-4" /> : '1'}
@@ -499,8 +626,8 @@ const BookMeeting = () => {
                 <div className="w-16 h-0.5 bg-platinum-tint rounded" />
                 <div className="flex items-center gap-2">
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        currentStep === 2 
-                            ? 'bg-action-blue text-white ring-4 ring-action-blue/15' 
+                        currentStep === 2
+                            ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
                             : 'bg-cloud-mist border border-platinum-tint text-slate-blue'
                     }`}>
                         2
@@ -554,7 +681,7 @@ const BookMeeting = () => {
                                 <Clock className="w-4 h-4 text-action-blue" /> Khung thời gian họp
                             </h3>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Ngày họp *</label>
                                     <input
@@ -564,7 +691,6 @@ const BookMeeting = () => {
                                         onChange={(e) => {
                                             setMeetingDate(e.target.value);
                                             setSelectedRoomId('');
-                                            setTimeAdjustedMessage('');
                                         }}
                                         className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
                                         required
@@ -578,7 +704,6 @@ const BookMeeting = () => {
                                         onChange={(e) => {
                                             setStartTime(e.target.value);
                                             setSelectedRoomId('');
-                                            setTimeAdjustedMessage('');
                                         }}
                                         className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
                                         required
@@ -592,10 +717,23 @@ const BookMeeting = () => {
                                         onChange={(e) => {
                                             setEndTime(e.target.value);
                                             setSelectedRoomId('');
-                                            setTimeAdjustedMessage('');
                                         }}
                                         className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
                                         required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Số người dự kiến</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={expectedAttendeeCount}
+                                        onChange={(e) => {
+                                            setExpectedAttendeeCount(e.target.value);
+                                            setSelectedRoomId('');
+                                        }}
+                                        placeholder="Tuỳ chọn"
+                                        className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
                                     />
                                 </div>
                             </div>
@@ -620,126 +758,54 @@ const BookMeeting = () => {
 
                         {/* Search Results */}
                         {searchPerformed && (
-                            <div className="space-y-6">
-                                {timeAdjustedMessage && (
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center gap-2"
-                                    >
-                                        <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                                        <span className="font-semibold">{timeAdjustedMessage}</span>
-                                    </motion.div>
+                            <div>
+                                <h4 className="font-bold text-xs text-slate-blue uppercase mb-3 flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Phòng họp trống ({availableRooms.length})
+                                </h4>
+                                {availableRooms.length > 0 ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {availableRooms.map(room => {
+                                            const isSelected = selectedRoomId === room.id;
+                                            return (
+                                                <div
+                                                    key={room.id}
+                                                    onClick={() => handleSelectRoom(room)}
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${
+                                                        isSelected
+                                                            ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15'
+                                                            : 'bg-white border-platinum-tint hover:border-action-blue/50 hover:bg-cloud-mist/50'
+                                                    }`}
+                                                >
+                                                    <div>
+                                                        <div className="flex justify-between items-start">
+                                                            <h5 className="font-bold text-sm text-midnight-indigo">{room.roomName || room.room_name}</h5>
+                                                            <span className="text-[11px] font-bold text-slate-blue bg-cloud-mist px-2 py-0.5 rounded">
+                                                                Sức chứa: {room.capacity} người
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-blue mt-1 line-clamp-1">
+                                                            {room.siteName || room.site_name} • {room.areaName || room.area_name || 'Khu vực chính'}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Facilities Icons */}
+                                                    <div className="flex items-center justify-between border-t border-platinum-tint/40 pt-2.5 mt-2">
+                                                        <div className="flex items-center gap-2.5 text-slate-blue/70">
+                                                            {(room.hasCamera || room.has_camera) && <Video className="w-3.5 h-3.5" title="Có Camera" />}
+                                                            {(room.hasMicrophone || room.has_microphone) && <Mic className="w-3.5 h-3.5" title="Có Mic" />}
+                                                            {(room.hasDisplay || room.has_display) && <Calendar className="w-3.5 h-3.5" title="Có Màn hình" />}
+                                                        </div>
+                                                        <span className={`text-xs font-bold transition-colors ${isSelected ? 'text-action-blue' : 'text-slate-blue/60'}`}>
+                                                            {isSelected ? 'Đã chọn' : 'Chọn phòng'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-blue italic pl-2 py-2">Không tìm thấy phòng họp trống trong khung giờ này. Vui lòng đổi giờ hoặc số người dự kiến.</p>
                                 )}
-
-                                {/* Available Rooms */}
-                                <div>
-                                    <h4 className="font-bold text-xs text-slate-blue uppercase mb-3 flex items-center gap-1.5">
-                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Phòng họp phù hợp hoàn hảo ({availableRooms.length})
-                                    </h4>
-                                    {availableRooms.length > 0 ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {availableRooms.map(room => {
-                                                const isSelected = selectedRoomId === room.id;
-                                                return (
-                                                    <div
-                                                        key={room.id}
-                                                        onClick={() => handleSelectRoom(room, false)}
-                                                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${
-                                                            isSelected 
-                                                                ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15' 
-                                                                : 'bg-white border-platinum-tint hover:border-action-blue/50 hover:bg-cloud-mist/50'
-                                                        }`}
-                                                    >
-                                                        <div>
-                                                            <div className="flex justify-between items-start">
-                                                                <h5 className="font-bold text-sm text-midnight-indigo">{room.roomName || room.room_name}</h5>
-                                                                <span className="text-[11px] font-bold text-slate-blue bg-cloud-mist px-2 py-0.5 rounded">
-                                                                    Sức chứa: {room.capacity} người
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-blue mt-1 line-clamp-1">
-                                                                {room.siteName || room.site_name} • {room.area_name || 'Khu vực chính'}
-                                                            </p>
-                                                        </div>
-                                                        
-                                                        {/* Facilities Icons */}
-                                                        <div className="flex items-center justify-between border-t border-platinum-tint/40 pt-2.5 mt-2">
-                                                            <div className="flex items-center gap-2.5 text-slate-blue/70">
-                                                                {room.has_camera && <Video className="w-3.5 h-3.5" title="Có Camera" />}
-                                                                {room.has_microphone && <Mic className="w-3.5 h-3.5" title="Có Mic" />}
-                                                                {room.has_display && <Calendar className="w-3.5 h-3.5" title="Có Màn hình" />}
-                                                            </div>
-                                                            <span className={`text-xs font-bold transition-colors ${isSelected ? 'text-action-blue' : 'text-slate-blue/60'}`}>
-                                                                {isSelected ? 'Đã chọn' : 'Chọn phòng'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-blue italic pl-2 py-2">Không tìm thấy phòng họp trống hoàn hảo.</p>
-                                    )}
-                                </div>
-
-                                {/* Suggested Rooms with 10min buffer */}
-                                <div>
-                                    <h4 className="font-bold text-xs text-slate-blue uppercase mb-3 flex items-center gap-1.5">
-                                        <AlertTriangle className="w-4 h-4 text-sunset-gold" /> Phòng họp gợi ý dời giờ ({suggestedRooms.length})
-                                    </h4>
-                                    {suggestedRooms.length > 0 ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {suggestedRooms.map(room => {
-                                                const isSelected = selectedRoomId === room.id;
-                                                const startStr = formatTime(room.suggestedStartTime);
-                                                const endStr = formatTime(room.suggestedEndTime);
-                                                const diffMin = Math.round((room.suggestedStartTime.getTime() - new Date(`${meetingDate}T${startTime}:00`).getTime()) / 60000);
-                                                
-                                                return (
-                                                    <div
-                                                        key={room.id}
-                                                        onClick={() => handleSelectRoom(room, true)}
-                                                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-40 ${
-                                                            isSelected 
-                                                                ? 'bg-amber-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15' 
-                                                                : 'bg-white border-amber-200 hover:border-action-blue/50 hover:bg-amber-50/10'
-                                                        }`}
-                                                    >
-                                                        <div>
-                                                            <div className="flex justify-between items-start">
-                                                                <h5 className="font-bold text-sm text-midnight-indigo">{room.roomName || room.room_name}</h5>
-                                                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 shrink-0">
-                                                                    Dịch chuyển +{diffMin} phút
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-blue mt-1 line-clamp-1">{room.siteName || room.site_name}</p>
-                                                            
-                                                            <div className="mt-2 text-[11px] text-amber-700 font-semibold bg-amber-50/60 p-1.5 rounded flex items-center gap-1.5">
-                                                                <Clock className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                                                                <span>Khung giờ mới: <strong>{startStr} - {endStr}</strong></span>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        {/* Facilities & Action */}
-                                                        <div className="flex items-center justify-between border-t border-platinum-tint/40 pt-2.5 mt-2">
-                                                            <div className="flex items-center gap-2.5 text-slate-blue/70">
-                                                                {room.has_camera && <Video className="w-3.5 h-3.5" title="Có Camera" />}
-                                                                {room.has_microphone && <Mic className="w-3.5 h-3.5" title="Có Mic" />}
-                                                                {room.has_display && <Calendar className="w-3.5 h-3.5" title="Có Màn hình" />}
-                                                            </div>
-                                                            <span className={`text-xs font-bold transition-colors ${isSelected ? 'text-action-blue' : 'text-amber-600'}`}>
-                                                                {isSelected ? 'Đã chọn' : 'Đồng ý & chọn'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-blue italic pl-2 py-2">Không tìm thấy phòng họp trống sát giờ.</p>
-                                    )}
-                                </div>
                             </div>
                         )}
 
@@ -779,7 +845,7 @@ const BookMeeting = () => {
                                             {selectedRoom?.siteName || selectedRoom?.site_name} • Sức chứa: {selectedRoom?.capacity} người
                                         </p>
                                     </div>
-                                    
+
                                     <div className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl border border-platinum-tint/80 shadow-sm shrink-0">
                                         <Calendar className="w-5 h-5 text-action-blue shrink-0" />
                                         <div>
@@ -793,6 +859,27 @@ const BookMeeting = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Capacity override warning */}
+                                {capacityExceeded && (
+                                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+                                        <div className="flex gap-2 text-rose-700 text-xs">
+                                            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
+                                            <span className="font-semibold">
+                                                Số người dự kiến ({expectedAttendeeCount && Number(expectedAttendeeCount) > actualAttendeeCount ? expectedAttendeeCount : actualAttendeeCount}) vượt sức chứa phòng "{selectedRoom?.roomName || selectedRoom?.room_name}" ({selectedRoom?.capacity} người).
+                                            </span>
+                                        </div>
+                                        <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs text-rose-700 font-semibold">
+                                            <input
+                                                type="checkbox"
+                                                checked={capacityOverrideConfirmed}
+                                                onChange={(e) => setCapacityOverrideConfirmed(e.target.checked)}
+                                                className="w-4 h-4 rounded text-rose-600 border-rose-300 focus:ring-rose-500"
+                                            />
+                                            Tôi xác nhận vượt sức chứa phòng và vẫn muốn tiếp tục đặt phòng này.
+                                        </label>
+                                    </div>
+                                )}
 
                                 {/* General Information */}
                                 <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm space-y-4">
@@ -811,6 +898,18 @@ const BookMeeting = () => {
                                             required
                                         />
                                     </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Mô tả (tuỳ chọn)</label>
+                                        <textarea
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            placeholder="Mục tiêu, nội dung chính của cuộc họp..."
+                                            rows={3}
+                                            maxLength={2000}
+                                            className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue focus:ring-2 focus:ring-action-blue/15 text-midnight-indigo resize-none"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Invite Participants */}
@@ -820,51 +919,167 @@ const BookMeeting = () => {
                                             <Users className="w-4 h-4 text-royal-amethyst" /> Mời khách tham gia
                                         </h3>
                                         <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-                                            selectedParticipantIds.length + 1 > (selectedRoom?.capacity || 0)
+                                            (selectedParticipantIds.length + externalParticipants.length + 1) > (selectedRoom?.capacity || 0)
                                                 ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse'
                                                 : 'bg-cloud-mist text-slate-blue'
                                         }`}>
-                                            Đã mời: {selectedParticipantIds.length + 1} / {selectedRoom?.capacity || 0} người
+                                            Đã mời: {selectedParticipantIds.length + externalParticipants.length + 1} / {selectedRoom?.capacity || 0} người
                                         </span>
                                     </div>
 
-                                    {selectedParticipantIds.length + 1 > (selectedRoom?.capacity || 0) && (
+                                    {(selectedParticipantIds.length + externalParticipants.length + 1) > (selectedRoom?.capacity || 0) && !capacityOverrideConfirmed && (
                                         <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs flex gap-2">
                                             <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 animate-bounce" />
                                             <span>
-                                                Số người tham gia ({selectedParticipantIds.length + 1} người bao gồm cả bạn) đã vượt quá sức chứa của phòng ({selectedRoom?.capacity} người). Vui lòng bỏ chọn bớt hoặc quay lại bước 1 chọn phòng rộng hơn.
+                                                Số người tham gia ({selectedParticipantIds.length + externalParticipants.length + 1} người bao gồm cả bạn) đã vượt quá sức chứa của phòng ({selectedRoom?.capacity} người). Vui lòng bỏ chọn bớt hoặc quay lại bước 1 chọn phòng rộng hơn hoặc tick xác nhận vượt sức chứa.
                                             </span>
                                         </div>
                                     )}
 
-                                    <p className="text-xs text-slate-blue">Chọn các thành viên bắt buộc tham dự cuộc họp này:</p>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1">
-                                        {users.map(user => {
-                                            const isSelected = selectedParticipantIds.includes(user.id);
-                                            return (
-                                                <div
-                                                    key={user.id}
-                                                    onClick={() => toggleParticipant(user.id)}
-                                                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer select-none transition-all ${
-                                                        isSelected 
-                                                            ? 'bg-purple-50/50 border-royal-amethyst text-royal-amethyst font-semibold' 
-                                                            : 'border-platinum-tint hover:bg-cloud-mist/30 text-slate-blue'
-                                                    }`}
+                                    {/* Search & Import Section */}
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <div className="relative flex-1">
+                                            <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-blue/60" />
+                                            <input
+                                                type="text"
+                                                value={searchEmail}
+                                                onChange={(e) => setSearchEmail(e.target.value)}
+                                                onFocus={() => setSearchFocused(true)}
+                                                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                                                placeholder="Tìm kiếm nhân viên theo email..."
+                                                className="w-full pl-10 pr-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
+                                            />
+                                            {searchEmail && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSearchEmail('')}
+                                                    className="absolute right-3 top-3.5 text-slate-blue/50 hover:text-slate-blue"
                                                 >
-                                                    <div>
-                                                        <p className="text-sm">{user.fullName || user.full_name}</p>
-                                                        <p className="text-[11px] opacity-80">{user.email}</p>
-                                                    </div>
-                                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                                                        isSelected ? 'bg-royal-amethyst text-white border-royal-amethyst' : 'border-platinum-tint'
-                                                    }`}>
-                                                        {isSelected && <Check className="w-3 h-3" />}
-                                                    </div>
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+
+                                            {/* Floating Autocomplete Dropdown suggestions list */}
+                                            {searchFocused && (
+                                                <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-platinum-tint rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-cloud-mist">
+                                                    {getFilteredUsers().filter(u => !selectedParticipantIds.includes(u.id)).length > 0 ? (
+                                                        getFilteredUsers()
+                                                            .filter(u => !selectedParticipantIds.includes(u.id))
+                                                            .map(user => {
+                                                                const deptCode = getUserDeptCode(user);
+                                                                return (
+                                                                    <div
+                                                                        key={user.id}
+                                                                        onMouseDown={() => {
+                                                                            toggleParticipant(user.id);
+                                                                            setSearchEmail('');
+                                                                        }}
+                                                                        className="p-3 hover:bg-cloud-mist/30 cursor-pointer flex items-center justify-between text-slate-blue transition-colors"
+                                                                    >
+                                                                        <div className="space-y-0.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <p className="text-sm font-semibold text-midnight-indigo">{user.fullName || user.full_name}</p>
+                                                                                {deptCode && (
+                                                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue">
+                                                                                        {deptCode}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <p className="text-[11px] opacity-75">{user.email}</p>
+                                                                        </div>
+                                                                        <Plus className="w-4 h-4 text-action-blue opacity-60 hover:opacity-100 animate-pulse" />
+                                                                    </div>
+                                                                );
+                                                            })
+                                                    ) : (
+                                                        <div className="p-4 text-center text-xs text-slate-blue italic">
+                                                            {searchEmail ? 'Không tìm thấy nhân viên phù hợp.' : 'Không còn gợi ý nhân viên nào.'}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            );
-                                        })}
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowImportModal(true)}
+                                            className="px-4 py-2.5 bg-cloud-mist hover:bg-platinum-tint/50 text-slate-blue hover:text-midnight-indigo border border-platinum-tint rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shrink-0"
+                                        >
+                                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                                            Import danh sách
+                                        </button>
                                     </div>
+
+                                    {/* Internal Selected Participants List (Card format with Checkmark) */}
+                                    {selectedParticipantIds.length > 0 && (
+                                        <div className="pt-4 border-t border-platinum-tint/50 space-y-3">
+                                            <p className="text-xs font-bold text-midnight-indigo uppercase tracking-wider">
+                                                Nhân viên trong hệ thống đã chọn ({selectedParticipantIds.length}):
+                                            </p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                                                {users
+                                                    .filter(u => selectedParticipantIds.includes(u.id))
+                                                    .map(user => {
+                                                        const deptCode = getUserDeptCode(user);
+                                                        return (
+                                                            <div
+                                                                key={user.id}
+                                                                onClick={() => toggleParticipant(user.id)}
+                                                                className="p-3 rounded-xl border border-action-blue bg-blue-50/20 text-midnight-indigo font-semibold shadow-sm flex items-center justify-between cursor-pointer select-none transition-all hover:bg-rose-50/30 hover:border-rose-300 hover:text-rose-700 group"
+                                                            >
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="text-sm font-semibold">{user.fullName || user.full_name}</p>
+                                                                        {deptCode && (
+                                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700">
+                                                                                {deptCode}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-[11px] opacity-80">{user.email}</p>
+                                                                </div>
+                                                                <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all group-hover:bg-rose-600 group-hover:border-rose-600">
+                                                                    <Check className="w-3 h-3 block group-hover:hidden" />
+                                                                    <X className="w-3 h-3 hidden group-hover:block" />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* External Participants List */}
+                                    {externalParticipants.length > 0 && (
+                                        <div className="pt-2 border-t border-platinum-tint/50 space-y-2">
+                                            <p className="text-xs font-semibold text-slate-blue">
+                                                Khách mời ngoài hệ thống ({externalParticipants.length}):
+                                            </p>
+                                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
+                                                {externalParticipants.map((ext) => (
+                                                    <div
+                                                        key={ext.id}
+                                                        className={`flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                                                            ext.isCompanyUnmatched
+                                                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                        }`}
+                                                    >
+                                                        <span>{ext.email}</span>
+                                                        <span className="text-[10px] px-1 py-0.2 bg-white/70 rounded-full font-bold">
+                                                            {ext.isCompanyUnmatched ? 'Chưa khớp NV' : 'Khách ngoài'}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setExternalParticipants(prev => prev.filter(p => p.id !== ext.id))}
+                                                            className="p-0.5 rounded-full hover:bg-black/10 transition-colors"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Agenda Builder */}
@@ -879,34 +1094,63 @@ const BookMeeting = () => {
                                     </div>
 
                                     {/* New Agenda Input */}
-                                    <div className="flex flex-col sm:flex-row gap-3">
-                                        <div className="flex-1">
-                                            <input
-                                                type="text"
-                                                value={newAgendaTitle}
-                                                onChange={(e) => setNewAgendaTitle(e.target.value)}
-                                                placeholder="Chủ đề / Nội dung thảo luận..."
-                                                className="w-full px-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
-                                            />
+                                    <div className="space-y-3">
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <div className="flex-1">
+                                                <input
+                                                    type="text"
+                                                    value={newAgendaTitle}
+                                                    onChange={(e) => setNewAgendaTitle(e.target.value)}
+                                                    placeholder="Chủ đề / Nội dung thảo luận..."
+                                                    className="w-full px-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
+                                                />
+                                            </div>
+                                            <div className="w-full sm:w-32 flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    value={newAgendaDuration}
+                                                    onChange={(e) => setNewAgendaDuration(e.target.value)}
+                                                    min="1"
+                                                    placeholder="Phút"
+                                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo text-center"
+                                                />
+                                                <span className="text-xs text-slate-blue">phút</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddAgenda}
+                                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0"
+                                            >
+                                                <Plus className="w-4 h-4" /> Thêm
+                                            </button>
                                         </div>
-                                        <div className="w-full sm:w-32 flex items-center gap-2">
-                                            <input
-                                                type="number"
-                                                value={newAgendaDuration}
-                                                onChange={(e) => setNewAgendaDuration(e.target.value)}
-                                                min="1"
-                                                placeholder="Phút"
-                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo text-center"
-                                            />
-                                            <span className="text-xs text-slate-blue">phút</span>
+                                        
+                                        {/* Agenda Item Document Upload */}
+                                        <div className="flex items-center gap-3 w-full">
+                                            <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-platinum-tint hover:border-action-blue bg-cloud-mist/20 hover:bg-blue-50/20 text-slate-blue hover:text-action-blue rounded-xl text-xs font-bold cursor-pointer transition-all flex-1 justify-center select-none">
+                                                <Upload className="w-4 h-4 text-action-blue" />
+                                                <span>{newAgendaFile ? `Đã đính kèm: ${newAgendaFile.name}` : 'Đính kèm tài liệu thảo luận (PDF, Word, Excel, PowerPoint...)'}</span>
+                                                <input
+                                                    type="file"
+                                                    onChange={(e) => {
+                                                        if (e.target.files && e.target.files[0]) {
+                                                            setNewAgendaFile(e.target.files[0]);
+                                                        }
+                                                    }}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                            {newAgendaFile && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewAgendaFile(null)}
+                                                    className="p-2 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl transition-all"
+                                                    title="Hủy chọn file"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleAddAgenda}
-                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                                        >
-                                            <Plus className="w-4 h-4" /> Thêm
-                                        </button>
                                     </div>
 
                                     {/* Agenda List */}
@@ -915,10 +1159,19 @@ const BookMeeting = () => {
                                             {agendaList.map((item, index) => (
                                                 <div key={index} className="flex items-center justify-between p-3 bg-cloud-mist/30 rounded-xl border border-platinum-tint/40 text-sm">
                                                     <div className="flex items-center gap-3">
-                                                        <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 font-bold text-xs flex items-center justify-center border border-emerald-100">
+                                                        <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 font-bold text-xs flex items-center justify-center border border-emerald-100 shrink-0">
                                                             {index + 1}
                                                         </span>
-                                                        <span className="font-semibold text-midnight-indigo">{item.title}</span>
+                                                        <div className="space-y-1">
+                                                            <div className="font-semibold text-midnight-indigo">{item.title}</div>
+                                                            {item.file && (
+                                                                <div className="flex items-center gap-1.5 text-[10px] text-action-blue font-semibold bg-action-blue/5 px-2 py-0.5 rounded-lg border border-action-blue/10 w-max select-none">
+                                                                    <Paperclip className="w-3 h-3 text-action-blue" />
+                                                                    <span className="max-w-[200px] truncate">{item.file.name}</span>
+                                                                    <span className="text-[9px] opacity-60">({(item.file.size / 1024).toFixed(1)} KB)</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-xs font-medium text-slate-blue bg-cloud-mist px-2.5 py-0.5 rounded-full">{item.durationMin} phút</span>
@@ -967,7 +1220,7 @@ const BookMeeting = () => {
                                         </div>
 
                                         <p className="text-xs text-slate-blue leading-relaxed pt-2 border-t border-cloud-mist/50">
-                                            {isManagerOrAdmin 
+                                            {isManagerOrAdmin
                                                 ? 'Với vai trò quản lý hệ thống, lịch họp này sẽ được chốt tức thời mà không cần qua bước phê duyệt trung gian.'
                                                 : 'Yêu cầu của bạn sẽ được gửi tới hòm thư phê duyệt của Trưởng phòng. Phòng họp sẽ được tạm khóa giữ chỗ để tránh xung đột.'}
                                         </p>
@@ -1062,7 +1315,7 @@ const BookMeeting = () => {
                                         >
                                             <ArrowLeft className="w-4 h-4" /> Quay lại
                                         </button>
-                                        
+
                                         <button
                                             type="submit"
                                             disabled={submitting}
@@ -1126,6 +1379,313 @@ const BookMeeting = () => {
                             )}
                         </div>
                     </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Import Participants Modal (combined feature with backdrop blur) */}
+            <AnimatePresence>
+                {showImportModal && (
+                    <div className="fixed inset-0 w-full h-full z-50 flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl border border-platinum-tint shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                        >
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between p-5 border-b border-cloud-mist bg-cloud-mist/20">
+                                <div className="flex items-center gap-2">
+                                    <FileSpreadsheet className="w-5 h-5 text-action-blue" />
+                                    <h3 className="font-bold text-base text-midnight-indigo">Import danh sách khách mời</h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowImportModal(false);
+                                        setImportPreview([]);
+                                        setManualEmails('');
+                                    }}
+                                    className="p-1.5 hover:bg-cloud-mist rounded-lg text-slate-blue hover:text-midnight-indigo transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                                {/* Tab selection */}
+                                <div className="flex border-b border-platinum-tint">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setImportMethod('manual');
+                                            setImportPreview([]);
+                                        }}
+                                        className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${
+                                            importMethod === 'manual'
+                                                ? 'border-action-blue text-action-blue'
+                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                        }`}
+                                    >
+                                        Nhập thủ công
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setImportMethod('excel');
+                                            setImportPreview([]);
+                                        }}
+                                        className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${
+                                            importMethod === 'excel'
+                                                ? 'border-action-blue text-action-blue'
+                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                        }`}
+                                    >
+                                        Nhập từ file Excel
+                                    </button>
+                                </div>
+
+                                {importMethod === 'manual' ? (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">
+                                                Nhập danh sách Email *
+                                            </label>
+                                            <textarea
+                                                value={manualEmails}
+                                                onChange={(e) => setManualEmails(e.target.value)}
+                                                rows="4"
+                                                placeholder="Ví dụ: email1@company.com, email2@gmail.com, email3@company.com&#10;(Hỗ trợ ngăn cách bằng dấu phẩy, chấm phẩy hoặc xuống dòng)"
+                                                className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
+                                            />
+                                        </div>
+                                        
+                                        <div className="flex flex-wrap items-center gap-4">
+                                            <span className="text-xs font-semibold text-slate-blue">Phân loại email nhập vào:</span>
+                                            <div className="flex items-center gap-4">
+                                                <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
+                                                    <input
+                                                        type="radio"
+                                                        name="manualType"
+                                                        value="auto"
+                                                        checked={manualType === 'auto'}
+                                                        onChange={() => setManualType('auto')}
+                                                        className="text-action-blue focus:ring-action-blue"
+                                                    />
+                                                    Tự động nhận diện
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
+                                                    <input
+                                                        type="radio"
+                                                        name="manualType"
+                                                        value="internal"
+                                                        checked={manualType === 'internal'}
+                                                        onChange={() => setManualType('internal')}
+                                                        className="text-action-blue focus:ring-action-blue"
+                                                    />
+                                                    Trong công ty (Nội bộ)
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
+                                                    <input
+                                                        type="radio"
+                                                        name="manualType"
+                                                        value="external"
+                                                        checked={manualType === 'external'}
+                                                        onChange={() => setManualType('external')}
+                                                        className="text-action-blue focus:ring-action-blue"
+                                                    />
+                                                    Ngoài công ty (Khách ngoài)
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={handleManualImport}
+                                                disabled={!manualEmails.trim()}
+                                                className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all"
+                                            >
+                                                Xem trước danh sách
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {/* Download template banner */}
+                                        <div className="flex justify-between items-center bg-blue-50/40 border border-blue-100 p-3.5 rounded-xl">
+                                            <div className="space-y-0.5">
+                                                <h4 className="text-xs font-bold text-midnight-indigo flex items-center gap-1.5">
+                                                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Tải file Excel mẫu:
+                                                </h4>
+                                                <p className="text-[10.5px] text-slate-blue">Sử dụng file mẫu có cấu trúc định dạng chuẩn phục vụ import khách mời.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={downloadSampleExcel}
+                                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+                                            >
+                                                <Download className="w-3.5 h-3.5" /> Tải file mẫu
+                                            </button>
+                                        </div>
+
+                                        <div className="p-5 border-2 border-dashed border-platinum-tint hover:border-action-blue/50 rounded-2xl flex flex-col items-center justify-center bg-cloud-mist/10 relative transition-all group">
+                                            <input
+                                                type="file"
+                                                accept=".xlsx, .xls"
+                                                onChange={handleExcelImport}
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                            />
+                                            <Upload className="w-8 h-8 text-slate-blue/60 group-hover:text-action-blue transition-colors mb-2" />
+                                            <p className="text-xs font-bold text-midnight-indigo">Click để chọn hoặc kéo thả file Excel vào đây</p>
+                                            <p className="text-[10px] text-slate-blue mt-1">Hỗ trợ file định dạng .xlsx, .xls</p>
+                                        </div>
+
+                                        <div className="p-3.5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-1.5">
+                                            <h4 className="text-xs font-bold text-midnight-indigo flex items-center gap-1.5">
+                                                <Info className="w-3.5 h-3.5 text-action-blue" /> Hướng dẫn định dạng cột Excel:
+                                            </h4>
+                                            <p className="text-[11px] text-slate-blue leading-relaxed">
+                                                Hệ thống sẽ quét file Excel và đọc các cột:
+                                            </p>
+                                            <ul className="list-disc pl-4 text-[11px] text-slate-blue space-y-0.5">
+                                                <li>Cột <strong>Email</strong>: Chứa địa chỉ email của người tham gia.</li>
+                                                <li>Cột <strong>Trong công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là nhân viên nội bộ, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
+                                                <li>Cột <strong>Ngoài công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là khách ngoài, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
+                                                <li className="text-[10px] italic text-slate-blue/70">Nếu cả 2 cột đều bỏ trống, hệ thống sẽ tự nhận diện theo đuôi email.</li>
+                                            </ul>
+                                            
+                                            {/* Mini preview table */}
+                                            <div className="mt-2 border border-blue-100 rounded-lg overflow-hidden">
+                                                <table className="w-full text-[10.5px] text-center">
+                                                    <thead>
+                                                        <tr className="bg-blue-50/60 text-slate-blue font-bold">
+                                                            <th className="py-1.5 px-2 text-left">Email</th>
+                                                            <th className="py-1.5 px-2">Trong công ty</th>
+                                                            <th className="py-1.5 px-2">Ngoài công ty</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="text-slate-blue/80">
+                                                        <tr className="border-t border-blue-50">
+                                                            <td className="py-1 px-2 text-left">nhanvien@smrmpts.com</td>
+                                                            <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
+                                                            <td className="py-1 px-2 text-rose-400">✗</td>
+                                                        </tr>
+                                                        <tr className="border-t border-blue-50">
+                                                            <td className="py-1 px-2 text-left">khachngoai@gmail.com</td>
+                                                            <td className="py-1 px-2 text-rose-400">✗</td>
+                                                            <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Preview Section */}
+                                {importPreview.length > 0 && (
+                                    <div className="space-y-2 border-t border-platinum-tint/50 pt-4">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="text-xs font-bold text-midnight-indigo">
+                                                Xem trước dữ liệu import ({importPreview.length} dòng):
+                                            </h4>
+                                            {importPreview.some(p => p.error) && (
+                                                <span className="text-[10px] bg-rose-50 border border-rose-200 text-rose-600 px-2 py-0.5 rounded-lg font-bold animate-pulse">
+                                                    Phát hiện dòng dữ liệu bị lỗi! Vui lòng kiểm tra lại.
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="border border-platinum-tint rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+                                            <table className="w-full text-left text-xs border-collapse">
+                                                <thead>
+                                                    <tr className="bg-cloud-mist/50 border-b border-platinum-tint font-bold text-slate-blue">
+                                                        <th className="p-3">Email</th>
+                                                        <th className="p-3 text-center">Trong công ty</th>
+                                                        <th className="p-3 text-center">Ngoài công ty</th>
+                                                        <th className="p-3 text-right">Trạng thái đối khớp / Lỗi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {importPreview.map((item, idx) => {
+                                                        const isInternal = item.type === 'internal';
+                                                        const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
+                                                        
+                                                        let matchStatus = 'Khách ngoài công ty';
+                                                        let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                                                        
+                                                        if (isInternal) {
+                                                            if (foundUser) {
+                                                                matchStatus = `Nhân viên: ${foundUser.fullName || foundUser.full_name}`;
+                                                                badgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
+                                                            } else {
+                                                                matchStatus = 'Không thấy NV (Coi là khách)';
+                                                                badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
+                                                            }
+                                                        }
+                                                        
+                                                        if (item.error) {
+                                                            matchStatus = 'Lỗi định dạng';
+                                                            badgeClass = 'bg-red-50 text-red-700 border-red-100';
+                                                        }
+                                                        
+                                                        return (
+                                                            <tr key={idx} className={`border-b border-platinum-tint/50 hover:bg-cloud-mist/20 transition-colors ${item.error ? 'bg-rose-50/20' : ''}`}>
+                                                                <td className="p-3 font-medium text-midnight-indigo">
+                                                                    <span className={item.error ? 'text-rose-600 font-semibold' : ''}>{item.email || '(Để trống)'}</span>
+                                                                    {item.error && (
+                                                                        <span className="block text-[10px] text-rose-500 font-bold mt-0.5">{item.error}</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <span className={`text-sm font-bold ${isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
+                                                                        {isInternal ? '✓' : '✗'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3 text-center">
+                                                                    <span className={`text-sm font-bold ${!isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
+                                                                        {!isInternal ? '✓' : '✗'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3 text-right">
+                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeClass}`}>
+                                                                        {matchStatus}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-5 border-t border-cloud-mist bg-cloud-mist/10 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowImportModal(false);
+                                        setImportPreview([]);
+                                        setManualEmails('');
+                                    }}
+                                    className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmImport}
+                                    disabled={importPreview.length === 0 || importPreview.some(p => p.error !== '')}
+                                    className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                >
+                                    Xác nhận thêm ({importPreview.length})
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
         </div>
