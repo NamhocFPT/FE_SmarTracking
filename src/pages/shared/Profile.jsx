@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { get, patch } from '../../utils/request';
 import { getAvatarStatus } from '../../service/avatarService';
 import AvatarUploadForm from '../../component/AvatarReminder/AvatarUploadForm';
@@ -58,6 +60,7 @@ const Profile = () => {
     const [successMessage, setSuccessMessage] = useState(null);
     const [avatarStatus, setAvatarStatus] = useState(null);
     const [avatarStatusLoading, setAvatarStatusLoading] = useState(false);
+    const [avatarModalOpen, setAvatarModalOpen] = useState(false);
     const [profile, setProfile] = useState(null);
     const [formData, setFormData] = useState({
         fullName: "",
@@ -157,6 +160,7 @@ const Profile = () => {
         setFormData(prev => ({ ...prev, avatarFile: null }));
         setError(null);
         setSuccessMessage("Ảnh đại diện đã được gửi đi và đang chờ duyệt.");
+        setAvatarModalOpen(false);
     };
 
     const handleSubmit = async (e) => {
@@ -250,29 +254,35 @@ const Profile = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2 flex flex-col items-center text-center">
-                    {editMode ? (
-                        <div className="w-full mb-4">
-                            <AvatarUploadForm compact onSuccess={handleAvatarUploadSuccess} onCancel={() => setEditMode(false)} />
+                    <div className="relative group w-32 h-32 rounded-full overflow-hidden ring-4 ring-action-blue/10 bg-gradient-to-tr from-action-blue to-glacier-blue flex items-center justify-center text-white text-4xl font-extrabold select-none mb-4">
+                        {formData.avatarPreview ? (
+                            <img src={formData.avatarPreview} alt="Profile Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            (profile?.fullName?.charAt(0)?.toUpperCase() || "?")
+                        )}
+                        <div 
+                            onClick={() => setAvatarModalOpen(true)}
+                            className="absolute inset-0 bg-midnight-indigo/70 text-white flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span className="text-[10px] font-bold mt-1 uppercase">Đổi ảnh</span>
                         </div>
-                    ) : (
-                        <div className="relative group w-32 h-32 rounded-full overflow-hidden ring-4 ring-action-blue/10 bg-gradient-to-tr from-action-blue to-glacier-blue flex items-center justify-center text-white text-4xl font-extrabold select-none mb-4">
-                            {formData.avatarPreview ? (
-                                <img src={formData.avatarPreview} alt="Profile Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                (profile?.fullName?.charAt(0)?.toUpperCase() || "?")
-                            )}
-                            {editMode && (
-                                <label className="absolute inset-0 bg-midnight-indigo/70 text-white flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    <span className="text-[10px] font-bold mt-1 uppercase">Đổi ảnh</span>
-                                    <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-                                </label>
-                            )}
-                        </div>
-                    )}
+                    </div>
+                    
+                    <button
+                        type="button"
+                        onClick={() => setAvatarModalOpen(true)}
+                        className="mb-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-action-blue/10 hover:bg-action-blue hover:text-white text-action-blue rounded-xl text-xs font-bold transition-all"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Đổi ảnh đại diện
+                    </button>
                     <h3 className="text-lg font-bold text-midnight-indigo leading-tight">{profile?.fullName || ""}</h3>
                     <p className="text-xs text-slate-blue mt-1">{profile?.email || ""}</p>
                     <div className="flex flex-wrap gap-1.5 justify-center mt-3">
@@ -421,6 +431,47 @@ const Profile = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Avatar Upload Modal */}
+            {createPortal(
+                <AnimatePresence>
+                    {avatarModalOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-white rounded-2xl border border-platinum-tint shadow-lg w-full max-w-md p-6"
+                            >
+                                <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
+                                    <h3 className="text-base font-bold text-midnight-indigo">Cập nhật ảnh đại diện</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAvatarModalOpen(false)}
+                                        className="p-1 rounded-full text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                
+                                <AvatarUploadForm 
+                                    compact 
+                                    onSuccess={handleAvatarUploadSuccess} 
+                                    onCancel={() => setAvatarModalOpen(false)} 
+                                />
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 };
