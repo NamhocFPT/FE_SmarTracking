@@ -32,6 +32,7 @@ import ManagerHomePage from '../pages/manager/homePage';
 import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
 import ManagerInMeeting from '../pages/manager/InMeeting';
+import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
 
 // Employee Layout + Pages
 import EmployeeLayout from '../pages/employee/layout/EmployeeLayout';
@@ -178,6 +179,10 @@ export const router = [
             {
                 path: 'face-register',
                 element: <ManagerFaceRegistration />
+            },
+            {
+                path: 'meeting-approvals',
+                element: <ManagerMeetingApprovals />
             },
             {
                 path: 'meeting/:id',
