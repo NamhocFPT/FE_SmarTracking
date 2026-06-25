@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000'; // Using json-server mock DB port
+const API_BASE_URL = 'http://localhost:3000/api/v1'; // Connect to local backend API
 
 // Token storage helpers
 export const getAccessToken = () => localStorage.getItem('accessToken');
@@ -41,12 +41,13 @@ const isPublicEndpoint = (path) => {
 export const request = async (path, options = {}) => {
     const { method = 'GET', body, headers = {}, isPublic: customIsPublic } = options;
     const isPublic = customIsPublic !== undefined ? customIsPublic : isPublicEndpoint(path);
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
     
     const url = `${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
 
     const defaultHeaders = {
         'Accept': 'application/json',
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...headers,
     };
 
@@ -62,7 +63,7 @@ export const request = async (path, options = {}) => {
     };
 
     if (body) {
-        config.body = JSON.stringify(body);
+        config.body = isFormData ? body : JSON.stringify(body);
     }
 
     try {
@@ -164,7 +165,7 @@ const handleResponse = async (response) => {
         throw {
             success: false,
             error: {
-                message: errorDetail.message || 'Đã xảy ra lỗi hệ thống.',
+                message: result.message || errorDetail.message || 'Đã xảy ra lỗi hệ thống.',
                 code: errorDetail.code || 'UNKNOWN_ERROR',
                 requestId: requestId
             },
@@ -195,6 +196,8 @@ export const patch = (path, body, options = {}) => {
     }
     return request(actualPath, { ...actualOptions, method: 'PATCH', body });
 };
+
+export const put = (path, body, options = {}) => request(path, { ...options, method: 'PUT', body });
 
 export const dele = (path, options = {}) => {
     let actualPath = path;
