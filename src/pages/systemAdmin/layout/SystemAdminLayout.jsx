@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
+import AvatarReminderModal from '../../../component/AvatarReminder/AvatarReminderModal';
 
 /**
  * Navigation items cho SystemAdmin role
@@ -14,6 +15,7 @@ import logo from '../../../assets/images/logo.png';
  */
 const navigationItems = [
     { label: 'Tổng quan', to: '/system-admin', end: true },
+    { label: 'Duyệt ảnh đại diện', to: '/system-admin/avatar-submissions' },
     { label: 'Thiết bị IoT', to: '/system-admin/devices' },
     { label: 'Nhật ký hệ thống', to: '/system-admin/audit-logs' },
     { label: 'Cài đặt', to: '/system-admin/settings' },
@@ -228,6 +230,7 @@ const SystemAdminLayout = () => {
             {/* ========== MAIN CONTENT ========== */}
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 lg:px-12 py-6">
                 <Outlet />
+                <AvatarReminderModal />
             </main>
 
             {/* ========== FOOTER ========== */}
