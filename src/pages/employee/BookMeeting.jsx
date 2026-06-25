@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Calendar, Clock, Users, ShieldAlert, Video, Mic, Plus, Trash2, Check, AlertTriangle, ArrowLeft, Info, HelpCircle, Search, ChevronRight, CheckCircle2, X, FileSpreadsheet, Upload, Download, Paperclip
 } from 'lucide-react';
-import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers } from '../../service/employeeServices';
+import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers, getUserById } from '../../service/employeeServices';
 import { getDepartments } from '../../service/businessAdminServices';
 import * as XLSX from 'xlsx';
 
@@ -85,6 +85,32 @@ const BookMeeting = () => {
     const [manualEmails, setManualEmails] = useState('');
     const [manualType, setManualType] = useState('auto'); // 'auto', 'internal', 'external'
     const [importPreview, setImportPreview] = useState([]);
+
+    // User detail modal states
+    const [selectedDetailUserId, setSelectedDetailUserId] = useState(null);
+    const [userDetail, setUserDetail] = useState(null);
+    const [loadingDetail, setLoadingDetail] = useState(false);
+    const [detailError, setDetailError] = useState(null);
+
+    const handleOpenUserDetail = async (userId) => {
+        setSelectedDetailUserId(userId);
+        setUserDetail(null);
+        setLoadingDetail(true);
+        setDetailError(null);
+        try {
+            const res = await getUserById(userId);
+            if (res?.success && res.data) {
+                setUserDetail(res.data);
+            } else {
+                setDetailError(res?.message || 'Không thể tải thông tin nhân viên.');
+            }
+        } catch (err) {
+            console.error('Error fetching user details', err);
+            setDetailError(err?.error?.message || 'Không thể kết nối đến máy chủ.');
+        } finally {
+            setLoadingDetail(false);
+        }
+    };
 
     // Lock body scroll when import modal is open
     useEffect(() => {
@@ -1060,16 +1086,33 @@ const BookMeeting = () => {
                                                                 onClick={() => toggleParticipant(user.id)}
                                                                 className="p-3 rounded-xl border border-action-blue bg-blue-50/20 text-midnight-indigo font-semibold shadow-sm flex items-center justify-between cursor-pointer select-none transition-all hover:bg-rose-50/30 hover:border-rose-300 hover:text-rose-700 group"
                                                             >
-                                                                <div className="space-y-1">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <p className="text-sm font-semibold">{user.fullName || user.full_name}</p>
-                                                                        {deptCode && (
-                                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700">
-                                                                                {deptCode}
-                                                                            </span>
+                                                                <div className="flex items-center gap-3">
+                                                                    {/* Avatar */}
+                                                                    <div
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleOpenUserDetail(user.id);
+                                                                        }}
+                                                                        className="w-10 h-10 rounded-full overflow-hidden border border-platinum-tint flex-shrink-0 bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-extrabold text-sm hover:scale-105 transition-transform"
+                                                                        title="Xem chi tiết"
+                                                                    >
+                                                                        {user.avatarUrl ? (
+                                                                            <img src={user.avatarUrl} alt={user.fullName || user.full_name} className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            (user.fullName || user.full_name || 'U').charAt(0).toUpperCase()
                                                                         )}
                                                                     </div>
-                                                                    <p className="text-[11px] opacity-80">{user.email}</p>
+                                                                    <div className="space-y-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="text-sm font-semibold">{user.fullName || user.full_name}</p>
+                                                                            {deptCode && (
+                                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700">
+                                                                                    {deptCode}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-[11px] opacity-80">{user.email}</p>
+                                                                    </div>
                                                                 </div>
                                                                 <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all group-hover:bg-rose-600 group-hover:border-rose-600">
                                                                     <Check className="w-3 h-3 block group-hover:hidden" />
@@ -1724,6 +1767,139 @@ const BookMeeting = () => {
                 )}
             </AnimatePresence>
             , document.body)}
+
+            {selectedDetailUserId && ReactDOM.createPortal(
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
+                            <h3 className="font-bold text-midnight-indigo">Chi tiết thông tin nhân viên</h3>
+                            <button 
+                                onClick={() => {
+                                    setSelectedDetailUserId(null);
+                                    setUserDetail(null);
+                                }} 
+                                className="text-slate-blue hover:text-midnight-indigo"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            {detailError && (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs">{detailError}</div>
+                            )}
+
+                            {loadingDetail ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="mt-4 text-xs text-slate-blue font-medium">Đang tải thông tin chi tiết...</p>
+                                </div>
+                            ) : userDetail ? (
+                                <>
+                                    {/* Image area / Avatar */}
+                                    <div className="flex justify-center">
+                                        <div className="w-32 h-32 rounded-full overflow-hidden border border-platinum-tint bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-extrabold text-4xl shadow-md">
+                                            {userDetail.avatarUrl ? (
+                                                <img src={userDetail.avatarUrl} alt={userDetail.fullName} className="w-full h-full object-cover" />
+                                            ) : (
+                                                (userDetail.fullName || userDetail.full_name || 'U').charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Info Grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Họ tên</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.fullName || userDetail.full_name || "Chưa thiết lập"}</span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Email</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.email || "Chưa thiết lập"}</span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Mã nhân viên</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.employeeCode || "Chưa thiết lập"}</span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Số điện thoại</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.phoneNumber || userDetail.phone || "Chưa cung cấp"}</span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Phòng ban</span>
+                                            <span className="font-semibold text-midnight-indigo">
+                                                {userDetail.department?.departmentName || userDetail.department?.name || userDetail.departments?.[0]?.name || "Chưa phân bổ"}
+                                            </span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Chức danh / Vị trí</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.positionTitle || "Chưa thiết lập"}</span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Quản lý trực tiếp</span>
+                                            <span className="font-semibold text-midnight-indigo">{userDetail.directManager?.fullName || "Không có"}</span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Vai trò hệ thống</span>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {userDetail.roles && userDetail.roles.length > 0 ? (
+                                                    userDetail.roles.map(r => (
+                                                        <span key={r.id} className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue border border-blue-100 rounded-full font-semibold">
+                                                            {r.roleName || r.name}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-xs text-slate-blue italic">Chưa phân quyền</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Trạng thái tài khoản</span>
+                                            <span className={`inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold mt-1 ${
+                                                userDetail.accountStatus === "active" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+                                            }`}>
+                                                {userDetail.accountStatus === "active" ? "Hoạt động" : "Bị khóa"}
+                                            </span>
+                                        </div>
+                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
+                                            <span className="text-xs text-slate-blue block mb-0.5">Hồ sơ khuôn mặt (FaceID)</span>
+                                            <span className={`inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold mt-1 ${
+                                                userDetail.hasFaceProfile ? "bg-green-50 text-green-700 border border-green-200" : "bg-amber-50 text-amber-700 border border-amber-200"
+                                            }`}>
+                                                {userDetail.hasFaceProfile ? "Đã hợp lệ" : "Chưa đăng ký"}
+                                            </span>
+                                        </div>
+                                        {userDetail.lastLoginAt && (
+                                            <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30 sm:col-span-2">
+                                                <span className="text-xs text-slate-blue block mb-0.5">Đăng nhập cuối</span>
+                                                <span className="font-semibold text-midnight-indigo">{new Date(userDetail.lastLoginAt).toLocaleString("vi-VN")}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center text-xs text-slate-blue italic py-6">Không tìm thấy thông tin nhân viên này.</div>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end sticky bottom-0 z-10">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedDetailUserId(null);
+                                    setUserDetail(null);
+                                }}
+                                className="px-4 py-2 bg-slate-blue/10 hover:bg-slate-blue/20 text-midnight-indigo rounded-xl text-xs font-bold transition-all"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };
