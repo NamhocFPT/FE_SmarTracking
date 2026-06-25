@@ -594,7 +594,7 @@ const AuditLogs = () => {
 
             {/* DETAIL JSON MODAL */}
             {isDetailOpen && selectedLog && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-2xl w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>

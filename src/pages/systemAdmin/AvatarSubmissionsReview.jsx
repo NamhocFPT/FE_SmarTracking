@@ -135,7 +135,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
             <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                 <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
                     <h3 className="font-bold text-midnight-indigo">Chi tiết yêu cầu duyệt ảnh</h3>
