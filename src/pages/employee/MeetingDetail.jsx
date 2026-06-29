@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Calendar, Clock, MapPin, Users, Video, Edit3, Trash2, ArrowLeft,
+    Calendar, Clock, MapPin, Users, Video, Edit3, Trash2,
     Check, Play, Pause, Search, List, AlertTriangle
 } from 'lucide-react';
 import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers } from '../../service/employeeServices';
@@ -21,6 +21,7 @@ const EmployeeMeetingDetail = () => {
 
     // State
     const [loading, setLoading] = useState(true);
+    const [timeValidationModal, setTimeValidationModal] = useState({ isOpen: false, message: '' });
     const [meeting, setMeeting] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [error, setError] = useState(null);
@@ -122,6 +123,40 @@ const EmployeeMeetingDetail = () => {
             setLoading(false);
         }
     }, [id]);
+
+    const handleJoinMeeting = () => {
+        const startVal = meeting.start_time || meeting.startTime;
+        const endVal = meeting.end_time || meeting.endTime;
+        if (!startVal || !endVal) {
+            navigate(`/employee/in-meeting/${meeting.id}`);
+            return;
+        }
+
+        const startDate = new Date(startVal);
+        const endDate = new Date(endVal);
+        const now = new Date();
+
+        const diffMs = startDate.getTime() - now.getTime();
+        if (diffMs > 15 * 60 * 1000) {
+            const timeStr = startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = startDate.toLocaleDateString('vi-VN');
+            setTimeValidationModal({
+                isOpen: true,
+                message: `Cuộc họp chưa đến giờ diễn ra. Vui lòng quay lại vào lúc ${timeStr} ngày ${dateStr}.`
+            });
+            return;
+        }
+
+        if (now > endDate) {
+            setTimeValidationModal({
+                isOpen: true,
+                message: "Cuộc họp đã kết thúc khung giờ ban đầu."
+            });
+            return;
+        }
+
+        navigate(`/employee/in-meeting/${meeting.id}`);
+    };
 
     const initEditStates = (data) => {
         setEditTitle(data.title || '');
@@ -309,46 +344,38 @@ const EmployeeMeetingDetail = () => {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
-            {/* Header / Breadcrumb */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="inline-flex items-center gap-1.5 text-slate-blue hover:text-midnight-indigo font-bold text-sm"
-                >
-                    <ArrowLeft className="w-4 h-4" /> Quay lại
-                </button>
-                <div className="flex gap-2 w-full sm:w-auto">
-                    {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
-                        <>
-                            <button
-                                onClick={() => setIsEditModalOpen(true)}
-                                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-platinum-tint bg-white text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
-                            >
-                                <Edit3 className="w-4 h-4" /> Chỉnh sửa cuộc họp
-                            </button>
-                            <button
-                                onClick={() => setIsAgendaModalOpen(true)}
-                                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-platinum-tint bg-white text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
-                            >
-                                <List className="w-4 h-4" /> Quản lý Agenda
-                            </button>
-                            <button
-                                onClick={() => setIsCancelConfirmOpen(true)}
-                                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all"
-                            >
-                                <Trash2 className="w-4 h-4" /> Hủy họp
-                            </button>
-                        </>
-                    )}
-                    {canJoin && (
+            {/* Header / Actions */}
+            <div className="flex justify-end gap-2 w-full">
+                {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                    <>
                         <button
-                            onClick={() => navigate(`/employee/in-meeting/${meeting.id}`)}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all animate-pulse-soft"
+                            onClick={() => setIsEditModalOpen(true)}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-platinum-tint bg-white text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
                         >
-                            <Video className="w-4 h-4" /> Tham gia phòng họp
+                            <Edit3 className="w-4 h-4" /> Chỉnh sửa cuộc họp
                         </button>
-                    )}
-                </div>
+                        <button
+                            onClick={() => setIsAgendaModalOpen(true)}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-platinum-tint bg-white text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
+                        >
+                            <List className="w-4 h-4" /> Quản lý Agenda
+                        </button>
+                        <button
+                            onClick={() => setIsCancelConfirmOpen(true)}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all"
+                        >
+                            <Trash2 className="w-4 h-4" /> Hủy họp
+                        </button>
+                    </>
+                )}
+                {canJoin && (
+                    <button
+                        onClick={handleJoinMeeting}
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all animate-pulse-soft"
+                    >
+                        <Video className="w-4 h-4" /> Tham gia phòng họp
+                    </button>
+                )}
             </div>
 
             {successMsg && (
@@ -551,6 +578,38 @@ const EmployeeMeetingDetail = () => {
                     )}
                 </div>
             </div>
+
+            {/* MODAL: Time Validation Warning */}
+            <AnimatePresence>
+                {timeValidationModal.isOpen && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl border border-platinum-tint shadow-sm-3 max-w-md w-full p-6 space-y-4"
+                        >
+                            <div className="flex items-center gap-3 text-amber-500 border-b border-platinum-tint pb-3">
+                                <AlertTriangle className="w-6 h-6" />
+                                <h2 className="text-lg font-bold text-midnight-indigo">Thông báo thời gian</h2>
+                            </div>
+                            <div className="space-y-2 text-left">
+                                <p className="text-sm text-slate-blue leading-relaxed">
+                                    {timeValidationModal.message}
+                                </p>
+                            </div>
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={() => setTimeValidationModal({ isOpen: false, message: '' })}
+                                    className="px-5 py-2 bg-midnight-indigo hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                                >
+                                    Đồng ý
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* MODAL 1: Edit Meeting */}
             <AnimatePresence>

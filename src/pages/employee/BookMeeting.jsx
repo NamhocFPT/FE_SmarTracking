@@ -655,18 +655,10 @@ const BookMeeting = () => {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header / Back Button */}
-            <div className="flex items-center gap-4">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="p-2 bg-white rounded-xl border border-platinum-tint text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50 transition-colors shadow-sm"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-midnight-indigo">Đặt lịch & Đăng ký phòng họp</h1>
-                    <p className="text-xs text-slate-blue">Lên kế hoạch cuộc họp, thiết lập chương trình (agenda) và kiểm tra chính sách bảo mật</p>
-                </div>
+            {/* Header */}
+            <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-midnight-indigo">Đặt lịch & Đăng ký phòng họp</h1>
+                <p className="text-xs text-slate-blue">Lên kế hoạch cuộc họp, thiết lập chương trình (agenda) và kiểm tra chính sách bảo mật</p>
             </div>
 
             {/* Visual Step Progress Indicator */}

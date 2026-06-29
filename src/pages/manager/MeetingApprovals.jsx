@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+
 import {
     Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, RefreshCw, 
-    Search, Eye, ArrowLeft, Info, X, ChevronLeft, ChevronRight, Users, FileText
+    Search, Eye, Info, X, ChevronLeft, ChevronRight, Users, FileText
 } from 'lucide-react';
 import {
     getPendingMeetingRequests,
@@ -25,7 +25,7 @@ const itemVariants = {
 };
 
 const MeetingApprovals = () => {
-    const navigate = useNavigate();
+
     
     // List & pagination states
     const [requests, setRequests] = useState([]);
@@ -206,15 +206,9 @@ const MeetingApprovals = () => {
             animate="show"
             className="space-y-6 max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-2"
         >
-            {/* Header & Back Button */}
+            {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-platinum-tint pb-4">
                 <div>
-                    <button
-                        onClick={() => navigate('/manager')}
-                        className="inline-flex items-center gap-1.5 text-slate-blue hover:text-midnight-indigo font-bold text-sm mb-2 transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" /> Quay lại Trang chủ
-                    </button>
                     <h1 className="text-xl md:text-2xl font-extrabold text-midnight-indigo leading-tight">
                         Quản lý lịch họp & Phê duyệt
                     </h1>
