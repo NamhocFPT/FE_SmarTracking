@@ -31,7 +31,6 @@ import ManagerLayout from '../pages/manager/layout/ManagerLayout';
 import ManagerHomePage from '../pages/manager/homePage';
 import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
-import ManagerInMeeting from '../pages/manager/InMeeting';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
 
 // Employee Layout + Pages
@@ -41,8 +40,8 @@ import BookMeeting from '../pages/employee/BookMeeting';
 import PersonalCalendar from '../pages/employee/PersonalCalendar';
 import EmployeeFaceRegistration from '../pages/employee/FaceRegistration';
 import EmployeeMeetingDetail from '../pages/employee/MeetingDetail';
-import EmployeeInMeeting from '../pages/employee/InMeeting';
 import EmployeeRecordings from '../pages/employee/Recordings';
+import InMeetingRoom from '../pages/shared/InMeetingRoom';
 
 export const router = [
     // ========== Auth Routes (public) ==========
@@ -65,6 +64,10 @@ export const router = [
     {
         path: '/change-password',
         element: <ChangePass />
+    },
+    {
+        path: '/public/in-meeting/:id',
+        element: <InMeetingRoom isPublic={true} />
     },
 
     // ========== SystemAdmin Routes (protected) ==========
@@ -190,7 +193,7 @@ export const router = [
             },
             {
                 path: 'in-meeting/:id',
-                element: <ManagerInMeeting />
+                element: <InMeetingRoom />
             },
             {
                 path: 'notifications',
@@ -234,7 +237,7 @@ export const router = [
             },
             {
                 path: 'in-meeting/:id',
-                element: <EmployeeInMeeting />
+                element: <InMeetingRoom />
             },
             {
                 path: 'notifications',
