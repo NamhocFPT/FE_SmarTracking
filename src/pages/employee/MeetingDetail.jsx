@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Calendar, Clock, MapPin, Users, Video, Edit3, Trash2,
-    Check, Play, Pause, Search, List, AlertTriangle
+    Check, Play, Pause, Search, List, AlertTriangle, Upload, X, FileText
 } from 'lucide-react';
 import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers } from '../../service/employeeServices';
+import UserAvatar from '../../component/UserAvatar';
 
 const mockTranscript = [
     { time: 10, speaker: 'Lê Hoàng Hải', text: 'Chào mọi người, chúng ta bắt đầu họp bàn về thiết kế giao diện FE SmarTracking nhé.' },
@@ -46,6 +47,7 @@ const EmployeeMeetingDetail = () => {
     const [agendaList, setAgendaList] = useState([]);
     const [newAgendaTitle, setNewAgendaTitle] = useState('');
     const [newAgendaDuration, setNewAgendaDuration] = useState('15');
+    const [newAgendaFile, setNewAgendaFile] = useState(null);
 
     // Data lists for editing
     const [rooms, setRooms] = useState([]);
@@ -268,6 +270,7 @@ const EmployeeMeetingDetail = () => {
             }
         } catch (err) {
             setError(err.message || 'Lỗi cập nhật cuộc họp.');
+            setIsEditModalOpen(false);
         }
     };
 
@@ -287,6 +290,7 @@ const EmployeeMeetingDetail = () => {
             }
         } catch (err) {
             setError(err.message || 'Lỗi hủy cuộc họp.');
+            setIsCancelConfirmOpen(false);
         }
     };
 
@@ -297,9 +301,15 @@ const EmployeeMeetingDetail = () => {
 
         setAgendaList(prev => [
             ...prev,
-            { title: newAgendaTitle, durationMin: dur, orderIndex: prev.length }
+            { 
+                title: newAgendaTitle, 
+                durationMin: dur, 
+                orderIndex: prev.length,
+                file: newAgendaFile ? { name: newAgendaFile.name, size: newAgendaFile.size } : null
+            }
         ]);
         setNewAgendaTitle('');
+        setNewAgendaFile(null);
     };
 
     const handleRemoveAgendaItem = (idx) => {
@@ -321,6 +331,7 @@ const EmployeeMeetingDetail = () => {
             }
         } catch (err) {
             setError('Không thể lưu Agenda.');
+            setIsAgendaModalOpen(false);
         }
     };
 
@@ -334,6 +345,18 @@ const EmployeeMeetingDetail = () => {
     }
 
     const isHost = currentUser?.id === (meeting.host_id || meeting.hostId);
+    const hostParticipant = meeting.participants?.find((participant) =>
+        participant.id === (meeting.host_id || meeting.hostId)
+        || participant.userId === (meeting.host_id || meeting.hostId)
+        || participant.participantRole === 'host'
+        || participant.participant_role === 'host'
+    );
+    const hostUser = hostParticipant
+        || (typeof meeting.host === 'object' ? meeting.host : {
+            fullName: meeting.host,
+            avatarUrl: meeting.hostAvatarUrl || meeting.host_avatar_url,
+        });
+    const hostName = hostUser?.fullName || hostUser?.full_name || meeting.hostName || meeting.host_name || 'Host';
     const canJoin = meeting.status === 'scheduled' || meeting.status === 'in_progress';
     const isCompleted = meeting.status === 'completed';
 
@@ -342,7 +365,26 @@ const EmployeeMeetingDetail = () => {
         item.speaker.toLowerCase().includes(transcriptQuery.toLowerCase())
     );
 
+    let isBefore15Min = false;
+    let isEnded = false;
+    if (meeting?.start_time || meeting?.startTime) {
+        const startVal = meeting.start_time || meeting.startTime;
+        const startDate = new Date(startVal);
+        const diffMs = startDate.getTime() - new Date().getTime();
+        if (diffMs > 15 * 60 * 1000) {
+            isBefore15Min = true;
+        }
+    }
+    if (meeting?.end_time || meeting?.endTime) {
+        const endVal = meeting.end_time || meeting.endTime;
+        const endDate = new Date(endVal);
+        if (endDate.getTime() < new Date().getTime()) {
+            isEnded = true;
+        }
+    }
+
     return (
+        <>
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
             {/* Header / Actions */}
             <div className="flex justify-end gap-2 w-full">
@@ -355,12 +397,6 @@ const EmployeeMeetingDetail = () => {
                             <Edit3 className="w-4 h-4" /> Chỉnh sửa cuộc họp
                         </button>
                         <button
-                            onClick={() => setIsAgendaModalOpen(true)}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-platinum-tint bg-white text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
-                        >
-                            <List className="w-4 h-4" /> Quản lý Agenda
-                        </button>
-                        <button
                             onClick={() => setIsCancelConfirmOpen(true)}
                             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all"
                         >
@@ -368,10 +404,30 @@ const EmployeeMeetingDetail = () => {
                         </button>
                     </>
                 )}
-                {canJoin && (
+                {meeting.status === 'completed' || isEnded ? (
                     <button
-                        onClick={handleJoinMeeting}
-                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all animate-pulse-soft"
+                        disabled
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
+                    >
+                        Cuộc họp đã kết thúc
+                    </button>
+                ) : meeting.status === 'cancelled' ? (
+                    <button
+                        disabled
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all bg-red-50 text-red-400 cursor-not-allowed border border-red-200"
+                    >
+                        Cuộc họp đã bị hủy
+                    </button>
+                ) : canJoin && (
+                    <button
+                        onClick={isBefore15Min ? null : handleJoinMeeting}
+                        disabled={isBefore15Min}
+                        title={isBefore15Min ? "Nút tham gia sẽ mở trước giờ họp 15 phút" : ""}
+                        className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all ${
+                            isBefore15Min
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse-soft'
+                        }`}
                     >
                         <Video className="w-4 h-4" /> Tham gia phòng họp
                     </button>
@@ -440,10 +496,20 @@ const EmployeeMeetingDetail = () => {
                 <div className="lg:col-span-2 space-y-6">
                     {/* Agenda */}
                     <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
-                        <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider border-b border-platinum-tint pb-3 mb-4 flex items-center gap-2">
-                            <List className="w-4.5 h-4.5 text-action-blue" />
-                            Chương trình nghị sự ({meeting.agenda?.length || 0})
-                        </h3>
+                        <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
+                            <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                                <List className="w-4.5 h-4.5 text-action-blue" />
+                                Chương trình nghị sự ({meeting.agenda?.length || 0})
+                            </h3>
+                            {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                <button
+                                    onClick={() => setIsAgendaModalOpen(true)}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border border-action-blue/20 bg-blue-50 text-action-blue hover:bg-blue-100 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                >
+                                    <Edit3 className="w-3.5 h-3.5" /> Quản lý Agenda
+                                </button>
+                            )}
+                        </div>
                         {meeting.agenda && meeting.agenda.length > 0 ? (
                             <div className="space-y-4">
                                 {meeting.agenda.map((item, idx) => (
@@ -453,7 +519,10 @@ const EmployeeMeetingDetail = () => {
                                         </div>
                                         <div className="flex-1 bg-cloud-mist/55 p-3 rounded-xl border border-outline-gray/60">
                                             <div className="flex justify-between items-center">
-                                                <h4 className="font-semibold text-midnight-indigo text-xs sm:text-sm">{item.title}</h4>
+                                                <h4 className="font-semibold text-midnight-indigo text-xs sm:text-sm flex items-center gap-2">
+                                                    {item.title}
+                                                    {item.file && <FileText className="w-4 h-4 text-action-blue shrink-0" title={item.file.name} />}
+                                                </h4>
                                                 <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded font-bold">{item.durationMin} phút</span>
                                             </div>
                                         </div>
@@ -473,20 +542,23 @@ const EmployeeMeetingDetail = () => {
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-action-blue text-white font-bold flex items-center justify-center text-sm ring-2 ring-white">
-                                    {meeting.host?.charAt(0).toUpperCase()}
-                                </div>
+                                <UserAvatar
+                                    user={hostUser}
+                                    name={hostName}
+                                    className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
+                                />
                                 <div className="truncate">
                                     <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Chủ trì / Host</span>
-                                    <span className="text-xs font-bold text-midnight-indigo block truncate">{meeting.host}</span>
+                                    <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
                                 </div>
                             </div>
                             
-                            {meeting.participants?.filter(p => (p.fullName || p.full_name) !== meeting.host).map(p => (
+                            {meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName).map(p => (
                                 <div key={p.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-sm">
-                                        {(p.fullName || p.full_name)?.charAt(0).toUpperCase()}
-                                    </div>
+                                    <UserAvatar
+                                        user={p}
+                                        className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
+                                    />
                                     <div className="truncate">
                                         <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Attendee</span>
                                         <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
@@ -578,11 +650,12 @@ const EmployeeMeetingDetail = () => {
                     )}
                 </div>
             </div>
+        </div>
 
             {/* MODAL: Time Validation Warning */}
             <AnimatePresence>
                 {timeValidationModal.isOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -614,7 +687,7 @@ const EmployeeMeetingDetail = () => {
             {/* MODAL 1: Edit Meeting */}
             <AnimatePresence>
                 {isEditModalOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -714,7 +787,7 @@ const EmployeeMeetingDetail = () => {
             {/* MODAL 2: Manage Agenda */}
             <AnimatePresence>
                 {isAgendaModalOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -723,39 +796,56 @@ const EmployeeMeetingDetail = () => {
                         >
                             <h2 className="text-lg font-bold text-midnight-indigo border-b border-platinum-tint pb-3">Quản lý chương trình Agenda</h2>
                             <div className="space-y-4">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Tên mục nghị sự mới..."
-                                        value={newAgendaTitle}
-                                        onChange={(e) => setNewAgendaTitle(e.target.value)}
-                                        className="flex-1 px-3 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue"
-                                    />
-                                    <select
-                                        value={newAgendaDuration}
-                                        onChange={(e) => setNewAgendaDuration(e.target.value)}
-                                        className="w-24 px-2.5 py-2 border border-platinum-tint rounded-xl text-xs bg-white focus:outline-none"
-                                    >
-                                        <option value="5">5 phút</option>
-                                        <option value="10">10 phút</option>
-                                        <option value="15">15 phút</option>
-                                        <option value="30">30 phút</option>
-                                        <option value="45">45 phút</option>
-                                    </select>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddAgendaItem}
-                                        className="px-3.5 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold"
-                                    >
-                                        Thêm
-                                    </button>
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Tên mục nghị sự mới..."
+                                            value={newAgendaTitle}
+                                            onChange={(e) => setNewAgendaTitle(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue"
+                                        />
+                                        <select
+                                            value={newAgendaDuration}
+                                            onChange={(e) => setNewAgendaDuration(e.target.value)}
+                                            className="w-24 px-2.5 py-2 border border-platinum-tint rounded-xl text-xs bg-white focus:outline-none"
+                                        >
+                                            <option value="5">5 phút</option>
+                                            <option value="10">10 phút</option>
+                                            <option value="15">15 phút</option>
+                                            <option value="30">30 phút</option>
+                                            <option value="45">45 phút</option>
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddAgendaItem}
+                                            className="px-3.5 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold shrink-0"
+                                        >
+                                            Thêm
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-3 w-full">
+                                        <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-platinum-tint hover:border-action-blue bg-cloud-mist/20 hover:bg-blue-50/20 text-slate-blue hover:text-action-blue rounded-xl text-xs font-bold cursor-pointer transition-all flex-1 justify-center select-none">
+                                            <Upload className="w-4 h-4 text-action-blue" />
+                                            <span>{newAgendaFile ? `Đã đính kèm: ${newAgendaFile.name}` : 'Đính kèm tài liệu thảo luận (PDF, Word, Excel, PowerPoint...)'}</span>
+                                            <input type="file" onChange={(e) => { if(e.target.files && e.target.files[0]) setNewAgendaFile(e.target.files[0]); }} className="hidden" />
+                                        </label>
+                                        {newAgendaFile && (
+                                            <button type="button" onClick={() => setNewAgendaFile(null)} className="p-2 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl transition-all" title="Hủy chọn file">
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {agendaList.map((item, idx) => (
                                         <div key={idx} className="flex justify-between items-center p-3 bg-cloud-mist rounded-xl border border-outline-gray">
                                             <div className="text-left">
-                                                <span className="text-xs font-bold text-midnight-indigo block">{item.title}</span>
+                                                <span className="text-xs font-bold text-midnight-indigo flex items-center gap-2 mb-1">
+                                                    {item.title}
+                                                    {item.file && <FileText className="w-3.5 h-3.5 text-action-blue shrink-0" title={item.file.name} />}
+                                                </span>
                                                 <span className="text-[10px] text-slate-blue font-medium">{item.durationMin} phút</span>
                                             </div>
                                             <button
@@ -792,7 +882,7 @@ const EmployeeMeetingDetail = () => {
             {/* MODAL 3: Cancel Confirm */}
             <AnimatePresence>
                 {isCancelConfirmOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -838,7 +928,7 @@ const EmployeeMeetingDetail = () => {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </>
     );
 };
 

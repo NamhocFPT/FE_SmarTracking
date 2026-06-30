@@ -511,7 +511,7 @@ const MeetingApprovals = () => {
             {/* 1. Request Detail Modal */}
             <AnimatePresence>
                 {detailModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -671,7 +671,7 @@ const MeetingApprovals = () => {
             {/* 2. Approve Confirmation Modal */}
             <AnimatePresence>
                 {approvalModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -723,7 +723,7 @@ const MeetingApprovals = () => {
             {/* 3. Reject Confirmation Modal */}
             <AnimatePresence>
                 {rejectionModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}

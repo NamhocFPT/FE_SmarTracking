@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getMeetingById as getMeetingEmployee } from '../../service/employeeServices';
 import { getMeetingById as getMeetingManager } from '../../service/managerServices';
+import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 
 // CSS styles injected for custom floating reactions and voice sound wave animations
 const customStyles = `
@@ -73,6 +74,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [meetingState, setMeetingState] = useState(null);
     const [toasts, setToasts] = useState([]);
     const [floatingReactions, setFloatingReactions] = useState([]);
+    const [renameModal, setRenameModal] = useState({ isOpen: false, targetId: null, currentName: '', isSelf: true });
+    const [confirmLeaveModal, setConfirmLeaveModal] = useState(false);
     
     // User local settings
     const [isMicOn, setIsMicOn] = useState(true);
@@ -148,6 +151,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 if (baseMeeting.agenda && baseMeeting.agenda.length > 0) {
                     savedState.agenda = baseMeeting.agenda;
                 }
+                savedState.participants = savedState.participants?.map((savedParticipant) => {
+                    const apiParticipant = baseMeeting.participants?.find((participant) => {
+                        const participantId = participant.userId || participant.user_id || participant.user?.id || participant.id;
+                        return participantId === savedParticipant.id;
+                    });
+                    return apiParticipant
+                        ? { ...savedParticipant, avatarUrl: resolveAvatarUrl(apiParticipant) || savedParticipant.avatarUrl }
+                        : savedParticipant;
+                });
             }
             setMeetingState(savedState);
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(savedState));
@@ -159,18 +171,36 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 if (baseMeeting.agenda && baseMeeting.agenda.length > 0) {
                     initial.agenda = baseMeeting.agenda;
                 }
-                initial.host = baseMeeting.host || initial.host;
                 initial.hostId = baseMeeting.host_id || baseMeeting.hostId || initial.hostId;
                 initial.status = baseMeeting.status || initial.status;
-                
+                const apiHost = baseMeeting.participants?.find((participant) => {
+                    const participantId = participant.userId || participant.user_id || participant.user?.id || participant.id;
+                    return participantId === initial.hostId
+                        || participant.participantRole === 'host'
+                        || participant.participant_role === 'host';
+                }) || (typeof baseMeeting.host === 'object' ? baseMeeting.host : null);
+                initial.host = apiHost?.fullName || apiHost?.full_name || baseMeeting.hostName || baseMeeting.host_name
+                    || (typeof baseMeeting.host === 'string' ? baseMeeting.host : initial.host);
+
                 const parts = [
-                    { id: initial.hostId, fullName: initial.host, role: 'Host', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: false }
+                    {
+                        id: initial.hostId,
+                        fullName: initial.host,
+                        avatarUrl: resolveAvatarUrl(apiHost) || baseMeeting.hostAvatarUrl || baseMeeting.host_avatar_url || '',
+                        role: 'Host',
+                        isMuted: false,
+                        isCameraOff: false,
+                        isSpeaking: false,
+                        isBot: false,
+                    }
                 ];
                 baseMeeting.participants?.forEach(p => {
-                    if (p.id !== initial.hostId) {
+                    const participantId = p.userId || p.user_id || p.user?.id || p.id;
+                    if (participantId !== initial.hostId) {
                         parts.push({
-                            id: p.id,
+                            id: participantId,
                             fullName: p.fullName || p.full_name,
+                            avatarUrl: resolveAvatarUrl(p),
                             role: 'Thành viên',
                             isMuted: false,
                             isCameraOff: false,
@@ -377,6 +407,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
             
             if (exists) {
                 exists.fullName = selectedName;
+                exists.avatarUrl = resolveAvatarUrl(currentUser) || exists.avatarUrl;
                 exists.role = userRole;
                 exists.isCameraOff = !isVideoOn;
                 exists.isMuted = !isMicOn;
@@ -384,6 +415,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 list.push({
                     id: myParticipantId,
                     fullName: selectedName,
+                    avatarUrl: resolveAvatarUrl(currentUser),
                     role: userRole,
                     isMuted: !isMicOn,
                     isCameraOff: !isVideoOn,
@@ -486,34 +518,27 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const handleRenameSelf = () => {
         const currentName = meetingState.participants?.find(p => p.id === myParticipantId)?.fullName || '';
-        const name = prompt('Nhập tên hiển thị mới của bạn:', currentName);
-        if (name && name.trim()) {
-            setMeetingState(prev => {
-                const next = {
-                    ...prev,
-                    participants: prev.participants.map(p => p.id === myParticipantId ? { ...p, fullName: name.trim() } : p)
-                };
-                localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-                return next;
-            });
-            showToast('Đổi tên thành công!', 'success');
-        }
+        setRenameModal({ isOpen: true, targetId: myParticipantId, currentName, isSelf: true });
     };
 
     const handleHostRename = (pId, currentName) => {
         if (!isHost) return;
-        const name = prompt(`Thay đổi tên cho thành viên "${currentName}":`, currentName);
+        setRenameModal({ isOpen: true, targetId: pId, currentName, isSelf: false });
+    };
+
+    const submitRename = (name) => {
         if (name && name.trim()) {
             setMeetingState(prev => {
                 const next = {
                     ...prev,
-                    participants: prev.participants.map(p => p.id === pId ? { ...p, fullName: name.trim() } : p)
+                    participants: prev.participants.map(p => p.id === renameModal.targetId ? { ...p, fullName: name.trim() } : p)
                 };
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                 return next;
             });
-            showToast('Host đã thay đổi tên của thành viên!', 'success');
+            showToast(renameModal.isSelf ? 'Đổi tên thành công!' : 'Host đã thay đổi tên của thành viên!', 'success');
         }
+        setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true });
     };
 
     const handleHostMuteToggle = (pId, currentMuteState) => {
@@ -575,17 +600,19 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     const handleLeaveRoom = () => {
-        if (window.confirm('Bạn có chắc chắn muốn rời phòng họp?')) {
-            setMeetingState(prev => {
-                const next = {
-                    ...prev,
-                    participants: prev.participants.filter(p => p.id !== myParticipantId)
-                };
-                localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-                return next;
-            });
-            navigate(isPublic ? '/' : '/employee');
-        }
+        setConfirmLeaveModal(true);
+    };
+
+    const confirmLeave = () => {
+        setMeetingState(prev => {
+            const next = {
+                ...prev,
+                participants: prev.participants.filter(p => p.id !== myParticipantId)
+            };
+            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+            return next;
+        });
+        navigate(isPublic ? '/' : '/employee');
     };
 
     return (
@@ -710,9 +737,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 {meetingState.participants?.map(p => (
                                     <div key={p.id} className="flex items-center justify-between text-xs p-2 bg-slate-900/50 rounded-lg">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-indigo-950 text-indigo-300 font-bold flex items-center justify-center text-[10px]">
-                                                {p.fullName?.charAt(0).toUpperCase()}
-                                            </div>
+                                            <UserAvatar
+                                                user={p}
+                                                className="w-6 h-6 rounded-full shrink-0 bg-indigo-950 text-indigo-300 font-bold text-[10px]"
+                                            />
                                             <span className="font-semibold text-slate-200">{p.fullName}</span>
                                         </div>
                                         <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold tracking-wider uppercase ${
@@ -786,13 +814,11 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                     className="w-full h-full rounded-full object-cover transform scale-x-[-1]" 
                                                 />
                                             ) : (
-                                                <div className={`w-full h-full rounded-full bg-gradient-to-br flex items-center justify-center font-bold text-lg ${
+                                                <UserAvatar user={p} className={`w-full h-full rounded-full bg-gradient-to-br font-bold text-lg ${
                                                     p.role === 'Host' ? 'from-red-950 to-indigo-950 text-indigo-300' :
                                                     p.role === 'Khách' ? 'from-emerald-950 to-slate-950 text-emerald-300' :
                                                     'from-blue-950 to-slate-950 text-blue-300'
-                                                }`}>
-                                                    {p.fullName?.substring(0, 2).toUpperCase()}
-                                                </div>
+                                                }`} />
                                             )}
 
                                             {/* Micro-animations: Speak waves */}
@@ -1032,6 +1058,65 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
                     </div>
 
+                </div>
+            )}
+
+            {/* RENAME MODAL */}
+            {renameModal.isOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl transition-all">
+                    <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                        <h3 className="text-lg font-bold text-white mb-2">
+                            {renameModal.isSelf ? 'Nhập tên hiển thị mới của bạn:' : `Thay đổi tên cho thành viên "${renameModal.currentName}":`}
+                        </h3>
+                        <input
+                            type="text"
+                            autoFocus
+                            defaultValue={renameModal.currentName}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') submitRename(e.target.value);
+                            }}
+                            id="renameInput"
+                            className="w-full px-4 py-3 bg-slate-950 border border-indigo-900/50 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors text-white font-semibold mb-6"
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true })}
+                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors"
+                            >
+                                Hủy
+                            </button>
+                            <button 
+                                onClick={() => submitRename(document.getElementById('renameInput').value)}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-indigo-600/20"
+                            >
+                                Lưu thay đổi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CONFIRM LEAVE MODAL */}
+            {confirmLeaveModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl transition-all">
+                    <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                        <h3 className="text-lg font-bold text-white mb-2">Xác nhận rời phòng</h3>
+                        <p className="text-sm text-slate-300 mb-6">Bạn có chắc chắn muốn rời phòng họp?</p>
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => setConfirmLeaveModal(false)}
+                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors"
+                            >
+                                Hủy
+                            </button>
+                            <button 
+                                onClick={confirmLeave}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-red-600/20"
+                            >
+                                Rời đi
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
