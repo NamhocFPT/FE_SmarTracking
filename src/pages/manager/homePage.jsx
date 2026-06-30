@@ -978,7 +978,7 @@ const ManagerHomePage = () => {
             {/* Approval Modal */}
             <AnimatePresence>
                 {approvalModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -1030,7 +1030,7 @@ const ManagerHomePage = () => {
             {/* Rejection Modal */}
             <AnimatePresence>
                 {rejectionModalOpen && selectedRequest && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}

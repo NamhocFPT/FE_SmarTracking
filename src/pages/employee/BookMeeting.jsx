@@ -11,21 +11,25 @@ import * as XLSX from 'xlsx';
 
 const getInitialTimes = () => {
     const now = new Date();
-    const sh = String(now.getHours()).padStart(2, '0');
-    const sm = String(now.getMinutes()).padStart(2, '0');
+    const startDate = new Date(now.getTime() + 5 * 60 * 1000);
+
+    const sh = String(startDate.getHours()).padStart(2, '0');
+    const sm = String(startDate.getMinutes()).padStart(2, '0');
     const start = `${sh}:${sm}`;
 
-    // Default end time is 1 hour later
-    const later = new Date(now.getTime() + 60 * 60 * 1000);
-    let eh = String(later.getHours()).padStart(2, '0');
-    let em = String(later.getMinutes()).padStart(2, '0');
+    // End time = start time + 1 giờ
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
-    // If end time wrapped around to next day, cap it at 23:59
-    if (later.getDate() !== now.getDate()) {
+    let eh = String(endDate.getHours()).padStart(2, '0');
+    let em = String(endDate.getMinutes()).padStart(2, '0');
+
+    if (endDate.getDate() !== startDate.getDate()) {
         eh = '23';
         em = '59';
     }
+
     const end = `${eh}:${em}`;
+
     return { start, end };
 };
 
@@ -665,8 +669,8 @@ const BookMeeting = () => {
             <div className="flex items-center justify-center gap-4 py-2 border-b border-platinum-tint/30 mb-2">
                 <div className="flex items-center gap-2">
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStep === 1
-                            ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
-                            : 'bg-emerald-500 text-white'
+                        ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
+                        : 'bg-emerald-500 text-white'
                         }`}>
                         {currentStep > 1 ? <Check className="w-4 h-4" /> : '1'}
                     </span>
@@ -677,8 +681,8 @@ const BookMeeting = () => {
                 <div className="w-16 h-0.5 bg-platinum-tint rounded" />
                 <div className="flex items-center gap-2">
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStep === 2
-                            ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
-                            : 'bg-cloud-mist border border-platinum-tint text-slate-blue'
+                        ? 'bg-action-blue text-white ring-4 ring-action-blue/15'
+                        : 'bg-cloud-mist border border-platinum-tint text-slate-blue'
                         }`}>
                         2
                     </span>
@@ -821,8 +825,8 @@ const BookMeeting = () => {
                                                     key={room.id}
                                                     onClick={() => handleSelectRoom(room)}
                                                     className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${isSelected
-                                                            ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15'
-                                                            : 'bg-white border-platinum-tint hover:border-action-blue/50 hover:bg-cloud-mist/50'
+                                                        ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15'
+                                                        : 'bg-white border-platinum-tint hover:border-action-blue/50 hover:bg-cloud-mist/50'
                                                         }`}
                                                 >
                                                     <div>
@@ -968,8 +972,8 @@ const BookMeeting = () => {
                                             <Users className="w-4 h-4 text-royal-amethyst" /> Mời khách tham gia
                                         </h3>
                                         <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${(selectedParticipantIds.length + externalParticipants.length + 1) > (selectedRoom?.capacity || 0)
-                                                ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse'
-                                                : 'bg-cloud-mist text-slate-blue'
+                                            ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse'
+                                            : 'bg-cloud-mist text-slate-blue'
                                             }`}>
                                             Đã mời: {selectedParticipantIds.length + externalParticipants.length + 1} / {selectedRoom?.capacity || 0} người
                                         </span>
@@ -1039,7 +1043,7 @@ const BookMeeting = () => {
                                                                                         {user.fullName || user.full_name}
                                                                                     </p>
                                                                                     {deptCode && (
-                                                                                        <span 
+                                                                                        <span
                                                                                             className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue shrink-0 max-w-[85px] truncate"
                                                                                             title={deptCode}
                                                                                         >
@@ -1111,14 +1115,14 @@ const BookMeeting = () => {
                                                                     </div>
                                                                     <div className="space-y-0.5 min-w-0 flex-1">
                                                                         <div className="flex items-center gap-1.5 min-w-0">
-                                                                            <span 
+                                                                            <span
                                                                                 className="text-sm font-semibold text-midnight-indigo group-hover:text-rose-950 transition-colors truncate"
                                                                                 title={user.fullName || user.full_name}
                                                                             >
                                                                                 {user.fullName || user.full_name}
                                                                             </span>
                                                                             {deptCode && (
-                                                                                <span 
+                                                                                <span
                                                                                     className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700 transition-colors shrink-0 max-w-[85px] truncate"
                                                                                     title={deptCode}
                                                                                 >
@@ -1126,7 +1130,7 @@ const BookMeeting = () => {
                                                                                 </span>
                                                                             )}
                                                                         </div>
-                                                                        <p 
+                                                                        <p
                                                                             className="text-[11px] font-normal text-slate-blue/80 group-hover:text-rose-700/60 transition-colors truncate"
                                                                             title={user.email}
                                                                         >
@@ -1156,8 +1160,8 @@ const BookMeeting = () => {
                                                     <div
                                                         key={ext.id}
                                                         className={`flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border text-xs font-medium transition-colors max-w-full min-w-0 ${ext.isCompanyUnmatched
-                                                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                                             }`}
                                                     >
                                                         <span className="truncate max-w-[150px] sm:max-w-[200px]" title={ext.email}>
@@ -1484,7 +1488,7 @@ const BookMeeting = () => {
             {showImportModal && ReactDOM.createPortal(
                 <AnimatePresence>
                     {showImportModal && (
-                        <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/15 backdrop-blur-xl">
+                        <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -1521,8 +1525,8 @@ const BookMeeting = () => {
                                                 setImportPreview([]);
                                             }}
                                             className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${importMethod === 'manual'
-                                                    ? 'border-action-blue text-action-blue'
-                                                    : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                                ? 'border-action-blue text-action-blue'
+                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
                                                 }`}
                                         >
                                             Nhập thủ công
@@ -1534,8 +1538,8 @@ const BookMeeting = () => {
                                                 setImportPreview([]);
                                             }}
                                             className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${importMethod === 'excel'
-                                                    ? 'border-action-blue text-action-blue'
-                                                    : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                                ? 'border-action-blue text-action-blue'
+                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
                                                 }`}
                                         >
                                             Nhập từ file Excel
@@ -1788,7 +1792,7 @@ const BookMeeting = () => {
                 , document.body)}
 
             {selectedDetailUserId && ReactDOM.createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
                             <h3 className="font-bold text-midnight-indigo">Chi tiết thông tin nhân viên</h3>

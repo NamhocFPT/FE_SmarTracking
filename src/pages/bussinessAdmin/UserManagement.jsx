@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import UserAvatar from '../../component/UserAvatar';
 import {
     getUsers,
     createUser,
@@ -626,9 +627,10 @@ const UserManagement = () => {
                                         <tr key={user.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
                                             <td className="py-4 px-6">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-bold text-sm select-none">
-                                                        {user.fullName.charAt(0).toUpperCase()}
-                                                    </div>
+                                                    <UserAvatar
+                                                        user={user}
+                                                        className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
+                                                    />
                                                     <div>
                                                         <h4 
                                                             onClick={() => handleViewDetail(user)}
@@ -759,7 +761,7 @@ const UserManagement = () => {
 
             {/* CREATE MODAL */}
             {isCreateModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Tạo người dùng mới</h3>
@@ -855,7 +857,7 @@ const UserManagement = () => {
 
             {/* EDIT MODAL */}
             {isEditModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Chỉnh sửa thông tin</h3>
@@ -947,7 +949,7 @@ const UserManagement = () => {
 
             {/* IMPORT MODAL (WITH ERROR FEEDBACK & TEMPLATE DOWNLOAD) */}
             {isImportModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-lg w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
@@ -1040,7 +1042,7 @@ const UserManagement = () => {
 
             {/* USER LOGS MODAL */}
             {isLogsModalOpen && selectedUser && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-lg w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
@@ -1093,7 +1095,7 @@ const UserManagement = () => {
 
             {/* DETAIL MODAL (UC-AM-10) */}
             {isDetailModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-2xl w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Chi tiết hồ sơ tài khoản</h3>
@@ -1112,9 +1114,10 @@ const UserManagement = () => {
                             <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
                                 {/* Top header summary */}
                                 <div className="flex items-center gap-4 bg-cloud-mist/55 p-4 rounded-xl border border-platinum-tint/50">
-                                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-extrabold text-xl">
-                                        {selectedUserDetail.fullName.charAt(0).toUpperCase()}
-                                    </div>
+                                    <UserAvatar
+                                        user={selectedUserDetail}
+                                        className="w-16 h-16 rounded-full shrink-0 font-extrabold text-xl"
+                                    />
                                     <div>
                                         <h4 className="text-lg font-bold text-midnight-indigo leading-tight">{selectedUserDetail.fullName}</h4>
                                         <p className="text-sm text-slate-blue mt-0.5">{selectedUserDetail.email}</p>

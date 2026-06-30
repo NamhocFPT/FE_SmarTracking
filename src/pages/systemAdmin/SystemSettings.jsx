@@ -603,7 +603,7 @@ const SystemSettings = () => {
 
             {/* SOFT WARNING MODAL (UC-RUM-15 E1) */}
             {showSoftWarning && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-red-200 shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-red-100 flex items-center justify-between bg-red-50/50">
