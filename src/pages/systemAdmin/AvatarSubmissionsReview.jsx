@@ -8,6 +8,7 @@ import {
     rejectAvatarSubmission,
 } from "../../service/avatarReviewService";
 import { getDepartments } from "../../service/sysAdminServices";
+import UserAvatar from "../../component/UserAvatar";
 
 const STATUS_MAP = {
     pending_review: { label: "Đang chờ duyệt", badge: "bg-blue-50 text-action-blue border border-blue-200" },
@@ -135,7 +136,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
     };
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
             <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                 <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
                     <h3 className="font-bold text-midnight-indigo">Chi tiết yêu cầu duyệt ảnh</h3>
@@ -391,8 +392,6 @@ const AvatarSubmissionsReview = () => {
         fetchSubmissions();
     };
 
-    const getInitial = (name) => (name || "?").charAt(0).toUpperCase();
-
     return (
         <div className="space-y-6 animate-fade-in-up">
             <div>
@@ -490,9 +489,11 @@ const AvatarSubmissionsReview = () => {
                                 submissions.map((sub) => (
                                     <tr key={sub.id || sub.faceProfileId} className="border-b border-platinum-tint/50 hover:bg-cloud-mist/50 transition-colors">
                                         <td className="px-4 py-3">
-                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-action-blue to-glacier-blue flex items-center justify-center text-white font-bold text-sm">
-                                                {getInitial(sub.fullName || sub.user?.fullName)}
-                                            </div>
+                                            <UserAvatar
+                                                user={sub.user || sub}
+                                                name={sub.fullName || sub.user?.fullName}
+                                                className="w-9 h-9 rounded-full shrink-0 font-bold text-sm"
+                                            />
                                         </td>
                                         <td className="px-4 py-3 font-semibold text-midnight-indigo">{sub.fullName || sub.user?.fullName || ""}</td>
                                         <td className="px-4 py-3 text-slate-blue">{sub.email || sub.user?.email || ""}</td>

@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
 import AvatarReminderModal from '../../../component/AvatarReminder/AvatarReminderModal';
+import UserAvatar from '../../../component/UserAvatar';
 
 /**
  * Navigation items cho BusinessAdmin role
@@ -151,9 +152,11 @@ const BusinessAdminLayout = () => {
                                     </span>
                                 </div>
 
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-action-blue to-glacier-blue flex items-center justify-center text-white font-bold text-sm ring-2 ring-action-blue/20">
-                                    {displayName.charAt(0).toUpperCase()}
-                                </div>
+                                <UserAvatar
+                                    user={currentUser}
+                                    name={displayName}
+                                    className="w-9 h-9 rounded-full font-bold text-sm ring-2 ring-action-blue/20"
+                                />
 
                                 <svg
                                     className={`w-4 h-4 text-slate-blue transition-transform duration-200 ${
