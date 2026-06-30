@@ -96,6 +96,9 @@
 - Default: `page=1`, `limit=20`, max `limit=100`
 - `sortBy` phải là allowlist, không inject trực tiếp
 
+### Quy tắc UI/UX Chung (Frontend)
+- **Modal & Popup:** Bắt buộc TẤT CẢ các modal, dialog, popup khi hiển thị phải có hiệu ứng làm mờ toàn bộ nền (backdrop blur). Sử dụng CSS/Tailwind class: `bg-midnight-indigo/50 backdrop-blur-md` hoặc `backdrop-blur-lg` cho lớp overlay ngoài cùng. Tuyệt đối không dùng `window.prompt` hay `window.confirm` mặc định của trình duyệt mà không có hiệu ứng nền.
+
 ### Quy tắc v3.2 Compact
 - OTP reset mật khẩu lưu **Redis/cache TTL**, không có bảng `password_reset_requests`
 - Conflict scheduling tính **động** từ `meetings`, `room_bookings`, `meeting_participants`
