@@ -1,4 +1,4 @@
-import { get, post, patch, put } from '../utils/request';
+import { get, post, patch, put, buildQuery } from '../utils/request';
 
 // ============================================================
 // EMPLOYEE APIs (UC-SM-01 ~ UC-SM-03)
@@ -72,8 +72,8 @@ export const addInternalParticipant = async (meetingId, data) => {
  * @param {object} params - { from, to, view, status }
  */
 export const getMySchedule = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/me/schedule${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/me/schedule${query}`);
 };
 
 /**
@@ -157,4 +157,30 @@ export const getMyRecordings = async (params = {}) => {
  */
 export const getRecordingDownloadUrl = async (sessionId) => {
     return await get(`/recordings/${sessionId}/download`);
+};
+
+// ============================================================
+// MEETING NOTES & ACTIONS ENDPOINTS (RESTORED)
+// ============================================================
+
+export const getMeetingAttendance = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/attendance${query}`);
+};
+
+export const updateAttendanceStatus = async (meetingId, data) => {
+    return await patch(`/meetings/${meetingId}/attendance/status`, data);
+};
+
+export const listMeetingNotes = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/notes${query}`);
+};
+
+export const createMeetingNote = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/notes`, data);
+};
+
+export const endMeeting = async (meetingId) => {
+    return await post(`/meetings/${meetingId}/end`);
 };

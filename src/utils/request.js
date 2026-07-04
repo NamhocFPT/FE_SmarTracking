@@ -24,12 +24,31 @@ const onRefreshed = (token) => {
     refreshSubscribers = [];
 };
 
+/**
+ * Xây dựng query string từ object, lọc bỏ các giá trị undefined, null, chuỗi rỗng
+ * @param {Object} params - Tham số truy vấn
+ * @returns {string} Chuỗi truy vấn đã serialize
+ */
+export const buildQuery = (params) => {
+    if (!params) return '';
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== '') {
+            if (Array.isArray(value)) {
+                value.forEach(item => query.append(key, item));
+            } else {
+                query.append(key, value);
+            }
+        }
+    }
+    const qStr = query.toString();
+    return qStr ? `?${qStr}` : '';
+};
+
 // Check if an endpoint is public
 const isPublicEndpoint = (path) => {
     const publicPaths = [
         '/auth/login',
-        '/auth/reset-password',
-        '/auth/forgot-password',
         '/auth/password-reset/otp',
         '/auth/password-reset/confirm'
     ];

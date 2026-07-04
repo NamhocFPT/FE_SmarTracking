@@ -1,4 +1,4 @@
-import { get, post, patch } from '../utils/request';
+import { get, post, patch, put, buildQuery } from '../utils/request';
 
 // ============================================================
 // DASHBOARD & ANALYTICS APIs for Department Manager
@@ -132,8 +132,8 @@ export const getDepartments = async (params = {}) => {
  * @param {object} params - { from, to, view, status }
  */
 export const getMySchedule = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/me/schedule${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/me/schedule${query}`);
 };
 
 /**
@@ -210,4 +210,43 @@ export const getRooms = async (params = {}) => {
 export const getUsers = async (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return await get(`/users${query ? `?${query}` : ''}`);
+};
+
+// ============================================================
+// MEDIA & RECORDING ENDPOINTS (ADDED)
+// ============================================================
+
+export const getMeetingMediaFiles = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/media-files${query}`);
+};
+
+export const updateMediaVisibility = async (fileId, data) => {
+    return await patch(`/media-files/${fileId}/visibility`, data);
+};
+
+// ============================================================
+// MEETING NOTES & ACTIONS ENDPOINTS (RESTORED)
+// ============================================================
+
+export const listMeetingNotes = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/notes${query}`);
+};
+
+export const createMeetingNote = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/notes`, data);
+};
+
+export const endMeeting = async (meetingId) => {
+    return await post(`/meetings/${meetingId}/end`);
+};
+
+export const getMeetingAttendance = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/attendance${query}`);
+};
+export const getPresentAttendees = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/attendance/present${query}`);
 };

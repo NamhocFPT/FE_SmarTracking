@@ -1,4 +1,4 @@
-import { request, get, post, patch, dele } from '../utils/request';
+import { request, get, post, patch, dele, buildQuery } from '../utils/request';
 
 // ============================================================
 // DASHBOARD / ANALYTICS APIs (UC-RPT-01, UC-RPT-02, UC-RPT-03, UC-RPT-04)
@@ -18,8 +18,8 @@ export const getDashboardOverview = async () => {
  * @returns {Promise<object>} response envelope
  */
 export const getRoomAnalytics = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/dashboard${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/dashboard${query}`);
 };
 
 /**
@@ -28,8 +28,8 @@ export const getRoomAnalytics = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getAttendanceAnalytics = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/attendance/dashboard${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/attendance/on-time-rate${query}`);
 };
 
 /**
@@ -38,8 +38,8 @@ export const getAttendanceAnalytics = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getNoShowStats = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/no-show-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/no-show-rate${query}`);
 };
 
 // ============================================================
@@ -52,8 +52,8 @@ export const getNoShowStats = async (params = {}) => {
  * @returns {Promise<object>} { success, data: [...users], meta: { page, limit, total, totalPages } }
  */
 export const getUsers = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/users${query}`);
 };
 
 /**
@@ -178,8 +178,8 @@ export const getImportTemplate = async () => {
  * @returns {Promise<object>} { success, data: [...devices], meta }
  */
 export const getDevices = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/iot-devices${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/iot-devices${query}`);
 };
 
 /**
@@ -229,8 +229,8 @@ export const removeDevice = async (deviceId) => {
  * @returns {Promise<object>} { success, data: [...logs], meta }
  */
 export const getAuditLogs = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/audit-logs${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/audit-logs${query}`);
 };
 
 // ============================================================
@@ -264,8 +264,8 @@ export const updateSystemConfig = async (data) => {
  * @returns {Promise<object>} response envelope
  */
 export const getDepartments = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/departments${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/departments${query}`);
 };
 
 /**
@@ -326,8 +326,8 @@ export const getBackgroundJobStatus = async (jobId) => {
  * @returns {Promise<Blob>} file binary data
  */
 export const exportUsers = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users/export${query ? `?${query}` : ''}`, { responseType: 'blob' });
+    const query = buildQuery(params);
+    return await get(`/users/export${query}`, { responseType: 'blob' });
 };
 
 /**
@@ -345,16 +345,16 @@ export const updateSelfProfile = async (data) => {
  * @returns {Promise<object>} response envelope
  */
 export const getRooms = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/rooms${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/rooms${query}`);
 };
 
 /**
  * UC-NOTI-01: Get notifications list
  */
 export const getNotifications = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/notifications${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/notifications${query}`);
 };
 
 /**
@@ -371,3 +371,35 @@ export const markAllNotificationsRead = async () => {
     return await patch('/notifications/read-all');
 };
 
+
+// ============================================================
+// CAMERA & IOT MANAGEMENT ENDPOINTS (ADDED)
+// ============================================================
+
+export const assignDeviceRoom = async (deviceId, data) => {
+    return await post(`/iot-devices/${deviceId}/assign-room`, data);
+};
+
+export const configDeviceRtsp = async (deviceId, data) => {
+    return await patch(`/iot-devices/${deviceId}/rtsp-config`, data);
+};
+
+export const rotateFaceServerToken = async (deviceId) => {
+    return await post(`/iot-devices/${deviceId}/face-server/rotate`);
+};
+
+export const revokeFaceServerToken = async (deviceId) => {
+    return await post(`/iot-devices/${deviceId}/face-server/revoke`);
+};
+
+export const disableDevice = async (deviceId) => {
+    return await post(`/iot-devices/${deviceId}/disable`);
+};
+
+export const enableDevice = async (deviceId) => {
+    return await post(`/iot-devices/${deviceId}/enable`);
+};
+
+export const checkDeviceAvailability = async (deviceId) => {
+    return await post(`/iot-devices/${deviceId}/check-availability`);
+};

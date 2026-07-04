@@ -1,4 +1,4 @@
-import { request, get, post, patch, dele } from '../utils/request';
+import { request, get, post, patch, dele, buildQuery } from '../utils/request';
 
 // ============================================================
 // DASHBOARD & ANALYTICS APIs for Business Admin
@@ -10,8 +10,8 @@ import { request, get, post, patch, dele } from '../utils/request';
  * @returns {Promise<object>} response envelope
  */
 export const getDashboardOverview = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/dashboard/overview${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/dashboard/overview${query}`);
 };
 
 /**
@@ -20,8 +20,8 @@ export const getDashboardOverview = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getRoomAnalytics = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/dashboard${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/dashboard${query}`);
 };
 
 /**
@@ -30,8 +30,8 @@ export const getRoomAnalytics = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getAttendanceAnalytics = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/attendance/dashboard${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/attendance/on-time-rate${query}`);
 };
 
 /**
@@ -40,8 +40,8 @@ export const getAttendanceAnalytics = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getRoomUtilizationRate = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/utilization-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/utilization-rate${query}`);
 };
 
 /**
@@ -50,8 +50,8 @@ export const getRoomUtilizationRate = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getNoShowStats = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/no-show-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/no-show-rate${query}`);
 };
 
 /**
@@ -60,8 +60,8 @@ export const getNoShowStats = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getOnTimeRate = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/attendance/on-time-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/attendance/on-time-rate${query}`);
 };
 
 /**
@@ -70,8 +70,8 @@ export const getOnTimeRate = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getMeetingsCountByPeriod = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/count-by-period${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/count-by-period${query}`);
 };
 
 /**
@@ -80,8 +80,8 @@ export const getMeetingsCountByPeriod = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getMeetingStatusBreakdown = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/status-breakdown${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/status-breakdown${query}`);
 };
 
 /**
@@ -90,8 +90,8 @@ export const getMeetingStatusBreakdown = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getAverageMeetingDuration = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/average-duration${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/average-duration${query}`);
 };
 
 /**
@@ -100,8 +100,8 @@ export const getAverageMeetingDuration = async (params = {}) => {
  * @returns {Promise<object>} response envelope
  */
 export const getMeetingCancelRate = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/cancel-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/cancel-rate${query}`);
 };
 
 /**
@@ -121,8 +121,8 @@ export const exportMeetingActivity = async (data) => {
  * UC-ACC-06: Tìm kiếm / lọc danh sách tài khoản
  */
 export const getUsers = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/users${query}`);
 };
 
 /**
@@ -207,8 +207,8 @@ export const getImportTemplate = async () => {
  * Xuất danh sách tài khoản người dùng ra file Excel
  */
 export const exportUsers = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users/export${query ? `?${query}` : ''}`, { responseType: 'blob' });
+    const query = buildQuery(params);
+    return await get(`/users/export${query}`, { responseType: 'blob' });
 };
 
 // ============================================================
@@ -216,8 +216,8 @@ export const exportUsers = async (params = {}) => {
 // ============================================================
 
 export const getDepartments = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/departments${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/departments${query}`);
 };
 
 export const createDepartment = async (data) => {
@@ -245,8 +245,8 @@ export const getBackgroundJobStatus = async (jobId) => {
 // ============================================================
 
 export const getRooms = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/rooms${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/rooms${query}`);
 };
 
 export const createRoom = async (data) => {
@@ -266,8 +266,8 @@ export const deleteRoom = async (roomId) => {
 // ============================================================
 
 export const getMeetings = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/meetings${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/meetings${query}`);
 };
 
 export const createMeeting = async (data) => {
@@ -287,8 +287,8 @@ export const cancelMeeting = async (meetingId, reason = 'Huỷ bởi quản tr�
 // ============================================================
 
 export const getRecordings = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/recordings${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/recordings${query}`);
 };
 
 export const deleteRecording = async (sessionId) => {
@@ -299,13 +299,18 @@ export const getRecordingDownloadUrl = async (sessionId) => {
     return await get(`/recordings/${sessionId}/download`);
 };
 
+export const updateRecordingVisibility = async (sessionId, data) => {
+    return await patch(`/recordings/${sessionId}/visibility`, data);
+};
+
+
 // ============================================================
 // NOTIFICATION APIs (UC-NOTI-01 ~ UC-NOTI-05)
 // ============================================================
 
 export const getNotifications = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/notifications${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/notifications${query}`);
 };
 
 export const markNotificationRead = async (notificationId) => {

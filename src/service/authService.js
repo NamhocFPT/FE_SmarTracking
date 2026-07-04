@@ -1,4 +1,4 @@
-import { post, get, clearTokens } from '../utils/request';
+import { post, get, patch, clearTokens } from '../utils/request';
 
 /**
  * UC-AUTH-01 Đăng nhập hệ thống
@@ -54,7 +54,7 @@ export const confirmPasswordReset = async (email, otp, newPassword, confirmPassw
  * @returns {Promise<object>} response envelope
  */
 export const changePassword = async (currentPassword, newPassword, confirmPassword) => {
-    return await post('/auth/me/password', { currentPassword, newPassword, confirmPassword });
+    return await patch('/auth/change-password', { currentPassword, newPassword, confirmPassword });
 };
 
 /**
