@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Mic, MicOff, Video as VideoIcon, VideoOff, Shield, 
     Smile, Play, Clock, ChevronRight, Edit2, Check,
-    AlertTriangle, Volume2, VolumeX, ArrowLeft, Sparkles
+    AlertTriangle, Volume2, VolumeX, ArrowLeft, Sparkles, Users
 } from 'lucide-react';
-import { getMeetingById as getMeetingEmployee } from '../../service/employeeServices';
-import { getMeetingById as getMeetingManager } from '../../service/managerServices';
+import { getSocket, subscribeToMeeting } from '../../utils/socket';
+import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, endMeeting as endEmployee, getPresentAttendees as getEmployeeAttendees, getMeetingAttendance as getEmployeeAttendance, createMeetingNote as createEmployeeNote, listMeetingNotes as listEmployeeNotes } from '../../service/employeeServices';
+import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 
 // CSS styles injected for custom floating reactions and voice sound wave animations
@@ -65,6 +66,35 @@ const seats = [
     { top: '30%', right: '16%', transform: 'translate(50%, -50%)' }      // Seat 5: Top Right
 ];
 
+
+// Universal fallback caller for host actions
+const callWithFallback = async (employeeFn, managerFn, ...args) => {
+    try {
+        const res = await employeeFn(...args);
+        if (res?.success) return res;
+        throw new Error('Employee scope failed');
+    } catch (e) {
+        return await managerFn(...args);
+    }
+};
+
+const normalizeMeetingDetail = (raw, currentUserId) => {
+    // Basic mapping, keeping it flat for UI
+    return {
+        ...raw,
+        participants: raw.participants?.map(p => ({
+            id: p.userId || p.user_id || p.id,
+            fullName: p.fullName || p.full_name,
+            avatarUrl: resolveAvatarUrl(p),
+            role: p.participantRole || p.participant_role === 'host' ? 'Host' : 'Thành viên',
+            isMuted: false,
+            isCameraOff: false,
+            isSpeaking: false,
+            isBot: p.userId !== currentUserId
+        })) || []
+    };
+};
+
 const InMeetingRoom = ({ isPublic = false }) => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -76,6 +106,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [floatingReactions, setFloatingReactions] = useState([]);
     const [renameModal, setRenameModal] = useState({ isOpen: false, targetId: null, currentName: '', isSelf: true });
     const [confirmLeaveModal, setConfirmLeaveModal] = useState(false);
+    const [notes, setNotes] = useState([]);
+    const [noteInput, setNoteInput] = useState('');
+    const [attendance, setAttendance] = useState([]);
+    const [actionLoading, setActionLoading] = useState(false);
     
     // User local settings
     const [isMicOn, setIsMicOn] = useState(true);
@@ -143,6 +177,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         }
 
         const savedStateStr = localStorage.getItem(`meeting_state_${id}`);
+
         if (savedStateStr) {
             const savedState = JSON.parse(savedStateStr);
             if (baseMeeting) {
@@ -216,6 +251,40 @@ const InMeetingRoom = ({ isPublic = false }) => {
         }
         setLoading(false);
     };
+
+// Realtime sync via WebSocket
+        useEffect(() => {
+            if (meetingState?.status === 'in_progress') {
+                const cleanup = subscribeToMeeting(id);
+                const s = getSocket();
+                s.on('meeting.session.started', () => {
+                    setMeetingState(prev => ({ ...prev, status: 'in_progress' }));
+                });
+                s.on('meeting.session.ended', () => {
+                    setMeetingState(prev => ({ ...prev, status: 'completed' }));
+                });
+                return cleanup;
+            }
+        }, [meetingState?.status, id]);
+
+        const loadNotes = async () => {
+            try {
+                const res = await callWithFallback(listEmployeeNotes, listManagerNotes, id, { limit: 100 });
+                if (res?.success) setNotes(res.data.items || []);
+            } catch (err) {}
+        };
+        const loadAttendance = async () => {
+            try {
+                const res = await callWithFallback(getEmployeeAttendance, getManagerAttendance, id, {});
+                if (res?.success) setAttendance(res.data.items || []);
+            } catch (err) {}
+        };
+        useEffect(() => {
+            if (meetingState?.status === 'in_progress') {
+                loadNotes();
+                loadAttendance();
+            }
+        }, [meetingState?.status]);
 
     useEffect(() => {
         initMeetingState();
@@ -432,19 +501,66 @@ const InMeetingRoom = ({ isPublic = false }) => {
         showToast('Đã tham gia phòng chờ cuộc họp!', 'success');
     };
 
-    const handleStartMeeting = () => {
+    const handleStartMeeting = async () => {
         if (!isHost) return;
-        setMeetingState(prev => {
-            const next = {
-                ...prev,
-                status: 'in_progress',
-                agendaTimeLeft: (prev.agenda?.[0]?.durationMin || 10) * 60
-            };
-            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-            return next;
-        });
-        showToast('Bắt đầu cuộc họp!', 'success');
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(startEmployee, startManager, id);
+            if (res?.success) {
+                setMeetingState(prev => {
+                    const next = { ...prev, status: 'in_progress', agendaTimeLeft: (prev.agenda?.[0]?.durationMin || 10) * 60 };
+                    localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+                    return next;
+                });
+                showToast('Bắt đầu cuộc họp!', 'success');
+            } else {
+                showToast(res?.message || res?.error?.message || 'Lỗi khi bắt đầu', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối', 'error');
+        } finally {
+            setActionLoading(false);
+        }
     };
+
+    const handleEndMeeting = async () => {
+        if (!isHost) return;
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(endEmployee, endManager, id);
+            if (res?.success) {
+                setMeetingState(prev => {
+                    const next = { ...prev, status: 'completed' };
+                    localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+                    return next;
+                });
+                showToast('Cuộc họp đã kết thúc', 'info');
+            } else {
+                showToast(res?.message || res?.error?.message || 'Lỗi khi kết thúc', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleAddNote = async (e) => {
+        e.preventDefault();
+        if (!noteInput.trim()) return;
+        try {
+            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, { content: noteInput });
+            if (res?.success) {
+                setNoteInput('');
+                loadNotes();
+                showToast('Đã thêm ghi chú', 'success');
+            }
+        } catch (err) {
+            showToast('Lỗi khi thêm ghi chú', 'error');
+        }
+    };
+
+
 
     const handleMicToggle = () => {
         const me = meetingState.participants?.find(p => p.id === myParticipantId);
@@ -765,6 +881,18 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 </div>
             )}
 
+            {/* VIEW D: END MEETING */}
+            {meetingState.status === 'completed' && (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 z-10 text-center">
+                    <div className="max-w-md w-full bg-slate-900/70 p-8 rounded-3xl border border-indigo-900/30 backdrop-blur-lg shadow-2xl space-y-6">
+                        <div className="w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-inner">
+                            <Check className="w-8 h-8" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white uppercase tracking-wider">Cuộc họp đã kết thúc</h2>
+                        <button onClick={handleLeaveRoom} className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-extrabold uppercase transition-all">Quay lại trang chủ</button>
+                    </div>
+                </div>
+            )}
             {/* VIEW C: ACTIVE MEETING ROOM (in_progress) */}
             {meetingState.status === 'in_progress' && (
                 <div className="flex-1 flex flex-col lg:flex-row relative z-10">
@@ -1056,7 +1184,58 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             )}
                         </div>
 
+                        {/* Notes Section */}
+                        <div className="bg-slate-950/40 p-4 rounded-2xl border border-indigo-950/40 flex-1 flex flex-col gap-4 max-h-[300px]">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 border-b border-indigo-950 pb-2">
+                                <Edit2 className="w-4 h-4 text-indigo-400" />
+                                Ghi chú cuộc họp
+                            </h3>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {notes.map((note, idx) => (
+                                    <div key={idx} className="bg-slate-900 p-2 rounded-lg border border-indigo-900/30">
+                                        <div className="text-[10px] text-indigo-400 font-bold mb-1">{note.authorName}</div>
+                                        <div className="text-xs text-slate-300">{note.content}</div>
+                                    </div>
+                                ))}
+                                {notes.length === 0 && <p className="text-xs text-slate-500 italic">Chưa có ghi chú nào.</p>}
+                            </div>
+                            <form onSubmit={handleAddNote} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={noteInput}
+                                    onChange={e => setNoteInput(e.target.value)}
+                                    placeholder="Thêm ghi chú..."
+                                    className="flex-1 px-3 py-1.5 bg-slate-900 border border-indigo-900/50 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500"
+                                />
+                                <button type="submit" disabled={actionLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">Gửi</button>
+                            </form>
+                        </div>
+
+                        {/* Attendance Section */}
+                        <div className="bg-slate-950/40 p-4 rounded-2xl border border-indigo-950/40 flex-1 flex flex-col gap-4 max-h-[250px]">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 border-b border-indigo-950 pb-2">
+                                <Users className="w-4 h-4 text-indigo-400" />
+                                Điểm danh thiết bị
+                            </h3>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {attendance.map((att, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-slate-900 p-2 rounded-lg border border-indigo-900/30">
+                                        <div className="text-xs text-slate-300 font-semibold">{att.userFullName}</div>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                            att.attendanceStatus === 'present' ? 'bg-emerald-950 text-emerald-400' :
+                                            att.attendanceStatus === 'late' ? 'bg-amber-950 text-amber-400' :
+                                            'bg-red-950 text-red-400'
+                                        }`}>
+                                            {att.attendanceStatus}
+                                        </span>
+                                    </div>
+                                ))}
+                                {attendance.length === 0 && <p className="text-xs text-slate-500 italic">Chưa có dữ liệu điểm danh từ thiết bị.</p>}
+                            </div>
+                        </div>
+
                     </div>
+
 
                 </div>
             )}

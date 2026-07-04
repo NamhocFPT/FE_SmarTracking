@@ -150,10 +150,10 @@ const MeetingApprovals = () => {
                 setSelectedRequest(null);
                 fetchRequests();
             } else {
-                setError(res?.message || 'Thao tác phê duyệt thất bại.');
+                throw new Error(res?.error?.message || res?.message || 'Thao tác phê duyệt thất bại.');
             }
         } catch (err) {
-            setError(err?.error?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
+            setError(err?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -177,10 +177,10 @@ const MeetingApprovals = () => {
                 setSelectedRequest(null);
                 fetchRequests();
             } else {
-                setError(res?.message || 'Thao tác từ chối thất bại.');
+                throw new Error(res?.error?.message || res?.message || 'Thao tác từ chối thất bại.');
             }
         } catch (err) {
-            setError(err?.error?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
+            setError(err?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -453,6 +453,7 @@ const MeetingApprovals = () => {
                                                     <>
                                                         <button
                                                             onClick={() => {
+                                                                setError(null);
                                                                 setSelectedRequest(req);
                                                                 setApprovalModalOpen(true);
                                                             }}
@@ -463,6 +464,7 @@ const MeetingApprovals = () => {
                                                         </button>
                                                         <button
                                                             onClick={() => {
+                                                                setError(null);
                                                                 setSelectedRequest(req);
                                                                 setRejectionModalOpen(true);
                                                             }}
@@ -649,13 +651,13 @@ const MeetingApprovals = () => {
                                 {selectedRequest.approvalStatus === 'pending' && (
                                     <>
                                         <button
-                                            onClick={() => setRejectionModalOpen(true)}
+                                            onClick={() => { setError(null); setRejectionModalOpen(true); }}
                                             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
                                         >
                                             <XCircle className="w-4 h-4" /> Từ chối yêu cầu
                                         </button>
                                         <button
-                                            onClick={() => setApprovalModalOpen(true)}
+                                            onClick={() => { setError(null); setApprovalModalOpen(true); }}
                                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
                                         >
                                             <CheckCircle2 className="w-4 h-4" /> Phê duyệt yêu cầu
@@ -683,6 +685,12 @@ const MeetingApprovals = () => {
                                 Bạn chuẩn bị phê duyệt yêu cầu <strong className="text-midnight-indigo font-mono">{selectedRequest.requestCode}</strong> cho cuộc họp <strong>"{selectedRequest.meeting?.title}"</strong>.
                             </p>
 
+                            {error && (
+                                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
                             <div className="space-y-4 text-left">
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Ghi chú phê duyệt (Tùy chọn)</label>
@@ -735,6 +743,12 @@ const MeetingApprovals = () => {
                                 Vui lòng nhập lý do từ chối cụ thể cho yêu cầu <strong className="text-midnight-indigo font-mono">{selectedRequest.requestCode}</strong>.
                             </p>
 
+                            {error && (
+                                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
                             <div className="space-y-4 text-left">
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Lý do từ chối (Bắt buộc)</label>

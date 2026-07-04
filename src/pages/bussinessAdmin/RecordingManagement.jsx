@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     getRecordings, 
     deleteRecording, 
-    getRecordingDownloadUrl, 
-    getRooms 
+    getRecordingDownloadUrl,
+    getRooms,
+    updateRecordingVisibility
 } from '../../service/businessAdminServices';
 import { 
     Video, Download, Trash2, Search, RefreshCw, 
@@ -40,13 +41,8 @@ const RecordingManagement = () => {
         try {
             const res = await getRooms({ limit: 100 });
             if (res?.success) setRooms(res.data || []);
-        } catch {
-            setRooms([
-                { id: 'r-1', roomName: 'Phòng Apollo 101' },
-                { id: 'r-2', roomName: 'Phòng Athena 102' },
-                { id: 'r-3', roomName: 'Phòng Zeus 201' },
-                { id: 'r-4', roomName: 'Phòng Hermes 302' }
-            ]);
+        } catch (err) {
+            setError('Lỗi tải danh sách phòng.');
         }
     }, []);
 
@@ -69,89 +65,10 @@ const RecordingManagement = () => {
             } else {
                 throw new Error();
             }
-        } catch {
-            // Local Mock Fallback matching specs
-            const mockRecordings = [
-                {
-                    id: 'rec-1',
-                    meetingTitle: 'Họp Kick-off Dự án SmarTracking',
-                    organizer: 'Nguyễn Văn A',
-                    roomName: 'Phòng Apollo 101',
-                    roomId: 'r-1',
-                    startedAt: '2026-06-10T09:00:00+07:00',
-                    endedAt: '2026-06-10T10:30:00+07:00',
-                    durationSec: 5400,
-                    fileSizeBytes: 1572864000, // 1.46 GB
-                    status: 'COMPLETED',
-                    s3Key: 'recordings/rec-1.mp4',
-                    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-                },
-                {
-                    id: 'rec-2',
-                    meetingTitle: 'Đánh giá Tiến độ Sprint 1',
-                    organizer: 'Lê Thị B',
-                    roomName: 'Phòng Athena 102',
-                    roomId: 'r-2',
-                    startedAt: '2026-06-09T14:00:00+07:00',
-                    endedAt: '2026-06-09T15:00:00+07:00',
-                    durationSec: 3600,
-                    fileSizeBytes: 943718400, // 900 MB
-                    status: 'COMPLETED',
-                    s3Key: 'recordings/rec-2.mp4',
-                    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'
-                },
-                {
-                    id: 'rec-3',
-                    meetingTitle: 'Họp Giao Ban Ban Giám Đốc',
-                    organizer: 'Trần Hữu C',
-                    roomName: 'Phòng Zeus 201',
-                    roomId: 'r-3',
-                    startedAt: '2026-06-08T10:00:00+07:00',
-                    endedAt: '2026-06-08T10:45:00+07:00',
-                    durationSec: 2700,
-                    fileSizeBytes: 629145600, // 600 MB
-                    status: 'PARTIAL',
-                    s3Key: 'recordings/rec-3-partial.mp4',
-                    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-                },
-                {
-                    id: 'rec-4',
-                    meetingTitle: 'Đánh giá Kết quả Nghiên cứu R&D',
-                    organizer: 'Phạm Minh D',
-                    roomName: 'Phòng Hermes 302',
-                    roomId: 'r-4',
-                    startedAt: '2026-06-10T16:00:00+07:00',
-                    endedAt: '2026-06-10T17:30:00+07:00',
-                    durationSec: 5400,
-                    fileSizeBytes: 0,
-                    status: 'FAILED',
-                    s3Key: null,
-                    videoUrl: null,
-                    errorMessage: 'Không thể kết nối RTSP stream của Camera Hermes 302.'
-                }
-            ];
-
-            let filtered = mockRecordings;
-            if (search.trim()) {
-                filtered = filtered.filter(r => 
-                    r.meetingTitle.toLowerCase().includes(search.toLowerCase()) ||
-                    r.organizer.toLowerCase().includes(search.toLowerCase())
-                );
-            }
-            if (selectedRoom) {
-                filtered = filtered.filter(r => r.roomId === selectedRoom);
-            }
-            if (statusFilter) {
-                filtered = filtered.filter(r => r.status === statusFilter);
-            }
-
-            // Client-side pagination logic for mock data fallback
-            const startIndex = (page - 1) * limit;
-            const paginated = filtered.slice(startIndex, startIndex + limit);
-
-            setRecordingsList(paginated);
-            setTotalPages(Math.ceil(filtered.length / limit) || 1);
-            setTotalItems(filtered.length);
+        } catch (err) {
+            setError('Lỗi tải danh sách ghi hình từ máy chủ.');
+            setRecordingsList([]);
+            setTotalItems(0);
         } finally {
             setLoading(false);
         }
@@ -174,6 +91,22 @@ const RecordingManagement = () => {
     }, [successMessage]);
 
     // Download Handler
+    
+    const toggleVisibility = async (rec) => {
+        try {
+            const newStatus = rec.status === 'HIDDEN' ? 'COMPLETED' : 'HIDDEN';
+            const res = await updateRecordingVisibility(rec.id, { status: newStatus });
+            if (res?.success) {
+                setSuccessMessage('Cập nhật trạng thái hiển thị thành công.');
+                fetchRecordingsList();
+            } else {
+                setError('Lỗi cập nhật trạng thái hiển thị.');
+            }
+        } catch (err) {
+            setError('Lỗi kết nối khi cập nhật trạng thái.');
+        }
+    };
+
     const handleDownload = async (rec) => {
         try {
             const res = await getRecordingDownloadUrl(rec.id);

@@ -157,7 +157,15 @@ const DashBoard = () => {
 
             // Map attendance analytics
             if (attendanceRes.status === 'fulfilled' && attendanceRes.value?.success) {
-                setAttendanceSummary(attendanceRes.value.data);
+                const data = attendanceRes.value.data;
+                const totalReq = data.totalRequiredParticipants || ((data.onTimeCount || 0) + (data.lateCount || 0));
+                const presentCount = (data.onTimeCount || 0) + (data.lateCount || 0);
+                const presentRate = totalReq ? ((presentCount / totalReq) * 100).toFixed(1) : 0;
+                setAttendanceSummary({
+                    ...data,
+                    presentRate: parseFloat(presentRate),
+                    topLateUsers: data.topLateUsers || []
+                });
             } else {
                 setAttendanceSummary({
                     presentRate: 91.2,

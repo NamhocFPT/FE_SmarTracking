@@ -102,15 +102,20 @@ const ManagerHomePage = () => {
     const handleApprove = async () => {
         if (!selectedRequest) return;
         setSubmittingAction(true);
+        setError(null);
         try {
-            await approveMeetingRequest(selectedRequest.id, decisionNote);
-            setSuccessMsg('Đã phê duyệt yêu cầu đặt phòng họp thành công!');
-            setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
-            setApprovalModalOpen(false);
-            setDecisionNote('');
-            setSelectedRequest(null);
-        } catch {
-            setError('Thao tác phê duyệt thất bại, vui lòng thử lại.');
+            const res = await approveMeetingRequest(selectedRequest.id, decisionNote);
+            if (res?.success) {
+                setSuccessMsg('Đã phê duyệt yêu cầu đặt phòng họp thành công!');
+                setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
+                setApprovalModalOpen(false);
+                setDecisionNote('');
+                setSelectedRequest(null);
+            } else {
+                throw new Error(res?.error?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
+            }
+        } catch (err) {
+            setError(err.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -125,14 +130,18 @@ const ManagerHomePage = () => {
         setSubmittingAction(true);
         setError(null);
         try {
-            await rejectMeetingRequest(selectedRequest.id, rejectionReason);
-            setSuccessMsg('Đã từ chối yêu cầu đặt phòng họp.');
-            setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
-            setRejectionModalOpen(false);
-            setRejectionReason('');
-            setSelectedRequest(null);
-        } catch {
-            setError('Thao tác từ chối thất bại, vui lòng thử lại.');
+            const res = await rejectMeetingRequest(selectedRequest.id, rejectionReason);
+            if (res?.success) {
+                setSuccessMsg('Đã từ chối yêu cầu đặt phòng họp.');
+                setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
+                setRejectionModalOpen(false);
+                setRejectionReason('');
+                setSelectedRequest(null);
+            } else {
+                throw new Error(res?.error?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
+            }
+        } catch (err) {
+            setError(err.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -220,7 +229,15 @@ const ManagerHomePage = () => {
             }
 
             if (attendanceRes.status === 'fulfilled' && attendanceRes.value?.success) {
-                setAttendanceSummary(attendanceRes.value.data);
+                const data = attendanceRes.value.data;
+                const totalReq = data.totalRequiredParticipants || (data.onTimeCount + data.lateCount);
+                const presentCount = (data.onTimeCount || 0) + (data.lateCount || 0);
+                const presentRate = totalReq ? ((presentCount / totalReq) * 100).toFixed(1) : 0;
+                setAttendanceSummary({
+                    ...data,
+                    presentRate: parseFloat(presentRate),
+                    topLateUsers: data.topLateUsers || []
+                });
             } else {
                 setAttendanceSummary({
                     presentRate: 93.4,
@@ -621,6 +638,7 @@ const ManagerHomePage = () => {
                                                         <td className="p-4 text-right flex justify-end gap-2">
                                                             <button
                                                                 onClick={() => {
+                                                                    setError(null);
                                                                     setSelectedRequest(req);
                                                                     setApprovalModalOpen(true);
                                                                 }}
@@ -631,6 +649,7 @@ const ManagerHomePage = () => {
                                                             </button>
                                                             <button
                                                                 onClick={() => {
+                                                                    setError(null);
                                                                     setSelectedRequest(req);
                                                                     setRejectionModalOpen(true);
                                                                 }}

@@ -16,6 +16,8 @@ import SystemSettings from '../pages/systemAdmin/SystemSettings';
 import Profile from '../pages/shared/Profile';
 import Notifications from '../pages/systemAdmin/Notifications';
 import AvatarSubmissionsReview from '../pages/systemAdmin/AvatarSubmissionsReview';
+import ANPRManagement from '../pages/bussinessAdmin/ANPRManagement'; // SystemAdmin can also use this
+import MyVehicles from '../pages/shared/MyVehicles';
 
 // BusinessAdmin Layout + Pages
 import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLayout';
@@ -107,6 +109,14 @@ export const router = [
                 path: 'avatar-submissions',
                 element: <AvatarSubmissionsReview />
             },
+            {
+                path: 'my-vehicles',
+                element: <MyVehicles />
+            },
+            {
+                path: 'anpr-management',
+                element: <ANPRManagement />
+            },
         ]
     },
 
@@ -150,6 +160,14 @@ export const router = [
             {
                 path: 'notifications',
                 element: <Notifications />
+            },
+            {
+                path: 'my-vehicles',
+                element: <MyVehicles />
+            },
+            {
+                path: 'anpr-management',
+                element: <ANPRManagement />
             },
         ]
     },
@@ -199,6 +217,10 @@ export const router = [
                 path: 'notifications',
                 element: <Notifications />
             },
+            {
+                path: 'my-vehicles',
+                element: <MyVehicles />
+            },
         ]
     },
 
@@ -246,6 +268,10 @@ export const router = [
             {
                 path: 'recordings',
                 element: <EmployeeRecordings />
+            },
+            {
+                path: 'my-vehicles',
+                element: <MyVehicles />
             },
         ]
     },

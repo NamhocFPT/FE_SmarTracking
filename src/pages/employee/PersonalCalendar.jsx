@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Calendar as CalendarIcon, Clock, MapPin, User, ChevronLeft, ChevronRight,
-    Filter, Info, Video, CheckCircle, XCircle, Grid, List
+    Filter, Info, AlertTriangle, CheckCircle, XCircle, Grid, List
 } from 'lucide-react';
 import { getMySchedule } from '../../service/employeeServices';
 
 const STATUS_CONFIG = {
+    draft: { label: 'Bản nháp', bg: 'bg-slate-50 text-slate-600 border-slate-200', icon: Clock },
+    pending_approval: { label: 'Chờ duyệt', bg: 'bg-amber-50 text-amber-600 border-amber-200', icon: Clock },
     scheduled: { label: 'Đã lên lịch', bg: 'bg-blue-50 text-action-blue border-blue-150', icon: Clock },
     in_progress: { label: 'Đang diễn ra', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle },
     completed: { label: 'Đã kết thúc', bg: 'bg-purple-50 text-purple-700 border-purple-200', icon: CheckCircle },
@@ -20,7 +22,18 @@ const PersonalCalendar = () => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [meetings, setMeetings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [statusFilter, setStatusFilter] = useState(''); // all, scheduled, in_progress, cancelled
+
+    const mapEventToMeeting = (dto) => ({
+        id: dto.meetingId || dto.id,
+        title: dto.title || dto.meetingCode || 'Cuộc họp',
+        room: { roomName: dto.room?.roomName || dto.roomName || 'N/A', location: dto.room?.location || dto.roomLocation || dto.location },
+        startTime: dto.startTime || dto.start_time,
+        endTime: dto.endTime || dto.end_time,
+        myRole: dto.userRole || dto.user_role,
+        status: (dto.status || (dto.isCurrent ? 'in_progress' : dto.isPast ? 'completed' : 'scheduled')).toLowerCase(),
+    });
 
     const fetchSchedule = useCallback(async () => {
         setLoading(true);
@@ -31,71 +44,28 @@ const PersonalCalendar = () => {
             const from = `${year}-${month}-01`;
             // Calculate last day of month
             const lastDay = new Date(year, currentDate.getMonth() + 1, 0).getDate();
-            const to = `${year}-${month}-${lastDay}`;
+            
+            const fromStr = `${year}-${month}-01T00:00:00+07:00`;
+            const toStr = `${year}-${month}-${lastDay}T23:59:59+07:00`;
 
             const res = await getMySchedule({
-                from,
-                to,
-                status: statusFilter || undefined
+                from: fromStr,
+                to: toStr,
+                view: 'month', // Always fetch month view data for the grid
+                status: statusFilter ? [statusFilter, statusFilter] : undefined
             });
 
             if (res?.success) {
-                setMeetings(res.data || []);
+                const mappedMeetings = (res.data?.items || res.data || []).map(mapEventToMeeting);
+                setMeetings(mappedMeetings);
+                setError(null);
             } else {
-                throw new Error();
+                throw new Error(res?.error?.message || 'Lỗi khi tải lịch trình');
             }
-        } catch {
-            // Local Mock Fallback
-            setMeetings([
-                {
-                    id: 'meet-101',
-                    title: 'Họp kỹ thuật dự án FE SmarTracking',
-                    room: { roomName: 'Phòng Apollo 101' },
-                    startTime: new Date(new Date().setHours(9, 0, 0)).toISOString(),
-                    endTime: new Date(new Date().setHours(10, 30, 0)).toISOString(),
-                    host: 'Lê Hoàng Hải',
-                    myRole: 'host',
-                    status: 'scheduled',
-                    recordingEnabled: true,
-                    description: 'Rà soát giao diện và các API của các chức năng đặt phòng họp.'
-                },
-                {
-                    id: 'meet-102',
-                    title: 'Review Sprint 2 và lập kế hoạch Sprint 3',
-                    room: { roomName: 'Phòng Athena 102' },
-                    startTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
-                    endTime: new Date(Date.now() + 3.5 * 3600 * 1000).toISOString(),
-                    host: 'Phan Văn Minh',
-                    myRole: 'attendee',
-                    status: 'in_progress',
-                    recordingEnabled: false,
-                    description: 'Tổng kết kết quả Sprint 2 và lên danh sách backlog cho Sprint 3.'
-                },
-                {
-                    id: 'meet-103',
-                    title: 'Đồng bộ giải pháp AI nhận diện khuôn mặt',
-                    room: { roomName: 'Phòng Zeus 201' },
-                    startTime: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
-                    endTime: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
-                    host: 'Nguyễn Thị Minh',
-                    myRole: 'attendee',
-                    status: 'scheduled',
-                    recordingEnabled: true,
-                    description: 'Tích hợp camera AI phát hiện hiện diện phòng họp thực tế.'
-                },
-                {
-                    id: 'meet-104',
-                    title: 'Họp đột xuất giải quyết lỗi Gateway',
-                    room: { roomName: 'Phòng Huddle 302' },
-                    startTime: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
-                    endTime: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
-                    host: 'Trần Văn B',
-                    myRole: 'attendee',
-                    status: 'completed',
-                    recordingEnabled: false,
-                    description: 'Xử lý khẩn cấp sự cố nghẽn mạng thiết bị IoT.'
-                }
-            ]);
+        } catch (err) {
+            setMeetings([]);
+            const errorMsg = err?.error?.message || err?.message || 'Lỗi kết nối máy chủ';
+            setError(errorMsg);
         } finally {
             setLoading(false);
         }
@@ -277,6 +247,21 @@ const PersonalCalendar = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Calendar Body (2/3 width) */}
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden flex flex-col">
+                    {error && (
+                        <div className="m-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5" />
+                                <span className="text-sm font-semibold">{error}</span>
+                            </div>
+                            <button 
+                                onClick={fetchSchedule}
+                                className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-bold rounded-lg transition-colors"
+                            >
+                                Thử lại
+                            </button>
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="flex flex-col items-center justify-center p-20 min-h-[400px]">
                             <div className="w-10 h-10 border-4 border-action-blue border-t-transparent rounded-full animate-spin" />
@@ -457,7 +442,7 @@ const PersonalCalendar = () => {
                             ) : (
                                 selectedDayMeetings.map(meet => {
                                     const StatusIcon = STATUS_CONFIG[meet.status]?.icon || Clock;
-                                    const statusStyle = STATUS_CONFIG[meet.status] || { bg: 'bg-slate-50 text-slate-500 border-platinum-tint' };
+                                    const statusStyle = STATUS_CONFIG[meet.status] || { label: 'Không xác định', bg: 'bg-slate-50 text-slate-500 border-platinum-tint' };
                                     const startTimeStr = new Date(meet.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
                                     const endTimeStr = new Date(meet.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
@@ -488,19 +473,17 @@ const PersonalCalendar = () => {
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
                                                     <User className="w-3.5 h-3.5 text-slate-blue" />
-                                                    <span className="truncate">Chủ trì: {meet.host}</span>
+                                                    <span className="truncate">Vai trò: {
+                                                        meet.myRole === 'host' ? 'Chủ trì' :
+                                                        meet.myRole === 'organizer' ? 'Người tổ chức' : 'Người tham dự'
+                                                    }</span>
                                                 </div>
-                                                {meet.recordingEnabled && (
-                                                    <div className="flex items-center gap-1.5 text-red-600 font-semibold">
-                                                        <Video className="w-3.5 h-3.5" />
-                                                        <span>Có ghi hình</span>
-                                                    </div>
-                                                )}
                                             </div>
 
-                                            {meet.description && (
-                                                <p className="text-xs text-slate-blue italic leading-relaxed pt-2 border-t border-platinum-tint/40">
-                                                    "{meet.description}"
+                                            {meet.room?.location && (
+                                                <p className="text-xs text-slate-blue italic leading-relaxed pt-2 border-t border-platinum-tint/40 flex items-start gap-1">
+                                                    <MapPin className="w-3 h-3 mt-0.5" />
+                                                    {meet.room.location}
                                                 </p>
                                             )}
                                         </div>

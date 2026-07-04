@@ -344,6 +344,14 @@ const EmployeeMeetingDetail = () => {
         );
     }
 
+    if (!meeting) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[450px]">
+                <p className="text-red-500 font-semibold">Không tìm thấy thông tin cuộc họp hoặc có lỗi xảy ra.</p>
+            </div>
+        );
+    }
+
     const isHost = currentUser?.id === (meeting.host_id || meeting.hostId);
     const hostParticipant = meeting.participants?.find((participant) =>
         participant.id === (meeting.host_id || meeting.hostId)
