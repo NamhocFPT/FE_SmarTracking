@@ -1,9 +1,84 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { Sparkles, Video, ShieldAlert, Cpu } from 'lucide-react';
 
+const slideVariants = {
+    enter: (direction) => ({
+        x: direction > 0 ? '100%' : '-100%',
+        opacity: 0,
+        rotateY: direction > 0 ? 45 : -45,
+        scale: 0.8,
+        z: -200
+    }),
+    center: {
+        x: 0,
+        opacity: 1,
+        rotateY: 0,
+        scale: 1,
+        z: 0,
+        transition: {
+            type: 'spring',
+            stiffness: 250,
+            damping: 25,
+            mass: 0.5
+        }
+    },
+    exit: (direction) => ({
+        x: direction < 0 ? '100%' : '-100%',
+        opacity: 0,
+        rotateY: direction < 0 ? 45 : -45,
+        scale: 0.8,
+        z: -200,
+        transition: {
+            type: 'spring',
+            stiffness: 250,
+            damping: 25,
+            mass: 0.5
+        }
+    })
+};
+
+const TiltCard = ({ children, className }) => {
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+    const mouseXSpring = useSpring(x, { stiffness: 150, damping: 15 });
+    const mouseYSpring = useSpring(y, { stiffness: 150, damping: 15 });
+    const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ['15deg', '-15deg']);
+    const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ['-15deg', '15deg']);
+
+    const handleMouseMove = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const xPct = mouseX / width - 0.5;
+        const yPct = mouseY / height - 0.5;
+        x.set(xPct);
+        y.set(yPct);
+    };
+
+    const handleMouseLeave = () => {
+        x.set(0);
+        y.set(0);
+    };
+
+    return (
+        <motion.div
+            style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            className={`relative ${className}`}
+        >
+            <div style={{ transform: "translateZ(30px)" }} className="w-full h-full">
+                {children}
+            </div>
+        </motion.div>
+    );
+};
+
 const DashboardBanner = ({ roleName = 'Admin' }) => {
-    const [currentSlide, setCurrentSlide] = useState(0);
+    const [[page, direction], setPage] = useState([0, 0]);
     const [isHovered, setIsHovered] = useState(false);
 
     const slides = [
@@ -13,27 +88,27 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
             description: 'Giám sát không gian phòng họp bằng Camera AI & Cảm biến chuyển động. Tự động nhận diện khuôn mặt và đếm số người tham gia để điểm danh chính xác mà không cần thẻ hay vân tay.',
             badgeColor: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40',
             gradient: 'from-midnight-indigo via-[#152a55] to-emerald-950',
-            icon: <Video className="w-5 h-5 text-emerald-400" />,
+            icon: <Video className="w-5 h-5 text-emerald-400 drop-shadow-md" />,
             interactiveElement: (
-                <div className="relative w-48 h-36 border border-white/10 rounded-2xl bg-white/5 backdrop-blur-md overflow-hidden flex items-center justify-center group cursor-pointer">
-                    {/* Simulated Room Grid */}
-                    <div className="grid grid-cols-4 gap-3 p-4 w-full h-full relative">
+                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex items-center justify-center cursor-pointer">
+                    <div className="grid grid-cols-4 gap-2.5 p-4 w-full h-full relative">
                         {Array.from({ length: 8 }).map((_, i) => {
                             const active = [1, 3, 4, 6].includes(i);
                             return (
                                 <motion.div
                                     key={i}
-                                    className={`relative rounded-lg flex items-center justify-center border transition-all ${
+                                    className={`relative rounded-xl flex items-center justify-center border transition-all ${
                                         active 
-                                            ? 'bg-emerald-500/20 border-emerald-500/40' 
-                                            : 'bg-white/5 border-white/5'
+                                            ? 'bg-emerald-500/30 border-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
+                                            : 'bg-white/5 border-white/10'
                                     }`}
-                                    whileHover={{ scale: 1.15, backgroundColor: 'rgba(16, 185, 129, 0.4)' }}
+                                    whileHover={{ scale: 1.15, z: 20 }}
+                                    style={{ transform: "translateZ(10px)" }}
                                 >
                                     {active ? (
                                         <span className="relative flex h-3 w-3">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-[0_0_8px_#10b981]"></span>
                                         </span>
                                     ) : (
                                         <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
@@ -43,8 +118,8 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
                         })}
                     </div>
                     {/* Overlay Scanning Animation */}
-                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce pointer-events-none" />
-                </div>
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse shadow-[0_0_10px_#34d399] blur-[1px]" style={{ transform: "translateZ(20px)" }} />
+                </TiltCard>
             )
         },
         {
@@ -53,29 +128,28 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
             description: 'Tối ưu hóa tài nguyên phòng họp. Nếu không phát hiện hiện diện sau 10 phút so với lịch trình, hệ thống sẽ tự động hủy lịch giữ phòng và gửi thông báo giải phóng không gian.',
             badgeColor: 'bg-sunset-gold/25 text-amber-300 border-sunset-gold/40',
             gradient: 'from-[#1a1c3d] via-[#232042] to-amber-950',
-            icon: <ShieldAlert className="w-5 h-5 text-amber-400" />,
+            icon: <ShieldAlert className="w-5 h-5 text-amber-400 drop-shadow-md" />,
             interactiveElement: (
-                <div className="relative w-48 h-36 border border-white/10 rounded-2xl bg-white/5 backdrop-blur-md overflow-hidden flex flex-col items-center justify-center p-3 cursor-pointer select-none">
+                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center p-4 cursor-pointer select-none">
                     <motion.div 
-                        className="text-center space-y-1.5"
-                        whileHover={{ scale: 1.05 }}
+                        className="text-center space-y-2 w-full"
+                        style={{ transform: "translateZ(20px)" }}
                     >
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300/80 block">Trạng thái giải phóng</span>
-                        <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-xl border border-white/5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                            <span className="font-mono text-sm text-white font-bold">09:59s</span>
+                        <span className="text-[11px] uppercase font-bold tracking-wider text-amber-300/90 block">Trạng thái giải phóng</span>
+                        <div className="flex items-center justify-center gap-2 bg-black/40 px-4 py-2.5 rounded-xl border border-white/10 shadow-inner">
+                            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
+                            <span className="font-mono text-base text-white font-bold tracking-wider">09:59s</span>
                         </div>
-                        <span className="text-[9px] text-white/50 block">Nhấp/Di chuột để xem cảnh báo</span>
                     </motion.div>
                     {/* Progress Bar Animation */}
-                    <div className="absolute bottom-0 left-0 w-full bg-white/10 h-1.5">
+                    <div className="absolute bottom-0 left-0 w-full bg-white/10 h-1.5" style={{ transform: "translateZ(5px)" }}>
                         <motion.div 
-                            className="bg-amber-500 h-full" 
+                            className="bg-amber-500 h-full shadow-[0_0_10px_#f59e0b]" 
                             animate={{ width: ['0%', '100%'] }} 
                             transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
                         />
                     </div>
-                </div>
+                </TiltCard>
             )
         },
         {
@@ -84,113 +158,120 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
             description: 'Theo dõi chi tiết tỷ lệ lấp đầy phòng, thời gian họp trung bình và kỷ luật đúng giờ của toàn thể nhân sự. Xuất file báo cáo dễ dàng hỗ trợ nhà quản lý đưa ra quyết định tối ưu.',
             badgeColor: 'bg-sky-500/25 text-sky-300 border-sky-500/40',
             gradient: 'from-[#0b172a] via-[#10203a] to-blue-950',
-            icon: <Cpu className="w-5 h-5 text-sky-400" />,
+            icon: <Cpu className="w-5 h-5 text-sky-400 drop-shadow-md" />,
             interactiveElement: (
-                <div className="relative w-48 h-36 border border-white/10 rounded-2xl bg-white/5 backdrop-blur-md overflow-hidden flex items-center justify-center p-3 cursor-pointer">
-                    {/* Mini Dynamic Graph */}
-                    <div className="w-full h-full flex items-end justify-between gap-1 pt-6">
+                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex items-center justify-center p-4 cursor-pointer">
+                    <div className="w-full h-full flex items-end justify-between gap-1.5 pt-4" style={{ transform: "translateZ(15px)" }}>
                         {[40, 70, 55, 90, 65, 80].map((h, i) => (
                             <motion.div
                                 key={i}
-                                className="w-full bg-gradient-to-t from-action-blue/70 to-sky-400 rounded-t-sm"
+                                className="w-full bg-gradient-to-t from-sky-600 to-sky-300 rounded-t-sm shadow-[0_0_8px_rgba(56,189,248,0.5)]"
                                 style={{ height: `${h}%` }}
-                                whileHover={{ height: '98%', backgroundColor: '#00D1FF' }}
-                                transition={{ type: 'spring', stiffness: 150 }}
+                                whileHover={{ height: '98%', backgroundColor: '#00D1FF', filter: 'brightness(1.2)' }}
+                                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                             />
                         ))}
                     </div>
                     {/* Floating target metric */}
-                    <div className="absolute top-2 right-2 bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 rounded text-[9px] font-bold text-sky-300">
+                    <motion.div 
+                        className="absolute top-2 right-2 bg-sky-500/20 border border-sky-400/50 px-2 py-0.5 rounded text-[10px] font-bold text-sky-200 backdrop-blur-md shadow-lg"
+                        style={{ transform: "translateZ(25px)" }}
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                    >
                         +18.5%
-                    </div>
-                </div>
+                    </motion.div>
+                </TiltCard>
             )
         }
     ];
 
-    // Auto-advance slides unless hovered
+    const currentSlide = Math.abs(page % slides.length);
+    const activeSlide = slides[currentSlide];
+
+    const paginate = (newDirection) => {
+        setPage([page + newDirection, newDirection]);
+    };
+
+    // Auto-advance
     useEffect(() => {
         if (isHovered) return;
         const interval = setInterval(() => {
-            setCurrentSlide(prev => (prev + 1) % slides.length);
-        }, 6500);
+            paginate(1);
+        }, 7000);
         return () => clearInterval(interval);
-    }, [isHovered, slides.length]);
-
-    const activeSlide = slides[currentSlide];
+    }, [isHovered, page]);
 
     return (
         <div 
-            className="relative overflow-hidden rounded-2xl shadow-lg border border-white/5 transition-all duration-500"
+            className="relative overflow-hidden rounded-2xl shadow-2xl border border-white/10 transition-all duration-700"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            style={{ perspective: 1200 }}
         >
             {/* Dynamic Background Gradient */}
-            <div className={`absolute inset-0 bg-gradient-to-r ${activeSlide.gradient} transition-all duration-700 ease-in-out`} />
+            <div className={`absolute inset-0 bg-gradient-to-r ${activeSlide.gradient} transition-all duration-1000 ease-in-out`} />
             
-            {/* Ambient glowing circles */}
-            <div className="absolute -top-12 -left-12 w-64 h-64 rounded-full bg-action-blue/15 blur-3xl" />
-            <div className="absolute -bottom-12 -right-12 w-64 h-64 rounded-full bg-royal-amethyst/15 blur-3xl" />
+            {/* Ambient glowing circles with 3D feel */}
+            <div className="absolute -top-12 -left-12 w-64 h-64 rounded-full bg-action-blue/20 blur-3xl mix-blend-screen" style={{ transform: "translateZ(-100px)" }} />
+            <div className="absolute -bottom-12 -right-12 w-72 h-72 rounded-full bg-royal-amethyst/20 blur-3xl mix-blend-screen" style={{ transform: "translateZ(-50px)" }} />
 
-            <div className="relative z-10 p-6 md:p-8 text-white flex flex-col md:flex-row items-center justify-between gap-8 min-h-[220px]">
-                {/* Left Side: Copy/Content */}
-                <div className="flex-1 space-y-4 max-w-xl text-center md:text-left">
-                    <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/10 backdrop-blur-sm text-sky-200 border border-white/10">
-                            <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-300" />
-                            Xin chào, {roleName}!
-                        </span>
-                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold border ${activeSlide.badgeColor} uppercase tracking-wider`}>
-                            {activeSlide.icon}
-                            {activeSlide.tag}
-                        </span>
-                    </div>
+            <div className="relative z-10 p-6 md:p-10 text-white min-h-[260px] flex items-center">
+                <AnimatePresence initial={false} custom={direction} mode="popLayout">
+                    <motion.div
+                        key={page}
+                        custom={direction}
+                        variants={slideVariants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        className="w-full flex flex-col md:flex-row items-center justify-between gap-10"
+                        style={{ transformStyle: "preserve-3d" }}
+                    >
+                        {/* Left Side: Copy/Content */}
+                        <div className="flex-1 space-y-5 max-w-2xl text-center md:text-left" style={{ transform: "translateZ(30px)" }}>
+                            <div className="flex items-center justify-center md:justify-start gap-3 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-white/10 backdrop-blur-md text-sky-100 border border-white/20 shadow-lg">
+                                    <Sparkles className="w-4 h-4 animate-pulse text-amber-300 drop-shadow-md" />
+                                    Xin chào, {roleName}!
+                                </span>
+                                <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold border ${activeSlide.badgeColor} uppercase tracking-wider shadow-lg backdrop-blur-md`}>
+                                    {activeSlide.icon}
+                                    {activeSlide.tag}
+                                </span>
+                            </div>
 
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={currentSlide}
-                            initial={{ opacity: 0, x: -15 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 15 }}
-                            transition={{ duration: 0.3 }}
-                            className="space-y-2"
-                        >
-                            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight leading-tight">
-                                {activeSlide.title}
-                            </h2>
-                            <p className="text-white/80 text-sm leading-relaxed font-medium">
-                                {activeSlide.description}
-                            </p>
-                        </motion.div>
-                    </AnimatePresence>
-                </div>
+                            <div className="space-y-3">
+                                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-50 to-white/70 drop-shadow-sm">
+                                    {activeSlide.title}
+                                </h2>
+                                <p className="text-white/85 text-sm md:text-base leading-relaxed font-medium max-w-xl">
+                                    {activeSlide.description}
+                                </p>
+                            </div>
+                        </div>
 
-                {/* Right Side: Interactive Hover Demo Element */}
-                <div className="flex-shrink-0 relative group select-none">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={currentSlide}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.3 }}
-                        >
+                        {/* Right Side: Interactive Hover Demo Element */}
+                        <div className="flex-shrink-0 relative group select-none hidden md:block">
                             {activeSlide.interactiveElement}
-                        </motion.div>
-                    </AnimatePresence>
-                </div>
+                        </div>
+                    </motion.div>
+                </AnimatePresence>
             </div>
 
             {/* Bottom Controls / Indicators */}
-            <div className="absolute bottom-4 left-6 md:left-8 z-20 flex items-center gap-2">
+            <div className="absolute bottom-5 left-6 md:left-10 z-20 flex items-center gap-2.5">
                 {slides.map((_, index) => (
                     <button
                         key={index}
-                        onClick={() => setCurrentSlide(index)}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                        onClick={() => {
+                            const newDirection = index > currentSlide ? 1 : -1;
+                            setPage([page + (index - currentSlide), newDirection]);
+                        }}
+                        className={`h-1.5 rounded-full transition-all duration-500 ease-out shadow-sm ${
                             currentSlide === index 
-                                ? 'w-6 bg-white' 
-                                : 'w-2 bg-white/40 hover:bg-white/70'
+                                ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' 
+                                : 'w-2 bg-white/30 hover:bg-white/60'
                         }`}
                         aria-label={`Go to slide ${index + 1}`}
                     />
