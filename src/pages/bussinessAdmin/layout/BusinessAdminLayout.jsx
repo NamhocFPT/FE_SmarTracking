@@ -132,7 +132,12 @@ const BusinessAdminLayout = () => {
                         >
                             {navigationItems.map((item) => (
                                 item.isDropdown ? (
-                                    <div key={item.label} className="relative">
+                                    <div 
+                                        key={item.label} 
+                                        className="relative"
+                                        onMouseEnter={() => setOpenDropdown(item.label)}
+                                        onMouseLeave={() => setOpenDropdown(null)}
+                                    >
                                         <button
                                             onClick={() => setOpenDropdown(openDropdown === item.label ? null : item.label)}
                                             className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist flex items-center gap-1"
@@ -142,24 +147,27 @@ const BusinessAdminLayout = () => {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                                             </svg>
                                         </button>
+                                        
                                         {openDropdown === item.label && (
-                                            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-platinum-tint rounded-xl shadow-lg transition-all duration-200 z-50 overflow-hidden py-1">
-                                                {item.children.map(child => (
-                                                    <NavLink
-                                                        key={child.label}
-                                                        to={child.to}
-                                                        end={child.end || false}
-                                                        onClick={() => setOpenDropdown(null)}
-                                                        className={({ isActive }) =>
-                                                            `block px-4 py-2.5 text-sm transition-colors ${isActive
-                                                                ? 'text-action-blue bg-blue-50 font-bold'
-                                                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
-                                                            }`
-                                                        }
-                                                    >
-                                                        {child.label}
-                                                    </NavLink>
-                                                ))}
+                                            <div className="absolute top-full left-0 pt-1 w-48 z-50">
+                                                <div className="bg-white border border-platinum-tint rounded-xl shadow-lg overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
+                                                    {item.children.map(child => (
+                                                        <NavLink
+                                                            key={child.label}
+                                                            to={child.to}
+                                                            end={child.end || false}
+                                                            onClick={() => setOpenDropdown(null)}
+                                                            className={({ isActive }) =>
+                                                                `block px-4 py-2.5 text-sm transition-colors ${isActive
+                                                                    ? 'text-action-blue bg-blue-50 font-bold'
+                                                                    : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
+                                                                }`
+                                                            }
+                                                        >
+                                                            {child.label}
+                                                        </NavLink>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
