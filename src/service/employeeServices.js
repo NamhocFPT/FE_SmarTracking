@@ -9,8 +9,8 @@ import { get, post, patch, put, buildQuery } from '../utils/request';
  * @param {object} params - { startTime, endTime, minCapacity } (startTime/endTime: ISO8601)
  */
 export const getAvailableRooms = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/rooms/available${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/rooms/available${query}`);
 };
 
 /**
@@ -19,8 +19,8 @@ export const getAvailableRooms = async (params = {}) => {
  * @param {object} params - { page, limit }
  */
 export const getRooms = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/rooms${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/rooms/available${query}`);
 };
 
 /**
@@ -28,8 +28,8 @@ export const getRooms = async (params = {}) => {
  * @param {object} params - { page, limit, search }
  */
 export const getUsers = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/users${query}`);
 };
 
 /**
@@ -105,8 +105,12 @@ export const updateSelfProfile = async (data) => {
  * @param {number|string} userId
  * @param {object} data - Payload matching backend schema
  */
-export const registerFaceProfile = async (userId, data) => {
-    return await post(`/users/${userId}/face-profile`, data);
+export const registerFaceProfile = async (formData) => {
+    // Note: Do not pass Content-Type header so the browser can automatically
+    // set the multipart/form-data boundary
+    return await post('/users/face-profile', formData, {
+        headers: {} 
+    });
 };
 
 /**
@@ -114,6 +118,10 @@ export const registerFaceProfile = async (userId, data) => {
  */
 export const getMeetingById = async (id) => {
     return await get(`/meetings/${id}`);
+};
+
+export const getMeetingMediaFiles = async (meetingId) => {
+    return await get(`/meetings/${meetingId}/media-files`);
 };
 
 /**
@@ -138,18 +146,19 @@ export const checkInMeeting = async (id, data) => {
 };
 
 /**
- * Bắt đầu cuộc họp (Host action)
+ * UC-94: Bắt đầu phiên họp
+ * Endpoint: POST /live-meetings/{meetingId}/start
  */
 export const startMeeting = async (id) => {
-    return await post(`/meetings/${id}/start`);
+    return await post(`/live-meetings/${id}/start`);
 };
 
 /**
  * UC-REC-01: Lấy danh sách các bản ghi (recording sessions) của cuộc họp employee tham gia
  */
 export const getMyRecordings = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/me/recordings${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/me/recordings${query}`);
 };
 
 /**
@@ -181,6 +190,35 @@ export const createMeetingNote = async (meetingId, data) => {
     return await post(`/meetings/${meetingId}/notes`, data);
 };
 
+/**
+ * UC-98: Kết thúc phiên họp
+ * Endpoint: POST /live-meetings/{meetingId}/end
+ */
 export const endMeeting = async (meetingId) => {
-    return await post(`/meetings/${meetingId}/end`);
+    return await post(`/live-meetings/${meetingId}/end`);
+};
+
+/**
+ * UC-100: Xem danh sách người đang có mặt
+ * Endpoint: GET /live-meetings/{meetingId}/present-attendees
+ */
+export const getPresentAttendees = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/live-meetings/${meetingId}/present-attendees${query}`);
+};
+
+/**
+ * UC-95: Yêu cầu gia hạn phiên họp
+ * Endpoint: POST /live-meetings/{meetingId}/extension-requests
+ */
+export const requestExtension = async (meetingId, data) => {
+    return await post(`/live-meetings/${meetingId}/extension-requests`, data);
+};
+
+/**
+ * UC-96: Phê duyệt/từ chối yêu cầu gia hạn
+ * Endpoint: POST /live-meetings/{meetingId}/extension-requests/{requestId}/decide
+ */
+export const decideExtension = async (meetingId, requestId, data) => {
+    return await post(`/live-meetings/${meetingId}/extension-requests/${requestId}/decide`, data);
 };

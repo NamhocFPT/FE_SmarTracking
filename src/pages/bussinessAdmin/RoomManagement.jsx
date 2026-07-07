@@ -7,9 +7,12 @@ import {
     updateRoom,
     deleteRoom
 } from '../../service/businessAdminServices';
-import { Plus, Edit2, Trash2, Home, CheckCircle, AlertCircle, Users, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Home, CheckCircle, AlertCircle, Users, RefreshCw, Activity, List, ShieldAlert } from 'lucide-react';
+import RealtimeRoomMonitor from '../../component/RealtimeRoomMonitor';
+import StrangerAlerts from '../../component/StrangerAlerts';
 
 const RoomManagement = () => {
+    const [viewMode, setViewMode] = useState('list');
     const [roomsList, setRoomsList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -191,7 +194,31 @@ const RoomManagement = () => {
                 </div>
             )}
 
-            {/* Filter */}
+            {/* Tabs */}
+            <div className="flex bg-cloud-mist/50 p-1 rounded-xl w-fit">
+                <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-action-blue' : 'text-slate-blue hover:text-midnight-indigo'}`}
+                >
+                    <List className="w-4 h-4" /> Danh sách phòng
+                </button>
+                <button
+                    onClick={() => setViewMode('realtime')}
+                    className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === 'realtime' ? 'bg-white shadow-sm text-action-blue' : 'text-slate-blue hover:text-midnight-indigo'}`}
+                >
+                    <Activity className="w-4 h-4" /> Giám sát trực tuyến
+                </button>
+                <button
+                    onClick={() => setViewMode('alerts')}
+                    className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === 'alerts' ? 'bg-white shadow-sm text-red-600' : 'text-slate-blue hover:text-midnight-indigo'}`}
+                >
+                    <ShieldAlert className="w-4 h-4" /> Cảnh báo an ninh
+                </button>
+            </div>
+
+            {viewMode === 'list' ? (
+                <>
+                    {/* Filter */}
             <div className="bg-white p-4 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col sm:flex-row gap-4 justify-between">
                 <input
                     type="text"
@@ -283,6 +310,11 @@ const RoomManagement = () => {
                     </div>
                 )}
             </div>
+            </>) : viewMode === 'realtime' ? (
+                <RealtimeRoomMonitor />
+            ) : (
+                <StrangerAlerts />
+            )}
 
             {/* Add/Edit Modal */}
             {isModalOpen && createPortal(

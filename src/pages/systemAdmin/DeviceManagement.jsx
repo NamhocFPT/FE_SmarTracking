@@ -5,7 +5,14 @@ import {
     registerDevice,
     updateDevice,
     removeDevice,
-    getRooms
+    getRooms,
+    enableDevice,
+    disableDevice,
+    assignDeviceRoom,
+    configDeviceRtsp,
+    rotateFaceServerToken,
+    revokeFaceServerToken,
+    checkDeviceAvailability
 } from '../../service/sysAdminServices';
 
 /**
@@ -64,23 +71,8 @@ const DeviceManagement = () => {
 
             if (roomsRes?.success) setRooms(roomsRes.data || []);
             if (devicesRes?.success) setDevicesList(devicesRes.data || []);
-        } catch {
-            // Mock Fallbacks for offline development
-            setRooms([
-                { id: 'room-vip', roomName: 'Phòng Họp VIP', siteName: 'Tòa A - Tầng 3' },
-                { id: 'room-seminar', roomName: 'Phòng Hội Thảo A', siteName: 'Tòa A - Tầng 1' },
-                { id: 'room-small', roomName: 'Phòng Họp Nhỏ B', siteName: 'Tòa B - Tầng 2' },
-                { id: 'room-creative', roomName: 'Phòng Sáng Tạo', siteName: 'Tòa B - Tầng 4' }
-            ]);
-
-            setDevicesList([
-                { id: 'dev-1', deviceCode: 'CAM-VIP-01', deviceName: 'Camera Toàn Cảnh VIP', deviceType: 'camera', roomId: 'room-vip', ipAddress: '192.168.1.10', macAddress: '00:1A:2B:3C:4D:5E', status: 'online', streamUrl: 'rtsp://192.168.1.10/live/main', agentVersion: 'v2.3.1', lastSeenAt: new Date().toISOString() },
-                { id: 'dev-2', deviceCode: 'TERM-VIP-01', deviceName: 'Face Terminal Cửa VIP', deviceType: 'face_terminal', roomId: 'room-vip', ipAddress: '192.168.1.11', macAddress: '00:1A:2B:3C:4D:5F', status: 'online', agentVersion: 'v2.0.1', lastSeenAt: new Date().toISOString() },
-                { id: 'dev-3', deviceCode: 'CAM-SEM-01', deviceName: 'Camera Hội Thảo A', deviceType: 'camera', roomId: 'room-seminar', ipAddress: '192.168.1.20', macAddress: '00:1A:2B:3C:4D:6E', status: 'offline', streamUrl: 'rtsp://192.168.1.20/live/main', agentVersion: 'v2.3.1', lastSeenAt: new Date(Date.now() - 3600000).toISOString() },
-                { id: 'dev-4', deviceCode: 'TERM-SEM-01', deviceName: 'Face Terminal Hội Thảo', deviceType: 'face_terminal', roomId: 'room-seminar', ipAddress: '192.168.1.21', macAddress: '00:1A:2B:3C:4D:6F', status: 'online', agentVersion: 'v2.0.1', lastSeenAt: new Date().toISOString() },
-                { id: 'dev-5', deviceCode: 'CAM-SM-01', deviceName: 'Camera Họp Nhỏ B', deviceType: 'camera', roomId: 'room-small', ipAddress: '192.168.1.30', macAddress: '00:1A:2B:3C:4D:7E', status: 'online', streamUrl: 'rtsp://192.168.1.30/live/main', agentVersion: 'v2.3.1', lastSeenAt: new Date().toISOString() },
-                { id: 'dev-6', deviceCode: 'FS-MAIN-01', deviceName: 'Face Server Trung Tâm', deviceType: 'face_server', roomId: 'room-creative', ipAddress: '192.168.1.5', macAddress: '00:1A:2B:3C:4D:1A', status: 'online', agentVersion: 'v3.0.0', lastSeenAt: new Date().toISOString() }
-            ]);
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể tải dữ liệu thiết bị và phòng họp.');
         } finally {
             setLoading(false);
         }
@@ -146,7 +138,6 @@ const DeviceManagement = () => {
         setIsEditModalOpen(true);
     };
 
-    // Register IoT Device (UC-IOT-01 / UC-67)
     const handleRegisterSubmit = async (e) => {
         e.preventDefault();
         setError(null);
@@ -170,21 +161,10 @@ const DeviceManagement = () => {
                 setIsRegisterModalOpen(false);
                 fetchData();
             } else {
-                // Mock simulation
-                setSuccessMessage(`Đã mô phỏng: Đăng ký thành công thiết bị ${formData.deviceName}.`);
-                setIsRegisterModalOpen(false);
-                setDevicesList(prev => [
-                    ...prev,
-                    {
-                        id: 'dev-' + Math.random(),
-                        ...formData,
-                        status: 'online',
-                        lastSeenAt: new Date().toISOString()
-                    }
-                ]);
+                throw new Error(res?.error?.message || res?.message || 'Không thể đăng ký thiết bị.');
             }
         } catch (err) {
-            setError(err.message || 'Không thể đăng ký thiết bị.');
+            setError(err?.error?.message || err?.message || 'Không thể đăng ký thiết bị.');
         } finally {
             setSubmitting(false);
         }
@@ -213,12 +193,10 @@ const DeviceManagement = () => {
                 setIsEditModalOpen(false);
                 fetchData();
             } else {
-                setSuccessMessage(`Đã mô phỏng: Cập nhật thành công thiết bị ${formData.deviceName}.`);
-                setIsEditModalOpen(false);
-                setDevicesList(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, ...formData } : d));
+                throw new Error(res?.error?.message || res?.message || 'Không thể cập nhật thiết bị.');
             }
         } catch (err) {
-            setError(err.message || 'Không thể cập nhật thiết bị.');
+            setError(err?.error?.message || err?.message || 'Không thể cập nhật thiết bị.');
         } finally {
             setSubmitting(false);
         }
@@ -235,23 +213,65 @@ const DeviceManagement = () => {
                 setSuccessMessage('Đã gỡ bỏ thiết bị khỏi hệ thống.');
                 fetchData();
             } else {
-                setSuccessMessage(`Đã mô phỏng: Xóa thành công thiết bị ${device.deviceCode}.`);
-                setDevicesList(prev => prev.filter(d => d.id !== device.id));
+                throw new Error(res?.error?.message || res?.message || 'Không thể gỡ bỏ thiết bị.');
             }
         } catch (err) {
-            setError(err.message || 'Không thể gỡ bỏ thiết bị.');
+            setError(err?.error?.message || err?.message || 'Không thể gỡ bỏ thiết bị.');
         }
     };
 
-    const toggleDeviceSimulatedStatus = (deviceId) => {
-        setDevicesList(prev => prev.map(d => {
-            if (d.id === deviceId) {
-                const nextStatus = d.status === 'online' ? 'offline' : 'online';
-                setSuccessMessage(`Đã mô phỏng chuyển đổi ${d.deviceName} sang ${nextStatus === 'online' ? 'Hoạt động' : 'Mất kết nối'}`);
-                return { ...d, status: nextStatus, lastSeenAt: new Date().toISOString() };
+    const toggleDeviceStatus = async (device) => {
+        if (!window.confirm(`Bạn có muốn ${device.status === 'online' ? 'ngừng kích hoạt (disable)' : 'kích hoạt lại (enable)'} thiết bị ${device.deviceCode}?`)) return;
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            let res;
+            if (device.status === 'online') {
+                res = await disableDevice(device.id);
+            } else {
+                res = await enableDevice(device.id);
             }
-            return d;
-        }));
+            if (res?.success) {
+                setSuccessMessage(`Đã ${device.status === 'online' ? 'ngừng kích hoạt' : 'kích hoạt lại'} thiết bị thành công.`);
+                fetchData();
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không thể chuyển trạng thái thiết bị.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể chuyển trạng thái thiết bị.');
+        }
+    };
+
+    const handleCheckAvailability = async (device) => {
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await checkDeviceAvailability(device.id);
+            if (res?.success && res.data) {
+                setSuccessMessage(`Thiết bị ${device.deviceName} phản hồi: ${res.data.isReachable ? 'Có thể kết nối (Reachable)' : 'Không thể kết nối (Unreachable)'}.`);
+                fetchData(); // refresh status
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không thể kiểm tra kết nối thiết bị.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Lỗi khi kiểm tra kết nối thiết bị.');
+        }
+    };
+
+    const handleRotateToken = async (device) => {
+        if (!window.confirm(`Bạn có chắc chắn muốn Rotate/Revoke Token cho Face Server ${device.deviceName}? (Các thiết bị cũ sẽ mất kết nối nếu không cập nhật token mới)`)) return;
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await rotateFaceServerToken(device.id);
+            if (res?.success) {
+                setSuccessMessage('Đã tạo Token mới cho Face Server. Vui lòng cập nhật vào các thiết bị đầu cuối.');
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không thể rotate token.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể rotate token.');
+        }
     };
 
     // Helper translation dicts
@@ -474,7 +494,36 @@ const DeviceManagement = () => {
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-right space-x-2">
+                                                    <td className="py-4 px-6 text-right space-x-1.5 whitespace-nowrap">
+                                                        <button
+                                                            onClick={() => handleCheckAvailability(device)}
+                                                            title="Kiểm tra kết nối (Ping)"
+                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-green-600 hover:bg-green-50 transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                            </svg>
+                                                        </button>
+                                                        {device.deviceType === 'face_server' && (
+                                                            <button
+                                                                onClick={() => handleRotateToken(device)}
+                                                                title="Tạo lại Token (Rotate)"
+                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => toggleDeviceStatus(device)}
+                                                            title={device.status === 'online' ? "Ngừng kích hoạt" : "Kích hoạt lại"}
+                                                            className={`inline-flex p-1.5 rounded-lg transition-colors ${device.status === 'online' ? 'text-slate-blue hover:text-orange-600 hover:bg-orange-50' : 'text-slate-blue hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        </button>
                                                         <button
                                                             onClick={() => openEditModal(device)}
                                                             title="Cấu hình thiết bị"
@@ -773,7 +822,7 @@ const DeviceManagement = () => {
                                                         </span>
                                                         <button
                                                             type="button"
-                                                            onClick={() => toggleDeviceSimulatedStatus(d.id)}
+                                                            onClick={() => alert('Trạng thái thiết bị được đồng bộ tự động từ camera.')}
                                                             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
                                                                 d.status === 'online' ? 'bg-green-500' : 'bg-slate-300'
                                                             }`}

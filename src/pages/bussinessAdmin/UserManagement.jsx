@@ -49,7 +49,7 @@ const UserManagement = () => {
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-    
+
     const [selectedUser, setSelectedUser] = useState(null);
     const [selectedUserDetail, setSelectedUserDetail] = useState(null);
     const [userLogs, setUserLogs] = useState([]);
@@ -628,11 +628,17 @@ const UserManagement = () => {
                                             <td className="py-4 px-6">
                                                 <div className="flex items-center gap-3">
                                                     <UserAvatar
-                                                        user={user}
+                                                        user={user.avatarUrl
+                                                            || user.avatar_url
+                                                            || user.user?.avatarUrl
+                                                            || user.user?.avatar_url
+                                                            || user.profile?.avatarUrl
+                                                            || user.profile?.avatar_url
+                                                            || user}
                                                         className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
                                                     />
                                                     <div>
-                                                        <h4 
+                                                        <h4
                                                             onClick={() => handleViewDetail(user)}
                                                             className="text-sm font-bold text-midnight-indigo leading-tight cursor-pointer hover:underline hover:text-action-blue"
                                                         >
@@ -1174,9 +1180,8 @@ const UserManagement = () => {
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                                             <div>
                                                 <span className="text-slate-blue block text-xs">Trạng thái hoạt động:</span>
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${
-                                                    selectedUserDetail.accountStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                                                }`}>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${selectedUserDetail.accountStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                                    }`}>
                                                     {selectedUserDetail.accountStatus === 'active' ? 'Hoạt động' : 'Bị khóa'}
                                                 </span>
                                             </div>
@@ -1188,9 +1193,8 @@ const UserManagement = () => {
                                             </div>
                                             <div>
                                                 <span className="text-slate-blue block text-xs">Hồ sơ khuôn mặt (FaceID):</span>
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${
-                                                    selectedUserDetail.hasFaceProfile ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
-                                                }`}>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${selectedUserDetail.hasFaceProfile ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                                                    }`}>
                                                     {selectedUserDetail.hasFaceProfile ? 'Đã hợp lệ' : 'Chưa đăng ký'}
                                                 </span>
                                             </div>
@@ -1220,11 +1224,10 @@ const UserManagement = () => {
                                                 setIsDetailModalOpen(false);
                                                 handleLockToggle(selectedUserDetail);
                                             }}
-                                            className={`px-3 py-1.5 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 ${
-                                                (selectedUserDetail.accountStatus === 'locked' || selectedUserDetail.locked)
-                                                    ? 'border-green-200 bg-white text-green-600 hover:bg-green-50'
-                                                    : 'border-red-200 bg-white text-red-500 hover:bg-red-50'
-                                            }`}
+                                            className={`px-3 py-1.5 border rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 ${(selectedUserDetail.accountStatus === 'locked' || selectedUserDetail.locked)
+                                                ? 'border-green-200 bg-white text-green-600 hover:bg-green-50'
+                                                : 'border-red-200 bg-white text-red-500 hover:bg-red-50'
+                                                }`}
                                         >
                                             {(selectedUserDetail.accountStatus === 'locked' || selectedUserDetail.locked) ? (
                                                 <>

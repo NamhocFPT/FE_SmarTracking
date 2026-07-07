@@ -90,12 +90,11 @@ const RecordingManagement = () => {
         }
     }, [successMessage]);
 
-    // Download Handler
-    
+    // Visibility Handler
     const toggleVisibility = async (rec) => {
         try {
             const newStatus = rec.status === 'HIDDEN' ? 'COMPLETED' : 'HIDDEN';
-            const res = await updateRecordingVisibility(rec.id, { status: newStatus });
+            const res = await updateRecordingVisibility(rec.id, { visibility: newStatus });
             if (res?.success) {
                 setSuccessMessage('Cập nhật trạng thái hiển thị thành công.');
                 fetchRecordingsList();
@@ -107,20 +106,18 @@ const RecordingManagement = () => {
         }
     };
 
+    // Download Handler
     const handleDownload = async (rec) => {
         try {
             const res = await getRecordingDownloadUrl(rec.id);
             if (res?.success && res.data?.downloadUrl) {
                 window.open(res.data.downloadUrl, '_blank');
+                setSuccessMessage(`Đã tạo liên kết tải xuống cho video: ${rec.meetingTitle}`);
             } else {
-                // Fallback direct mock download
-                window.open(rec.videoUrl || '#', '_blank');
+                setError('Lỗi không thể tải xuống video này.');
             }
-            setSuccessMessage(`Đã tạo liên kết tải xuống cho video: ${rec.meetingTitle}`);
         } catch {
-            // Mock fallback
-            window.open(rec.videoUrl || '#', '_blank');
-            setSuccessMessage(`Đã mô phỏng tải xuống video: ${rec.meetingTitle}`);
+            setError('Lỗi kết nối khi tải xuống video.');
         }
     };
 
@@ -135,12 +132,10 @@ const RecordingManagement = () => {
                 setSuccessMessage(`Đã xoá ghi hình cuộc họp: ${deleteTarget.meetingTitle}`);
                 fetchRecordingsList();
             } else {
-                throw new Error();
+                throw new Error(res?.message || 'Lỗi xoá ghi hình');
             }
-        } catch {
-            // Mock delete update
-            setRecordingsList(prev => prev.filter(item => item.id !== deleteTarget.id));
-            setSuccessMessage(`Đã mô phỏng xoá ghi hình thành công: ${deleteTarget.meetingTitle}`);
+        } catch (err) {
+            setError(err.message || 'Lỗi khi xoá ghi hình.');
         } finally {
             setIsDeleting(false);
             setDeleteTarget(null);

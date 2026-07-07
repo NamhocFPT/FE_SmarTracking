@@ -4,111 +4,56 @@ import { request, get, post, patch, dele, buildQuery } from '../utils/request';
 // DASHBOARD & ANALYTICS APIs for Business Admin
 // ============================================================
 
-/**
- * UC-148: Xem dashboard tổng quan hệ thống
- * @param {object} params - { from, to, departmentId, roomId }
- * @returns {Promise<object>} response envelope
- */
 export const getDashboardOverview = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/dashboard/overview${query}`);
 };
 
-/**
- * UC-149: Xem dashboard sử dụng phòng
- * @param {object} params - { from, to, roomId, siteName, groupBy }
- * @returns {Promise<object>} response envelope
- */
 export const getRoomAnalytics = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/rooms/dashboard${query}`);
 };
 
-/**
- * UC-150: Xem dashboard điểm danh & hiện diện
- * @param {object} params - { from, to, departmentId, groupBy }
- * @returns {Promise<object>} response envelope
- */
 export const getAttendanceAnalytics = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/attendance/on-time-rate${query}`);
 };
 
-/**
- * UC-155: Thống kê tỷ lệ sử dụng phòng tổng hợp
- * @param {object} params - { from, to, roomId, groupBy }
- * @returns {Promise<object>} response envelope
- */
 export const getRoomUtilizationRate = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/rooms/utilization-rate${query}`);
 };
 
-/**
- * UC-156: Thống kê tỷ lệ no-show theo phòng
- * @param {object} params - { from, to, roomId, groupBy }
- * @returns {Promise<object>} response envelope
- */
 export const getNoShowStats = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/rooms/no-show-rate${query}`);
 };
 
-/**
- * UC-157: Thống kê tỷ lệ tham dự đúng giờ
- * @param {object} params - { from, to, departmentId, graceMinutes }
- * @returns {Promise<object>} response envelope
- */
 export const getOnTimeRate = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/attendance/on-time-rate${query}`);
 };
 
-/**
- * UC-151: Thống kê số lượng cuộc họp theo thời gian
- * @param {object} params - { from, to, granularity, departmentId }
- * @returns {Promise<object>} response envelope
- */
 export const getMeetingsCountByPeriod = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/meetings/count-by-period${query}`);
 };
 
-/**
- * UC-152: Thống kê cuộc họp theo trạng thái
- * @param {object} params - { from, to, departmentId }
- * @returns {Promise<object>} response envelope
- */
 export const getMeetingStatusBreakdown = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/meetings/status-breakdown${query}`);
 };
 
-/**
- * UC-153: Thống kê thời lượng trung bình cuộc họp
- * @param {object} params - { from, to, mode, departmentId }
- * @returns {Promise<object>} response envelope
- */
 export const getAverageMeetingDuration = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/meetings/average-duration${query}`);
 };
 
-/**
- * UC-154: Thống kê tỷ lệ cuộc họp bị hủy
- * @param {object} params - { from, to, departmentId }
- * @returns {Promise<object>} response envelope
- */
 export const getMeetingCancelRate = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/meetings/cancel-rate${query}`);
 };
 
-/**
- * UC-158: Xuất báo cáo tổng hợp hoạt động cuộc họp
- * @param {object} data - { from, to, format, scope: { departmentId, roomId, organizerId }, sections: [], delivery }
- * @returns {Promise<object>} response envelope
- */
 export const exportMeetingActivity = async (data) => {
     return await post('/reports/meeting-activity/exports', data);
 };
@@ -117,45 +62,27 @@ export const exportMeetingActivity = async (data) => {
 // USER MANAGEMENT APIs (UC-ACC-01 ~ UC-ACC-07)
 // ============================================================
 
-/**
- * UC-ACC-06: Tìm kiếm / lọc danh sách tài khoản
- */
 export const getUsers = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/users${query}`);
 };
 
-/**
- * UC-ACC-07: Xem chi tiết hồ sơ user
- */
 export const getUserById = async (userId) => {
     return await get(`/users/${userId}`);
 };
 
-/**
- * UC-ACC-01: Tạo tài khoản đơn lẻ
- */
 export const createUser = async (data) => {
     return await post('/users', data);
 };
 
-/**
- * UC-ACC-03: Cập nhật thông tin tài khoản
- */
 export const updateUser = async (userId, data) => {
     return await patch(`/users/${userId}`, data);
 };
 
-/**
- * UC-08: Cập nhật vai trò và quyền tài khoản
- */
 export const updateUserRoles = async (userId, data) => {
     return await request(`/users/${userId}/roles`, { method: 'PUT', body: data });
 };
 
-/**
- * UC-12: Khóa tài khoản người dùng
- */
 export const lockUser = async (userId, data = {}) => {
     return await patch(`/users/${userId}/lock`, {
         reason: data.reason || 'Vi phạm quy định bảo mật',
@@ -163,9 +90,6 @@ export const lockUser = async (userId, data = {}) => {
     });
 };
 
-/**
- * UC-11: Mở khóa tài khoản người dùng (cập nhật trạng thái sang active)
- */
 export const unlockUser = async (userId, data = {}) => {
     return await patch(`/users/${userId}/status`, {
         accountStatus: 'active',
@@ -174,38 +98,23 @@ export const unlockUser = async (userId, data = {}) => {
     });
 };
 
-/**
- * UC-10: Xóa tài khoản người dùng
- */
 export const deleteUser = async (userId) => {
     return await dele(`/users/${userId}?confirm=true`);
 };
 
-/**
- * UC-ACC-07: Xem lịch sử hoạt động của user
- */
 export const getUserAuditLogs = async (userId, params = {}) => {
     const query = new URLSearchParams(params).toString();
     return await get(`/users/${userId}/audit-logs${query ? `?${query}` : ''}`);
 };
 
-/**
- * UC-ACC-02: Import tài khoản từ Excel
- */
 export const importUsers = async (formData) => {
     return await post('/users/import-jobs', formData);
 };
 
-/**
- * Tải template import Excel
- */
 export const getImportTemplate = async () => {
     return await get('/users/import-template');
 };
 
-/**
- * Xuất danh sách tài khoản người dùng ra file Excel
- */
 export const exportUsers = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/users/export${query}`, { responseType: 'blob' });
@@ -246,7 +155,36 @@ export const getBackgroundJobStatus = async (jobId) => {
 
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/rooms${query}`);
+    return await get(`/rooms/available${query}`);
+};
+
+export const getRoomRealtimeStatus = async () => {
+    return await get('/rooms/realtime-status');
+};
+
+export const getNoShowStatus = async (meetingId) => {
+    return await get(`/meetings/${meetingId}/no-show-status`);
+};
+
+export const handleNoShowCase = async (caseId, data) => {
+    return await patch(`/no-show-cases/${caseId}`, data);
+};
+
+export const releaseNoShowRoom = async (caseId) => {
+    return await post(`/no-show-cases/${caseId}/release`);
+};
+
+// ============================================================
+// SECURITY & STRANGER ALERTS APIs
+// ============================================================
+
+export const getStrangerAlerts = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/ivss/stranger-alerts${query}`);
+};
+
+export const resolveStrangerAlert = async (alertId, data) => {
+    return await patch(`/ivss/stranger-alerts/${alertId}/resolve`, data);
 };
 
 export const createRoom = async (data) => {
@@ -303,7 +241,6 @@ export const updateRecordingVisibility = async (sessionId, data) => {
     return await patch(`/recordings/${sessionId}/visibility`, data);
 };
 
-
 // ============================================================
 // NOTIFICATION APIs (UC-NOTI-01 ~ UC-NOTI-05)
 // ============================================================
@@ -320,6 +257,3 @@ export const markNotificationRead = async (notificationId) => {
 export const markAllNotificationsRead = async () => {
     return await patch('/notifications/read-all');
 };
-
-
-
