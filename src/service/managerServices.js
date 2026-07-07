@@ -1,4 +1,4 @@
-import { get, post, patch, put, buildQuery } from '../utils/request';
+import { get, post, patch, put, dele, buildQuery } from '../utils/request';
 
 // ============================================================
 // DASHBOARD & ANALYTICS APIs for Department Manager
@@ -9,64 +9,68 @@ import { get, post, patch, put, buildQuery } from '../utils/request';
  * @param {object} params - { from, to, departmentId }
  */
 export const getManagerOverview = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/dashboard/overview${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/dashboard/overview${query}`);
 };
 
 /**
  * Fetch room analytics for manager's department
  */
 export const getManagerRoomAnalytics = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/dashboard${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/dashboard${query}`);
 };
 
 /**
  * Fetch attendance analytics for manager's department
  */
+/**
+ * UC-150: Thống kê điểm danh & hiện diện theo phòng ban
+ * Endpoint: GET /analytics/attendance/on-time-rate
+ */
 export const getManagerAttendanceAnalytics = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/attendance/dashboard${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/attendance/on-time-rate${query}`);
 };
 
 /**
  * Fetch meetings trend count
  */
 export const getManagerMeetingsCountByPeriod = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/count-by-period${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/count-by-period${query}`);
 };
 
 /**
  * Fetch status breakdown for department meetings
  */
 export const getManagerMeetingStatusBreakdown = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/status-breakdown${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/status-breakdown${query}`);
 };
 
 /**
  * Fetch average meeting duration for department
  */
 export const getManagerAverageMeetingDuration = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/average-duration${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/average-duration${query}`);
 };
 
 /**
  * Fetch cancel rate for department meetings
  */
 export const getManagerMeetingCancelRate = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/meetings/cancel-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/meetings/cancel-rate${query}`);
 };
 
 /**
  * Fetch no-show stats for department
  */
 export const getManagerNoShowStats = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/analytics/rooms/no-show-rate${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/analytics/rooms/no-show-rate${query}`);
 };
 
 // ============================================================
@@ -123,8 +127,8 @@ export const exportMeetingActivity = async (data) => {
  * Get departments list
  */
 export const getDepartments = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/departments${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/departments${query}`);
 };
 
 /**
@@ -168,6 +172,12 @@ export const getMeetingById = async (id) => {
     return await get(`/meetings/${id}`);
 };
 
+
+
+export const getMeetingPresence = async (meetingId) => {
+    return await get(`/ivss/meetings/${meetingId}/presence`);
+};
+
 /**
  * UC-SM-02: Chỉnh sửa cuộc họp
  */
@@ -190,26 +200,27 @@ export const checkInMeeting = async (id, data) => {
 };
 
 /**
- * Bắt đầu cuộc họp (Host action)
+ * UC-94: Bắt đầu phiên họp
+ * Endpoint: POST /live-meetings/{meetingId}/start
  */
 export const startMeeting = async (id) => {
-    return await post(`/meetings/${id}/start`);
+    return await post(`/live-meetings/${id}/start`);
 };
 
 /**
  * Get available meeting rooms
  */
 export const getRooms = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/rooms${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/rooms/available${query}`);
 };
 
 /**
  * Get users (for inviting participants)
  */
 export const getUsers = async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users${query ? `?${query}` : ''}`);
+    const query = buildQuery(params);
+    return await get(`/users${query}`);
 };
 
 // ============================================================
@@ -238,15 +249,60 @@ export const createMeetingNote = async (meetingId, data) => {
     return await post(`/meetings/${meetingId}/notes`, data);
 };
 
+/**
+ * UC-98: Kết thúc phiên họp
+ * Endpoint: POST /live-meetings/{meetingId}/end
+ */
 export const endMeeting = async (meetingId) => {
-    return await post(`/meetings/${meetingId}/end`);
+    return await post(`/live-meetings/${meetingId}/end`);
 };
 
+/**
+ * UC-101: Xem trạng thái điểm danh người tham dự (UC-81)
+ * Endpoint: GET /meetings/{meetingId}/attendance
+ */
 export const getMeetingAttendance = async (meetingId, params = {}) => {
     const query = buildQuery(params);
     return await get(`/meetings/${meetingId}/attendance${query}`);
 };
+
+export const manualAttendanceCheckIn = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/attendance`, data);
+};
+
+export const updateAttendanceStatus = async (meetingId, recordId, data) => {
+    return await patch(`/meetings/${meetingId}/attendance/${recordId}/status`, data);
+};
+
+export const updateAttendanceRecord = async (meetingId, recordId, data) => {
+    return await patch(`/meetings/${meetingId}/attendance/${recordId}`, data);
+};
+
+export const invalidateAttendanceRecord = async (meetingId, recordId, data) => {
+    return await post(`/meetings/${meetingId}/attendance/${recordId}/invalidate`, data);
+};
+
+/**
+ * UC-100: Xem danh sách người đang có mặt
+ * Endpoint: GET /live-meetings/{meetingId}/present-attendees
+ */
 export const getPresentAttendees = async (meetingId, params = {}) => {
     const query = buildQuery(params);
-    return await get(`/meetings/${meetingId}/attendance/present${query}`);
+    return await get(`/live-meetings/${meetingId}/present-attendees${query}`);
+};
+
+/**
+ * UC-95: Yêu cầu gia hạn phiên họp
+ * Endpoint: POST /live-meetings/{meetingId}/extension-requests
+ */
+export const requestExtension = async (meetingId, data) => {
+    return await post(`/live-meetings/${meetingId}/extension-requests`, data);
+};
+
+/**
+ * UC-96: Phê duyệt/từ chối yêu cầu gia hạn
+ * Endpoint: POST /live-meetings/{meetingId}/extension-requests/{requestId}/decide
+ */
+export const decideExtension = async (meetingId, requestId, data) => {
+    return await post(`/live-meetings/${meetingId}/extension-requests/${requestId}/decide`, data);
 };
