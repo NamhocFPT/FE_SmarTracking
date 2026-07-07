@@ -106,11 +106,23 @@ const EmployeeFaceRegistration = () => {
         }, 7500);
 
         // Complete Scan (75% -> 100%)
-        const timer4 = setTimeout(() => {
+        const timer4 = setTimeout(async () => {
             setScanProgress(100);
             setScanInstruction('Đã chụp xong các góc. Đang xử lý vector sinh trắc học...');
+            
+            // Capture image before stopping camera
+            let blob = null;
+            if (videoRef.current && useRealCamera) {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoRef.current.videoWidth || 480;
+                canvas.height = videoRef.current.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+            }
+            
             stopCamera();
-            submitFaceProfile();
+            submitFaceProfile(blob);
         }, 10500);
 
         return () => {
@@ -121,32 +133,33 @@ const EmployeeFaceRegistration = () => {
         };
     };
 
-    const submitFaceProfile = async () => {
+    const submitFaceProfile = async (imageBlob) => {
         setStep('submitting');
         setError(null);
 
         const userId = currentUser?.id || 'emp-uuid';
-        const payload = {
-            deviceId: "d7f1be30-5dc9-4a92-9118-8eb0c8d1976a", // simulated uuid
-            devicePersonId: `person-${userId}`,
-            devicePersonCode: employeeCode,
-            primaryImageFileId: "file-9fbca62a-8c5e-4bb5-a6e5-4f466b039454", // mock image file uuid
-            consentAt: new Date().toISOString(),
-            modelVersion: "v2.1"
-        };
+        
+        const formData = new FormData();
+        formData.append('devicePersonCode', employeeCode);
+        formData.append('consentAt', new Date().toISOString());
+        
+        if (imageBlob) {
+            formData.append('image', imageBlob, 'face-profile.jpg');
+        } else {
+            // Fallback for simulation mode (create a tiny empty dummy blob)
+            const dummyBlob = new Blob(['dummy-image-data'], { type: 'image/jpeg' });
+            formData.append('image', dummyBlob, 'mock-face.jpg');
+        }
 
         try {
-            const res = await registerFaceProfile(userId, payload);
+            const res = await registerFaceProfile(userId, formData);
             if (res?.success) {
                 setStep('success');
             } else {
-                // Mock success behavior for demo/local environment if database is mock
-                setTimeout(() => {
-                    setStep('success');
-                }, 1500);
+                throw new Error(res?.message || 'Lỗi liên kết khuôn mặt.');
             }
         } catch (err) {
-            setError(err?.error?.message || 'Có lỗi xảy ra khi liên kết khuôn mặt với tài khoản.');
+            setError(err?.error?.message || err?.message || 'Có lỗi xảy ra khi liên kết khuôn mặt với tài khoản.');
             setStep('scanner');
         }
     };

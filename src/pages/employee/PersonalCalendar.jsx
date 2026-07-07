@@ -449,7 +449,10 @@ const PersonalCalendar = () => {
                                     return (
                                         <div
                                             key={meet.id}
-                                            onClick={() => navigate(window.location.pathname.startsWith('/manager') ? `/manager/meeting/${meet.id}` : `/employee/meeting/${meet.id}`)}
+                                            onClick={() => {
+                                                const basePath = window.location.pathname.split('/')[1];
+                                                navigate(`/${basePath}/meeting/${meet.id}`);
+                                            }}
                                             className="p-4 rounded-xl border border-platinum-tint/60 bg-cloud-mist/5 hover:shadow-md transition-all space-y-3 cursor-pointer hover:border-action-blue/30"
                                         >
                                             <div className="flex items-start justify-between gap-3">

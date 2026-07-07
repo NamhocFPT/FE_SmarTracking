@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Calendar, Clock, MapPin, Users, Video, Edit3, Trash2,
-    Check, Play, Pause, Search, List, AlertTriangle, Upload, X, FileText
+    Check, Play, Pause, Search, List, AlertTriangle, Upload, X, FileText, Download
 } from 'lucide-react';
-import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
+import MeetingPresenceTimeline from '../../component/MeetingPresenceTimeline';
 
 const mockTranscript = [
     { time: 10, speaker: 'Lê Hoàng Hải', text: 'Chào mọi người, chúng ta bắt đầu họp bàn về thiết kế giao diện FE SmarTracking nhé.' },
@@ -27,6 +28,7 @@ const EmployeeMeetingDetail = () => {
     const [currentUser, setCurrentUser] = useState(null);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
+    const [mediaFiles, setMediaFiles] = useState([]);
 
     // Editing modal states
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -59,6 +61,62 @@ const EmployeeMeetingDetail = () => {
     const [transcriptQuery, setTranscriptQuery] = useState('');
     const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
 
+    /**
+     * Chuẩn hoá DTO lồng nhau từ API GET /meetings/:id
+     * Map { meeting, host, organizer, room, participants, agendas, recordingConfig }
+     * sang shape phẳng mà UI dùng, giữ cả camelCase và snake_case để tương thích.
+     */
+    const normalizeMeetingDetail = (dto) => {
+        const hostName = dto.host?.fullName || dto.organizer?.fullName || dto.hostName || dto.host_name || 'Chưa rõ';
+        const hostId = dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id;
+        const room = dto.room || {};
+        const participants = (dto.participants || []).map(p => ({
+            id: p.userId || p.user_id || p.user?.id || p.id,
+            fullName: p.fullName || p.full_name || p.user?.fullName || '',
+            email: p.email || p.user?.email || '',
+            participantRole: p.participantRole || p.participant_role || 'participant',
+        }));
+        const agenda = (dto.agendas || dto.agenda || []).map((a, idx) => ({
+            ...a,
+            durationMin: a.durationMinutes ?? a.durationMin ?? a.plannedDurationMinutes ?? 15,
+            orderIndex: a.sortOrder ?? a.orderIndex ?? idx,
+        }));
+        return {
+            // Meeting core fields (dual casing for compatibility)
+            id: dto.id || dto.meetingId,
+            meetingId: dto.id || dto.meetingId,
+            meeting_code: dto.meetingCode || dto.meeting_code,
+            title: dto.title,
+            description: dto.description,
+            status: dto.status,
+            // Host
+            host: hostName,
+            hostId,
+            host_id: hostId,
+            // Room
+            room: {
+                id: room.id,
+                roomName: room.roomName || room.room_name,
+                room_name: room.roomName || room.room_name,
+                location: room.location,
+                siteName: room.siteName || room.site_name,
+                site_name: room.siteName || room.site_name,
+                capacity: room.capacity,
+            },
+            // Time fields (dual casing)
+            startTime: dto.startTime || dto.start_time,
+            start_time: dto.startTime || dto.start_time,
+            endTime: dto.endTime || dto.end_time,
+            end_time: dto.endTime || dto.end_time,
+            // Recording
+            recordingEnabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
+            recording_enabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
+            // Participants & Agenda
+            participants,
+            agenda,
+        };
+    };
+
     const fetchMeeting = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -71,60 +129,30 @@ const EmployeeMeetingDetail = () => {
 
             const res = await getMeetingById(id);
             if (res?.success && res.data) {
-                const data = res.data;
-                setMeeting(data);
-                initEditStates(data);
+                const normalized = normalizeMeetingDetail(res.data);
+                setMeeting(normalized);
+                initEditStates(normalized);
+                if (normalized.status === 'completed' && normalized.recordingEnabled) {
+                    try {
+                        const mediaRes = await getMeetingMediaFiles(normalized.id);
+                        if (mediaRes?.success) {
+                            setMediaFiles(mediaRes.data || []);
+                        }
+                    } catch (e) {
+                        // ignore error for media
+                    }
+                }
             } else {
-                throw new Error();
+                throw new Error(res?.error?.message || res?.message || 'Không thể tải chi tiết cuộc họp.');
             }
-        } catch {
-            // Mock fallbacks for employee meeting detail
-            const localUserStr = localStorage.getItem('user');
-            let userObj = { id: 'emp-uuid', fullName: 'Nhân viên nội bộ' };
-            if (localUserStr) {
-                try { userObj = JSON.parse(localUserStr); } catch (e) {}
-            }
-
-            const mockData = {
-                id: id || 'meet-101',
-                meeting_code: 'MEET-260615-001',
-                title: 'Họp kỹ thuật dự án FE SmarTracking',
-                room: { 
-                    id: 'room-1', 
-                    roomName: 'Phòng Apollo 101', 
-                    room_name: 'Phòng Apollo 101', 
-                    capacity: 10, 
-                    siteName: 'Tòa nhà A',
-                    site_name: 'Tòa nhà A'
-                },
-                startTime: new Date(new Date().setHours(9, 0, 0)).toISOString(),
-                start_time: new Date(new Date().setHours(9, 0, 0)).toISOString(),
-                endTime: new Date(new Date().setHours(10, 30, 0)).toISOString(),
-                end_time: new Date(new Date().setHours(10, 30, 0)).toISOString(),
-                host: userObj.fullName || 'Lê Hoàng Hải',
-                hostId: userObj.id || 'emp-uuid',
-                host_id: userObj.id || 'emp-uuid',
-                status: 'scheduled', // 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
-                recordingEnabled: true,
-                recording_enabled: true,
-                description: 'Rà soát giao diện và các API của các chức năng đặt phòng họp.',
-                participants: [
-                    { id: 'user-1', fullName: 'Lê Hoàng Hải', full_name: 'Lê Hoàng Hải', email: 'hai.lh@smrmpts.com' },
-                    { id: 'user-2', fullName: 'Nguyễn Thị Minh', full_name: 'Nguyễn Thị Minh', email: 'minh.nt@smrmpts.com' },
-                    { id: 'user-3', fullName: 'Phan Văn Minh', full_name: 'Phan Văn Minh', email: 'minh.pv@smrmpts.com' }
-                ],
-                agenda: [
-                    { title: 'Khởi động & Demo giao diện', durationMin: 15, orderIndex: 0 },
-                    { title: 'Thảo luận API tích hợp thiết bị', durationMin: 30, orderIndex: 1 },
-                    { title: 'Chốt phương án & phân công nhiệm vụ', durationMin: 15, orderIndex: 2 }
-                ]
-            };
-            setMeeting(mockData);
-            initEditStates(mockData);
+        } catch (err) {
+            const msg = err?.error?.message || err?.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+            setError(msg);
         } finally {
             setLoading(false);
         }
     }, [id]);
+
 
     const handleJoinMeeting = () => {
         const startVal = meeting.start_time || meeting.startTime;
@@ -391,6 +419,9 @@ const EmployeeMeetingDetail = () => {
         }
     }
 
+    const videoMedia = mediaFiles.find(m => m.type === 'VIDEO');
+    const transcriptMedia = mediaFiles.find(m => m.type === 'TRANSCRIPT');
+
     return (
         <>
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
@@ -586,7 +617,13 @@ const EmployeeMeetingDetail = () => {
                                 Video ghi hình & Transcript
                             </h3>
                             
-                            {/* Player Simulation */}
+                            
+                            {/* Real or Mock Player */}
+                            {videoMedia ? (
+                                <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner">
+                                    <video src={videoMedia.fileUrl} controls className="w-full h-full" />
+                                </div>
+                            ) : (
                             <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner group">
                                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/80 to-transparent flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <span className="text-[10px] font-semibold bg-red-600/90 text-white px-2 py-0.5 rounded self-start uppercase">Recording Playback</span>
@@ -602,8 +639,23 @@ const EmployeeMeetingDetail = () => {
                                     {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
                                 </button>
                             </div>
+                            )}
 
                             {/* Transcript Area */}
+                            {transcriptMedia ? (
+                                <div className="pt-2">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs font-bold text-midnight-indigo">Transcript cuộc họp</span>
+                                        <a href={transcriptMedia.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-action-blue rounded-lg text-xs font-bold hover:bg-blue-100">
+                                            <Download className="w-3.5 h-3.5" />
+                                            Tải xuống Transcript
+                                        </a>
+                                    </div>
+                                    <div className="text-xs text-slate-blue italic text-center p-4 bg-cloud-mist/30 rounded-xl border border-platinum-tint">
+                                        Tính năng hiển thị trực tiếp transcript đang được phát triển. Vui lòng tải xuống file gốc để xem.
+                                    </div>
+                                </div>
+                            ) : (
                             <div className="space-y-3 pt-2">
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-midnight-indigo">Transcript cuộc họp</span>
@@ -644,6 +696,7 @@ const EmployeeMeetingDetail = () => {
                                     )}
                                 </div>
                             </div>
+                            )}
                         </div>
                     ) : (
                         <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 text-center py-8 text-slate-blue">
@@ -658,6 +711,17 @@ const EmployeeMeetingDetail = () => {
                     )}
                 </div>
             </div>
+
+            {/* Presence Timeline Section */}
+            {meeting && (meeting.status === 'completed' || meeting.status === 'in_progress') && (
+                <div className="pt-4 border-t border-platinum-tint/50">
+                    <MeetingPresenceTimeline 
+                        meetingId={meeting.id} 
+                        meetingStartTime={meeting.start_time || meeting.startTime} 
+                        meetingEndTime={meeting.end_time || meeting.endTime} 
+                    />
+                </div>
+            )}
         </div>
 
             {/* MODAL: Time Validation Warning */}

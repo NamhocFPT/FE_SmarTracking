@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -80,6 +81,7 @@ const ManagerHomePage = () => {
     const [approvalModalOpen, setApprovalModalOpen] = useState(false);
     const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
     const [submittingAction, setSubmittingAction] = useState(false);
+    const [modalError, setModalError] = useState(null); // lỗi riêng cho modal action
 
     const fetchPendingRequests = useCallback(async () => {
         setLoadingOverview(true);
@@ -102,7 +104,7 @@ const ManagerHomePage = () => {
     const handleApprove = async () => {
         if (!selectedRequest) return;
         setSubmittingAction(true);
-        setError(null);
+        setModalError(null);
         try {
             const res = await approveMeetingRequest(selectedRequest.id, decisionNote);
             if (res?.success) {
@@ -115,7 +117,7 @@ const ManagerHomePage = () => {
                 throw new Error(res?.error?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
             }
         } catch (err) {
-            setError(err.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
+            setModalError(err.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -124,11 +126,11 @@ const ManagerHomePage = () => {
     const handleReject = async () => {
         if (!selectedRequest) return;
         if (!rejectionReason.trim()) {
-            setError('Lý do từ chối là bắt buộc.');
+            setModalError('Lý do từ chối là bắt buộc.');
             return;
         }
         setSubmittingAction(true);
-        setError(null);
+        setModalError(null);
         try {
             const res = await rejectMeetingRequest(selectedRequest.id, rejectionReason);
             if (res?.success) {
@@ -141,7 +143,7 @@ const ManagerHomePage = () => {
                 throw new Error(res?.error?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
             }
         } catch (err) {
-            setError(err.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
+            setModalError(err.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -995,6 +997,7 @@ const ManagerHomePage = () => {
 
             {/* MODALS */}
             {/* Approval Modal */}
+            {typeof document !== 'undefined' && createPortal(
             <AnimatePresence>
                 {approvalModalOpen && selectedRequest && (
                     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl">
@@ -1008,6 +1011,15 @@ const ManagerHomePage = () => {
                             <p className="text-xs text-slate-blue mb-4">
                                 Bạn chuẩn bị phê duyệt yêu cầu <strong className="text-midnight-indigo">{selectedRequest.requestCode}</strong> cho cuộc họp <strong>"{selectedRequest.meeting?.title}"</strong>.
                             </p>
+
+                            {/* Banner lỗi bên trong modal */}
+                            {modalError && (
+                                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    <span>{modalError}</span>
+                                    <button onClick={() => setModalError(null)} className="ml-auto text-rose-500 font-bold">✕</button>
+                                </div>
+                            )}
 
                             <div className="space-y-3">
                                 <div>
@@ -1026,6 +1038,7 @@ const ManagerHomePage = () => {
                                         onClick={() => {
                                             setApprovalModalOpen(false);
                                             setDecisionNote('');
+                                            setModalError(null);
                                         }}
                                         className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist rounded-xl text-xs font-bold text-midnight-indigo transition-colors"
                                     >
@@ -1044,9 +1057,12 @@ const ManagerHomePage = () => {
                         </motion.div>
                     </div>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+            )}
 
             {/* Rejection Modal */}
+            {typeof document !== 'undefined' && createPortal(
             <AnimatePresence>
                 {rejectionModalOpen && selectedRequest && (
                     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl">
@@ -1060,6 +1076,15 @@ const ManagerHomePage = () => {
                             <p className="text-xs text-slate-blue mb-4">
                                 Vui lòng nhập lý do từ chối chi tiết cho yêu cầu <strong className="text-midnight-indigo">{selectedRequest.requestCode}</strong>.
                             </p>
+
+                            {/* Banner lỗi bên trong modal */}
+                            {modalError && (
+                                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    <span>{modalError}</span>
+                                    <button onClick={() => setModalError(null)} className="ml-auto text-rose-500 font-bold">✕</button>
+                                </div>
+                            )}
 
                             <div className="space-y-3">
                                 <div>
@@ -1078,6 +1103,7 @@ const ManagerHomePage = () => {
                                         onClick={() => {
                                             setRejectionModalOpen(false);
                                             setRejectionReason('');
+                                            setModalError(null);
                                         }}
                                         className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist rounded-xl text-xs font-bold text-midnight-indigo transition-colors"
                                     >
@@ -1096,7 +1122,9 @@ const ManagerHomePage = () => {
                         </motion.div>
                     </div>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+            )}
         </motion.div>
     );
 };
