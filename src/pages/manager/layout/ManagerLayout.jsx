@@ -6,10 +6,43 @@ import AvatarReminderModal from '../../../component/AvatarReminder/AvatarReminde
 import UserAvatar from '../../../component/UserAvatar';
 
 const navigationItems = [
-    { label: 'Trang chủ', to: '/manager', end: true },
-    { label: 'Quản lý lịch họp', to: '/manager/meeting-approvals' },
-    { label: 'Lịch cá nhân', to: '/manager/schedule' },
-    { label: 'Đăng ký họp', to: '/manager/book' }
+    {
+        label: 'Trang chủ',
+        to: '/manager',
+        end: true
+    },
+    {
+        label: 'Lịch họp',
+        isDropdown: true,
+        children: [
+            {
+                label: 'Lịch cá nhân',
+                to: '/manager/schedule'
+            },
+            {
+                label: 'Đăng ký họp',
+                to: '/manager/book'
+            }
+        ]
+    }
+    ,
+
+    {
+        label: 'Điều hành',
+        isDropdown: true,
+        children: [
+            {
+                label: 'Phê duyệt cuộc họp',
+                to: '/manager/meeting-approvals'
+            },
+            {
+                label: 'Duyệt ảnh đại diện',
+                to: '/manager/avatar-submissions'
+            }
+        ]
+    },
+
+
 ];
 
 const footerLinks = [
@@ -20,8 +53,10 @@ const footerLinks = [
 
 const ManagerLayout = () => {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [openDropdown, setOpenDropdown] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const profileMenuRef = useRef(null);
+    const navRef = useRef(null);
     const navigate = useNavigate();
 
     // Load user info from localStorage
@@ -42,6 +77,9 @@ const ManagerLayout = () => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
                 setIsProfileMenuOpen(false);
             }
+            if (navRef.current && !navRef.current.contains(event.target)) {
+                setOpenDropdown(null);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -59,7 +97,7 @@ const ManagerLayout = () => {
 
     const handleProfile = useCallback(() => {
         setIsProfileMenuOpen(false);
-        navigate('/manager/profile'); 
+        navigate('/manager/profile');
     }, [navigate]);
 
     const handleMyVehicles = useCallback(() => {
@@ -91,24 +129,58 @@ const ManagerLayout = () => {
 
                         {/* Navigation */}
                         <nav
+                            ref={navRef}
                             aria-label="Primary navigation"
                             className="hidden md:flex items-center gap-1"
                         >
                             {navigationItems.map((item) => (
-                                <NavLink
-                                    key={item.label}
-                                    to={item.to}
-                                    end={item.end || false}
-                                    className={({ isActive }) =>
-                                        `px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 no-underline whitespace-nowrap ${
-                                            isActive
+                                item.isDropdown ? (
+                                    <div key={item.label} className="relative">
+                                        <button
+                                            onClick={() => setOpenDropdown(openDropdown === item.label ? null : item.label)}
+                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist flex items-center gap-1"
+                                        >
+                                            {item.label}
+                                            <svg className={`w-4 h-4 transition-transform ${openDropdown === item.label ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                        {openDropdown === item.label && (
+                                            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-platinum-tint rounded-xl shadow-lg transition-all duration-200 z-50 overflow-hidden py-1">
+                                                {item.children.map(child => (
+                                                    <NavLink
+                                                        key={child.label}
+                                                        to={child.to}
+                                                        end={child.end || false}
+                                                        onClick={() => setOpenDropdown(null)}
+                                                        className={({ isActive }) =>
+                                                            `block px-4 py-2.5 text-sm transition-colors ${isActive
+                                                                ? 'text-action-blue bg-blue-50 font-bold'
+                                                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
+                                                            }`
+                                                        }
+                                                    >
+                                                        {child.label}
+                                                    </NavLink>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <NavLink
+                                        key={item.label}
+                                        to={item.to}
+                                        end={item.end || false}
+                                        className={({ isActive }) =>
+                                            `px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 no-underline whitespace-nowrap ${isActive
                                                 ? 'text-action-blue bg-blue-50'
                                                 : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
-                                        }`
-                                    }
-                                >
-                                    {item.label}
-                                </NavLink>
+                                            }`
+                                        }
+                                    >
+                                        {item.label}
+                                    </NavLink>
+                                )
                             ))}
                         </nav>
                     </div>
@@ -123,8 +195,8 @@ const ManagerLayout = () => {
                             className="relative p-2 rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors duration-200"
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" aria-hidden="true" />
                         </button>
@@ -158,9 +230,8 @@ const ManagerLayout = () => {
                                 />
 
                                 <svg
-                                    className={`w-4 h-4 text-slate-blue transition-transform duration-200 ${
-                                        isProfileMenuOpen ? 'rotate-180' : ''
-                                    }`}
+                                    className={`w-4 h-4 text-slate-blue transition-transform duration-200 ${isProfileMenuOpen ? 'rotate-180' : ''
+                                        }`}
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -189,8 +260,8 @@ const ManagerLayout = () => {
                                             className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-midnight-indigo hover:bg-cloud-mist transition-colors duration-150"
                                         >
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                                <circle cx="12" cy="7" r="4"/>
+                                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                                <circle cx="12" cy="7" r="4" />
                                             </svg>
                                             Hồ sơ cá nhân
                                         </button>
@@ -217,9 +288,9 @@ const ManagerLayout = () => {
                                             className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
                                         >
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                                                <polyline points="16,17 21,12 16,7"/>
-                                                <line x1="21" y1="12" x2="9" y2="12"/>
+                                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                                <polyline points="16,17 21,12 16,7" />
+                                                <line x1="21" y1="12" x2="9" y2="12" />
                                             </svg>
                                             Đăng xuất
                                         </button>

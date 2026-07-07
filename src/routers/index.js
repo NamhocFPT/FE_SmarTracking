@@ -15,7 +15,6 @@ import AuditLogs from '../pages/systemAdmin/AuditLogs';
 import SystemSettings from '../pages/systemAdmin/SystemSettings';
 import Profile from '../pages/shared/Profile';
 import Notifications from '../pages/systemAdmin/Notifications';
-import AvatarSubmissionsReview from '../pages/systemAdmin/AvatarSubmissionsReview';
 import ANPRManagement from '../pages/bussinessAdmin/ANPRManagement'; // SystemAdmin can also use this
 import MyVehicles from '../pages/shared/MyVehicles';
 
@@ -34,6 +33,7 @@ import ManagerHomePage from '../pages/manager/homePage';
 import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
+import AvatarSubmissionsReview from '../pages/manager/AvatarSubmissionsReview';
 
 // Employee Layout + Pages
 import EmployeeLayout from '../pages/employee/layout/EmployeeLayout';
@@ -105,10 +105,7 @@ export const router = [
                 path: 'notifications',
                 element: <Notifications />
             },
-            {
-                path: 'avatar-submissions',
-                element: <AvatarSubmissionsReview />
-            },
+
             {
                 path: 'my-vehicles',
                 element: <MyVehicles />
@@ -117,6 +114,22 @@ export const router = [
                 path: 'anpr-management',
                 element: <ANPRManagement />
             },
+            {
+                path: 'book',
+                element: <BookMeeting />
+            },
+            {
+                path: 'schedule',
+                element: <PersonalCalendar />
+            },
+            {
+                path: 'meeting/:id',
+                element: <EmployeeMeetingDetail />
+            },
+            {
+                path: 'in-meeting/:id',
+                element: <InMeetingRoom />
+            }
         ]
     },
 
@@ -169,6 +182,22 @@ export const router = [
                 path: 'anpr-management',
                 element: <ANPRManagement />
             },
+            {
+                path: 'book',
+                element: <BookMeeting />
+            },
+            {
+                path: 'schedule',
+                element: <PersonalCalendar />
+            },
+            {
+                path: 'meeting/:id',
+                element: <EmployeeMeetingDetail />
+            },
+            {
+                path: 'in-meeting/:id',
+                element: <InMeetingRoom />
+            }
         ]
     },
 
@@ -216,6 +245,10 @@ export const router = [
             {
                 path: 'notifications',
                 element: <Notifications />
+            },
+            {
+                path: 'avatar-submissions',
+                element: <AvatarSubmissionsReview />
             },
             {
                 path: 'my-vehicles',
