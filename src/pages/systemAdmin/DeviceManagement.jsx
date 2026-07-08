@@ -39,6 +39,23 @@ const DeviceManagement = () => {
     const [selectedDevice, setSelectedDevice] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
+    // FE-5: Assign Room Modal
+    const [isAssignRoomModalOpen, setIsAssignRoomModalOpen] = useState(false);
+    const [assignRoomDeviceId, setAssignRoomDeviceId] = useState(null);
+    const [assignRoomValue, setAssignRoomValue] = useState('');
+
+    // FE-5: RTSP Config Modal
+    const [isRtspModalOpen, setIsRtspModalOpen] = useState(false);
+    const [rtspDeviceId, setRtspDeviceId] = useState(null);
+    const [rtspUrl, setRtspUrl] = useState('');
+
+    // FE-5: Token Display Modal (chỉ hiện 1 lần)
+    const [tokenModalData, setTokenModalData] = useState(null); // { token, deviceName }
+    const [tokenCopied, setTokenCopied] = useState(false);
+
+    // FE-5: Confirmation Modal (replaces window.confirm)
+    const [confirmModal, setConfirmModal] = useState(null); // { title, message, onConfirm, type }
+
     // Filters states
     const [search, setSearch] = useState('');
     const [selectedType, setSelectedType] = useState('');
@@ -202,44 +219,59 @@ const DeviceManagement = () => {
         }
     };
 
-    // Unregister / Delete Device (UC-IOT-03)
-    const handleDeleteDevice = async (device) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn gỡ bỏ hoàn toàn thiết bị ${device.deviceCode}?`)) return;
-        setError(null);
-        setSuccessMessage(null);
-        try {
-            const res = await removeDevice(device.id);
-            if (res?.success) {
-                setSuccessMessage('Đã gỡ bỏ thiết bị khỏi hệ thống.');
-                fetchData();
-            } else {
-                throw new Error(res?.error?.message || res?.message || 'Không thể gỡ bỏ thiết bị.');
+    // Unregister / Delete Device (UC-IOT-03) — uses custom confirm modal
+    const handleDeleteDevice = (device) => {
+        setConfirmModal({
+            title: 'Xác nhận gỡ đăng ký thiết bị',
+            message: `Bạn có chắc chắn muốn gỡ bỏ hoàn toàn thiết bị ${device.deviceCode}? Hành động này không thể hoàn tác.`,
+            type: 'danger',
+            onConfirm: async () => {
+                setError(null);
+                setSuccessMessage(null);
+                try {
+                    const res = await removeDevice(device.id);
+                    if (res?.success) {
+                        setSuccessMessage('Đã gỡ bỏ thiết bị khỏi hệ thống.');
+                        fetchData();
+                    } else {
+                        throw new Error(res?.error?.message || res?.message || 'Không thể gỡ bỏ thiết bị.');
+                    }
+                } catch (err) {
+                    setError(err?.error?.message || err?.message || 'Không thể gỡ bỏ thiết bị.');
+                }
+                setConfirmModal(null);
             }
-        } catch (err) {
-            setError(err?.error?.message || err?.message || 'Không thể gỡ bỏ thiết bị.');
-        }
+        });
     };
 
-    const toggleDeviceStatus = async (device) => {
-        if (!window.confirm(`Bạn có muốn ${device.status === 'online' ? 'ngừng kích hoạt (disable)' : 'kích hoạt lại (enable)'} thiết bị ${device.deviceCode}?`)) return;
-        setError(null);
-        setSuccessMessage(null);
-        try {
-            let res;
-            if (device.status === 'online') {
-                res = await disableDevice(device.id);
-            } else {
-                res = await enableDevice(device.id);
+    const toggleDeviceStatus = (device) => {
+        const isOnline = device.status === 'online';
+        setConfirmModal({
+            title: isOnline ? 'Ngừng kích hoạt thiết bị' : 'Kích hoạt lại thiết bị',
+            message: `Bạn có muốn ${isOnline ? 'ngừng kích hoạt (disable)' : 'kích hoạt lại (enable)'} thiết bị ${device.deviceCode}?`,
+            type: isOnline ? 'warning' : 'info',
+            onConfirm: async () => {
+                setError(null);
+                setSuccessMessage(null);
+                try {
+                    let res;
+                    if (isOnline) {
+                        res = await disableDevice(device.id);
+                    } else {
+                        res = await enableDevice(device.id);
+                    }
+                    if (res?.success) {
+                        setSuccessMessage(`Đã ${isOnline ? 'ngừng kích hoạt' : 'kích hoạt lại'} thiết bị thành công.`);
+                        fetchData();
+                    } else {
+                        throw new Error(res?.error?.message || res?.message || 'Không thể chuyển trạng thái thiết bị.');
+                    }
+                } catch (err) {
+                    setError(err?.error?.message || err?.message || 'Không thể chuyển trạng thái thiết bị.');
+                }
+                setConfirmModal(null);
             }
-            if (res?.success) {
-                setSuccessMessage(`Đã ${device.status === 'online' ? 'ngừng kích hoạt' : 'kích hoạt lại'} thiết bị thành công.`);
-                fetchData();
-            } else {
-                throw new Error(res?.error?.message || res?.message || 'Không thể chuyển trạng thái thiết bị.');
-            }
-        } catch (err) {
-            setError(err?.error?.message || err?.message || 'Không thể chuyển trạng thái thiết bị.');
-        }
+        });
     };
 
     const handleCheckAvailability = async (device) => {
@@ -258,19 +290,119 @@ const DeviceManagement = () => {
         }
     };
 
-    const handleRotateToken = async (device) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn Rotate/Revoke Token cho Face Server ${device.deviceName}? (Các thiết bị cũ sẽ mất kết nối nếu không cập nhật token mới)`)) return;
-        setError(null);
-        setSuccessMessage(null);
+    const handleRotateToken = (device) => {
+        setConfirmModal({
+            title: 'Rotate Token Face Server',
+            message: `Bạn có chắc chắn muốn Rotate Token cho Face Server ${device.deviceName}? Các thiết bị cũ sẽ mất kết nối nếu không cập nhật token mới.`,
+            type: 'warning',
+            onConfirm: async () => {
+                setError(null);
+                setSuccessMessage(null);
+                try {
+                    const res = await rotateFaceServerToken(device.id);
+                    if (res?.success) {
+                        // FE-5: Hiển thị token trong modal "chỉ hiện 1 lần"
+                        setTokenModalData({
+                            token: res.data?.token || res.data?.accessToken || 'Token đã được tạo',
+                            deviceName: device.deviceName
+                        });
+                        setTokenCopied(false);
+                    } else {
+                        throw new Error(res?.error?.message || res?.message || 'Không thể rotate token.');
+                    }
+                } catch (err) {
+                    setError(err?.error?.message || err?.message || 'Không thể rotate token.');
+                }
+                setConfirmModal(null);
+            }
+        });
+    };
+
+    // FE-5: Revoke Token handler
+    const handleRevokeToken = (device) => {
+        setConfirmModal({
+            title: 'Thu hồi Token Face Server',
+            message: `Bạn có chắc chắn muốn thu hồi (revoke) token hiện tại của ${device.deviceName}? Thiết bị sẽ mất kết nối ngay lập tức.`,
+            type: 'danger',
+            onConfirm: async () => {
+                setError(null);
+                setSuccessMessage(null);
+                try {
+                    const res = await revokeFaceServerToken(device.id);
+                    if (res?.success) {
+                        setSuccessMessage(`Đã thu hồi token của ${device.deviceName} thành công.`);
+                        fetchData();
+                    } else {
+                        throw new Error(res?.error?.message || res?.message || 'Không thể thu hồi token.');
+                    }
+                } catch (err) {
+                    setError(err?.error?.message || err?.message || 'Không thể thu hồi token.');
+                }
+                setConfirmModal(null);
+            }
+        });
+    };
+
+    // FE-5: Assign Room handler
+    const handleAssignRoom = async (e) => {
+        e.preventDefault();
+        if (!assignRoomDeviceId || !assignRoomValue) return;
+        setSubmitting(true);
         try {
-            const res = await rotateFaceServerToken(device.id);
+            const res = await assignDeviceRoom(assignRoomDeviceId, { roomId: assignRoomValue });
             if (res?.success) {
-                setSuccessMessage('Đã tạo Token mới cho Face Server. Vui lòng cập nhật vào các thiết bị đầu cuối.');
+                setSuccessMessage('Đã gán phòng cho thiết bị thành công.');
+                setIsAssignRoomModalOpen(false);
+                fetchData();
             } else {
-                throw new Error(res?.error?.message || res?.message || 'Không thể rotate token.');
+                throw new Error(res?.error?.message || res?.message || 'Không thể gán phòng cho thiết bị.');
             }
         } catch (err) {
-            setError(err?.error?.message || err?.message || 'Không thể rotate token.');
+            setError(err?.error?.message || err?.message || 'Không thể gán phòng cho thiết bị.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // FE-5: RTSP Config handler
+    const handleRtspConfig = async (e) => {
+        e.preventDefault();
+        if (!rtspDeviceId || !rtspUrl.trim()) return;
+        setSubmitting(true);
+        try {
+            const res = await configDeviceRtsp(rtspDeviceId, { rtsp_url: rtspUrl });
+            if (res?.success) {
+                setSuccessMessage('Đã cập nhật cấu hình RTSP thành công.');
+                setIsRtspModalOpen(false);
+                fetchData();
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không thể cập nhật cấu hình RTSP.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể cập nhật cấu hình RTSP.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // FE-5: Copy token to clipboard
+    const handleCopyToken = async () => {
+        if (tokenModalData?.token) {
+            try {
+                await navigator.clipboard.writeText(tokenModalData.token);
+                setTokenCopied(true);
+                setTimeout(() => setTokenCopied(false), 2000);
+            } catch {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = tokenModalData.token;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                setTokenCopied(true);
+                setTimeout(() => setTokenCopied(false), 2000);
+            }
         }
     };
 
@@ -505,6 +637,7 @@ const DeviceManagement = () => {
                                                             </svg>
                                                         </button>
                                                         {device.deviceType === 'face_server' && (
+                                                            <>
                                                             <button
                                                                 onClick={() => handleRotateToken(device)}
                                                                 title="Tạo lại Token (Rotate)"
@@ -514,7 +647,37 @@ const DeviceManagement = () => {
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                                 </svg>
                                                             </button>
+                                                            <button
+                                                                onClick={() => handleRevokeToken(device)}
+                                                                title="Thu hồi Token (Revoke)"
+                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                                </svg>
+                                                            </button>
+                                                            </>
                                                         )}
+                                                        {device.deviceType === 'camera' && (
+                                                            <button
+                                                                onClick={() => { setRtspDeviceId(device.id); setRtspUrl(device.streamUrl || ''); setIsRtspModalOpen(true); }}
+                                                                title="Cấu hình RTSP"
+                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.roomId || ''); setIsAssignRoomModalOpen(true); }}
+                                                            title="Gán phòng"
+                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                            </svg>
+                                                        </button>
                                                         <button
                                                             onClick={() => toggleDeviceStatus(device)}
                                                             title={device.status === 'online' ? "Ngừng kích hoạt" : "Kích hoạt lại"}
@@ -996,7 +1159,7 @@ const DeviceManagement = () => {
 
             {/* EDIT MODAL */}
             {isEditModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo">Cấu hình thông tin thiết bị</h3>
@@ -1009,32 +1172,16 @@ const DeviceManagement = () => {
                         <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã thiết bị (Read-only)</label>
-                                <input
-                                    type="text"
-                                    disabled
-                                    value={formData.deviceCode}
-                                    className="w-full px-3 py-2 border border-platinum-tint bg-cloud-mist rounded-xl text-sm text-steel-gray focus:outline-none cursor-not-allowed"
-                                />
+                                <input type="text" disabled value={formData.deviceCode} className="w-full px-3 py-2 border border-platinum-tint bg-cloud-mist rounded-xl text-sm text-steel-gray focus:outline-none cursor-not-allowed" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên thiết bị</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.deviceName}
-                                    onChange={(e) => setFormData({...formData, deviceName: e.target.value})}
-                                    placeholder="Ví dụ: Camera chính Phòng 101"
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                />
+                                <input type="text" required value={formData.deviceName} onChange={(e) => setFormData({...formData, deviceName: e.target.value})} placeholder="Ví dụ: Camera chính Phòng 101" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại thiết bị</label>
-                                    <select
-                                        value={formData.deviceType}
-                                        onChange={(e) => setFormData({...formData, deviceType: e.target.value})}
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
-                                    >
+                                    <select value={formData.deviceType} onChange={(e) => setFormData({...formData, deviceType: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
                                         <option value="camera">Camera AI</option>
                                         <option value="face_terminal">Face Terminal</option>
                                         <option value="face_server">Face Server</option>
@@ -1042,72 +1189,147 @@ const DeviceManagement = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Phòng họp gán</label>
-                                    <select
-                                        value={formData.roomId}
-                                        onChange={(e) => setFormData({...formData, roomId: e.target.value})}
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
-                                    >
+                                    <select value={formData.roomId} onChange={(e) => setFormData({...formData, roomId: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
                                         <option value="">Chọn phòng họp...</option>
-                                        {rooms.map(room => (
-                                            <option key={room.id} value={room.id}>{room.roomName}</option>
-                                        ))}
+                                        {rooms.map(room => (<option key={room.id} value={room.id}>{room.roomName}</option>))}
                                     </select>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ IP</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.ipAddress}
-                                        onChange={(e) => setFormData({...formData, ipAddress: e.target.value})}
-                                        placeholder="192.168.1.50"
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                    />
+                                    <input type="text" required value={formData.ipAddress} onChange={(e) => setFormData({...formData, ipAddress: e.target.value})} placeholder="192.168.1.50" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ MAC</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.macAddress}
-                                        onChange={(e) => setFormData({...formData, macAddress: e.target.value})}
-                                        placeholder="AA:BB:CC:DD:EE:FF"
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                    />
+                                    <input type="text" required value={formData.macAddress} onChange={(e) => setFormData({...formData, macAddress: e.target.value})} placeholder="AA:BB:CC:DD:EE:FF" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                                 </div>
                             </div>
                             {formData.deviceType === 'camera' && (
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Đường dẫn luồng video (RTSP URL)</label>
-                                    <input
-                                        type="text"
-                                        value={formData.streamUrl}
-                                        onChange={(e) => setFormData({...formData, streamUrl: e.target.value})}
-                                        placeholder="rtsp://192.168.1.50/live/main"
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                    />
+                                    <input type="text" value={formData.streamUrl} onChange={(e) => setFormData({...formData, streamUrl: e.target.value})} placeholder="rtsp://192.168.1.50/live/main" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                                 </div>
                             )}
-
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors"
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-colors"
-                                >
-                                    {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
-                                </button>
+                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors">Hủy</button>
+                                <button type="submit" disabled={submitting} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-colors">{submitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FE-5: ASSIGN ROOM MODAL */}
+            {isAssignRoomModalOpen && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-sm w-full overflow-hidden animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                            <h3 className="font-bold text-midnight-indigo text-sm">Gán phòng cho thiết bị</h3>
+                            <button onClick={() => setIsAssignRoomModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleAssignRoom} className="p-6 space-y-4">
+                            <div>
+                                <label htmlFor="assign-room-select" className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn phòng họp</label>
+                                <select id="assign-room-select" value={assignRoomValue} onChange={(e) => setAssignRoomValue(e.target.value)} required className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
+                                    <option value="">-- Chọn phòng --</option>
+                                    {rooms.map(room => (<option key={room.id} value={room.id}>{room.roomName}</option>))}
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setIsAssignRoomModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
+                                <button type="submit" disabled={submitting || !assignRoomValue} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold disabled:opacity-50">{submitting ? 'Đang gán...' : 'Gán phòng'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FE-5: RTSP CONFIG MODAL */}
+            {isRtspModalOpen && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-sm w-full overflow-hidden animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                            <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình RTSP Stream</h3>
+                            <button onClick={() => setIsRtspModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleRtspConfig} className="p-6 space-y-4">
+                            <div>
+                                <label htmlFor="rtsp-url-input" className="block text-xs font-bold text-slate-blue uppercase mb-1">RTSP URL</label>
+                                <input id="rtsp-url-input" type="text" required value={rtspUrl} onChange={(e) => setRtspUrl(e.target.value)} placeholder="rtsp://192.168.1.50/live/main" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue" />
+                                <p className="text-[10px] text-slate-blue mt-1">Nhập đường dẫn RTSP stream. Mật khẩu sẽ được BE tự mask.</p>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setIsRtspModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
+                                <button type="submit" disabled={submitting || !rtspUrl.trim()} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold disabled:opacity-50">{submitting ? 'Đang lưu...' : 'Lưu cấu hình'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FE-5: TOKEN DISPLAY MODAL (chỉ hiện 1 lần) */}
+            {tokenModalData && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
+                        <div className="bg-amber-50 p-6 text-center border-b border-amber-100">
+                            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                            </div>
+                            <h2 className="text-lg font-bold text-amber-900">Token mới đã được tạo</h2>
+                            <p className="text-xs text-amber-700 mt-1">Thiết bị: {tokenModalData.deviceName}</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 font-semibold text-center">
+                                ⚠ Token này chỉ hiển thị MỘT LẦN. Vui lòng sao chép và lưu trữ an toàn.
+                            </div>
+                            <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-green-400 break-all select-all">
+                                {tokenModalData.token}
+                            </div>
+                            <button onClick={handleCopyToken} className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${tokenCopied ? 'bg-green-600 text-white' : 'bg-action-blue hover:bg-glacier-blue text-white'}`}>
+                                {tokenCopied ? (
+                                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg> Đã sao chép!</>
+                                ) : (
+                                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Sao chép Token</>
+                                )}
+                            </button>
+                        </div>
+                        <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 text-right">
+                            <button onClick={() => setTokenModalData(null)} className="px-4 py-2 text-xs font-bold text-slate-blue hover:text-midnight-indigo">Đã lưu, đóng lại</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FE-5: CONFIRMATION MODAL (replaces window.confirm) */}
+            {confirmModal && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-sm w-full overflow-hidden animate-fade-in-up p-6 text-center">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                            confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' :
+                            confirmModal.type === 'warning' ? 'bg-amber-100 text-amber-600' :
+                            'bg-blue-100 text-action-blue'
+                        }`}>
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        </div>
+                        <h3 className="font-bold text-midnight-indigo text-base mb-2">{confirmModal.title}</h3>
+                        <p className="text-xs text-slate-blue mb-6">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setConfirmModal(null)} className="flex-1 px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue bg-white hover:bg-cloud-mist">Hủy</button>
+                            <button onClick={confirmModal.onConfirm} className={`flex-1 px-4 py-2 text-white rounded-xl text-xs font-bold ${
+                                confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+                                confirmModal.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' :
+                                'bg-action-blue hover:bg-glacier-blue'
+                            }`}>Xác nhận</button>
+                        </div>
                     </div>
                 </div>,
                 document.body
