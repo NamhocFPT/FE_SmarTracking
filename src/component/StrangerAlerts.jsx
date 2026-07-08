@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getStrangerAlerts, resolveStrangerAlert } from '../service/businessAdminServices';
-import { getUsers } from '../service/managerServices'; // to fetch user list for mapping
-import { ShieldAlert, CheckCircle, Search, UserX, UserCheck, Activity, Image as ImageIcon } from 'lucide-react';
+import { getStrangerAlerts } from '../service/businessAdminServices';
+import { 
+    ShieldAlert, CheckCircle, Search, UserX, Activity, 
+    AlertCircle, RefreshCw, FileX
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/**
+ * FE-2: StrangerAlerts — CHỈ hiển thị cảnh báo khuôn mặt lạ (stranger alerts)
+ * - KHÔNG có mapping user (đã tách sang UnmappedVerifyReview)
+ * - KHÔNG có ảnh base64 (BE chỉ trả metadata: id, deviceCode, roomName, capturedAt)
+ * - Nút resolve: TẠM ẨN (BE chưa có endpoint PATCH /face-access/stranger-alerts/:id/resolve)
+ */
 const StrangerAlerts = () => {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -14,70 +22,30 @@ const StrangerAlerts = () => {
     // Filter
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Modal state for resolving
+    // Detail modal
     const [selectedAlert, setSelectedAlert] = useState(null);
-    const [isResolving, setIsResolving] = useState(false);
-    const [users, setUsers] = useState([]);
-    const [mappedUserId, setMappedUserId] = useState('');
 
     const fetchAlerts = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await getStrangerAlerts({ status: 'UNRESOLVED' });
+            const res = await getStrangerAlerts({});
             if (res?.success) {
                 setAlerts(res.data || []);
+            } else {
+                throw new Error(res?.message || 'Không thể tải dữ liệu cảnh báo.');
             }
         } catch (err) {
-            // Mock data fallback
-            setAlerts([
-                {
-                    id: 'alert-1',
-                    detectedAt: new Date(Date.now() - 3600000).toISOString(),
-                    location: 'Phòng Apollo 101',
-                    confidenceScore: 89,
-                    imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop',
-                    status: 'UNRESOLVED',
-                    notes: 'Khuôn mặt không có trong CSDL (Stranger)'
-                },
-                {
-                    id: 'alert-2',
-                    detectedAt: new Date(Date.now() - 7200000).toISOString(),
-                    location: 'Hành lang Tầng 2',
-                    confidenceScore: 75,
-                    imageUrl: null,
-                    status: 'UNRESOLVED',
-                    notes: 'Nhận diện nhầm hoặc góc mặt không rõ'
-                }
-            ]);
+            setError(err?.message || 'Lỗi kết nối khi tải danh sách cảnh báo khuôn mặt lạ. Vui lòng thử lại.');
+            setAlerts([]);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    const loadUsersForMapping = async () => {
-        try {
-            const res = await getUsers();
-            if (res?.success) {
-                setUsers(res.data || []);
-            }
-        } catch {
-            setUsers([
-                { id: 'u1', fullName: 'Nguyễn Văn A' },
-                { id: 'u2', fullName: 'Trần Thị C' }
-            ]);
-        }
-    };
-
     useEffect(() => {
         fetchAlerts();
     }, [fetchAlerts]);
-
-    useEffect(() => {
-        if (selectedAlert) {
-            loadUsersForMapping();
-        }
-    }, [selectedAlert]);
 
     useEffect(() => {
         if (successMsg) {
@@ -86,202 +54,236 @@ const StrangerAlerts = () => {
         }
     }, [successMsg]);
 
-    const handleOpenResolve = (alert) => {
-        setSelectedAlert(alert);
-        setMappedUserId('');
-    };
-
-    const handleResolve = async (action) => {
-        if (action === 'MAP_TO_USER' && !mappedUserId) {
-            alert('Vui lòng chọn nhân viên để gán!');
-            return;
-        }
-
-        setIsResolving(true);
-        try {
-            const payload = {
-                action,
-                userId: action === 'MAP_TO_USER' ? mappedUserId : undefined,
-                resolutionNote: action === 'IGNORE' ? 'Đã bỏ qua (Khách hoặc False Alarm)' : 'Đã gán khuôn mặt vào hồ sơ nhân viên'
-            };
-            const res = await resolveStrangerAlert(selectedAlert.id, payload);
-            if (res?.success) {
-                setSuccessMsg('Đã xử lý cảnh báo thành công!');
-                setAlerts(prev => prev.filter(a => a.id !== selectedAlert.id));
-                setSelectedAlert(null);
-            } else {
-                throw new Error();
-            }
-        } catch {
-            // Mock success
-            setSuccessMsg('Đã mô phỏng xử lý cảnh báo!');
-            setAlerts(prev => prev.filter(a => a.id !== selectedAlert.id));
-            setSelectedAlert(null);
-        } finally {
-            setIsResolving(false);
-        }
-    };
-
-    const filteredAlerts = alerts.filter(a => 
-        a.location.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        a.notes.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    if (loading) {
+    // Filter — dùng đúng field từ BE: deviceCode, roomName
+    const filteredAlerts = alerts.filter(a => {
+        const q = searchQuery.toLowerCase();
         return (
-            <div className="flex flex-col items-center justify-center min-h-[300px]">
-                <Activity className="w-8 h-8 text-action-blue animate-pulse mb-3" />
-                <p className="text-slate-blue text-sm font-semibold">Đang tải dữ liệu cảnh báo an ninh...</p>
+            (a.deviceCode || '').toLowerCase().includes(q) ||
+            (a.roomName || '').toLowerCase().includes(q)
+        );
+    });
+
+    // ──────────────── LOADING STATE (Skeleton) ────────────────
+    if (loading && alerts.length === 0) {
+        return (
+            <div className="space-y-6 animate-fade-in-up">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-cloud-mist/50 p-4 rounded-xl border border-platinum-tint animate-pulse">
+                    <div className="space-y-2 flex-1">
+                        <div className="h-5 w-64 bg-slate-200 rounded" />
+                        <div className="h-3 w-44 bg-slate-100 rounded" />
+                    </div>
+                    <div className="h-9 w-48 bg-slate-200 rounded-xl" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <div key={i} className="bg-white rounded-2xl border border-platinum-tint shadow-sm p-5 animate-pulse space-y-3">
+                            <div className="flex justify-between">
+                                <div className="h-4 w-24 bg-slate-200 rounded" />
+                                <div className="h-4 w-16 bg-red-100 rounded-full" />
+                            </div>
+                            <div className="h-3 w-36 bg-slate-100 rounded" />
+                            <div className="h-3 w-28 bg-slate-100 rounded" />
+                            <div className="h-8 w-full bg-slate-200 rounded-xl mt-4" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
 
     return (
         <div className="space-y-6 animate-fade-in-up">
+            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-cloud-mist/50 p-4 rounded-xl border border-platinum-tint">
                 <div>
                     <h2 className="text-lg font-bold text-midnight-indigo flex items-center gap-2">
                         <ShieldAlert className="w-5 h-5 text-red-600" />
-                        Cảnh báo an ninh (Người lạ / Chưa nhận diện)
+                        Cảnh báo khuôn mặt lạ (Stranger Alerts)
                     </h2>
-                    <p className="text-xs text-slate-blue mt-1">Hệ thống IVSS ghi nhận khuôn mặt không khớp với bất kỳ hồ sơ nào trong CSDL.</p>
+                    <p className="text-xs text-slate-blue mt-1">Danh sách sự kiện khuôn mặt lạ ghi nhận từ camera AI. Chỉ metadata — không có ảnh.</p>
                 </div>
-                <div className="relative w-full md:w-64">
-                    <input
-                        type="text"
-                        placeholder="Tìm theo vị trí, ghi chú..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-white border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                    />
-                    <Search className="w-4 h-4 text-slate-blue absolute left-3 top-2.5" />
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-56">
+                        <input
+                            type="text"
+                            placeholder="Tìm theo thiết bị, phòng..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-white border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                        />
+                        <Search className="w-4 h-4 text-slate-blue absolute left-3 top-2.5" />
+                    </div>
+                    <button
+                        onClick={fetchAlerts}
+                        className="p-2 border border-platinum-tint bg-white hover:bg-cloud-mist rounded-xl text-slate-blue hover:text-midnight-indigo transition-all"
+                        title="Làm mới dữ liệu"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 
-            {successMsg && (
-                <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" /> {successMsg}
+            {/* Success message */}
+            <AnimatePresence>
+                {successMsg && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl flex items-center gap-2"
+                    >
+                        <CheckCircle className="w-4 h-4" /> {successMsg}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Error state */}
+            {error && (
+                <div className="p-6 bg-red-50 border border-red-200 rounded-2xl flex flex-col items-center gap-3 text-center">
+                    <AlertCircle className="w-8 h-8 text-red-400" />
+                    <p className="text-red-700 text-sm font-semibold">{error}</p>
+                    <button
+                        onClick={fetchAlerts}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                    >
+                        <RefreshCw className="w-3.5 h-3.5" /> Thử lại
+                    </button>
                 </div>
             )}
 
+            {/* Alerts Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAlerts.length > 0 ? filteredAlerts.map(alert => (
-                    <div key={alert.id} className="bg-white rounded-2xl border border-red-200 shadow-sm-1 overflow-hidden flex flex-col">
-                        <div className="relative h-40 bg-slate-900 flex items-center justify-center overflow-hidden">
-                            {alert.imageUrl ? (
-                                <img src={alert.imageUrl} alt="Stranger" className="w-full h-full object-cover opacity-80" />
-                            ) : (
-                                <ImageIcon className="w-12 h-12 text-slate-700" />
-                            )}
-                            <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                Score: {alert.confidenceScore}%
+                {filteredAlerts.length > 0 ? filteredAlerts.map(a => (
+                    <motion.div 
+                        key={a.id} 
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-2xl border border-red-100 shadow-sm-1 p-5 flex flex-col hover:border-red-200 transition-all"
+                    >
+                        <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
+                                    <UserX className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold border border-red-100">
+                                        Stranger
+                                    </span>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-blue bg-cloud-mist px-2 py-0.5 rounded">
+                                {a.id?.substring(0, 8)}...
+                            </span>
+                        </div>
+
+                        <div className="space-y-2 flex-1 text-xs text-slate-blue">
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-midnight-indigo w-16 shrink-0">Thiết bị:</span>
+                                <span className="font-mono">{a.deviceCode || '—'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-midnight-indigo w-16 shrink-0">Phòng:</span>
+                                <span>{a.roomName || 'Không xác định'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-midnight-indigo w-16 shrink-0">Thời gian:</span>
+                                <span>{a.capturedAt ? new Date(a.capturedAt).toLocaleString('vi-VN') : '—'}</span>
                             </div>
                         </div>
-                        <div className="p-4 flex-1 flex flex-col">
-                            <h3 className="text-sm font-bold text-midnight-indigo mb-1">{alert.location}</h3>
-                            <p className="text-xs text-slate-blue mb-2">{new Date(alert.detectedAt).toLocaleString('vi-VN')}</p>
-                            <p className="text-xs font-semibold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 mb-4">{alert.notes}</p>
-                            
-                            <div className="mt-auto pt-4 border-t border-platinum-tint flex gap-2">
-                                <button
-                                    onClick={() => handleOpenResolve(alert)}
-                                    className="flex-1 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-                                >
-                                    <UserCheck className="w-4 h-4" /> Xử lý
-                                </button>
-                            </div>
+
+                        <div className="mt-4 pt-3 border-t border-platinum-tint/50">
+                            <button
+                                onClick={() => setSelectedAlert(a)}
+                                className="w-full py-2 bg-white border border-platinum-tint text-slate-blue hover:bg-cloud-mist hover:text-midnight-indigo rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <UserX className="w-3.5 h-3.5" /> Xem chi tiết
+                            </button>
                         </div>
-                    </div>
-                )) : (
-                    <div className="col-span-full py-12 text-center text-slate-blue text-sm border-2 border-dashed border-platinum-tint rounded-2xl">
-                        Không có cảnh báo an ninh nào chưa xử lý.
+                    </motion.div>
+                )) : !error && (
+                    /* Empty State */
+                    <div className="col-span-full py-16 text-center border-2 border-dashed border-platinum-tint rounded-2xl bg-white">
+                        <FileX className="w-10 h-10 text-platinum-tint mx-auto mb-3" />
+                        <h3 className="text-sm font-bold text-midnight-indigo">Không có cảnh báo khuôn mặt lạ</h3>
+                        <p className="text-xs text-slate-blue mt-1 max-w-sm mx-auto">
+                            Hệ thống chưa ghi nhận sự kiện khuôn mặt lạ nào từ camera AI. Dữ liệu sẽ cập nhật tự động.
+                        </p>
+                        <button
+                            onClick={fetchAlerts}
+                            className="mt-4 px-4 py-2 bg-action-blue text-white rounded-xl text-xs font-bold hover:bg-glacier-blue transition-colors inline-flex items-center gap-1.5"
+                        >
+                            <RefreshCw className="w-3.5 h-3.5" /> Tải lại
+                        </button>
                     </div>
                 )}
             </div>
 
-            {/* Resolve Modal */}
+            {/* ─────────── Detail Modal ─────────── */}
             {typeof document !== 'undefined' && createPortal(
                 <AnimatePresence>
                     {selectedAlert && (
-                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-3xl">
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/50 backdrop-blur-md">
                             <motion.div
                                 initial={{ scale: 0.95, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white rounded-2xl w-full max-w-md border border-platinum-tint shadow-2xl overflow-hidden p-6"
-                        >
-                            <h2 className="text-lg font-bold text-midnight-indigo mb-4 border-b border-platinum-tint pb-3 flex items-center gap-2">
-                                <UserX className="w-5 h-5 text-action-blue" />
-                                Xử lý cảnh báo khuôn mặt
-                            </h2>
-                            
-                            <div className="flex gap-4 mb-6">
-                                <div className="w-24 h-24 bg-slate-100 rounded-xl overflow-hidden shrink-0 border border-platinum-tint">
-                                    {selectedAlert.imageUrl ? (
-                                        <img src={selectedAlert.imageUrl} alt="Face" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-400"><ImageIcon className="w-8 h-8" /></div>
-                                    )}
+                                className="bg-white rounded-2xl w-full max-w-md border border-platinum-tint shadow-2xl overflow-hidden"
+                            >
+                                <div className="bg-red-50 p-6 text-center border-b border-red-100">
+                                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <UserX className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-lg font-bold text-red-900">Chi tiết cảnh báo khuôn mặt lạ</h2>
                                 </div>
-                                <div className="text-sm space-y-2 text-slate-blue">
-                                    <p><strong className="text-midnight-indigo">Thời gian:</strong> {new Date(selectedAlert.detectedAt).toLocaleString('vi-VN')}</p>
-                                    <p><strong className="text-midnight-indigo">Vị trí:</strong> {selectedAlert.location}</p>
-                                    <p><strong className="text-midnight-indigo">Ghi chú:</strong> {selectedAlert.notes}</p>
-                                </div>
-                            </div>
 
-                            <div className="space-y-4">
-                                <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
-                                    <p className="text-xs font-bold text-midnight-indigo">Gán vào hồ sơ nhân viên (Mapping)</p>
-                                    <select
-                                        value={mappedUserId}
-                                        onChange={(e) => setMappedUserId(e.target.value)}
-                                        className="w-full p-2 border border-platinum-tint rounded-lg text-sm bg-white focus:outline-none focus:border-action-blue"
-                                    >
-                                        <option value="">-- Chọn nhân viên --</option>
-                                        {users.map(u => (
-                                            <option key={u.id} value={u.id}>{u.fullName}</option>
-                                        ))}
-                                    </select>
+                                <div className="p-6 space-y-3">
+                                    <div className="bg-cloud-mist/30 p-4 rounded-xl border border-platinum-tint/50 space-y-2 text-sm text-slate-blue">
+                                        <div className="flex justify-between">
+                                            <span className="font-semibold text-midnight-indigo">Mã cảnh báo:</span>
+                                            <span className="font-mono text-xs">{selectedAlert.id?.substring(0, 12)}...</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="font-semibold text-midnight-indigo">Thiết bị:</span>
+                                            <span className="font-mono">{selectedAlert.deviceCode || '—'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="font-semibold text-midnight-indigo">Phòng:</span>
+                                            <span>{selectedAlert.roomName || 'Không xác định'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="font-semibold text-midnight-indigo">Phát hiện lúc:</span>
+                                            <span>{selectedAlert.capturedAt ? new Date(selectedAlert.capturedAt).toLocaleString('vi-VN') : '—'}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-100 text-center">
+                                        ⚠ BE chưa có endpoint đánh dấu xử lý (resolve). Nút xử lý sẽ được kích hoạt khi BE hỗ trợ.
+                                    </div>
+                                </div>
+
+                                <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 flex gap-3">
                                     <button
-                                        onClick={() => handleResolve('MAP_TO_USER')}
-                                        disabled={isResolving || !mappedUserId}
-                                        className="w-full py-2 mt-2 bg-action-blue text-white rounded-lg text-xs font-bold hover:bg-glacier-blue disabled:opacity-50"
+                                        onClick={() => setSelectedAlert(null)}
+                                        className="flex-1 px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue bg-white hover:bg-cloud-mist"
                                     >
-                                        Gán & Lưu khuôn mặt
+                                        Đóng
+                                    </button>
+                                    {/* Nút resolve: TẠM DISABLE — BE chưa có endpoint */}
+                                    <button
+                                        disabled
+                                        className="flex-1 px-4 py-2 bg-slate-200 text-slate-400 rounded-xl text-xs font-bold cursor-not-allowed"
+                                        title="BE chưa có endpoint PATCH /face-access/stranger-alerts/:id/resolve"
+                                    >
+                                        Đánh dấu đã xử lý
                                     </button>
                                 </div>
-
-                                <div className="flex items-center gap-4 my-2">
-                                    <div className="flex-1 h-px bg-platinum-tint"></div>
-                                    <span className="text-xs text-slate-400 font-bold uppercase">Hoặc</span>
-                                    <div className="flex-1 h-px bg-platinum-tint"></div>
-                                </div>
-
-                                <button
-                                    onClick={() => handleResolve('IGNORE')}
-                                    disabled={isResolving}
-                                    className="w-full py-2 bg-white border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all disabled:opacity-50"
-                                >
-                                    Bỏ qua cảnh báo (Khách viếng thăm)
-                                </button>
-                            </div>
-
-                            <div className="mt-6 pt-4 border-t border-platinum-tint text-right">
-                                <button
-                                    onClick={() => setSelectedAlert(null)}
-                                    disabled={isResolving}
-                                    className="px-4 py-2 text-xs font-bold text-slate-blue hover:text-midnight-indigo transition-colors"
-                                >
-                                    Đóng
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>,
-            document.body
-        )}
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 };

@@ -162,8 +162,12 @@ export const getRoomRealtimeStatus = async () => {
     return await get('/rooms/realtime-status');
 };
 
-export const getNoShowStatus = async (meetingId) => {
-    return await get(`/meetings/${meetingId}/no-show-status`);
+/**
+ * FE-3: Lấy no-show case theo phòng (thay cho getNoShowStatus gọi endpoint không tồn tại)
+ * @param {string} roomId
+ */
+export const getNoShowByRoom = async (roomId) => {
+    return await get(`/no-show-cases?roomId=${roomId}&status=DETECTED`);
 };
 
 export const handleNoShowCase = async (caseId, data) => {
@@ -180,11 +184,13 @@ export const releaseNoShowRoom = async (caseId) => {
 
 export const getStrangerAlerts = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/ivss/stranger-alerts${query}`);
+    return await get(`/face-access/stranger-alerts${query}`);
 };
 
+// NOTE: BE chưa có endpoint PATCH /face-access/stranger-alerts/:id/resolve
+// Tạm giữ function nhưng UI sẽ disable nút resolve
 export const resolveStrangerAlert = async (alertId, data) => {
-    return await patch(`/ivss/stranger-alerts/${alertId}/resolve`, data);
+    return await patch(`/face-access/stranger-alerts/${alertId}/resolve`, data);
 };
 
 export const createRoom = async (data) => {

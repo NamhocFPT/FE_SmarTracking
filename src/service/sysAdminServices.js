@@ -403,3 +403,24 @@ export const enableDevice = async (deviceId) => {
 export const checkDeviceAvailability = async (deviceId) => {
     return await post(`/iot-devices/${deviceId}/check-availability`);
 };
+
+// ============================================================
+// FACE ACCESS — Unmapped Verifies (FE-2)
+// ============================================================
+
+/**
+ * Lấy danh sách verify chưa khớp mapping (chưa gán person↔user)
+ * @param {object} params - { page, pageSize, deviceId, from, to }
+ */
+export const getUnmappedVerifies = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/face-access/unmapped-verifies${query}`);
+};
+
+/**
+ * Gán person↔user cho verify chưa khớp
+ * @param {object} data - { personId, userId } hoặc { verifyId, userId }
+ */
+export const mapUnmappedVerify = async (data) => {
+    return await post(`/face-access/unmapped-verifies/map`, data);
+};
