@@ -111,6 +111,10 @@ export const router = [
                 element: <MyVehicles />
             },
             {
+                path: 'rooms',
+                element: <BusinessRoomManagement />
+            },
+            {
                 path: 'anpr-management',
                 element: <ANPRManagement />
             },

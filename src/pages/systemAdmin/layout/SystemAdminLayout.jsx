@@ -45,6 +45,10 @@ const navigationItems = [
                 to: '/system-admin/devices'
             },
             {
+                label: 'Quản lý phòng họp',
+                to: '/system-admin/rooms'
+            },
+            {
                 label: 'Kiểm soát phương tiện',
                 to: '/system-admin/anpr-management'
             }

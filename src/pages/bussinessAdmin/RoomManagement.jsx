@@ -7,9 +7,10 @@ import {
     updateRoom,
     deleteRoom
 } from '../../service/businessAdminServices';
-import { Plus, Edit2, Trash2, Home, CheckCircle, AlertCircle, Users, RefreshCw, Activity, List, ShieldAlert } from 'lucide-react';
+import { Plus, Edit2, Trash2, Home, CheckCircle, AlertCircle, Users, RefreshCw, Activity, List, ShieldAlert, FileWarning, UserCheck } from 'lucide-react';
 import RealtimeRoomMonitor from '../../component/RealtimeRoomMonitor';
 import StrangerAlerts from '../../component/StrangerAlerts';
+import UnmappedVerifyReview from '../../component/UnmappedVerifyReview';
 
 const RoomManagement = () => {
     const [viewMode, setViewMode] = useState('list');
@@ -214,6 +215,12 @@ const RoomManagement = () => {
                 >
                     <ShieldAlert className="w-4 h-4" /> Cảnh báo an ninh
                 </button>
+                <button
+                    onClick={() => setViewMode('unmapped')}
+                    className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === 'unmapped' ? 'bg-white shadow-sm text-action-blue' : 'text-slate-blue hover:text-midnight-indigo'}`}
+                >
+                    <UserCheck className="w-4 h-4" /> Gán danh tính
+                </button>
             </div>
 
             {viewMode === 'list' ? (
@@ -312,6 +319,8 @@ const RoomManagement = () => {
             </div>
             </>) : viewMode === 'realtime' ? (
                 <RealtimeRoomMonitor />
+            ) : viewMode === 'unmapped' ? (
+                <UnmappedVerifyReview />
             ) : (
                 <StrangerAlerts />
             )}
