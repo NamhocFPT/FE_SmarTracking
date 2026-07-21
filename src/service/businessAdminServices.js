@@ -99,7 +99,7 @@ export const unlockUser = async (userId, data = {}) => {
 };
 
 export const deleteUser = async (userId) => {
-    return await dele(`/users/${userId}?confirm=true`);
+    return await dele(`/users/${userId}`);
 };
 
 export const getUserAuditLogs = async (userId, params = {}) => {
@@ -112,7 +112,7 @@ export const importUsers = async (formData) => {
 };
 
 export const getImportTemplate = async () => {
-    return await get('/users/import-template');
+    return await get('/users/import/template');
 };
 
 export const exportUsers = async (params = {}) => {
@@ -137,9 +137,7 @@ export const updateDepartment = async (id, data) => {
     return await patch(`/departments/${id}`, data);
 };
 
-export const deleteDepartment = async (id) => {
-    return await dele(`/departments/${id}`);
-};
+
 
 export const getRoles = async () => {
     return await get('/roles');
@@ -159,7 +157,7 @@ export const getRooms = async (params = {}) => {
 };
 
 export const getRoomRealtimeStatus = async () => {
-    return await get('/rooms/realtime-status');
+    return await get('/rooms/search');
 };
 
 /**
@@ -235,9 +233,7 @@ export const getRecordings = async (params = {}) => {
     return await get(`/recordings${query}`);
 };
 
-export const deleteRecording = async (sessionId) => {
-    return await dele(`/recordings/${sessionId}`);
-};
+
 
 export const getRecordingDownloadUrl = async (sessionId) => {
     return await get(`/recordings/${sessionId}/download`);

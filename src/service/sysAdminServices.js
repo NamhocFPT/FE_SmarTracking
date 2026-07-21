@@ -137,7 +137,7 @@ export const updateUserStatus = async (userId, data) => {
  * @returns {Promise<object>} response envelope
  */
 export const deleteUser = async (userId) => {
-    return await dele(`/users/${userId}?confirm=true`);
+    return await dele(`/users/${userId}`);
 };
 
 /**
@@ -165,7 +165,7 @@ export const importUsers = async (formData) => {
  * @returns {Promise<Blob>} Excel file
  */
 export const getImportTemplate = async () => {
-    return await get('/users/import-template');
+    return await get('/users/import/template');
 };
 
 // ============================================================
@@ -210,14 +210,7 @@ export const updateDevice = async (deviceId, data) => {
     return await patch(`/iot-devices/${deviceId}`, data);
 };
 
-/**
- * Xóa / ngừng kích hoạt thiết bị
- * @param {number|string} deviceId
- * @returns {Promise<object>} response envelope
- */
-export const removeDevice = async (deviceId) => {
-    return await dele(`/iot-devices/${deviceId}`);
-};
+
 
 // ============================================================
 // AUDIT LOG APIs (UC-CFG-02)

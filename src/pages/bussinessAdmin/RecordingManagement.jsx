@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     getRecordings, 
-    deleteRecording, 
     getRecordingDownloadUrl,
     getRooms,
     updateRecordingVisibility
@@ -127,13 +126,8 @@ const RecordingManagement = () => {
         setIsDeleting(true);
         setError(null);
         try {
-            const res = await deleteRecording(deleteTarget.id);
-            if (res?.success) {
-                setSuccessMessage(`Đã xoá ghi hình cuộc họp: ${deleteTarget.meetingTitle}`);
-                fetchRecordingsList();
-            } else {
-                throw new Error(res?.message || 'Lỗi xoá ghi hình');
-            }
+            // BE doesn't support hard delete for recordings yet, just simulate or show error
+            throw new Error('Tính năng xóa bản ghi hiện không được hỗ trợ bởi hệ thống.');
         } catch (err) {
             setError(err.message || 'Lỗi khi xoá ghi hình.');
         } finally {

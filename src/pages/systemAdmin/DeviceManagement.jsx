@@ -4,7 +4,6 @@ import {
     getDevices,
     registerDevice,
     updateDevice,
-    removeDevice,
     getRooms,
     enableDevice,
     disableDevice,
@@ -229,13 +228,8 @@ const DeviceManagement = () => {
                 setError(null);
                 setSuccessMessage(null);
                 try {
-                    const res = await removeDevice(device.id);
-                    if (res?.success) {
-                        setSuccessMessage('Đã gỡ bỏ thiết bị khỏi hệ thống.');
-                        fetchData();
-                    } else {
-                        throw new Error(res?.error?.message || res?.message || 'Không thể gỡ bỏ thiết bị.');
-                    }
+                    // BE doesn't support delete IoT device
+                    throw new Error('Hệ thống không hỗ trợ xóa thiết bị. Vui lòng vô hiệu hóa thay vì xóa.');
                 } catch (err) {
                     setError(err?.error?.message || err?.message || 'Không thể gỡ bỏ thiết bị.');
                 }
