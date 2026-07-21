@@ -438,6 +438,41 @@ function wrapResponse(data) {
   };
 }
 
+
+// Role permissions custom endpoint
+app.get('/roles/:roleId/permissions', (req, res) => {
+  const { roleId } = req.params;
+  const db = readDB();
+  const mappings = (db.role_permissions || []).filter(rp => String(rp.role_id) === String(roleId));
+  const assignedPermissionIds = mappings.map(rp => rp.permission_id);
+  
+  // Return list of permission objects that are assigned
+  const permissions = (db.permissions || []).filter(p => assignedPermissionIds.includes(p.id));
+  return res.json({ success: true, data: permissions });
+});
+
+app.post('/roles/:roleId/permissions', (req, res) => {
+  const { roleId } = req.params;
+  const { permissionIds } = req.body;
+  const db = readDB();
+  
+  // Remove old mappings
+  db.role_permissions = (db.role_permissions || []).filter(rp => String(rp.role_id) !== String(roleId));
+  
+  // Add new mappings
+  if (Array.isArray(permissionIds)) {
+    permissionIds.forEach(pId => {
+      db.role_permissions.push({
+        id: `rp-${roleId}-${pId}-${Date.now()}`,
+        role_id: roleId,
+        permission_id: pId
+      });
+    });
+  }
+  writeDB(db);
+  return res.json({ success: true, message: 'Cập nhật phân quyền thành công!' });
+});
+
 // Generic CRUD endpoints mapping for collections in db.json
 const collections = [
   'users',

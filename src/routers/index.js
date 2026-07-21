@@ -11,6 +11,8 @@ import ProtectedRoute from './ProtectedRoute';
 import SystemAdminLayout from '../pages/systemAdmin/layout/SystemAdminLayout';
 import DashBoard from '../pages/systemAdmin/dashBoard';
 import DeviceManagement from '../pages/systemAdmin/DeviceManagement';
+import EquipmentManagement from '../pages/systemAdmin/EquipmentManagement';
+import RolePermissionManagement from '../pages/systemAdmin/RolePermissionManagement';
 import AuditLogs from '../pages/systemAdmin/AuditLogs';
 import SystemSettings from '../pages/systemAdmin/SystemSettings';
 import Profile from '../pages/shared/Profile';
@@ -88,6 +90,14 @@ export const router = [
             {
                 path: 'devices',
                 element: <DeviceManagement />
+            },
+            {
+                path: 'equipments',
+                element: <EquipmentManagement />
+            },
+            {
+                path: 'roles-permissions',
+                element: <RolePermissionManagement />
             },
             {
                 path: 'audit-logs',
