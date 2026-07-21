@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/api/v1'; // Connect to local backend API
+const API_BASE_URL = 'http://localhost:8000/api/v1'; // Connect to local backend API
 
 // Token storage helpers
 export const getAccessToken = () => localStorage.getItem('accessToken');
@@ -45,11 +45,10 @@ export const buildQuery = (params) => {
     return qStr ? `?${qStr}` : '';
 };
 
-// Check if an endpoint is public
 const isPublicEndpoint = (path) => {
     const publicPaths = [
         '/auth/login',
-        '/auth/password-reset/otp',
+        '/auth/password-reset/request',
         '/auth/password-reset/confirm'
     ];
     // Normalize path (remove leading/trailing slashes for check)
@@ -61,7 +60,7 @@ export const request = async (path, options = {}) => {
     const { method = 'GET', body, headers = {}, isPublic: customIsPublic } = options;
     const isPublic = customIsPublic !== undefined ? customIsPublic : isPublicEndpoint(path);
     const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
-    
+
     const url = `${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
 
     const defaultHeaders = {
@@ -104,7 +103,7 @@ export const request = async (path, options = {}) => {
                             body: JSON.stringify({ refreshToken }),
                         });
                         const refreshResult = await refreshResponse.json();
-                        
+
                         if (refreshResponse.ok && refreshResult.success) {
                             const { accessToken: newAccess, refreshToken: newRefresh } = refreshResult.data;
                             setTokens(newAccess, newRefresh);
@@ -120,9 +119,9 @@ export const request = async (path, options = {}) => {
                                 error: {
                                     message: 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.',
                                     code: 'AUTH_EXPIRED',
-                                    requestId: refreshResult.requestId || 'unknown'
+                                    requestId: refreshResult.requestId !== 'unknown' ? refreshResult.requestId : null
                                 },
-                                requestId: refreshResult.requestId || 'unknown'
+                                requestId: refreshResult.requestId !== 'unknown' ? refreshResult.requestId : null
                             };
                         }
                     } catch (refreshErr) {
@@ -153,11 +152,11 @@ export const request = async (path, options = {}) => {
         throw {
             success: false,
             error: {
-                message: error.message || 'Lỗi kết nối máy chủ.',
+                message: 'Lỗi mạng: Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.',
                 code: 'CONNECTION_ERROR',
-                requestId: 'local-err-' + Math.random().toString(36).substr(2, 9)
+                requestId: null
             },
-            requestId: 'local-err-' + Math.random().toString(36).substr(2, 9)
+            requestId: null
         };
     }
 };
@@ -170,22 +169,39 @@ const handleResponse = async (response) => {
         throw {
             success: false,
             error: {
-                message: `Phản hồi không hợp lệ từ máy chủ (${response.status})`,
+                message: `Lỗi hệ thống: Phản hồi không hợp lệ từ máy chủ (${response.status})`,
                 code: 'INVALID_RESPONSE',
-                requestId: 'unknown'
+                requestId: null
             },
-            requestId: 'unknown'
+            requestId: null
         };
     }
 
     if (!response.ok || result.success === false) {
         const errorDetail = result.error || {};
-        const requestId = result.requestId || errorDetail.requestId || 'unknown';
+        let message = result.message || errorDetail.message || 'Đã xảy ra lỗi hệ thống.';
+        const code = errorDetail.code || 'UNKNOWN_ERROR';
+        let requestId = result.requestId || errorDetail.requestId || 'unknown';
+
+        if (typeof message === 'string') {
+            if (message.startsWith('Cannot ') && (message.includes('POST') || message.includes('GET') || message.includes('PUT') || message.includes('DELETE') || message.includes('PATCH'))) {
+                message = 'Lỗi hệ thống: Đường dẫn không tồn tại hoặc chưa được hỗ trợ.';
+            } else if (message === 'Internal Server Error' || response.status >= 500) {
+                message = 'Lỗi hệ thống: Máy chủ đang gặp sự cố.';
+            } else if (response.status === 404 && message.includes('Not Found')) {
+                message = 'Lỗi hệ thống: Không tìm thấy dữ liệu yêu cầu.';
+            }
+        }
+
+        if (requestId === 'unknown' || requestId === 'N/A') {
+            requestId = null;
+        }
+
         throw {
             success: false,
             error: {
-                message: result.message || errorDetail.message || 'Đã xảy ra lỗi hệ thống.',
-                code: errorDetail.code || 'UNKNOWN_ERROR',
+                message: message,
+                code: code,
                 requestId: requestId
             },
             requestId: requestId
