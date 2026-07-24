@@ -44,6 +44,9 @@ const BookMeeting = () => {
     const initialTimes = getInitialTimes();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [meetingType, setMeetingType] = useState('normal');
+    const [meetingMode, setMeetingMode] = useState('offline');
+    const [hostId, setHostId] = useState('');
     const [selectedRoomId, setSelectedRoomId] = useState('');
     const [meetingDate, setMeetingDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [startTime, setStartTime] = useState(initialTimes.start);
@@ -528,7 +531,10 @@ const BookMeeting = () => {
             startTime: isoStart,
             endTime: isoEnd,
             roomId: selectedRoomId,
+            meetingType,
+            meetingMode,
         };
+        if (hostId) payload.hostId = hostId;
         if (description.trim()) payload.description = description.trim();
         if (expectedAttendeeCount) payload.expectedAttendeeCount = Number(expectedAttendeeCount);
         if (capacityExceeded && capacityOverrideConfirmed) payload.capacityOverrideConfirmed = true;
@@ -590,12 +596,11 @@ const BookMeeting = () => {
             }
 
             let homePath = '/employee';
-            if (currentUser?.role === 'Manager') {
-                homePath = '/manager';
-            } else if (currentUser?.role === 'BusinessAdmin') {
-                homePath = '/business-admin';
-            } else if (currentUser?.role === 'SystemAdmin') {
-                homePath = '/system-admin';
+            if (currentUser?.roles) {
+                const roles = currentUser.roles.map(r => (typeof r === 'string' ? r : r.roleCode || '').toUpperCase());
+                if (roles.includes('SYSTEM_ADMIN') || roles.includes('ADMIN')) homePath = '/system-admin';
+                else if (roles.includes('BUSINESS_ADMIN')) homePath = '/business-admin';
+                else if (roles.includes('MANAGER')) homePath = '/manager';
             }
 
             // Clear form and reset
@@ -950,6 +955,50 @@ const BookMeeting = () => {
                                             className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue focus:ring-2 focus:ring-action-blue/15 text-midnight-indigo"
                                             required
                                         />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Loại cuộc họp</label>
+                                            <select
+                                                value={meetingType}
+                                                onChange={(e) => setMeetingType(e.target.value)}
+                                                className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
+                                            >
+                                                <option value="normal">Thông thường</option>
+                                                <option value="training">Đào tạo</option>
+                                                <option value="interview">Phỏng vấn</option>
+                                                <option value="emergency">Khẩn cấp</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Hình thức họp</label>
+                                            <select
+                                                value={meetingMode}
+                                                onChange={(e) => setMeetingMode(e.target.value)}
+                                                className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
+                                            >
+                                                <option value="offline">Trực tiếp (Offline)</option>
+                                                <option value="online">Trực tuyến (Online)</option>
+                                                <option value="hybrid">Kết hợp (Hybrid)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Người chủ trì (Host)</label>
+                                        <select
+                                            value={hostId}
+                                            onChange={(e) => setHostId(e.target.value)}
+                                            className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
+                                        >
+                                            <option value="">Tôi (Mặc định)</option>
+                                            {users.map(u => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.fullName || u.full_name} ({u.email})
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     <div>
