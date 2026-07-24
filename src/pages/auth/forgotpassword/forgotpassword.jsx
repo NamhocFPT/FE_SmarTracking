@@ -110,7 +110,7 @@ const ForgotPassword = () => {
             console.error("Forgot Password OTP Error:", err);
             const errDetail = err.error || {};
             let message = errDetail.message || "Không thể gửi mã xác nhận. Vui lòng kiểm tra lại.";
-            const reqId = err.requestId || errDetail.requestId || "N/A";
+            const reqId = err.requestId || errDetail.requestId || null;
 
             // E1 exception
             if (errDetail.code === "EMAIL_NOT_FOUND" || errDetail.code === "ACCOUNT_LOCKED" || message.includes("không tồn tại") || message.includes("khóa")) {
@@ -168,7 +168,9 @@ const ForgotPassword = () => {
                         {/* Error Alert Box */}
                         {error && (
                             <div className="w-full p-3 text-sm text-red-800 bg-red-50 rounded-lg border border-red-200" role="alert">
-                                <div className="font-semibold">Lỗi yêu cầu</div>
+                                <div className="font-semibold">
+                                    {error.includes("Lỗi hệ thống") ? "Lỗi hệ thống" : error.includes("Lỗi mạng") ? "Lỗi kết nối" : "Lỗi yêu cầu"}
+                                </div>
                                 <div>{error}</div>
                                 {requestId && (
                                     <div className="text-[10px] text-red-500 mt-1 font-mono">
@@ -227,11 +229,6 @@ const ForgotPassword = () => {
                                 <span className="relative flex items-center justify-center w-fit mt-[-1.00px] [font-family:'Inter-SemiBold',Helvetica] font-semibold text-white text-sm text-center tracking-[0.28px] leading-[14px] whitespace-nowrap">
                                     {loading ? "Đang gửi..." : "Gửi mã xác thực"}
                                 </span>
-                                {/* Inline Right Arrow SVG */}
-                                <svg className="relative w-3.5 h-3.5 text-white fill-none stroke-current" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                    <polyline points="12 5 19 12 12 19"></polyline>
-                                </svg>
                             </button>
                         </form>
                         <div className="flex flex-col items-center pt-8 pb-0 px-0 relative self-stretch w-full flex-[0_0_auto] mb-[-12.00px] border-t border-solid border-[#dbe4ed]">

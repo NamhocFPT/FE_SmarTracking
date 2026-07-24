@@ -7,7 +7,6 @@ import icon2 from "../../../assets/icons/icon-2.svg";
 import icon3 from "../../../assets/icons/icon-3.svg";
 import icon4 from "../../../assets/icons/icon-4.svg";
 import icon5 from "../../../assets/icons/icon-5.svg";
-import image from "../../../assets/images/image.svg";
 import backgroundPng from "../../../assets/images/background.png";
 
 const OTP_LENGTH = 6;
@@ -245,7 +244,7 @@ export const VerifyOTP = () => {
             console.error("Resend OTP Error:", err);
             const errDetail = err.error || {};
             let message = errDetail.message || "Không thể gửi lại mã. Vui lòng thử lại.";
-            const reqId = err.requestId || errDetail.requestId || "N/A";
+            const reqId = err.requestId || errDetail.requestId || null;
 
             if (errDetail.code === "TOO_MANY_REQUESTS" || errDetail.code === "RATE_LIMIT" || message.includes("spam") || message.includes("nhiều lần") || err.status === 429) {
                 message = "Bạn đã thao tác quá nhiều lần. Vui lòng thử lại sau 60 phút";
@@ -313,12 +312,6 @@ export const VerifyOTP = () => {
                 src={backgroundDecorativeElements}
                 aria-hidden="true"
             />
-            <img
-                className="absolute top-[104px] right-0 w-[25%] max-w-[360px] h-[449px] pointer-events-none select-none opacity-30 lg:opacity-80 z-0"
-                alt=""
-                src={image}
-                aria-hidden="true"
-            />
 
             {/* Responsive Flex Wrapper */}
             <div className="flex flex-col lg:flex-row w-full max-w-[1080px] items-center justify-center p-6 gap-12 lg:gap-16 z-10">
@@ -347,7 +340,9 @@ export const VerifyOTP = () => {
                         {/* Error Alert Box */}
                         {error && (
                             <div className="w-full p-3 text-sm text-red-800 bg-red-50 rounded-lg border border-red-200" role="alert">
-                                <div className="font-semibold">Lỗi xác thực</div>
+                                <div className="font-semibold">
+                                    {error.includes("Lỗi hệ thống") ? "Lỗi hệ thống" : error.includes("Lỗi mạng") ? "Lỗi kết nối" : "Lỗi xác thực"}
+                                </div>
                                 <div>{error}</div>
                                 {requestId && (
                                     <div className="text-[10px] text-red-500 mt-1 font-mono">

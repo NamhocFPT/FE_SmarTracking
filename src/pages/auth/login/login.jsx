@@ -125,7 +125,7 @@ const Login = () => {
     const emailId = useId();
     const passwordId = useId();
     const rememberId = useId();
-    
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberLogin, setRememberLogin] = useState(false);
@@ -176,7 +176,7 @@ const Login = () => {
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        
+
         // Client-side validation (E1)
         let hasError = false;
         setEmailError(null);
@@ -208,13 +208,13 @@ const Login = () => {
         try {
             // UC-AUTH-01 Đăng nhập hệ thống (POST /api/v1/auth/login, public)
             const response = await authLogin(email.trim(), password);
-            
+
             if (response.success && response.data) {
                 const { accessToken, refreshToken, user } = response.data;
-                
+
                 // Store tokens in localStorage for request header injection and rotation
                 setTokens(accessToken, refreshToken);
-                
+
                 // Store user information if needed
                 localStorage.setItem("user", JSON.stringify(user));
                 if (rememberLogin) {
@@ -224,7 +224,7 @@ const Login = () => {
                 }
 
                 setRedirecting(true);
-                
+
                 // Redirect user to the app dashboard based on role
                 const redirectPath = getRedirectPathByRoles(user?.roles);
                 setTimeout(() => {
@@ -233,7 +233,19 @@ const Login = () => {
             }
         } catch (err) {
             // Handle error response matching backend envelope
-            const message = err.error?.message || "Email hoặc mật khẩu không đúng. Vui lòng thử lại.";
+            let rawMessage = err.error?.message || err.message || "";
+            let message = "Đăng nhập thất bại. Vui lòng thử lại.";
+            
+            if (rawMessage.toLowerCase().includes("invalid credentials") || rawMessage.toLowerCase().includes("unauthorized")) {
+                message = "Sai email hoặc mật khẩu. Vui lòng thử lại.";
+            } else if (rawMessage.toLowerCase().includes("not found")) {
+                message = "Tài khoản không tồn tại trong hệ thống.";
+            } else if (rawMessage.toLowerCase().includes("inactive") || rawMessage.toLowerCase().includes("blocked")) {
+                message = "Tài khoản đã bị vô hiệu hóa hoặc khoá.";
+            } else if (rawMessage) {
+                message = rawMessage; // Fallback to backend message if it's not a generic english one
+            }
+            
             setError(message);
         } finally {
             setLoading(false);
@@ -306,7 +318,9 @@ const Login = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                                 </svg>
                                 <div>
-                                    <div className="font-semibold">Đăng nhập thất bại</div>
+                                    <div className="font-semibold">
+                                        {error.includes("Lỗi hệ thống") ? "Lỗi hệ thống" : error.includes("Lỗi mạng") ? "Lỗi kết nối" : "Đăng nhập thất bại"}
+                                    </div>
                                     <div className="mt-0.5">{error}</div>
                                 </div>
                             </div>
@@ -440,7 +454,7 @@ const Login = () => {
                                 <div className="absolute w-full top-0 left-0 h-14 bg-[#ffffff01] rounded-lg shadow-[0px_4px_6px_-4px_#0000001a,0px_10px_15px_-3px_#0000001a]" />
                             </button>
                         </form>
-                        <div className="flex flex-col items-center gap-4 pb-[4.26e-14px] pt-6 px-0 relative self-stretch w-full flex-[0_0_auto] border-t [border-top-style:solid] border-[#d4e0ed]">
+                        {/* <div className="flex flex-col items-center gap-4 pb-[4.26e-14px] pt-6 px-0 relative self-stretch w-full flex-[0_0_auto] border-t [border-top-style:solid] border-[#d4e0ed]">
                             <div className="inline-flex flex-col items-start pt-0 pb-[0.8px] px-0 relative flex-[0_0_auto]">
                                 <div className="relative w-fit mt-[-1.00px] [font-family:'Montserrat-Medium',Helvetica] font-medium text-[#a6bbd1] text-xs tracking-[1.20px] leading-[16.8px] flex items-center whitespace-nowrap">
                                     HOẶC ĐĂNG NHẬP VỚI
@@ -459,7 +473,7 @@ const Login = () => {
                                     </button>
                                 ))}
                             </div>
-                        </div>
+                        </div> */}
                     </div>
                 </section>
                 <section
@@ -487,15 +501,15 @@ const Login = () => {
                             </p>
                         </div>
                     </div>
-                    
+
                     <div className="flex flex-col w-[calc(100%_-_48px)] items-start absolute top-[277px] left-12">
                         <div className="absolute w-full h-full top-0 left-0 bg-[#0059bb] rounded-3xl blur-md opacity-5 pointer-events-none" />
                         <div className="flex-col items-start p-2 self-stretch flex-[0_0_auto] rounded-3xl overflow-hidden border-[#dbe4ed80] flex relative w-full bg-white border border-solid shadow-[0px_10px_30px_#0000000d]">
-                            <div 
-                                className="relative self-stretch w-full rounded-[18px] aspect-[1.78] bg-cover bg-[50%_50%]" 
+                            <div
+                                className="relative self-stretch w-full rounded-[18px] aspect-[1.78] bg-cover bg-[50%_50%]"
                                 style={{ backgroundImage: `url(${backgroundPng})` }}
                             />
-                            
+
                             <div className="inline-flex items-center gap-[11.99px] px-5 py-3 absolute top-[25px] right-[25px] bg-[#ffffffcc] rounded-xl border border-solid border-[#ffffff80] backdrop-blur-[6px] backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(6px)_brightness(100%)]">
                                 <div className="absolute w-full h-full top-0 left-0 bg-[#ffffff01] rounded-xl shadow-[0px_4px_6px_-4px_#0000001a,0px_10px_15px_-3px_#0000001a]" />
                                 <div className="inline-flex flex-col items-start p-2 relative flex-[0_0_auto] bg-[#87b1fd] rounded-lg">
@@ -519,7 +533,7 @@ const Login = () => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="inline-flex items-center gap-3 px-6 py-3 absolute left-[25px] bottom-[25px] bg-[#ffffffe6] rounded-full border border-solid border-[#ffffff80] backdrop-blur-[6px] backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(6px)_brightness(100%)]">
                                 <div className="absolute w-full h-full top-0 left-0 bg-[#ffffff01] rounded-full shadow-[0px_4px_6px_-4px_#0000001a,0px_10px_15px_-3px_#0000001a]" />
                                 <div className="relative w-3 h-3 bg-[#ba1a1a] rounded-full" />
@@ -531,7 +545,7 @@ const Login = () => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-3 grid-rows-[73px] w-[calc(100%_-_48px)] h-[73px] gap-6 absolute top-[618px] left-12">
                         {featureCards.map((card) => (
                             <article key={card.id} className={card.cardClassName}>

@@ -172,7 +172,7 @@ export const ChangePass = () => {
             console.error("Confirm Reset Password Error:", err);
             const errDetail = err.error || {};
             let message = errDetail.message || "Đã xảy ra lỗi khi đặt lại mật khẩu.";
-            const reqId = err.requestId || errDetail.requestId || "N/A";
+            const reqId = err.requestId || errDetail.requestId || null;
             
             if (errDetail.code === "WEAK_PASSWORD" || message.includes("mật khẩu") || message.includes("password")) {
                 message = "Mật khẩu mới không đạt chuẩn bảo mật";
@@ -232,7 +232,9 @@ export const ChangePass = () => {
                         {/* Error Alert Box */}
                         {error && (
                             <div className="w-full p-3 text-sm text-red-800 bg-red-50 rounded-lg border border-red-200" role="alert">
-                                <div className="font-semibold">Lỗi yêu cầu</div>
+                                <div className="font-semibold">
+                                    {error.includes("Lỗi hệ thống") ? "Lỗi hệ thống" : error.includes("Lỗi mạng") ? "Lỗi kết nối" : "Lỗi yêu cầu"}
+                                </div>
                                 <div>{error}</div>
                                 {requestId && (
                                     <div className="text-[10px] text-red-500 mt-1 font-mono">
