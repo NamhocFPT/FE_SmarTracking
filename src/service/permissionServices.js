@@ -19,6 +19,15 @@ export const updateRole = async (id, data) => {
     return await patch(`/roles/${id}`, data);
 };
 
+/**
+ * Xoá vai trò
+ * BE: DELETE /roles/:id
+ * @param {string|number} id
+ */
+export const deleteRole = async (id) => {
+    return await dele(`/roles/${id}`);
+};
+
 // ================= PERMISSIONS =================
 
 export const getPermissions = async (params = {}) => {

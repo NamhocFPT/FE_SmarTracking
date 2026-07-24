@@ -90,11 +90,15 @@ export const lockUser = async (userId, data = {}) => {
     });
 };
 
+/**
+ * UC-11: Mở khóa tài khoản người dùng
+ * BE đúng: PATCH /users/:userId/unlock
+ * @param {number|string} userId
+ * @param {object} data - { reason }
+ */
 export const unlockUser = async (userId, data = {}) => {
-    return await patch(`/users/${userId}/status`, {
-        accountStatus: 'active',
-        reason: data.reason || 'Mở khóa tài khoản',
-        lockedUntil: null
+    return await patch(`/users/${userId}/unlock`, {
+        reason: data.reason || 'Mở khóa tài khoản'
     });
 };
 
@@ -102,13 +106,21 @@ export const deleteUser = async (userId) => {
     return await dele(`/users/${userId}`);
 };
 
+/**
+ * UC-ACC-07: Xem lịch sử hoạt động của user
+ * BE đúng: GET /audit-logs?userId= (không còn /users/:userId/audit-logs)
+ */
 export const getUserAuditLogs = async (userId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users/${userId}/audit-logs${query ? `?${query}` : ''}`);
+    const query = buildQuery({ ...params, userId });
+    return await get(`/audit-logs${query}`);
 };
 
+/**
+ * UC-ACC-02: Import tài khoản từ Excel
+ * BE đúng: POST /users/import (không còn /users/import-jobs)
+ */
 export const importUsers = async (formData) => {
-    return await post('/users/import-jobs', formData);
+    return await post('/users/import', formData);
 };
 
 export const getImportTemplate = async () => {
@@ -176,6 +188,11 @@ export const releaseNoShowRoom = async (caseId) => {
     return await post(`/no-show-cases/${caseId}/release`);
 };
 
+export const getAllNoShowCases = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/no-show-cases${query}`);
+};
+
 // ============================================================
 // SECURITY & STRANGER ALERTS APIs
 // ============================================================
@@ -225,22 +242,46 @@ export const cancelMeeting = async (meetingId, reason = 'Huỷ bởi quản tr�
 };
 
 // ============================================================
-// RECORDING MANAGEMENT APIs (UC-REC-01 ~ UC-REC-09)
+// RECORDING MANAGEMENT APIs — đã chuyển sang /media-files/*
 // ============================================================
 
-export const getRecordings = async (params = {}) => {
+/**
+ * Lấy danh sách file media của cuộc họp
+ * BE: GET /meetings/:meetingId/media-files
+ * @param {string} meetingId
+ * @param {object} params
+ */
+export const getMeetingMediaFiles = async (meetingId, params = {}) => {
     const query = buildQuery(params);
-    return await get(`/recordings${query}`);
+    return await get(`/meetings/${meetingId}/media-files${query}`);
 };
 
-
-
-export const getRecordingDownloadUrl = async (sessionId) => {
-    return await get(`/recordings/${sessionId}/download`);
+/**
+ * Tải xuống file media (secure download)
+ * BE: GET /media-files/:fileId/secure-download
+ * @param {string} fileId - ID file media
+ */
+export const getMediaFileSecureDownload = async (fileId) => {
+    return await get(`/media-files/${fileId}/secure-download`);
 };
 
-export const updateRecordingVisibility = async (sessionId, data) => {
-    return await patch(`/recordings/${sessionId}/visibility`, data);
+/**
+ * Phát lại file media trong trình duyệt
+ * BE: GET /media-files/:fileId/playback
+ * @param {string} fileId
+ */
+export const getMediaFilePlayback = async (fileId) => {
+    return await get(`/media-files/${fileId}/playback`);
+};
+
+/**
+ * Cập nhật quyền xem file media
+ * BE: PATCH /media-files/:fileId/visibility
+ * @param {string} fileId
+ * @param {object} data - { visibility }
+ */
+export const updateMediaVisibility = async (fileId, data) => {
+    return await patch(`/media-files/${fileId}/visibility`, data);
 };
 
 // ============================================================
@@ -252,10 +293,20 @@ export const getNotifications = async (params = {}) => {
     return await get(`/notifications${query}`);
 };
 
+/**
+ * UC-NOTI-02: Đánh dấu thông báo đã đọc
+ * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
+ */
 export const markNotificationRead = async (notificationId) => {
+    // TODO: BE chưa có PATCH /notifications/:id/read — chờ §5.3
     return await patch(`/notifications/${notificationId}/read`);
 };
 
+/**
+ * UC-NOTI-03: Đánh dấu tất cả thông báo đã đọc
+ * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
+ */
 export const markAllNotificationsRead = async () => {
+    // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     return await patch('/notifications/read-all');
 };

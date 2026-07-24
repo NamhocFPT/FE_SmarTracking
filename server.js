@@ -473,6 +473,36 @@ app.post('/roles/:roleId/permissions', (req, res) => {
   return res.json({ success: true, message: 'Cập nhật phân quyền thành công!' });
 });
 
+app.get('/meetings/:id', (req, res, next) => {
+  const db = readDB();
+  const meeting = db.meetings?.find(m => String(m.id) === String(req.params.id));
+  if (!meeting) return next();
+
+  const host = db.users?.find(u => u.id === meeting.host_id);
+  const organizer = db.users?.find(u => u.id === meeting.organizer_id);
+  const room = db.rooms?.find(r => r.id === meeting.room_id);
+  const participants = (db.meeting_participants || [])
+    .filter(p => p.meeting_id === meeting.id)
+    .map(p => {
+      const u = db.users?.find(u => u.id === p.user_id) || {};
+      return { ...p, fullName: u.full_name || u.fullName, email: u.email, user: u };
+    });
+  
+  const agendas = db.agendas?.filter(a => a.meeting_id === meeting.id) || [];
+
+  const hydrated = {
+    ...meeting,
+    host,
+    organizer,
+    room,
+    participants,
+    agendas,
+    recordingConfig: { enableVideo: true }
+  };
+
+  return res.json(wrapResponse(hydrated));
+});
+
 // Generic CRUD endpoints mapping for collections in db.json
 const collections = [
   'users',

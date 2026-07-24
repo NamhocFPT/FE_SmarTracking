@@ -108,16 +108,15 @@ export const lockUser = async (userId, data = {}) => {
 };
 
 /**
- * UC-11: Mở khóa tài khoản người dùng (cập nhật trạng thái sang active)
+ * UC-11: Mở khóa tài khoản người dùng
+ * BE đúng: PATCH /users/:userId/unlock
  * @param {number|string} userId
  * @param {object} data - { reason }
  * @returns {Promise<object>} response envelope
  */
 export const unlockUser = async (userId, data = {}) => {
-    return await patch(`/users/${userId}/status`, {
-        accountStatus: 'active',
-        reason: data.reason || 'Mở khóa tài khoản',
-        lockedUntil: null
+    return await patch(`/users/${userId}/unlock`, {
+        reason: data.reason || 'Mở khóa tài khoản'
     });
 };
 
@@ -142,22 +141,24 @@ export const deleteUser = async (userId) => {
 
 /**
  * UC-ACC-07: Xem lịch sử hoạt động của user
+ * BE đúng: GET /audit-logs?userId= (không còn /users/:userId/audit-logs)
  * @param {number|string} userId
  * @param {object} params - { page, limit }
  * @returns {Promise<object>} response envelope
  */
 export const getUserAuditLogs = async (userId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return await get(`/users/${userId}/audit-logs${query ? `?${query}` : ''}`);
+    const query = buildQuery({ ...params, userId });
+    return await get(`/audit-logs${query}`);
 };
 
 /**
  * UC-ACC-02: Import tài khoản từ Excel
+ * BE đúng: POST /users/import (không còn /users/import-jobs)
  * @param {FormData} formData - file upload
  * @returns {Promise<object>} response envelope with jobId
  */
 export const importUsers = async (formData) => {
-    return await post('/users/import-jobs', formData);
+    return await post('/users/import', formData);
 };
 
 /**
@@ -232,18 +233,22 @@ export const getAuditLogs = async (params = {}) => {
 
 /**
  * UC-CFG-01: Lấy danh sách cấu hình hệ thống
+ * TODO: Chờ BE mở route (xem §5.2 kế hoạch đồng bộ)
  * @returns {Promise<object>} { success, data: [...configs] }
  */
 export const getSystemConfigs = async () => {
+    // TODO: BE chưa có controller cho system_configs — chờ §5.2
     return await get('/system-configurations');
 };
 
 /**
  * UC-CFG-01: Cập nhật cấu hình hệ thống
+ * TODO: Chờ BE mở route (xem §5.2 kế hoạch đồng bộ)
  * @param {object} data - { key, value }
  * @returns {Promise<object>} response envelope
  */
 export const updateSystemConfig = async (data) => {
+    // TODO: BE chưa có controller cho system_configs — chờ §5.2
     return await patch('/system-configurations', data);
 };
 
@@ -325,11 +330,13 @@ export const exportUsers = async (params = {}) => {
 
 /**
  * UC-AM-12: Cập nhật thông tin cá nhân (self)
- * @param {object} data - { fullName, phoneNumber, avatarFileId }
+ * BE đúng: PATCH /users/:userId (không còn /me/profile)
+ * @param {string|number} userId - Lấy từ localStorage hoặc auth context
+ * @param {object} data - { fullName, phoneNumber }
  * @returns {Promise<object>} response envelope
  */
-export const updateSelfProfile = async (data) => {
-    return await patch('/me/profile', data);
+export const updateSelfProfile = async (userId, data) => {
+    return await patch(`/users/${userId}`, data);
 };
 
 /**
@@ -351,16 +358,20 @@ export const getNotifications = async (params = {}) => {
 };
 
 /**
- * UC-NOTI-02: Mark a notification as read
+ * UC-NOTI-02: Đánh dấu thông báo đã đọc
+ * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
  */
 export const markNotificationRead = async (notificationId) => {
+    // TODO: BE chưa có PATCH /notifications/:id/read — chờ §5.3
     return await patch(`/notifications/${notificationId}/read`);
 };
 
 /**
- * UC-NOTI-03: Mark all notifications as read
+ * UC-NOTI-03: Đánh dấu tất cả thông báo đã đọc
+ * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
  */
 export const markAllNotificationsRead = async () => {
+    // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     return await patch('/notifications/read-all');
 };
 
