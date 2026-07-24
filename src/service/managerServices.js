@@ -150,10 +150,12 @@ export const getUserById = async (userId) => {
 
 /**
  * UC-AM-12: Cập nhật thông tin cá nhân (self)
- * @param {object} data - { fullName, phoneNumber, avatarFileId }
+ * BE đúng: PATCH /users/:userId (không còn /me/profile)
+ * @param {string|number} userId - Lấy từ localStorage hoặc auth context
+ * @param {object} data - { fullName, phoneNumber }
  */
-export const updateSelfProfile = async (data) => {
-    return await patch('/me/profile', data);
+export const updateSelfProfile = async (userId, data) => {
+    return await patch(`/users/${userId}`, data);
 };
 
 /**
@@ -305,4 +307,49 @@ export const requestExtension = async (meetingId, data) => {
  */
 export const decideExtension = async (meetingId, requestId, data) => {
     return await post(`/live-meetings/${meetingId}/extension-requests/${requestId}/decide`, data);
+};
+
+// ============================================================
+// RECORDING & NO-SHOW CONTROL ENDPOINTS (ADDED)
+// ============================================================
+
+export const startVideoRecording = async (meetingId, data) => {
+    return await post(`/live-meetings/${meetingId}/recording/start-video`, data);
+};
+
+export const pauseVideoRecording = async (meetingId, sessionId) => {
+    return await post(`/live-meetings/${meetingId}/recording/${sessionId}/pause-video`);
+};
+
+export const resumeVideoRecording = async (meetingId, sessionId) => {
+    return await post(`/live-meetings/${meetingId}/recording/${sessionId}/resume-video`);
+};
+
+export const stopVideoRecording = async (meetingId, sessionId) => {
+    return await post(`/live-meetings/${meetingId}/recording/${sessionId}/stop-video`);
+};
+
+export const getRoomDevices = async (roomId) => {
+    return await get(`/rooms/${roomId}/devices`);
+};
+
+export const getAllNoShowCases = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/no-show-cases${query}`);
+};
+
+export const getRecordingStatus = async (meetingId, sessionId) => {
+    return await get(`/live-meetings/${meetingId}/recording/${sessionId}/status`);
+};
+
+export const getRecordingSessions = async (meetingId) => {
+    return await get(`/meetings/${meetingId}/recording-sessions`);
+};
+
+export const getRecordingConfig = async (meetingId) => {
+    return await get(`/meetings/${meetingId}/recording-config`);
+};
+
+export const updateRecordingConfig = async (meetingId, data) => {
+    return await patch(`/meetings/${meetingId}/recording-config`, data);
 };

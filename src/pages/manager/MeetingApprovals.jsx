@@ -34,7 +34,7 @@ const MeetingApprovals = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
-    
+
     // View state
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
 
@@ -64,7 +64,7 @@ const MeetingApprovals = () => {
         setError(null);
         try {
             const params = {
-                approvalStatus: statusFilter === 'all' ? undefined : statusFilter,
+                approvalStatus: statusFilter === 'all' ? 'all' : statusFilter,
                 page: currentPage,
                 limit: limit,
                 q: searchVal.trim() || undefined,
@@ -158,7 +158,7 @@ const MeetingApprovals = () => {
                 throw new Error(res?.error?.message || res?.message || 'Thao tác phê duyệt thất bại.');
             }
         } catch (err) {
-            setError(err?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
+            setError(err?.error?.message || err?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -185,7 +185,7 @@ const MeetingApprovals = () => {
                 throw new Error(res?.error?.message || res?.message || 'Thao tác từ chối thất bại.');
             }
         } catch (err) {
-            setError(err?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
+            setError(err?.error?.message || err?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
         } finally {
             setSubmittingAction(false);
         }
@@ -333,8 +333,8 @@ const MeetingApprovals = () => {
                         key={tab.key}
                         onClick={() => handleTabChange(tab.key)}
                         className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${statusFilter === tab.key
-                                ? 'bg-action-blue text-white shadow-sm'
-                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                            ? 'bg-action-blue text-white shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
                             }`}
                     >
                         {tab.label}
@@ -347,21 +347,19 @@ const MeetingApprovals = () => {
                 <div className="flex bg-cloud-mist/30 p-1 rounded-xl border border-platinum-tint shadow-sm">
                     <button
                         onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
-                            viewMode === 'grid'
+                        className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'grid'
                                 ? 'bg-white text-action-blue shadow-sm'
                                 : 'text-slate-blue hover:text-midnight-indigo hover:bg-white/50'
-                        }`}
+                            }`}
                     >
                         <LayoutGrid className="w-4 h-4" /> Grid
                     </button>
                     <button
                         onClick={() => setViewMode('list')}
-                        className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${
-                            viewMode === 'list'
+                        className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'list'
                                 ? 'bg-white text-action-blue shadow-sm'
                                 : 'text-slate-blue hover:text-midnight-indigo hover:bg-white/50'
-                        }`}
+                            }`}
                     >
                         <List className="w-4 h-4" /> Danh sách
                     </button>
@@ -425,7 +423,7 @@ const MeetingApprovals = () => {
                                                     <span className="text-[10px] opacity-80">{req.requestedBy?.email}</span>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="flex items-start gap-2.5">
                                                 <div className="w-6 h-6 rounded-full bg-cloud-mist/50 flex items-center justify-center shrink-0 mt-0.5">
                                                     <Info className="w-3.5 h-3.5 text-slate-blue" />
@@ -533,24 +531,24 @@ const MeetingApprovals = () => {
                                             <td className="p-4 font-mono text-xs text-midnight-indigo font-bold whitespace-nowrap">
                                                 {req.requestCode}
                                             </td>
-                                            
+
                                             {/* Title */}
                                             <td className="p-4 font-semibold text-midnight-indigo max-w-xs truncate" title={req.meeting?.title || 'Đăt lịch phòng họp'}>
                                                 {req.meeting?.title || 'Đăt lịch phòng họp'}
                                             </td>
-                                            
+
                                             {/* Requester */}
                                             <td className="p-4 text-slate-blue font-medium whitespace-nowrap">
                                                 {req.requestedBy?.fullName || 'Nhân viên'}
                                                 <span className="block text-[10px] opacity-75">{req.requestedBy?.email}</span>
                                             </td>
-                                            
+
                                             {/* Room */}
                                             <td className="p-4 font-medium text-midnight-indigo whitespace-nowrap">
                                                 {req.targetRoom?.roomName || 'N/A'}
                                                 <span className="block text-[10px] text-slate-blue font-normal">{req.targetRoom?.siteName || 'Khu vực'}</span>
                                             </td>
-                                            
+
                                             {/* Time */}
                                             <td className="p-4 text-xs text-slate-blue font-medium whitespace-nowrap">
                                                 <span className="block font-bold text-midnight-indigo/90">
@@ -560,7 +558,7 @@ const MeetingApprovals = () => {
                                                     {new Date(req.requestedStartTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(req.requestedEndTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </td>
-                                            
+
                                             {/* Conflict Indicator */}
                                             <td className="p-4 whitespace-nowrap">
                                                 {hasConflict ? (
@@ -749,8 +747,8 @@ const MeetingApprovals = () => {
                                     {/* Conflict Alerts */}
                                     {selectedRequest.approvalStatus === 'pending' && (
                                         <div className={`p-4 rounded-xl border flex gap-3 ${selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
-                                                ? 'bg-rose-50 border-rose-200 text-rose-800'
-                                                : 'bg-emerald-50 border-emerald-250 text-emerald-800'
+                                            ? 'bg-rose-50 border-rose-200 text-rose-800'
+                                            : 'bg-emerald-50 border-emerald-250 text-emerald-800'
                                             }`}>
                                             <AlertTriangle className={`w-5 h-5 shrink-0 ${selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked' ? 'text-red-600 animate-pulse' : 'text-emerald-600'
                                                 }`} />
@@ -772,8 +770,8 @@ const MeetingApprovals = () => {
                                     {/* Approval/Rejection Log (For approved/rejected status) */}
                                     {selectedRequest.approvalStatus !== 'pending' && (
                                         <div className={`p-4 rounded-xl border space-y-2 ${selectedRequest.approvalStatus === 'approved'
-                                                ? 'bg-emerald-50/20 border-emerald-100 text-emerald-850'
-                                                : 'bg-rose-50/20 border-rose-100 text-rose-850'
+                                            ? 'bg-emerald-50/20 border-emerald-100 text-emerald-850'
+                                            : 'bg-rose-50/20 border-rose-100 text-rose-850'
                                             }`}>
                                             <h4 className="text-[11px] font-bold uppercase tracking-wider">
                                                 Lịch sử xét duyệt ({selectedRequest.approvalStatus === 'approved' ? 'Đã duyệt' : 'Đã từ chối'})
