@@ -334,13 +334,15 @@ const AuditLogs = () => {
 
     // Helper badges styling
     const getActionBadge = (action) => {
-        if (action.includes('CREATE') || action.includes('SUCCESS') || action === 'LOGIN') {
+        if (!action) return 'bg-slate-50 text-slate-700 border-slate-200';
+        const safeAction = String(action).toUpperCase();
+        if (safeAction.includes('CREATE') || safeAction.includes('SUCCESS') || safeAction === 'LOGIN') {
             return 'bg-green-50 text-green-700 border-green-200';
         }
-        if (action.includes('UPDATE') || action.includes('EDIT')) {
+        if (safeAction.includes('UPDATE') || safeAction.includes('EDIT')) {
             return 'bg-amber-50 text-amber-700 border-amber-200';
         }
-        if (action.includes('LOCK') || action.includes('FAILED') || action.includes('DELETE') || action.includes('OFFLINE')) {
+        if (safeAction.includes('LOCK') || safeAction.includes('FAILED') || safeAction.includes('DELETE') || safeAction.includes('OFFLINE')) {
             return 'bg-red-50 text-red-700 border-red-200';
         }
         return 'bg-slate-50 text-slate-700 border-slate-200';
