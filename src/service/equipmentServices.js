@@ -38,3 +38,13 @@ export const reportEquipmentFault = async (equipmentId, data) => {
 export const assignEquipment = async (equipmentId, data) => {
     return await patch(`/equipments/${equipmentId}/assignment`, data);
 };
+
+/**
+ * Xoá thiết bị-tài sản
+ * BE: DELETE /equipments/:equipmentId
+ * @param {string|number} equipmentId
+ * @returns {Promise<object>} response envelope
+ */
+export const deleteEquipment = async (equipmentId) => {
+    return await dele(`/equipments/${equipmentId}`);
+};

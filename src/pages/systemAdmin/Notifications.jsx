@@ -113,27 +113,19 @@ const Notifications = () => {
     }, [successMessage]);
 
     // Mark single notification as read
+    // TODO: BE chưa có PATCH /notifications/:id/read — chờ §5.3
     const handleMarkAsRead = async (noti) => {
-        try {
-            await markNotificationRead(noti.id);
-            setSuccessMessage(`Đã đánh dấu đọc thông báo: ${noti.title}`);
-            fetchNotificationsList();
-        } catch {
-            setNotificationsList(prev => prev.map(n => n.id === noti.id ? { ...n, read: true } : n));
-            setSuccessMessage(`Đã mô phỏng đánh dấu đọc thành công: ${noti.title}`);
-        }
+        // Tạm xử lý local vì BE chưa có route
+        setNotificationsList(prev => prev.map(n => n.id === noti.id ? { ...n, read: true } : n));
+        setSuccessMessage(`Đã đánh dấu đọc thông báo: ${noti.title} (chờ cập nhật hệ thống)`);
     };
 
     // Mark all notifications as read
+    // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     const handleMarkAllAsRead = async () => {
-        try {
-            await markAllNotificationsRead();
-            setSuccessMessage('Đã đánh dấu đọc toàn bộ thông báo.');
-            fetchNotificationsList();
-        } catch {
-            setNotificationsList(prev => prev.map(n => ({ ...n, read: true })));
-            setSuccessMessage('Đã mô phỏng đánh dấu đọc tất cả thông báo.');
-        }
+        // Tạm xử lý local vì BE chưa có route
+        setNotificationsList(prev => prev.map(n => ({ ...n, read: true })));
+        setSuccessMessage('Đã đánh dấu đọc toàn bộ thông báo (chờ cập nhật hệ thống).');
     };
 
     const getIcon = (type) => {

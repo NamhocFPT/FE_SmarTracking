@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment } from '../../service/equipmentServices';
+import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment } from '../../service/equipmentServices';
 import { getRooms } from '../../service/businessAdminServices';
 import { 
     Plus, Search, RefreshCw, AlertTriangle, Monitor, 
-    Video, Mic, Speaker, MapPin, Wrench, Package, Cpu
+    Video, Mic, Speaker, MapPin, Wrench, Package, Cpu, Trash2
 } from 'lucide-react';
 
 const EquipmentManagement = () => {
@@ -29,6 +29,9 @@ const EquipmentManagement = () => {
     const [isFaultModalOpen, setIsFaultModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedEquipment, setSelectedEquipment] = useState(null);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [equipmentToDelete, setEquipmentToDelete] = useState(null);
+    const [isDeletingEquipment, setIsDeletingEquipment] = useState(false);
 
     // Form states
     const [createForm, setCreateForm] = useState({
@@ -148,6 +151,34 @@ const EquipmentManagement = () => {
             }
         } catch (err) {
             setError(err?.message || 'Lỗi khi gán thiết bị.');
+        }
+    };
+
+    // Handle Delete
+    const handleDeleteClick = (equipment) => {
+        setEquipmentToDelete(equipment);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!equipmentToDelete) return;
+        setIsDeletingEquipment(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await deleteEquipment(equipmentToDelete.id);
+            if (res?.success) {
+                setSuccessMessage(`Đã xoá thiết bị ${equipmentToDelete.equipmentName} thành công.`);
+                setIsDeleteModalOpen(false);
+                fetchEquipments();
+            } else {
+                setError(res?.message || 'Không thể xoá thiết bị này.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Lỗi kết nối khi xoá thiết bị.');
+        } finally {
+            setIsDeletingEquipment(false);
+            setEquipmentToDelete(null);
         }
     };
 
@@ -337,10 +368,17 @@ const EquipmentManagement = () => {
                                             </button>
                                             <button
                                                 onClick={() => { setSelectedEquipment(eq); setIsFaultModalOpen(true); }}
-                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-orange-500 hover:bg-orange-50 transition-colors mr-1"
                                                 title="Báo hỏng / Bảo trì"
                                             >
                                                 <Wrench className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(eq)}
+                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                title="Xoá thiết bị"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </td>
                                     </tr>
@@ -504,6 +542,43 @@ const EquipmentManagement = () => {
                                 <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700">Lưu thông tin</button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* DELETE EQUIPMENT MODAL */}
+            {isDeleteModalOpen && equipmentToDelete && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-sm w-full flex flex-col overflow-hidden">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertTriangle className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-lg font-bold text-midnight-indigo mb-2">Xác nhận xoá thiết bị</h3>
+                            <p className="text-sm text-slate-blue mb-1">
+                                Bạn có chắc chắn muốn xoá thiết bị <span className="font-bold text-midnight-indigo">{equipmentToDelete.equipmentName}</span>?
+                            </p>
+                            <p className="text-[11px] text-red-500 bg-red-50 p-2 rounded-lg mt-3 text-left">
+                                Lưu ý: Thao tác này sẽ xoá hoàn toàn thiết bị khỏi hệ thống và không thể khôi phục. Hãy chắc chắn thiết bị không còn được sử dụng.
+                            </p>
+                        </div>
+                        <div className="p-4 bg-cloud-mist/30 border-t border-platinum-tint flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                disabled={isDeletingEquipment}
+                                className="px-4 py-2 bg-white border border-platinum-tint text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                disabled={isDeletingEquipment}
+                                className="inline-flex items-center justify-center px-4 py-2 bg-red-600 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-red-700 disabled:opacity-50 min-w-[100px]"
+                            >
+                                {isDeletingEquipment ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xoá vĩnh viễn'}
+                            </button>
+                        </div>
                     </div>
                 </div>,
                 document.body

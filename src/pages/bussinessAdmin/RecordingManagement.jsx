@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    getRecordings, 
-    getRecordingDownloadUrl,
+    getMeetingMediaFiles, 
+    getMediaFileSecureDownload,
     getRooms,
-    updateRecordingVisibility
+    updateMediaVisibility,
+    getMeetings
 } from '../../service/businessAdminServices';
 import { 
     Video, Download, Trash2, Search, RefreshCw, 
@@ -45,25 +46,59 @@ const RecordingManagement = () => {
         }
     }, []);
 
+    /**
+     * Lấy recordings qua 2 bước:
+     * 1. getMeetings() → danh sách cuộc họp
+     * 2. getMeetingMediaFiles(meetingId) → media files cho từng meeting
+     */
     const fetchRecordingsList = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const params = {
+            const meetingParams = {
                 page,
                 limit,
                 search: search.trim() || undefined,
                 roomId: selectedRoom || undefined,
-                status: statusFilter || undefined
+                status: 'COMPLETED'
             };
-            const res = await getRecordings(params);
-            if (res?.success) {
-                setRecordingsList(res.data || []);
-                setTotalPages(res.meta?.totalPages || 1);
-                setTotalItems(res.meta?.total || (res.data?.length || 0));
-            } else {
-                throw new Error();
+            const meetingsRes = await getMeetings(meetingParams);
+            if (!meetingsRes?.success || !meetingsRes.data?.length) {
+                setRecordingsList([]);
+                setTotalPages(meetingsRes?.meta?.totalPages || 1);
+                setTotalItems(meetingsRes?.meta?.total || 0);
+                return;
             }
+
+            const meetings = meetingsRes.data;
+            setTotalPages(meetingsRes.meta?.totalPages || 1);
+            setTotalItems(meetingsRes.meta?.total || meetings.length);
+
+            // Lấy media files cho từng meeting
+            const mediaPromises = meetings.map(async (meeting) => {
+                try {
+                    const mediaRes = await getMeetingMediaFiles(meeting.id);
+                    if (mediaRes?.success && mediaRes.data?.length) {
+                        return mediaRes.data.map(file => ({
+                            ...file,
+                            meetingId: meeting.id,
+                            meetingTitle: meeting.title || 'Cuộc họp',
+                            roomName: meeting.room?.name || meeting.roomName || '',
+                            meetingDate: meeting.startTime || meeting.scheduledStart
+                        }));
+                    }
+                    return [];
+                } catch {
+                    return [];
+                }
+            });
+
+            const allMedia = (await Promise.all(mediaPromises)).flat();
+            // Lọc theo status nếu có
+            const filtered = statusFilter
+                ? allMedia.filter(f => f.status === statusFilter || f.visibility === statusFilter)
+                : allMedia;
+            setRecordingsList(filtered);
         } catch (err) {
             setError('Lỗi tải danh sách ghi hình từ máy chủ.');
             setRecordingsList([]);
@@ -89,11 +124,11 @@ const RecordingManagement = () => {
         }
     }, [successMessage]);
 
-    // Visibility Handler
+    // Visibility Handler — dùng media-files API
     const toggleVisibility = async (rec) => {
         try {
             const newStatus = rec.status === 'HIDDEN' ? 'COMPLETED' : 'HIDDEN';
-            const res = await updateRecordingVisibility(rec.id, { visibility: newStatus });
+            const res = await updateMediaVisibility(rec.id, { visibility: newStatus });
             if (res?.success) {
                 setSuccessMessage('Cập nhật trạng thái hiển thị thành công.');
                 fetchRecordingsList();
@@ -105,10 +140,10 @@ const RecordingManagement = () => {
         }
     };
 
-    // Download Handler
+    // Download Handler — dùng media-files API
     const handleDownload = async (rec) => {
         try {
-            const res = await getRecordingDownloadUrl(rec.id);
+            const res = await getMediaFileSecureDownload(rec.id);
             if (res?.success && res.data?.downloadUrl) {
                 window.open(res.data.downloadUrl, '_blank');
                 setSuccessMessage(`Đã tạo liên kết tải xuống cho video: ${rec.meetingTitle}`);
