@@ -19,7 +19,7 @@ Các quy tắc sau là bắt buộc.
 
 AI Agent phải tuân thủ theo thứ tự ưu tiên:
 
-1. API_CONTRACT_v1.0_with_system_roles.md
+1. BE Swagger tại endpoint `/api/v1/docs` (Không dùng tài liệu cũ)
 2. DESIGN.md
 3. Business Requirements
 4. Taste Skill
@@ -37,10 +37,10 @@ BẮT BUỘC:
 * Không giả lập API.
 * Không hardcode dữ liệu nếu API đã tồn tại.
 * Không suy diễn business logic.
-* Chỉ sử dụng API được định nghĩa trong API_CONTRACT.md.
+* Chỉ sử dụng API được định nghĩa trong API_REQUIREMENTS_FOR_FE.md.
 * Nếu API chưa tồn tại phải ghi rõ:
 
-"API chưa được định nghĩa trong API_CONTRACT.md"
+"API chưa được định nghĩa trong API_REQUIREMENTS_FOR_FE.md"
 
 thay vì tự tạo endpoint mới.
 
@@ -299,3 +299,12 @@ Taste Skill không được:
 * thay đổi kiến trúc hệ thống
 
 Taste Skill là công cụ hỗ trợ UI, không phải nguồn sự thật của dự án.
+
+---
+
+# FRONTEND - BACKEND COLLABORATION RULES
+
+BẮT BUỘC:
+
+* Những yêu cầu chỉnh sửa bên Frontend KHÔNG ĐƯỢC tự ý thay đổi code Backend (BE) để phù hợp.
+* Nếu yêu cầu từ Frontend cần có sự chỉnh sửa hoặc thêm mới API từ Backend, AI Agent phải chỉ ra rõ ràng yêu cầu thay đổi đó để đội ngũ Backend thực hiện, tuyệt đối không tự ý chỉnh sửa code Backend.
