@@ -65,6 +65,8 @@ const UserManagement = () => {
         roleIds: []
     });
 
+    const [formErrors, setFormErrors] = useState({});
+
     const [importFile, setImportFile] = useState(null);
     const [importing, setImporting] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]); // Array of { line, message, value }
@@ -177,26 +179,47 @@ const UserManagement = () => {
     // Handle Create (UC-06)
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
+        
+        // Client-side Validation
+        const errors = {};
+        if (!formData.fullName.trim()) errors.fullName = "Vui lòng nhập họ và tên";
+        if (!formData.email.trim()) {
+            errors.email = "Vui lòng nhập email";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            errors.email = "Email không đúng định dạng";
+        }
+        if (!formData.departmentId) errors.departmentId = "Vui lòng chọn phòng ban";
+        if (formData.roleIds.length === 0) errors.roleIds = "Vui lòng gán ít nhất 1 vai trò";
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+        }
+
+        setFormErrors({});
         setError(null);
         setSuccessMessage(null);
+        
         try {
             const res = await createUser({
                 email: formData.email,
                 fullName: formData.fullName,
                 phoneNumber: formData.phone,
-                departmentId: formData.departmentId ? Number(formData.departmentId) : null,
-                roleIds: formData.roleIds.map(Number)
+                departmentId: formData.departmentId || null,
+                roleIds: formData.roleIds
             });
             if (res?.success) {
                 setSuccessMessage('Tạo tài khoản người dùng thành công!');
-                setIsCreateModalOpen(false);
                 fetchUsers();
                 resetForm();
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi tạo tài khoản.');
             }
-        } catch {
-            setError('Thao tác thất bại. Không thể kết nối tới server.');
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Thao tác thất bại. Không thể kết nối tới server.');
+        } finally {
+            // Close modal even on failure as requested
+            setIsCreateModalOpen(false);
         }
     };
 
@@ -209,9 +232,9 @@ const UserManagement = () => {
             const res = await updateUser(selectedUser.id, {
                 fullName: formData.fullName,
                 phoneNumber: formData.phone,
-                departmentId: formData.departmentId ? Number(formData.departmentId) : null
+                departmentId: formData.departmentId || null
             });
-            await updateUserRoles(selectedUser.id, { roleIds: formData.roleIds.map(Number) });
+            await updateUserRoles(selectedUser.id, { roleIds: formData.roleIds });
 
             if (res?.success) {
                 setSuccessMessage('Cập nhật tài khoản thành công!');
@@ -221,8 +244,8 @@ const UserManagement = () => {
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi cập nhật.');
             }
-        } catch {
-            setError('Thao tác thất bại. Không thể lưu thay đổi.');
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Thao tác thất bại. Không thể lưu thay đổi.');
         }
     };
 
@@ -353,27 +376,13 @@ const UserManagement = () => {
     };
 
     // Excel Export download
+    // TODO: BE chưa có GET /users/export — chờ §5.4 kế hoạch đồng bộ
+    // Tạm xuất CSV từ dữ liệu local
     const handleExportExcel = async () => {
         setError(null);
         setSuccessMessage(null);
         try {
-            const params = {
-                search: search.trim() || undefined,
-                roleId: selectedRole || undefined,
-                departmentId: selectedDept || undefined,
-                locked: selectedStatus === 'LOCKED' ? true : selectedStatus === 'ACTIVE' ? false : undefined
-            };
-            const blob = await exportUsers(params);
-            const url = window.URL.createObjectURL(new Blob([blob]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'Danh_Sach_Nguoi_Dung.xlsx');
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            setSuccessMessage('Xuất dữ liệu người dùng ra file Excel thành công.');
-        } catch {
-            // Local fallback generation
+            // Tạo CSV từ dữ liệu hiện có trên giao diện
             let csvContent = '\uFEFFID,Họ và Tên,Email,Số điện thoại,Phòng ban,Trạng thái\n';
             usersList.forEach(user => {
                 const depts = user.departments?.map(d => d.name).join('; ') || 'Chưa gán';
@@ -389,7 +398,9 @@ const UserManagement = () => {
             document.body.appendChild(link);
             link.click();
             link.parentNode.removeChild(link);
-            setSuccessMessage('Tải danh sách CSV (định dạng Excel tương thích) thành công.');
+            setSuccessMessage('Xuất dữ liệu trang hiện tại ra CSV thành công (chờ cập nhật hệ thống để xuất toàn bộ).');
+        } catch {
+            setError('Lỗi khi xuất dữ liệu.');
         }
     };
 
@@ -779,26 +790,26 @@ const UserManagement = () => {
                         </div>
                         <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Họ và Tên</label>
+                                <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.fullName ? 'text-red-500' : 'text-slate-blue'}`}>Họ và Tên</label>
                                 <input
                                     type="text"
-                                    required
                                     value={formData.fullName}
-                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                    onChange={(e) => { setFormData({ ...formData, fullName: e.target.value }); setFormErrors({...formErrors, fullName: ''}); }}
                                     placeholder="Ví dụ: Nguyễn Văn A"
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                                    className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.fullName ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 />
+                                {formErrors.fullName && <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>}
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Email</label>
+                                <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.email ? 'text-red-500' : 'text-slate-blue'}`}>Email</label>
                                 <input
                                     type="email"
-                                    required
                                     value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFormErrors({...formErrors, email: ''}); }}
                                     placeholder="email@smrmpts.com"
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                                    className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.email ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 />
+                                {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Số điện thoại</label>
@@ -811,33 +822,35 @@ const UserManagement = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Phòng ban</label>
+                                <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.departmentId ? 'text-red-500' : 'text-slate-blue'}`}>Phòng ban</label>
                                 <select
                                     value={formData.departmentId}
-                                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                    onChange={(e) => { setFormData({ ...formData, departmentId: e.target.value }); setFormErrors({...formErrors, departmentId: ''}); }}
+                                    className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none bg-white ${formErrors.departmentId ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 >
                                     <option value="">Chọn phòng ban...</option>
                                     {departments.map(d => (
                                         <option key={d.id} value={d.id}>{d.name}</option>
                                     ))}
                                 </select>
+                                {formErrors.departmentId && <p className="text-red-500 text-xs mt-1">{formErrors.departmentId}</p>}
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Gán vai trò (Role)</label>
+                                <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.roleIds ? 'text-red-500' : 'text-slate-blue'}`}>Gán vai trò (Role)</label>
                                 <div className="space-y-2 mt-1">
                                     {roles.map(r => (
                                         <label key={r.id} className="flex items-center gap-2 text-sm text-midnight-indigo font-medium cursor-pointer">
                                             <input
                                                 type="checkbox"
                                                 checked={formData.roleIds.includes(r.id)}
-                                                onChange={() => handleRoleCheckboxChange(r.id)}
+                                                onChange={() => { handleRoleCheckboxChange(r.id); setFormErrors({...formErrors, roleIds: ''}); }}
                                                 className="rounded text-action-blue focus:ring-action-blue"
                                             />
                                             {r.name}
                                         </label>
                                     ))}
                                 </div>
+                                {formErrors.roleIds && <p className="text-red-500 text-xs mt-1">{formErrors.roleIds}</p>}
                             </div>
 
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
