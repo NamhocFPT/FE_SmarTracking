@@ -2,11 +2,30 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     getRoles, getPermissions, getRolePermissions, 
-    assignRolePermissions, createRole, updateRole 
+    assignRolePermissions, createRole, updateRole, deleteRole
 } from '../../service/permissionServices';
 import { 
-    Shield, Plus, Save, AlertTriangle, Key, Search, RefreshCw, CheckCircle 
+    Shield, Plus, Save, AlertTriangle, Key, Search, RefreshCw, CheckCircle, Trash2
 } from 'lucide-react';
+
+const MODULE_TRANSLATIONS = {
+    'system_management': 'Quản trị hệ thống',
+    'gate_access': 'Kiểm soát vào ra',
+    'user_management': 'Quản lý người dùng',
+    'device_management': 'Quản lý thiết bị',
+    'role_management': 'Quản lý phân quyền',
+    'attendance_management': 'Quản lý điểm danh',
+    'meeting_management': 'Quản lý phòng họp',
+    'zone_management': 'Quản lý khu vực',
+    'other': 'Các quyền khác'
+};
+
+const ROLE_TRANSLATIONS = {
+    'SYSTEM_ADMIN': 'Quản trị hệ thống',
+    'BUSINESS_ADMIN': 'Quản trị doanh nghiệp',
+    'MANAGER': 'Quản lý',
+    'EMPLOYEE': 'Nhân viên'
+};
 
 const RolePermissionManagement = () => {
     // Data states
@@ -22,6 +41,8 @@ const RolePermissionManagement = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const modulesPerPage = 3;
 
     // Modal states
     const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false);
@@ -30,6 +51,11 @@ const RolePermissionManagement = () => {
         roleName: '',
         description: ''
     });
+    
+    // Delete states
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [roleToDelete, setRoleToDelete] = useState(null);
+    const [isDeletingRole, setIsDeletingRole] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -56,6 +82,11 @@ const RolePermissionManagement = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Reset pagination when searching or changing role
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedRole]);
 
     // Handle selecting a role
     const handleSelectRole = async (role) => {
@@ -126,6 +157,39 @@ const RolePermissionManagement = () => {
         }
     };
 
+    // Delete Role
+    const handleDeleteClick = (role, e) => {
+        e.stopPropagation(); // Prevent selecting the role
+        setRoleToDelete(role);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!roleToDelete) return;
+        setIsDeletingRole(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await deleteRole(roleToDelete.id);
+            if (res?.success) {
+                setSuccessMessage(`Đã xoá vai trò ${roleToDelete.roleName} thành công.`);
+                setIsDeleteModalOpen(false);
+                if (selectedRole?.id === roleToDelete.id) {
+                    setSelectedRole(null);
+                    setRolePermissions([]);
+                }
+                fetchData();
+            } else {
+                setError(res?.message || 'Không thể xoá vai trò.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Lỗi kết nối khi xoá vai trò.');
+        } finally {
+            setIsDeletingRole(false);
+            setRoleToDelete(null);
+        }
+    };
+
     // Filter permissions by module
     const groupedPermissions = permissions.reduce((acc, curr) => {
         const module = curr.moduleCode || 'other';
@@ -190,7 +254,9 @@ const RolePermissionManagement = () => {
                         ) : roles.length === 0 ? (
                             <div className="text-center py-8 text-slate-blue text-sm">Chưa có vai trò nào.</div>
                         ) : (
-                            roles.map(role => (
+                            roles.map(role => {
+                                const displayRoleName = ROLE_TRANSLATIONS[role.roleCode] || role.roleName;
+                                return (
                                 <div 
                                     key={role.id}
                                     onClick={() => handleSelectRole(role)}
@@ -201,15 +267,27 @@ const RolePermissionManagement = () => {
                                     }`}
                                 >
                                     <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-bold text-sm text-midnight-indigo">{role.roleName}</h3>
-                                        {role.isSystemRole && (
-                                            <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md">SYSTEM</span>
-                                        )}
+                                        <h3 className="font-bold text-sm text-midnight-indigo">{displayRoleName}</h3>
+                                        <div className="flex items-center gap-1">
+                                            {role.isSystemRole && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md">HỆ THỐNG</span>
+                                            )}
+                                            {!role.isSystemRole && (
+                                                <button
+                                                    onClick={(e) => handleDeleteClick(role, e)}
+                                                    className="p-1 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                    title="Xoá vai trò"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     <p className="text-xs text-slate-blue font-mono mb-2">{role.roleCode}</p>
                                     <p className="text-xs text-slate-blue line-clamp-2">{role.description || 'Không có mô tả'}</p>
                                 </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -222,7 +300,7 @@ const RolePermissionManagement = () => {
                                 <div>
                                     <h2 className="font-bold text-midnight-indigo flex items-center">
                                         <Key className="w-5 h-5 mr-2 text-action-blue" />
-                                        Phân quyền: {selectedRole.roleName}
+                                        Phân quyền: {ROLE_TRANSLATIONS[selectedRole.roleCode] || selectedRole.roleName}
                                     </h2>
                                     <p className="text-xs text-slate-blue mt-1">Cấu hình các quyền thao tác cho vai trò này</p>
                                 </div>
@@ -257,11 +335,12 @@ const RolePermissionManagement = () => {
                                 ) : filteredModules.length === 0 ? (
                                     <div className="text-center py-12 text-slate-blue text-sm">Không tìm thấy quyền nào.</div>
                                 ) : (
-                                    <div className="space-y-6">
-                                        {filteredModules.map(module => (
-                                            <div key={module} className="bg-cloud-mist/20 border border-platinum-tint rounded-xl overflow-hidden">
+                                    <div className="flex flex-col h-full">
+                                        <div className="space-y-6 flex-1">
+                                            {filteredModules.slice((currentPage - 1) * modulesPerPage, currentPage * modulesPerPage).map(module => (
+                                                <div key={module} className="bg-cloud-mist/20 border border-platinum-tint rounded-xl overflow-hidden">
                                                 <div className="bg-cloud-mist/40 px-4 py-2 border-b border-platinum-tint">
-                                                    <h3 className="font-bold text-midnight-indigo text-sm uppercase">{module}</h3>
+                                                    <h3 className="font-bold text-midnight-indigo text-sm uppercase">{MODULE_TRANSLATIONS[module] || module}</h3>
                                                 </div>
                                                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {groupedPermissions[module]
@@ -285,6 +364,30 @@ const RolePermissionManagement = () => {
                                                 </div>
                                             </div>
                                         ))}
+                                        </div>
+                                        
+                                        {/* Pagination Controls */}
+                                        {Math.ceil(filteredModules.length / modulesPerPage) > 1 && (
+                                            <div className="flex justify-center items-center mt-6 pt-4 border-t border-platinum-tint gap-2">
+                                                <button
+                                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                    disabled={currentPage === 1}
+                                                    className="px-3 py-1 text-sm bg-white border border-platinum-tint rounded-lg disabled:opacity-50 hover:bg-cloud-mist transition-colors"
+                                                >
+                                                    Trước
+                                                </button>
+                                                <span className="text-sm font-medium text-slate-blue px-2">
+                                                    Trang {currentPage} / {Math.ceil(filteredModules.length / modulesPerPage)}
+                                                </span>
+                                                <button
+                                                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredModules.length / modulesPerPage), p + 1))}
+                                                    disabled={currentPage === Math.ceil(filteredModules.length / modulesPerPage)}
+                                                    className="px-3 py-1 text-sm bg-white border border-platinum-tint rounded-lg disabled:opacity-50 hover:bg-cloud-mist transition-colors"
+                                                >
+                                                    Sau
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -326,6 +429,43 @@ const RolePermissionManagement = () => {
                                 <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue">Tạo mới</button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* DELETE ROLE MODAL */}
+            {isDeleteModalOpen && roleToDelete && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-sm w-full flex flex-col overflow-hidden">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <AlertTriangle className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-lg font-bold text-midnight-indigo mb-2">Xác nhận xoá vai trò</h3>
+                            <p className="text-sm text-slate-blue mb-1">
+                                Bạn có chắc chắn muốn xoá vai trò <span className="font-bold text-midnight-indigo">{roleToDelete.roleName}</span>?
+                            </p>
+                            <p className="text-[11px] text-red-500 bg-red-50 p-2 rounded-lg mt-3 text-left">
+                                Lưu ý: Thao tác này không thể hoàn tác. Người dùng đang có vai trò này có thể sẽ bị mất quyền truy cập.
+                            </p>
+                        </div>
+                        <div className="p-4 bg-cloud-mist/30 border-t border-platinum-tint flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                disabled={isDeletingRole}
+                                className="px-4 py-2 bg-white border border-platinum-tint text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                disabled={isDeletingRole}
+                                className="inline-flex items-center justify-center px-4 py-2 bg-red-600 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-red-700 disabled:opacity-50 min-w-[100px]"
+                            >
+                                {isDeletingRole ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xoá vĩnh viễn'}
+                            </button>
+                        </div>
                     </div>
                 </div>,
                 document.body
