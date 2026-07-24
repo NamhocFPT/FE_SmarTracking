@@ -66,6 +66,7 @@ const EmployeeMeetingDetail = () => {
     const normalizeMeetingDetail = (dto) => {
         const hostName = dto.host?.fullName || dto.organizer?.fullName || dto.hostName || dto.host_name || 'Chưa rõ';
         const hostId = dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id;
+        const organizerId = dto.organizerId || dto.organizer_id || dto.organizer?.id;
         const room = dto.room || {};
         const participants = (dto.participants || []).map(p => ({
             id: p.userId || p.user_id || p.user?.id || p.id,
@@ -86,10 +87,12 @@ const EmployeeMeetingDetail = () => {
             title: dto.title,
             description: dto.description,
             status: dto.status,
-            // Host
+            // Host and Organizer
             host: hostName,
             hostId,
             host_id: hostId,
+            organizerId,
+            organizer_id: organizerId,
             // Room
             room: {
                 id: room.id,
@@ -370,6 +373,8 @@ const EmployeeMeetingDetail = () => {
     }
 
     const isHost = currentUser?.id === (meeting.host_id || meeting.hostId);
+    const isOrganizer = currentUser?.id === (meeting.organizer_id || meeting.organizerId);
+    const canManage = isHost || isOrganizer;
     const hostParticipant = meeting.participants?.find((participant) =>
         participant.id === (meeting.host_id || meeting.hostId)
         || participant.userId === (meeting.host_id || meeting.hostId)
@@ -413,7 +418,7 @@ const EmployeeMeetingDetail = () => {
         <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
             {/* Header / Actions */}
             <div className="flex justify-end gap-2 w-full">
-                {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                     <>
                         <button
                             onClick={() => setIsEditModalOpen(true)}
@@ -526,7 +531,7 @@ const EmployeeMeetingDetail = () => {
                                 <List className="w-4.5 h-4.5 text-action-blue" />
                                 Chương trình nghị sự ({meeting.agenda?.length || 0})
                             </h3>
-                            {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                            {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                                 <button
                                     onClick={() => setIsAgendaModalOpen(true)}
                                     className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border border-action-blue/20 bg-blue-50 text-action-blue hover:bg-blue-100 rounded-lg text-xs font-bold transition-all shadow-sm"
@@ -615,8 +620,8 @@ const EmployeeMeetingDetail = () => {
                     {activeRightTab === 'transcript' ? (
                         meeting.recordingEnabled && isCompleted ? (
                             <div className="space-y-6">
-                                {/* Nút Upload Audio dành cho Host */}
-                                {isHost && (
+                                {/* Nút Upload Audio dành cho Host / Organizer */}
+                                {canManage && (
                                     <AudioUploader 
                                         meetingId={meeting.id} 
                                         onUploadSuccess={() => setRefreshTranscriptKey(prev => prev + 1)} 
@@ -627,7 +632,7 @@ const EmployeeMeetingDetail = () => {
                                 <TranscriptViewer 
                                     key={refreshTranscriptKey}
                                     meetingId={meeting.id} 
-                                    isHost={isHost} 
+                                    isHost={canManage} 
                                 />
                             </div>
                         ) : (
@@ -644,7 +649,7 @@ const EmployeeMeetingDetail = () => {
                     ) : (
                         <MinutesTabContent 
                             meetingId={meeting.id} 
-                            isHost={isHost} 
+                            isHost={canManage} 
                             transcriptStatus={meeting.recordingEnabled && isCompleted ? 'ready' : 'empty'} 
                         />
                     )}

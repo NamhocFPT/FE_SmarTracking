@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Mic, MicOff, Video as VideoIcon, VideoOff, Shield, 
     Smile, Play, Clock, ChevronRight, Edit2, Check,
-    AlertTriangle, Volume2, VolumeX, ArrowLeft, Sparkles, Users
+    AlertTriangle, Volume2, VolumeX, ArrowLeft, Sparkles, Users,
+    StopCircle, PauseCircle, PlayCircle
 } from 'lucide-react';
 import { getSocket, subscribeToMeeting } from '../../utils/socket';
-import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, endMeeting as endEmployee, getPresentAttendees as getEmployeeAttendees, getMeetingAttendance as getEmployeeAttendance, createMeetingNote as createEmployeeNote, listMeetingNotes as listEmployeeNotes } from '../../service/employeeServices';
-import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes } from '../../service/managerServices';
+import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, endMeeting as endEmployee, getPresentAttendees as getEmployeeAttendees, getMeetingAttendance as getEmployeeAttendance, createMeetingNote as createEmployeeNote, listMeetingNotes as listEmployeeNotes, startVideoRecording as startEmployeeVideoRecording, pauseVideoRecording as pauseEmployeeVideoRecording, resumeVideoRecording as resumeEmployeeVideoRecording, stopVideoRecording as stopEmployeeVideoRecording, getRecordingStatus as getEmployeeRecordingStatus, getMeetingMediaFiles as getEmployeeMediaFiles } from '../../service/employeeServices';
+import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes, startVideoRecording as startManagerVideoRecording, pauseVideoRecording as pauseManagerVideoRecording, resumeVideoRecording as resumeManagerVideoRecording, stopVideoRecording as stopManagerVideoRecording, getRecordingStatus as getManagerRecordingStatus, getMeetingMediaFiles as getManagerMediaFiles } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 
 // CSS styles injected for custom floating reactions and voice sound wave animations
@@ -111,11 +112,19 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [attendance, setAttendance] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
     
+    // Recording state
+    const [recordingStatus, setRecordingStatus] = useState('inactive'); // 'inactive', 'starting', 'recording', 'paused', 'stopping', 'completed', 'failed', 'no_data'
+    const [recordingSessionId, setRecordingSessionId] = useState(null);
+    const [recordingStartedAt, setRecordingStartedAt] = useState(null);
+    const [recordingDuration, setRecordingDuration] = useState(0); // in seconds
+    const [mediaFiles, setMediaFiles] = useState([]);
+    
     // User local settings
     const [isMicOn, setIsMicOn] = useState(true);
     const [isVideoOn, setIsVideoOn] = useState(true);
     const [localName, setLocalName] = useState('');
     const [isLobbyReady, setIsLobbyReady] = useState(false);
+    const [activeChatTab, setActiveChatTab] = useState('discussion');
 
     // Reference variables
     const videoRef = useRef(null);
@@ -156,6 +165,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== toastId));
         }, 3500);
+    };
+
+    // Format duration helper
+    const formatDuration = (seconds) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        if (h > 0) return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     // Load meeting details & synchronize
@@ -252,7 +270,60 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setLoading(false);
     };
 
-// Realtime sync via WebSocket
+    // Recording Polling & Duration Timer
+    useEffect(() => {
+        let interval;
+        if (['recording', 'starting', 'stopping'].includes(recordingStatus)) {
+            interval = setInterval(async () => {
+                if (recordingSessionId) {
+                    try {
+                        const res = await callWithFallback(getEmployeeRecordingStatus, getManagerRecordingStatus, id, recordingSessionId);
+                        if (res?.success) {
+                            const newStatus = res.data?.status?.toLowerCase() || 'inactive';
+                            if (newStatus !== recordingStatus) {
+                                setRecordingStatus(newStatus);
+                                if (newStatus === 'completed') {
+                                    showToast('Ghi hình đã hoàn tất, đang xử lý video.', 'success');
+                                    fetchMediaFiles(); // Refresh media list
+                                }
+                            }
+                            if (res.data?.startedAt && !recordingStartedAt) {
+                                setRecordingStartedAt(new Date(res.data.startedAt));
+                            }
+                        }
+                    } catch (e) {
+                        // Silent fail for polling
+                    }
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+        return () => clearInterval(interval);
+    }, [recordingStatus, recordingSessionId, id, recordingStartedAt]);
+
+    useEffect(() => {
+        let timer;
+        if (recordingStatus === 'recording' && recordingStartedAt) {
+            timer = setInterval(() => {
+                const now = new Date();
+                const diff = Math.floor((now - recordingStartedAt) / 1000);
+                setRecordingDuration(diff > 0 ? diff : 0);
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [recordingStatus, recordingStartedAt]);
+
+    const fetchMediaFiles = async () => {
+        try {
+            const res = await callWithFallback(getEmployeeMediaFiles, getManagerMediaFiles, id);
+            if (res?.success) {
+                setMediaFiles(res.data || []);
+            }
+        } catch (e) {
+            // Error loading media files silently ignored
+        }
+    };
+
+    // Realtime sync via WebSocket
         useEffect(() => {
             if (meetingState?.status === 'in_progress') {
                 const cleanup = subscribeToMeeting(id);
@@ -275,16 +346,23 @@ const InMeetingRoom = ({ isPublic = false }) => {
         };
         const loadAttendance = async () => {
             try {
-                const res = await callWithFallback(getEmployeeAttendance, getManagerAttendance, id, {});
-                if (res?.success) setAttendance(res.data.items || []);
+                const res = await callWithFallback(getEmployeeAttendees, getManagerAttendees, id);
+                if (res?.success) setAttendance(res.data.items || res.data || []);
             } catch (err) {}
         };
         useEffect(() => {
+            let attendanceInterval;
             if (meetingState?.status === 'in_progress') {
                 loadNotes();
                 loadAttendance();
+                attendanceInterval = setInterval(() => {
+                    loadAttendance();
+                }, 10000);
             }
-        }, [meetingState?.status]);
+            return () => {
+                if (attendanceInterval) clearInterval(attendanceInterval);
+            };
+        }, [meetingState?.status, id]);
 
     useEffect(() => {
         initMeetingState();
@@ -540,6 +618,81 @@ const InMeetingRoom = ({ isPublic = false }) => {
             }
         } catch (err) {
             showToast('Lỗi kết nối', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleStartRecording = async () => {
+        if (!isHost) return;
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(startEmployeeVideoRecording, startManagerVideoRecording, id, { deviceId: 'default' });
+            if (res?.success) {
+                setRecordingStatus('starting');
+                setRecordingSessionId(res.data?.sessionId || res.data?.id || `rec-${Date.now()}`);
+                setRecordingStartedAt(new Date());
+                setRecordingDuration(0);
+                showToast('Đang khởi tạo camera và kết nối luồng stream...', 'info');
+            } else {
+                showToast('Lỗi khi bắt đầu ghi hình', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server camera', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handlePauseRecording = async () => {
+        if (!isHost || !recordingSessionId) return;
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(pauseEmployeeVideoRecording, pauseManagerVideoRecording, id, recordingSessionId);
+            if (res?.success) {
+                setRecordingStatus('paused');
+                showToast('Đã tạm dừng ghi hình', 'info');
+            } else {
+                showToast('Lỗi khi tạm dừng ghi hình', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleResumeRecording = async () => {
+        if (!isHost || !recordingSessionId) return;
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(resumeEmployeeVideoRecording, resumeManagerVideoRecording, id, recordingSessionId);
+            if (res?.success) {
+                setRecordingStatus('recording');
+                showToast('Đã tiếp tục ghi hình', 'success');
+            } else {
+                showToast('Lỗi khi tiếp tục', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleStopRecording = async () => {
+        if (!isHost || !recordingSessionId) return;
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(stopEmployeeVideoRecording, stopManagerVideoRecording, id, recordingSessionId);
+            if (res?.success) {
+                setRecordingStatus('stopping');
+                showToast('Đang dừng ghi hình và lưu video...', 'info');
+            } else {
+                showToast('Lỗi khi dừng ghi hình', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
         } finally {
             setActionLoading(false);
         }
@@ -1123,6 +1276,34 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         {meetingState.reactionsLocked ? 'Mở khóa thả Reactions' : 'Khóa thả Reactions'}
                                     </button>
                                 </div>
+
+                                <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5 mt-4 pt-4 border-t border-indigo-900/40">
+                                    <VideoIcon className="w-4 h-4 text-indigo-400" />
+                                    Ghi Hình Phòng Họp
+                                </h3>
+                                <div className="flex flex-col gap-2.5">
+                                    {['recording', 'starting', 'stopping'].includes(recordingStatus) && (
+                                        <div className={`px-3 py-2 rounded-xl border flex items-center text-xs font-bold ${recordingStatus === 'recording' ? 'bg-red-950/50 text-red-400 border-red-900' : 'bg-blue-950/50 text-blue-400 border-blue-900'}`}>
+                                            {recordingStatus === 'recording' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />}
+                                            {recordingStatus === 'recording' ? `REC ${formatDuration(recordingDuration)}` : 'Đang xử lý...'}
+                                        </div>
+                                    )}
+                                    
+                                    {recordingStatus === 'inactive' ? (
+                                        <button onClick={handleStartRecording} disabled={actionLoading} className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5">
+                                            <PlayCircle className="w-4 h-4" /> Bắt đầu ghi hình
+                                        </button>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            {recordingStatus === 'recording' ? (
+                                                <button onClick={handlePauseRecording} className="flex-1 py-2 bg-amber-600 text-white rounded-xl text-xs font-semibold">Tạm dừng</button>
+                                            ) : recordingStatus === 'paused' ? (
+                                                <button onClick={handleResumeRecording} className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold">Tiếp tục</button>
+                                            ) : null}
+                                            <button onClick={handleStopRecording} className="flex-1 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold">Kết thúc</button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -1163,7 +1344,28 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     </div>
 
                                     {/* Remaining items */}
-                                    <div className="space-y-2.5">
+                                    <div className="space-y-4 pr-2">
+                                        {mediaFiles.length > 0 && (
+                                            <div className="mb-4">
+                                                <h4 className="text-xs font-bold text-indigo-400 uppercase mb-2">Video ghi hình ({mediaFiles.length})</h4>
+                                                <div className="space-y-2">
+                                                    {mediaFiles.map((file, idx) => (
+                                                        <div key={file.id || idx} className="p-3 bg-slate-950/50 border border-indigo-950 rounded-xl flex items-center justify-between">
+                                                            <div className="flex items-center">
+                                                                <VideoIcon className="w-4 h-4 text-indigo-400 mr-2 shrink-0" />
+                                                                <div className="text-left">
+                                                                    <p className="text-xs font-semibold text-slate-200">{file.title || `Video_${idx + 1}`}</p>
+                                                                    <p className="text-[9px] text-slate-500">{file.duration ? formatDuration(file.duration) : 'Recording'}</p>
+                                                                </div>
+                                                            </div>
+                                                            <a href={file.downloadUrl || '#'} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-900 border border-indigo-900 rounded-lg text-indigo-300 hover:text-white">
+                                                                <Play className="w-3 h-3" />
+                                                            </a>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                         <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest block">Nội dung kế tiếp</span>
                                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                             {meetingState.agenda.slice(meetingState.currentAgendaIndex + 1).map((item, idx) => (

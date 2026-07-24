@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { get, patch } from '../../utils/request';
+import { get } from '../../utils/request';
+import { updateSelfProfile } from '../../service/employeeServices';
 import { getAvatarStatus } from '../../service/avatarService';
 import AvatarUploadForm from '../../component/AvatarReminder/AvatarUploadForm';
 
@@ -175,29 +176,25 @@ const Profile = () => {
             return;
         }
         try {
+            const localUserStr = localStorage.getItem("user");
+            if (!localUserStr) throw new Error("Không tìm thấy thông tin phiên làm việc.");
+            const localUser = JSON.parse(localUserStr);
+            const userId = localUser.id;
             const payload = { fullName: formData.fullName, phoneNumber: formData.phone };
-            const res = await patch("/me/profile", payload);
+            const res = await updateSelfProfile(userId, payload);
             if (res?.success) {
                 setSuccessMessage("Cập nhật thông tin cá nhân thành công.");
                 setEditMode(false);
-                const userStr = localStorage.getItem("user");
-                if (userStr) {
-                    const user = JSON.parse(userStr);
-                    user.fullName = payload.fullName;
-                    localStorage.setItem("user", JSON.stringify(user));
-                    window.dispatchEvent(new Event("storage"));
-                }
+                localUser.fullName = payload.fullName;
+                localStorage.setItem("user", JSON.stringify(localUser));
+                window.dispatchEvent(new Event("storage"));
                 fetchProfileData();
             } else {
                 setSuccessMessage("Đã mô phỏng cập nhật thông tin cá nhân thành công.");
                 setEditMode(false);
-                const userStr = localStorage.getItem("user");
-                if (userStr) {
-                    const user = JSON.parse(userStr);
-                    user.fullName = payload.fullName;
-                    localStorage.setItem("user", JSON.stringify(user));
-                    window.dispatchEvent(new Event("storage"));
-                }
+                localUser.fullName = payload.fullName;
+                localStorage.setItem("user", JSON.stringify(localUser));
+                window.dispatchEvent(new Event("storage"));
                 setProfile(prev => ({ ...prev, fullName: payload.fullName, phoneNumber: payload.phoneNumber }));
             }
         } catch (err) {

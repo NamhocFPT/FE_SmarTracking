@@ -4,7 +4,8 @@ import {
     getRoomRealtimeStatus, 
     getNoShowByRoom, 
     handleNoShowCase, 
-    releaseNoShowRoom 
+    releaseNoShowRoom,
+    getAllNoShowCases
 } from '../service/businessAdminServices';
 import { 
     Activity, Users, AlertTriangle, CheckCircle, 
@@ -18,6 +19,10 @@ const RealtimeRoomMonitor = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
+    
+    // All No-Shows state
+    const [allNoShows, setAllNoShows] = useState([]);
+    const [isNoShowsLoading, setIsNoShowsLoading] = useState(false);
 
     // Modal state for No-Show handling
     const [selectedNoShow, setSelectedNoShow] = useState(null);
@@ -42,14 +47,30 @@ const RealtimeRoomMonitor = () => {
         }
     }, []);
 
+    const fetchAllNoShows = useCallback(async () => {
+        setIsNoShowsLoading(true);
+        try {
+            const res = await getAllNoShowCases({ limit: 10 });
+            if (res?.success) {
+                setAllNoShows(res.data?.items || res.data || []);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsNoShowsLoading(false);
+        }
+    }, []);
+
     // Initial load and polling every 10 seconds
     useEffect(() => {
         fetchRealtimeStatus();
+        fetchAllNoShows();
         const interval = setInterval(() => {
             fetchRealtimeStatus();
+            fetchAllNoShows();
         }, 10000);
         return () => clearInterval(interval);
-    }, [fetchRealtimeStatus]);
+    }, [fetchRealtimeStatus, fetchAllNoShows]);
 
     // Auto-hide success message
     useEffect(() => {
@@ -106,6 +127,7 @@ const RealtimeRoomMonitor = () => {
                 setNoShowDetail(null);
                 setConfirmAction(null);
                 fetchRealtimeStatus();
+                fetchAllNoShows();
             } else {
                 throw new Error(res?.message || 'Không thể giải phóng phòng.');
             }
@@ -128,6 +150,7 @@ const RealtimeRoomMonitor = () => {
                 setNoShowDetail(null);
                 setConfirmAction(null);
                 fetchRealtimeStatus();
+                fetchAllNoShows();
             } else {
                 throw new Error(res?.message || 'Không thể bỏ qua cảnh báo.');
             }
@@ -280,6 +303,65 @@ const RealtimeRoomMonitor = () => {
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Tổng hợp danh sách No-show */}
+            <div className="mt-8 bg-white rounded-2xl border border-platinum-tint shadow-sm-1 overflow-hidden">
+                <div className="p-4 border-b border-outline-gray bg-cloud-mist/30 flex justify-between items-center">
+                    <h3 className="font-bold text-midnight-indigo flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        Danh sách vi phạm No-show gần đây
+                    </h3>
+                    <button onClick={fetchAllNoShows} className="text-xs font-semibold text-action-blue hover:text-glacier-blue transition-colors flex items-center gap-1">
+                        <RefreshCw className={`w-3.5 h-3.5 ${isNoShowsLoading ? 'animate-spin' : ''}`} />
+                        Làm mới
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-cloud-mist/50 text-slate-blue text-xs uppercase">
+                            <tr>
+                                <th className="px-4 py-3 font-semibold">Mã Case</th>
+                                <th className="px-4 py-3 font-semibold">Phòng</th>
+                                <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                                <th className="px-4 py-3 font-semibold">Phát hiện lúc</th>
+                                <th className="px-4 py-3 font-semibold text-right">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-outline-gray">
+                            {allNoShows.length === 0 && !isNoShowsLoading && (
+                                <tr>
+                                    <td colSpan="5" className="px-4 py-8 text-center text-slate-blue italic">Không có dữ liệu vi phạm.</td>
+                                </tr>
+                            )}
+                            {allNoShows.map(caseItem => (
+                                <tr key={caseItem.id} className="hover:bg-cloud-mist/20 transition-colors">
+                                    <td className="px-4 py-3 font-mono text-xs">{caseItem.id?.substring(0, 8)}...</td>
+                                    <td className="px-4 py-3 font-semibold text-midnight-indigo">{caseItem.roomName || caseItem.roomId}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${
+                                            caseItem.status === 'PENDING' ? 'bg-red-100 text-red-700' :
+                                            caseItem.status === 'RELEASED' ? 'bg-green-100 text-green-700' :
+                                            caseItem.status === 'IGNORED' ? 'bg-slate-200 text-slate-700' :
+                                            'bg-blue-100 text-blue-700'
+                                        }`}>
+                                            {caseItem.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs">{caseItem.detectedAt ? new Date(caseItem.detectedAt).toLocaleString('vi-VN') : '—'}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <button 
+                                            onClick={() => handleOpenNoShow({ roomId: caseItem.roomId, roomName: caseItem.roomName })}
+                                            className="px-3 py-1 bg-white border border-platinum-tint hover:bg-cloud-mist rounded-lg text-xs font-semibold text-action-blue transition-colors"
+                                        >
+                                            Chi tiết
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* ─────────── No-Show Detail Modal ─────────── */}

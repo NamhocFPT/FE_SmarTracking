@@ -457,8 +457,8 @@ const ManagerMeetingDetail = () => {
                             disabled={isBefore15Min}
                             title={isBefore15Min ? "Nút tham gia sẽ mở trước giờ họp 15 phút" : ""}
                             className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all ${isBefore15Min
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse-soft'
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse-soft'
                                 }`}
                         >
                             <Video className="w-4 h-4" /> Tham gia phòng họp
@@ -485,9 +485,9 @@ const ManagerMeetingDetail = () => {
                     <div className="space-y-3">
                         <div className="flex items-center gap-2">
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${meeting.status === 'scheduled' ? 'bg-blue-50 text-action-blue border border-blue-150' :
-                                    meeting.status === 'in_progress' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                        meeting.status === 'completed' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                                            'bg-red-50 text-red-700 border border-red-200'
+                                meeting.status === 'in_progress' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                    meeting.status === 'completed' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                                        'bg-red-50 text-red-700 border border-red-200'
                                 }`}>
                                 {meeting.status === 'scheduled' ? 'Đã xếp lịch' :
                                     meeting.status === 'in_progress' ? 'Đang họp' :
@@ -669,8 +669,8 @@ const ManagerMeetingDetail = () => {
                                                     key={idx}
                                                     onClick={() => setCurrentTime(segment.time)}
                                                     className={`p-2 rounded-lg border cursor-pointer transition-colors ${idx === activeSegmentIndex && isPlaying
-                                                            ? 'bg-blue-50/80 border-blue-200 shadow-sm'
-                                                            : 'bg-white border-outline-gray/60 hover:bg-cloud-mist'
+                                                        ? 'bg-blue-50/80 border-blue-200 shadow-sm'
+                                                        : 'bg-white border-outline-gray/60 hover:bg-cloud-mist'
                                                         }`}
                                                 >
                                                     <div className="flex justify-between items-center mb-1 text-[9.5px]">
