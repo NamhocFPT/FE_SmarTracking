@@ -12,6 +12,7 @@ import SystemAdminLayout from '../pages/systemAdmin/layout/SystemAdminLayout';
 import DashBoard from '../pages/systemAdmin/dashBoard';
 import DeviceManagement from '../pages/systemAdmin/DeviceManagement';
 import EquipmentManagement from '../pages/systemAdmin/EquipmentManagement';
+import ZoneManagement from '../pages/systemAdmin/ZoneManagement';
 import RolePermissionManagement from '../pages/systemAdmin/RolePermissionManagement';
 import AuditLogs from '../pages/systemAdmin/AuditLogs';
 import SystemSettings from '../pages/systemAdmin/SystemSettings';
@@ -94,6 +95,10 @@ export const router = [
             {
                 path: 'equipments',
                 element: <EquipmentManagement />
+            },
+            {
+                path: 'zones',
+                element: <ZoneManagement />
             },
             {
                 path: 'roles-permissions',

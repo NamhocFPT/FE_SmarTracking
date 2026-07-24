@@ -4,6 +4,7 @@ import { logout } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
 import AvatarReminderModal from '../../../component/AvatarReminder/AvatarReminderModal';
 import UserAvatar from '../../../component/UserAvatar';
+import ChangePasswordModal from '../../../component/ChangePasswordModal';
 
 /**
  * Navigation items cho BusinessAdmin role
@@ -49,6 +50,7 @@ const footerLinks = [
 
 const BusinessAdminLayout = () => {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
     const [openDropdown, setOpenDropdown] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const profileMenuRef = useRef(null);
@@ -101,6 +103,11 @@ const BusinessAdminLayout = () => {
         setIsProfileMenuOpen(false);
         navigate('/business-admin/my-vehicles');
     }, [navigate]);
+
+    const handleChangePassword = useCallback(() => {
+        setIsProfileMenuOpen(false);
+        setIsChangePasswordOpen(true);
+    }, []);
 
     const displayName = currentUser?.fullName || 'Quản trị viên';
     const displayRole = 'Business Admin';
@@ -289,6 +296,19 @@ const BusinessAdminLayout = () => {
                                         <button
                                             type="button"
                                             role="menuitem"
+                                            onClick={handleChangePassword}
+                                            className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-midnight-indigo hover:bg-cloud-mist transition-colors duration-150"
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                            </svg>
+                                            Đổi mật khẩu
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            role="menuitem"
                                             onClick={handleLogout}
                                             className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
                                         >
@@ -311,6 +331,7 @@ const BusinessAdminLayout = () => {
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 lg:px-12 py-6">
                 <Outlet />
                 <AvatarReminderModal />
+                <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setIsChangePasswordOpen(false)} />
             </main>
 
             {/* ========== FOOTER ========== */}
