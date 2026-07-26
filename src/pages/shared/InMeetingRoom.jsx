@@ -79,6 +79,76 @@ const callWithFallback = async (employeeFn, managerFn, ...args) => {
     }
 };
 
+// Format duration helper
+const formatDuration = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+// Recording Timer Component (handles interval and polling without re-rendering parent)
+const RecordingTimer = ({ meetingId, sessionId, initialStatus, onStatusChange }) => {
+    const [duration, setDuration] = useState(0);
+    const [localStatus, setLocalStatus] = useState(initialStatus);
+    const [fileSize, setFileSize] = useState(null);
+
+    useEffect(() => {
+        setLocalStatus(initialStatus);
+    }, [initialStatus]);
+
+    // Local 1-second tick for duration
+    useEffect(() => {
+        if (localStatus !== 'recording') return;
+        const interval = setInterval(() => setDuration(prev => prev + 1), 1000);
+        return () => clearInterval(interval);
+    }, [localStatus]);
+
+    // 5-second polling for real status
+    useEffect(() => {
+        if (!sessionId || ['inactive', 'completed', 'failed'].includes(localStatus)) return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await callWithFallback(getEmployeeRecordingStatus, getManagerRecordingStatus, meetingId, sessionId);
+                if (res?.success) {
+                    const data = res.data;
+                    if (data.status && data.status !== localStatus) {
+                        setLocalStatus(data.status);
+                        if (onStatusChange) onStatusChange(data.status);
+                    }
+                    if (data.durationSeconds != null) setDuration(data.durationSeconds);
+                    if (data.fileSizeBytes != null) setFileSize(data.fileSizeBytes);
+                }
+            } catch (e) {}
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [sessionId, localStatus, meetingId, onStatusChange]);
+
+    const formatSize = (bytes) => {
+        if (!bytes) return '';
+        const mb = (parseInt(bytes) / (1024 * 1024)).toFixed(1);
+        return ` - ${mb}MB`;
+    };
+
+    if (['recording', 'starting', 'stopping', 'paused'].includes(localStatus)) {
+        return (
+            <div className={`px-3 py-2 rounded-xl border flex flex-col gap-1 text-xs font-bold ${localStatus === 'recording' ? 'bg-red-950/50 text-red-400 border-red-900' : localStatus === 'paused' ? 'bg-amber-950/50 text-amber-400 border-amber-900' : 'bg-blue-950/50 text-blue-400 border-blue-900'}`}>
+                <div className="flex items-center">
+                    {localStatus === 'recording' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />}
+                    {localStatus === 'recording' ? `REC ${formatDuration(duration)}${formatSize(fileSize)}` : 
+                     localStatus === 'paused' ? `PAUSED ${formatDuration(duration)}${formatSize(fileSize)}` : 
+                     'Đang xử lý...'}
+                </div>
+                {localStatus === 'paused' && (
+                    <div className="text-[10px] font-normal opacity-80 italic">Đoạn tạm dừng sẽ không có trong file ghi</div>
+                )}
+            </div>
+        );
+    }
+    return null;
+};
+
 const normalizeMeetingDetail = (raw, currentUserId) => {
     // Basic mapping, keeping it flat for UI
     return {
@@ -167,14 +237,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         }, 3500);
     };
 
-    // Format duration helper
-    const formatDuration = (seconds) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        if (h > 0) return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
+    // Format duration helper has been moved outside the component
 
     // Load meeting details & synchronize
     const initMeetingState = async () => {
@@ -1282,11 +1345,13 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     Ghi Hình Phòng Họp
                                 </h3>
                                 <div className="flex flex-col gap-2.5">
-                                    {['recording', 'starting', 'stopping'].includes(recordingStatus) && (
-                                        <div className={`px-3 py-2 rounded-xl border flex items-center text-xs font-bold ${recordingStatus === 'recording' ? 'bg-red-950/50 text-red-400 border-red-900' : 'bg-blue-950/50 text-blue-400 border-blue-900'}`}>
-                                            {recordingStatus === 'recording' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />}
-                                            {recordingStatus === 'recording' ? `REC ${formatDuration(recordingDuration)}` : 'Đang xử lý...'}
-                                        </div>
+                                    {['recording', 'starting', 'stopping', 'paused'].includes(recordingStatus) && (
+                                        <RecordingTimer 
+                                            meetingId={id} 
+                                            sessionId={recordingSessionId} 
+                                            initialStatus={recordingStatus} 
+                                            onStatusChange={setRecordingStatus} 
+                                        />
                                     )}
                                     
                                     {recordingStatus === 'inactive' ? (
