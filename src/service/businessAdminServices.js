@@ -165,11 +165,11 @@ export const getBackgroundJobStatus = async (jobId) => {
 
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/rooms/available${query}`);
+    return await get(`/rooms/search${query}`);
 };
 
 export const getRoomRealtimeStatus = async () => {
-    return await get('/rooms/search');
+    return await get('/rooms/realtime-status');
 };
 
 /**
@@ -235,6 +235,18 @@ export const createMeeting = async (data) => {
 
 export const updateMeeting = async (meetingId, data) => {
     return await patch(`/meetings/${meetingId}`, data);
+};
+
+export const updateMeetingTime = async (id, data) => {
+    return await patch(`/meetings/${id}/time`, data);
+};
+
+export const updateMeetingRoom = async (id, data) => {
+    return await patch(`/meetings/${id}/room`, data);
+};
+
+export const updateMeetingRecordingConfig = async (id, data) => {
+    return await patch(`/meetings/${id}/recording-config`, data);
 };
 
 export const cancelMeeting = async (meetingId, reason = 'Huỷ bởi quản trị viên') => {

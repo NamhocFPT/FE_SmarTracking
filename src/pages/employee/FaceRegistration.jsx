@@ -144,11 +144,11 @@ const EmployeeFaceRegistration = () => {
         formData.append('consentAt', new Date().toISOString());
         
         if (imageBlob) {
-            formData.append('image', imageBlob, 'face-profile.jpg');
+            formData.append('file', imageBlob, 'face-profile.jpg');
         } else {
             // Fallback for simulation mode (create a tiny empty dummy blob)
             const dummyBlob = new Blob(['dummy-image-data'], { type: 'image/jpeg' });
-            formData.append('image', dummyBlob, 'mock-face.jpg');
+            formData.append('file', dummyBlob, 'mock-face.jpg');
         }
 
         try {

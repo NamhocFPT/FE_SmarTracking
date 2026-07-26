@@ -49,12 +49,12 @@ export const deleteZone = async (id) => {
 
 /**
  * Gán thiết bị vào khu vực
- * BE: POST /zones/:id/devices
+ * BE: PATCH /zones/:id/devices
  * @param {string} id - ID của Zone
- * @param {object} data - { deviceId: string }
+ * @param {object} data - { device_ids: string[] }
  */
 export const assignDeviceToZone = async (id, data) => {
-    return await post(`/zones/${id}/devices`, data);
+    return await patch(`/zones/${id}/devices`, data);
 };
 
 /**

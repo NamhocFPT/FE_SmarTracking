@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/api/v1'; // Connect to local backend API
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api/v1';
 
 // Token storage helpers
 export const getAccessToken = () => localStorage.getItem('accessToken');

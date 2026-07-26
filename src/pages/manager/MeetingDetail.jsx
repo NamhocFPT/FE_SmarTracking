@@ -5,7 +5,7 @@ import {
     Calendar, Clock, MapPin, Users, Video, Edit3, Trash2,
     Check, Play, Pause, Search, List, AlertTriangle, Upload, X, FileText, Download
 } from 'lucide-react';
-import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/managerServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/managerServices';
 import UserAvatar from '../../component/UserAvatar';
 import MeetingAttendanceBoard from '../../component/MeetingAttendanceBoard';
 
@@ -261,18 +261,30 @@ const ManagerMeetingDetail = () => {
             const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
             const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
 
-            const payload = {
-                title: editTitle,
-                roomId: editRoomId,
-                scheduledStart: startISO,
-                scheduledEnd: endISO,
-                participantIds: editParticipants,
-                recordingEnabled: editRecordingEnabled,
-                agenda: agendaList
-            };
+            let successCount = 0;
+            // 1. Update Time if changed
+            if (startISO !== meeting.startTime || endISO !== meeting.endTime) {
+                const timeRes = await updateMeetingTime(meeting.id, { startTime: startISO, endTime: endISO });
+                if (timeRes?.success) successCount++;
+            }
+            // 2. Update Room if changed
+            if (editRoomId !== meeting.room?.id) {
+                const roomRes = await updateMeetingRoom(meeting.id, { newRoomId: editRoomId });
+                if (roomRes?.success) successCount++;
+            }
+            // 3. Update Recording config if changed
+            if (editRecordingEnabled !== meeting.recordingEnabled) {
+                const recRes = await updateMeetingRecordingConfig(meeting.id, { autoRecord: editRecordingEnabled, allowRecording: editRecordingEnabled });
+                if (recRes?.success) successCount++;
+            }
 
-            const res = await updateMeeting(meeting.id, payload);
-            if (res?.success) {
+            // 4. Update other info (Title) - Chờ BE-03
+            if (editTitle !== meeting.title) {
+                await updateMeeting(meeting.id, { title: editTitle }); // Tạm gọi hàm cũ
+                successCount++;
+            }
+
+            if (successCount > 0 || (startISO === meeting.startTime && endISO === meeting.endTime && editRoomId === meeting.room?.id && editRecordingEnabled === meeting.recordingEnabled && editTitle === meeting.title)) {
                 setSuccessMsg('Đã cập nhật thông tin cuộc họp thành công.');
                 setIsEditModalOpen(false);
                 fetchMeeting();

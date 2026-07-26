@@ -163,8 +163,10 @@ export const updateSelfProfile = async (userId, data) => {
  * @param {number|string} userId
  * @param {object} data - Payload matching backend schema
  */
-export const registerFaceProfile = async (userId, data) => {
-    return await post(`/users/${userId}/face-profile`, data);
+export const registerFaceProfile = async (userId, formData) => {
+    return await post(`/users/${userId}/face-profile`, formData, {
+        headers: {}
+    });
 };
 
 /**
@@ -187,6 +189,18 @@ export const updateMeeting = async (id, data) => {
     return await patch(`/meetings/${id}`, data);
 };
 
+export const updateMeetingTime = async (id, data) => {
+    return await patch(`/meetings/${id}/time`, data);
+};
+
+export const updateMeetingRoom = async (id, data) => {
+    return await patch(`/meetings/${id}/room`, data);
+};
+
+export const updateMeetingRecordingConfig = async (id, data) => {
+    return await patch(`/meetings/${id}/recording-config`, data);
+};
+
 /**
  * UC-SM-03: Hủy cuộc họp
  */
@@ -198,6 +212,7 @@ export const cancelMeeting = async (id, reason = '') => {
  * UC-SM-08: Check-in bằng khuôn mặt vào phòng họp
  */
 export const checkInMeeting = async (id, data) => {
+    // CHỜ BE-11
     return await post(`/meetings/${id}/check-in`, data);
 };
 
@@ -298,7 +313,7 @@ export const getPresentAttendees = async (meetingId, params = {}) => {
  * Endpoint: POST /live-meetings/{meetingId}/extension-requests
  */
 export const requestExtension = async (meetingId, data) => {
-    return await post(`/live-meetings/${meetingId}/extension-requests`, data);
+    return await post(`/meetings/${meetingId}/extension-requests`, data);
 };
 
 /**
@@ -330,7 +345,7 @@ export const stopVideoRecording = async (meetingId, sessionId) => {
 };
 
 export const getRoomDevices = async (roomId) => {
-    return await get(`/rooms/${roomId}/devices`);
+    return await get(`/iot-devices?roomId=${roomId}`);
 };
 
 export const getAllNoShowCases = async (params = {}) => {

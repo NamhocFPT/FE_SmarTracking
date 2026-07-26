@@ -4,7 +4,7 @@ import {
     getZones, getZoneById, createZone, updateZone, 
     deleteZone, assignDeviceToZone, removeDeviceFromZone 
 } from '../../service/zoneServices';
-import { getEquipments } from '../../service/equipmentServices';
+import { getDevices } from '../../service/sysAdminServices';
 import { 
     Map, Plus, Search, MapPin, Edit2, Trash2, 
     RefreshCw, AlertTriangle, Monitor, Video, Shield,
@@ -32,9 +32,12 @@ const ZoneManagement = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const [createForm, setCreateForm] = useState({
-        name: '',
-        description: '',
-        location: ''
+        zone_code: '',
+        zone_name: '',
+        zone_type: 'room',
+        building: '',
+        floor: '',
+        description: ''
     });
 
     const [assignForm, setAssignForm] = useState({
@@ -60,10 +63,11 @@ const ZoneManagement = () => {
 
     const fetchAvailableDevices = useCallback(async () => {
         try {
-            const res = await getEquipments({ limit: 500, equipmentType: 'camera' });
+            const res = await getDevices({ limit: 100 });
             if (res?.success) {
-                // Lọc ra các thiết bị chưa được gán hoặc có thể gán
-                setAvailableDevices(res.data || []);
+                const data = res.data || [];
+                const cameras = data.filter(d => ['ip_camera', 'door_camera', 'room_camera', 'occupancy_sensor', 'face_server'].includes(d.device_type));
+                setAvailableDevices(cameras);
             }
         } catch (err) {
             console.error('Lỗi tải thiết bị:', err);
@@ -111,7 +115,7 @@ const ZoneManagement = () => {
             if (res?.success) {
                 setSuccessMessage('Tạo khu vực mới thành công!');
                 setIsCreateModalOpen(false);
-                setCreateForm({ name: '', description: '', location: '' });
+                setCreateForm({ zone_code: '', zone_name: '', zone_type: 'room', building: '', floor: '', description: '' });
                 fetchZones();
             } else {
                 setError(res?.message || 'Tạo khu vực thất bại.');
@@ -133,7 +137,7 @@ const ZoneManagement = () => {
         try {
             const res = await deleteZone(zoneToDelete.id);
             if (res?.success) {
-                setSuccessMessage(`Đã xoá khu vực ${zoneToDelete.name} thành công.`);
+                setSuccessMessage(`Đã xoá khu vực ${zoneToDelete.zone_name} thành công.`);
                 setIsDeleteModalOpen(false);
                 if (selectedZone?.id === zoneToDelete.id) {
                     setSelectedZone(null);
@@ -155,12 +159,23 @@ const ZoneManagement = () => {
         if (!selectedZone || !assignForm.deviceId) return;
         
         try {
-            const res = await assignDeviceToZone(selectedZone.id, { deviceId: assignForm.deviceId });
+            const res = await assignDeviceToZone(selectedZone.id, { device_ids: [assignForm.deviceId] });
             if (res?.success) {
                 setSuccessMessage('Gán thiết bị thành công!');
                 setIsAssignModalOpen(false);
+                
+                // Vì API GET /zones/:id không trả về devices, ta phải tự update state ở client
+                const assignedDevice = availableDevices.find(d => d.id === assignForm.deviceId);
+                if (assignedDevice) {
+                    setSelectedZone(prev => ({
+                        ...prev,
+                        devices: [...(prev.devices || []), assignedDevice]
+                    }));
+                }
+                
                 setAssignForm({ deviceId: '' });
-                handleSelectZone(selectedZone); // Refresh details
+                // Không gọi lại handleSelectZone vì sẽ làm mất mảng devices do BE không trả về
+                fetchAvailableDevices();
             } else {
                 setError(res?.message || 'Gán thiết bị thất bại.');
             }
@@ -175,7 +190,14 @@ const ZoneManagement = () => {
             const res = await removeDeviceFromZone(selectedZone.id, deviceId);
             if (res?.success) {
                 setSuccessMessage('Đã gỡ thiết bị khỏi khu vực.');
-                handleSelectZone(selectedZone); // Refresh details
+                
+                // Update state ở client thay vì fetch lại API do API ko trả về devices
+                setSelectedZone(prev => ({
+                    ...prev,
+                    devices: (prev.devices || []).filter(d => d.id !== deviceId)
+                }));
+                
+                fetchAvailableDevices();
             } else {
                 setError(res?.message || 'Lỗi khi gỡ thiết bị.');
             }
@@ -184,10 +206,11 @@ const ZoneManagement = () => {
         }
     };
 
-    const filteredZones = zones.filter(z => 
-        z.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        z.location?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredZones = zones.filter(z => {
+        const searchLower = searchTerm.toLowerCase();
+        const loc = [z.building, z.floor].filter(Boolean).join(' - ').toLowerCase();
+        return z.zone_name?.toLowerCase().includes(searchLower) || loc.includes(searchLower);
+    });
 
     return (
         <div className="h-full flex flex-col space-y-4">
@@ -256,7 +279,7 @@ const ZoneManagement = () => {
                                     }`}
                                 >
                                     <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-bold text-sm text-midnight-indigo">{zone.name}</h3>
+                                        <h3 className="font-bold text-sm text-midnight-indigo">{zone.zone_name}</h3>
                                         <div className="flex items-center gap-1">
                                             <button
                                                 onClick={(e) => handleDeleteClick(zone, e)}
@@ -269,7 +292,7 @@ const ZoneManagement = () => {
                                     </div>
                                     <p className="text-xs text-slate-blue flex items-center mt-1">
                                         <MapPin className="w-3 h-3 mr-1" />
-                                        {zone.location || 'Chưa cập nhật vị trí'}
+                                        {[zone.building, zone.floor].filter(Boolean).join(' - ') || 'Chưa cập nhật vị trí'}
                                     </p>
                                 </div>
                             ))
@@ -285,7 +308,7 @@ const ZoneManagement = () => {
                                 <div>
                                     <h2 className="font-bold text-midnight-indigo flex items-center">
                                         <Map className="w-5 h-5 mr-2 text-action-blue" />
-                                        Chi tiết khu vực: {selectedZone.name}
+                                        Chi tiết khu vực: {selectedZone.zone_name}
                                     </h2>
                                     <p className="text-xs text-slate-blue mt-1">Quản lý các camera được gán vào khu vực này</p>
                                 </div>
@@ -319,7 +342,7 @@ const ZoneManagement = () => {
                                                     <p className="text-xs text-slate-blue mb-1">Vị trí</p>
                                                     <p className="text-sm font-medium text-midnight-indigo flex items-center">
                                                         <MapPin className="w-4 h-4 mr-1 text-slate-blue" />
-                                                        {selectedZone.location || 'Chưa rõ'}
+                                                        {[selectedZone.building, selectedZone.floor].filter(Boolean).join(' - ') || 'Chưa rõ'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -343,8 +366,8 @@ const ZoneManagement = () => {
                                                                     <Camera className="w-5 h-5" />
                                                                 </div>
                                                                 <div>
-                                                                    <p className="font-bold text-sm text-midnight-indigo">{device.equipmentName}</p>
-                                                                    <p className="text-xs text-slate-blue font-mono mt-0.5">{device.equipmentCode}</p>
+                                                                    <p className="font-bold text-sm text-midnight-indigo">{device.device_name}</p>
+                                                                    <p className="text-xs text-slate-blue font-mono mt-0.5">{device.device_code}</p>
                                                                     <span className="inline-flex mt-2 items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" /> Đang hoạt động
                                                                     </span>
@@ -386,12 +409,32 @@ const ZoneManagement = () => {
                         </div>
                         <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên khu vực <span className="text-red-500">*</span></label>
-                                <input required type="text" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Khu vực nhà xe" />
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã khu vực <span className="text-red-500">*</span></label>
+                                <input required type="text" value={createForm.zone_code} onChange={e => setCreateForm({...createForm, zone_code: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: ROOM-101" />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Vị trí</label>
-                                <input type="text" value={createForm.location} onChange={e => setCreateForm({...createForm, location: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1 toà nhà A" />
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên khu vực <span className="text-red-500">*</span></label>
+                                <input required type="text" value={createForm.zone_name} onChange={e => setCreateForm({...createForm, zone_name: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Phòng họp 1" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại khu vực <span className="text-red-500">*</span></label>
+                                <select required value={createForm.zone_type} onChange={e => setCreateForm({...createForm, zone_type: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm">
+                                    <option value="room">Phòng họp (room)</option>
+                                    <option value="gate">Cổng ra vào (gate)</option>
+                                    <option value="corridor">Hành lang (corridor)</option>
+                                    <option value="lobby">Sảnh lễ tân (lobby)</option>
+                                    <option value="parking">Bãi đỗ xe (parking)</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tòa nhà</label>
+                                    <input type="text" value={createForm.building} onChange={e => setCreateForm({...createForm, building: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Toà nhà A" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tầng</label>
+                                    <input type="text" value={createForm.floor} onChange={e => setCreateForm({...createForm, floor: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1" />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mô tả</label>
@@ -417,7 +460,7 @@ const ZoneManagement = () => {
                             </div>
                             <h3 className="text-lg font-bold text-midnight-indigo mb-2">Xác nhận xoá khu vực</h3>
                             <p className="text-sm text-slate-blue mb-1">
-                                Bạn có chắc chắn muốn xoá khu vực <span className="font-bold text-midnight-indigo">{zoneToDelete.name}</span>?
+                                Bạn có chắc chắn muốn xoá khu vực <span className="font-bold text-midnight-indigo">{zoneToDelete.zone_name}</span>?
                             </p>
                         </div>
                         <div className="p-4 bg-cloud-mist/30 border-t border-platinum-tint flex justify-end gap-3">
@@ -441,11 +484,11 @@ const ZoneManagement = () => {
                         </div>
                         <form onSubmit={handleAssignSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn thiết bị (Camera)</label>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn thiết bị giám sát</label>
                                 <select required value={assignForm.deviceId} onChange={e => setAssignForm({deviceId: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white">
                                     <option value="" disabled>-- Chọn thiết bị --</option>
                                     {availableDevices.map(dev => (
-                                        <option key={dev.id} value={dev.id}>{dev.equipmentName} ({dev.equipmentCode})</option>
+                                        <option key={dev.id} value={dev.id}>{dev.device_name} ({dev.device_code})</option>
                                     ))}
                                 </select>
                             </div>

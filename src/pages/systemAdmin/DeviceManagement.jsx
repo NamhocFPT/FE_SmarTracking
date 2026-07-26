@@ -145,7 +145,7 @@ const DeviceManagement = () => {
             deviceCode: device.deviceCode || '',
             deviceName: device.deviceName || '',
             deviceType: device.deviceType || 'camera',
-            roomId: device.roomId || '',
+            roomId: device.room_id || '',
             ipAddress: device.ipAddress || '',
             macAddress: device.macAddress || '',
             streamUrl: device.streamUrl || '',
@@ -171,7 +171,18 @@ const DeviceManagement = () => {
 
         setSubmitting(true);
         try {
-            const res = await registerDevice(formData);
+            const payload = {
+                device_code: formData.deviceCode,
+                device_name: formData.deviceName,
+                device_type: formData.deviceType,
+                ip_address: formData.ipAddress || undefined,
+                mac_address: formData.macAddress || undefined,
+                metadata_json: {
+                    stream_url: formData.streamUrl || '',
+                    agent_version: formData.agentVersion || 'v1.0.0'
+                }
+            };
+            const res = await registerDevice(payload);
             if (res?.success) {
                 setSuccessMessage('Đăng ký thiết bị IoT thành công.');
                 setIsRegisterModalOpen(false);
@@ -203,7 +214,12 @@ const DeviceManagement = () => {
 
         setSubmitting(true);
         try {
-            const res = await updateDevice(selectedDevice.id, formData);
+            const updatePayload = {
+                device_name: formData.deviceName,
+                ip_address: formData.ipAddress || undefined,
+                mac_address: formData.macAddress || undefined
+            };
+            const res = await updateDevice(selectedDevice.id, updatePayload);
             if (res?.success) {
                 setSuccessMessage('Cập nhật thông tin cấu hình thành công.');
                 setIsEditModalOpen(false);
@@ -343,7 +359,7 @@ const DeviceManagement = () => {
         if (!assignRoomDeviceId || !assignRoomValue) return;
         setSubmitting(true);
         try {
-            const res = await assignDeviceRoom(assignRoomDeviceId, { roomId: assignRoomValue });
+            const res = await assignDeviceRoom(assignRoomDeviceId, { room_id: assignRoomValue });
             if (res?.success) {
                 setSuccessMessage('Đã gán phòng cho thiết bị thành công.');
                 setIsAssignRoomModalOpen(false);
@@ -415,7 +431,7 @@ const DeviceManagement = () => {
             device.ipAddress.includes(search);
         const matchType = selectedType === '' || device.deviceType === selectedType;
         const matchStatus = selectedStatus === '' || device.status === selectedStatus;
-        const matchRoom = selectedRoomId === '' || device.roomId === selectedRoomId;
+        const matchRoom = selectedRoomId === '' || device.room_id === selectedRoomId;
         return matchSearch && matchType && matchStatus && matchRoom;
     });
 
@@ -575,7 +591,7 @@ const DeviceManagement = () => {
                                         </tr>
                                     ) : (
                                         paginatedDevices.map(device => {
-                                            const assignedRoom = rooms.find(r => r.id === device.roomId);
+                                            const assignedRoom = rooms.find(r => r.roomId === device.room_id);
                                             return (
                                                 <tr key={device.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
                                                     <td className="py-4 px-6">
@@ -664,7 +680,7 @@ const DeviceManagement = () => {
                                                             </button>
                                                         )}
                                                         <button
-                                                            onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.roomId || ''); setIsAssignRoomModalOpen(true); }}
+                                                            onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.room_id || ''); setIsAssignRoomModalOpen(true); }}
                                                             title="Gán phòng"
                                                             className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-teal-600 hover:bg-teal-50 transition-colors"
                                                         >
@@ -781,7 +797,7 @@ const DeviceManagement = () => {
                             {/* Blueprint grid layout */}
                             <div className="grid grid-cols-12 grid-rows-6 gap-4 w-full min-w-[700px] h-[380px]">
                                 {rooms.map(room => {
-                                    const roomDevices = devicesList.filter(d => d.roomId === room.id);
+                                    const roomDevices = devicesList.filter(d => d.room_id === room.roomId);
                                     const hasFault = roomDevices.some(d => d.status === 'offline');
                                     const isSelected = selectedRoomForSimulate?.id === room.id;
                                     
@@ -912,14 +928,14 @@ const DeviceManagement = () => {
                                 </div>
 
                                 {/* Simulated Camera Stream Live Feed */}
-                                {devicesList.filter(d => d.roomId === selectedRoomForSimulate.id && d.deviceType === 'camera').length > 0 && (
+                                {devicesList.filter(d => d.room_id === selectedRoomForSimulate.roomId && d.deviceType === 'camera').length > 0 && (
                                     <div className="space-y-2">
                                         <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider">Luồng live camera mô phỏng</label>
                                         <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-outline-gray/80 flex items-center justify-center group">
                                             {/* Grid overlay */}
                                             <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,0,0.05)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none" />
                                             {/* Check if the main camera is online */}
-                                            {devicesList.filter(d => d.roomId === selectedRoomForSimulate.id && d.deviceType === 'camera')[0].status === 'online' ? (
+                                            {devicesList.filter(d => d.room_id === selectedRoomForSimulate.roomId && d.deviceType === 'camera')[0].status === 'online' ? (
                                                 <>
                                                     <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/60 px-2 py-0.5 rounded text-[10px] text-green-400 font-bold border border-green-500/20">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -961,10 +977,10 @@ const DeviceManagement = () => {
                                     </div>
                                     
                                     <div className="space-y-3">
-                                        {devicesList.filter(d => d.roomId === selectedRoomForSimulate.id).length === 0 ? (
+                                        {devicesList.filter(d => d.room_id === selectedRoomForSimulate.roomId).length === 0 ? (
                                             <p className="text-xs text-steel-gray italic">Không có thiết bị nào trong phòng này để mô phỏng.</p>
                                         ) : (
-                                            devicesList.filter(d => d.roomId === selectedRoomForSimulate.id).map(d => (
+                                            devicesList.filter(d => d.room_id === selectedRoomForSimulate.roomId).map(d => (
                                                 <div 
                                                     key={d.id}
                                                     className="flex items-center justify-between p-3 rounded-xl border border-platinum-tint bg-cloud-mist/30 hover:bg-cloud-mist/60 transition-colors"
@@ -1002,7 +1018,7 @@ const DeviceManagement = () => {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            const dev = devicesList.find(d => d.roomId === selectedRoomForSimulate.id);
+                                            const dev = devicesList.find(d => d.room_id === selectedRoomForSimulate.roomId);
                                             if (dev) {
                                                 openEditModal(dev);
                                             } else {
@@ -1230,7 +1246,7 @@ const DeviceManagement = () => {
                                 <label htmlFor="assign-room-select" className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn phòng họp</label>
                                 <select id="assign-room-select" value={assignRoomValue} onChange={(e) => setAssignRoomValue(e.target.value)} required className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
                                     <option value="">-- Chọn phòng --</option>
-                                    {rooms.map(room => (<option key={room.id} value={room.id}>{room.roomName}</option>))}
+                                    {rooms.map(room => (<option key={room.roomId} value={room.roomId}>{room.roomName}</option>))}
                                 </select>
                             </div>
                             <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">

@@ -99,7 +99,17 @@ const EquipmentManagement = () => {
         setError(null);
         setSuccessMessage(null);
         try {
-            const res = await createEquipment(createForm);
+            // Format lại equipmentCode: loại bỏ khoảng trắng thừa và thay các ký tự không hợp lệ bằng dấu gạch ngang
+            let safeCode = createForm.equipmentCode.toUpperCase().trim().replace(/[^A-Z0-9]+/g, '-');
+            // Loại bỏ dấu gạch ngang ở đầu và cuối nếu có
+            safeCode = safeCode.replace(/^-+|-+$/g, '');
+            const formToSubmit = { ...createForm, equipmentCode: safeCode };
+
+            // Loại bỏ các trường rỗng (đặc biệt là purchaseDate) để tránh lỗi Validate của DTO
+            const payload = Object.fromEntries(
+                Object.entries(formToSubmit).filter(([_, v]) => v !== '')
+            );
+            const res = await createEquipment(payload);
             if (res?.success) {
                 setSuccessMessage('Tạo mới thiết bị thành công!');
                 setIsCreateModalOpen(false);
@@ -314,7 +324,9 @@ const EquipmentManagement = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                equipmentList.map(eq => (
+                                equipmentList.map(eq => {
+                                    const assignedRoom = rooms.find(r => r.roomId === eq.currentRoomId);
+                                    return (
                                     <tr key={eq.id} className="hover:bg-cloud-mist/20 transition-colors group">
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
@@ -349,10 +361,10 @@ const EquipmentManagement = () => {
                                             )}
                                         </td>
                                         <td className="p-4">
-                                            {eq.currentRoom ? (
+                                            {assignedRoom ? (
                                                 <div className="flex items-center text-sm text-midnight-indigo">
                                                     <MapPin className="w-4 h-4 mr-1 text-slate-blue" />
-                                                    {eq.currentRoom.roomName}
+                                                    {assignedRoom.roomName}
                                                 </div>
                                             ) : (
                                                 <span className="text-sm text-slate-blue italic">Chưa gán</span>
@@ -360,7 +372,7 @@ const EquipmentManagement = () => {
                                         </td>
                                         <td className="p-4 text-right">
                                             <button
-                                                onClick={() => { setSelectedEquipment(eq); setIsAssignModalOpen(true); }}
+                                                onClick={() => { setSelectedEquipment(eq); setAssignForm({ roomId: eq.currentRoomId || '', assignmentNote: '' }); setIsAssignModalOpen(true); }}
                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors mr-1"
                                                 title="Gán vào phòng"
                                             >
@@ -382,7 +394,8 @@ const EquipmentManagement = () => {
                                             </button>
                                         </td>
                                     </tr>
-                                ))
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -481,10 +494,15 @@ const EquipmentManagement = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn phòng họp <span className="text-red-500">*</span></label>
-                                <select required value={assignForm.roomId} onChange={e => setAssignForm({...assignForm, roomId: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm">
-                                    <option value="">-- Chọn phòng --</option>
+                                <select 
+                                    required 
+                                    value={assignForm.roomId} 
+                                    onChange={e => setAssignForm({...assignForm, roomId: e.target.value})} 
+                                    className="w-full px-3 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-action-blue/20 focus:border-action-blue bg-white text-midnight-indigo cursor-pointer shadow-sm"
+                                >
+                                    <option value="" disabled>-- Chọn phòng --</option>
                                     {rooms.map(r => (
-                                        <option key={r.id} value={r.id}>{r.roomName}</option>
+                                        <option key={r.roomId} value={r.roomId}>{r.roomName}</option>
                                     ))}
                                 </select>
                             </div>

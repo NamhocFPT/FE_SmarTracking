@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     CheckCircle, AlertTriangle, Edit3, Save, X, 
-    Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2
+    Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit
 } from 'lucide-react';
 import { updateMeetingMinutes, issueMeetingMinutes } from '../../service/minutesServices';
 
