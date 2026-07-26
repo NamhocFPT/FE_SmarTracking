@@ -64,6 +64,10 @@ const navigationItems = [
             {
                 label: 'Kiểm soát phương tiện',
                 to: '/system-admin/anpr-management'
+            },
+            {
+                label: 'Kiểm soát ra vào cổng',
+                to: '/system-admin/gate-access'
             }
         ]
     },

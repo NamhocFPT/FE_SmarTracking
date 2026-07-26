@@ -19,6 +19,7 @@ import SystemSettings from '../pages/systemAdmin/SystemSettings';
 import Profile from '../pages/shared/Profile';
 import Notifications from '../pages/systemAdmin/Notifications';
 import ANPRManagement from '../pages/bussinessAdmin/ANPRManagement'; // SystemAdmin can also use this
+import GateAccessManagement from '../pages/systemAdmin/GateAccessManagement';
 import MyVehicles from '../pages/shared/MyVehicles';
 
 // BusinessAdmin Layout + Pages
@@ -132,6 +133,10 @@ export const router = [
             {
                 path: 'anpr-management',
                 element: <ANPRManagement />
+            },
+            {
+                path: 'gate-access',
+                element: <GateAccessManagement />
             },
             {
                 path: 'book',

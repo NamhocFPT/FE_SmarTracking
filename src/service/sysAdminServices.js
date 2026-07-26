@@ -346,7 +346,7 @@ export const updateSelfProfile = async (userId, data) => {
  */
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/rooms${query}`);
+    return await get(`/rooms/search${query}`);
 };
 
 /**
@@ -373,6 +373,62 @@ export const markNotificationRead = async (notificationId) => {
 export const markAllNotificationsRead = async () => {
     // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     return await patch('/notifications/read-all');
+};
+
+
+// ============================================================
+// VEHICLES ENDPOINTS
+// ============================================================
+export const getMyVehicles = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/vehicles/me${query}`);
+};
+
+export const registerVehicle = async (data) => {
+    return await post('/vehicles', data);
+};
+
+export const updateVehicle = async (id, data) => {
+    return await patch(`/vehicles/${id}`, data);
+};
+
+export const deleteVehicle = async (id) => {
+    return await dele(`/vehicles/${id}`);
+};
+
+// ============================================================
+// GATE ACCESS & TRAFFIC STATS (UC-107)
+// ============================================================
+
+/**
+ * Lấy lịch sử ra vào thô (Raw logs)
+ */
+export const getAdminGateAccessLogs = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/gate-access-logs${query}`); // Based on B-P1.2, it's GET /admin/gate-access-logs but FE spec usually puts admin prefix if BE has it. Wait, the spec says `GET /api/v1/admin/gate-access-logs`.
+};
+
+/**
+ * Lấy danh sách phiên ghép cặp (Paired sessions)
+ */
+export const getAdminGateAccessHistory = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/gate-access/admin/history${query}`);
+};
+
+/**
+ * Xem chi tiết phiên ghép cặp
+ */
+export const getAdminGateAccessHistoryDetail = async (id) => {
+    return await get(`/gate-access/admin/history/${id}`);
+};
+
+/**
+ * Thống kê lưu lượng phương tiện
+ */
+export const getAdminVehicleTrafficStats = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/gate-access/admin/vehicle-traffic-stats${query}`);
 };
 
 
