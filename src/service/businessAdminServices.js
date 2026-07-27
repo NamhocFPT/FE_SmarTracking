@@ -322,3 +322,120 @@ export const markAllNotificationsRead = async () => {
     // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     return await patch('/notifications/read-all');
 };
+
+// ============================================================
+// B-M7: GỬI THÔNG BÁO CUỘC HỌP (Meeting Notifications)
+// Lưu ý: Tất cả POST trả HTTP 202 — KHÔNG có response.message
+// ============================================================
+
+// B-M7.1 — Gửi lời mời họp
+export const sendMeetingInvitations = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/invitations`, data);
+};
+
+// B-M7.2 — Gửi nhắc nhở họp
+export const sendMeetingReminder = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/reminders`, data);
+};
+
+// B-M7.3 — Gửi thông báo hủy họp (chỉ khi meeting đã cancelled)
+export const sendCancellationNotification = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/cancellation-notifications`, data);
+};
+
+// B-M7.4 — Phân phối biên bản
+export const sendMinutesDistribution = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/minutes/distributions`, data);
+};
+
+// B-M7.5 — Xem chi tiết 1 thông báo (self)
+export const getNotificationDetail = async (notificationId) => {
+    return await get(`/notifications/${notificationId}`);
+};
+
+// ============================================================
+// B-M8: PARTICIPANTS & AGENDA NÂNG CAO
+// ============================================================
+
+// B-M8.1 — Danh sách phòng trống thay thế
+export const getMeetingAvailableRooms = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/available-rooms${query}`);
+};
+
+// B-M8.3 — Tải template Excel import participant
+export const downloadParticipantImportTemplate = async (meetingId) => {
+    return await get(`/meetings/${meetingId}/participants/import/template`, { responseType: 'blob' });
+};
+
+// B-M8.4 — Import participants từ file Excel (2-bước)
+export const importMeetingParticipants = async (meetingId, formData) => {
+    return await post(`/meetings/${meetingId}/participants/import`, formData);
+};
+
+// B-M8.5 — Thêm khách bên ngoài tổ chức
+export const addExternalParticipant = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/participants/external`, data);
+};
+
+// B-M8.6 — Xóa khách bên ngoài
+export const removeExternalParticipant = async (meetingId, externalParticipantId, data = {}) => {
+    return await dele(`/meetings/${meetingId}/participants/external/${externalParticipantId}`, data);
+};
+
+// B-M8.7 — Xóa người tham gia nội bộ (CHỜ BE-06 — prefix meetings/ đang thiếu)
+// export const removeInternalParticipant = async (meetingId, participantUserId, data = {}) => {
+//     return await dele(`/meetings/${meetingId}/participants/${participantUserId}`, data);
+// };
+
+// ============================================================
+// B-M6: BIÊN BẢN NÂNG CAO (Minutes)
+// ============================================================
+
+// B-M6.1 — Tìm biên bản theo người (limit max 20)
+export const searchMinutesByPerson = async (userId, params = {}) => {
+    const query = buildQuery({ userId, ...params });
+    return await get(`/meeting-minutes/search-by-person${query}`);
+};
+
+// B-M6.2 — Gắn/gỡ tài nguyên vào biên bản
+export const linkMinutesResources = async (minutesId, data) => {
+    return await patch(`/meeting-minutes/${minutesId}/link-resources`, data);
+};
+
+// B-M6.3 — Chia sẻ biên bản cho user
+export const createMinutesShare = async (minutesId, data) => {
+    return await post(`/meeting-minutes/${minutesId}/shares`, data);
+};
+
+// B-M6.4 — Danh sách người được chia sẻ biên bản
+export const getMinutesShares = async (minutesId) => {
+    return await get(`/meeting-minutes/${minutesId}/shares`);
+};
+
+// B-M6.5 — Thu hồi chia sẻ biên bản
+export const revokeMinutesShare = async (minutesId, userId) => {
+    return await dele(`/meeting-minutes/${minutesId}/shares/${userId}`);
+};
+
+// B-M6.6 — Tạo job export biên bản (PDF/Docx) — poll /background-jobs/:jobId
+export const exportMinutes = async (minutesId, data) => {
+    return await post(`/meeting-minutes/${minutesId}/exports`, data);
+};
+
+// B-M6.7 — Upload file đính kèm biên bản
+export const uploadMinutesAttachment = async (minutesId, formData) => {
+    return await post(`/meeting-minutes/${minutesId}/attachments`, formData);
+};
+
+// B-M6.8 — Danh sách file đính kèm biên bản
+export const getMinutesAttachments = async (minutesId) => {
+    return await get(`/meeting-minutes/${minutesId}/attachments`);
+};
+
+// B-M6.9 — Xóa file đính kèm biên bản
+export const deleteMinutesAttachment = async (minutesId, fileId) => {
+    return await dele(`/meeting-minutes/${minutesId}/attachments/${fileId}`);
+};
+
+// Background job polling — getBackgroundJobStatus đã được khai báo ở dòng 158

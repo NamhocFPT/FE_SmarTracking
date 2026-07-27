@@ -348,8 +348,8 @@ const MeetingApprovals = () => {
                     <button
                         onClick={() => setViewMode('grid')}
                         className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'grid'
-                                ? 'bg-white text-action-blue shadow-sm'
-                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-white/50'
+                            ? 'bg-white text-action-blue shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-white/50'
                             }`}
                     >
                         <LayoutGrid className="w-4 h-4" /> Grid
@@ -357,8 +357,8 @@ const MeetingApprovals = () => {
                     <button
                         onClick={() => setViewMode('list')}
                         className={`p-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all ${viewMode === 'list'
-                                ? 'bg-white text-action-blue shadow-sm'
-                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-white/50'
+                            ? 'bg-white text-action-blue shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-white/50'
                             }`}
                     >
                         <List className="w-4 h-4" /> Danh sách

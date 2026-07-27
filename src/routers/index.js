@@ -21,7 +21,12 @@ import Notifications from '../pages/systemAdmin/Notifications';
 import ANPRManagement from '../pages/bussinessAdmin/ANPRManagement'; // SystemAdmin can also use this
 import GateAccessManagement from '../pages/systemAdmin/GateAccessManagement';
 import MyVehicles from '../pages/shared/MyVehicles';
-
+import SecurityAlerts from '../pages/systemAdmin/SecurityAlerts';
+import AlertRules from '../pages/systemAdmin/AlertRules';
+import PersonControlList from '../pages/systemAdmin/PersonControlList';
+import VehicleControlList from '../pages/systemAdmin/VehicleControlList';
+import VehicleRegistrations from '../pages/systemAdmin/VehicleRegistrations';
+import RoomOperations from '../pages/systemAdmin/RoomOperations';
 // BusinessAdmin Layout + Pages
 import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLayout';
 import BusinessDashboard from '../pages/bussinessAdmin/dashBoard';
@@ -121,7 +126,18 @@ export const router = [
                 path: 'notifications',
                 element: <Notifications />
             },
-
+            {
+                path: 'security-alerts',
+                element: <SecurityAlerts />
+            },
+            {
+                path: 'alert-rules',
+                element: <AlertRules />
+            },
+            {
+                path: 'person-control-list',
+                element: <PersonControlList />
+            },
             {
                 path: 'my-vehicles',
                 element: <MyVehicles />
@@ -133,6 +149,18 @@ export const router = [
             {
                 path: 'anpr-management',
                 element: <ANPRManagement />
+            },
+            {
+                path: 'vehicle-control-list',
+                element: <VehicleControlList />
+            },
+            {
+                path: 'vehicle-registrations',
+                element: <VehicleRegistrations />
+            },
+            {
+                path: 'room-operations',
+                element: <RoomOperations />
             },
             {
                 path: 'gate-access',
@@ -197,6 +225,10 @@ export const router = [
             {
                 path: 'notifications',
                 element: <Notifications />
+            },
+            {
+                path: 'security-alerts',
+                element: <SecurityAlerts />
             },
             {
                 path: 'my-vehicles',

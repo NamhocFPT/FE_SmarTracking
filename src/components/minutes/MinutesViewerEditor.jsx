@@ -2,17 +2,22 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     CheckCircle, AlertTriangle, Edit3, Save, X, 
-    Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit
+    Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit,
+    Share2, Download
 } from 'lucide-react';
 import { updateMeetingMinutes, issueMeetingMinutes } from '../../service/minutesServices';
+import ExportMinutesModal from '../../component/ExportMinutesModal';
+import ShareMinutesModal from '../../component/ShareMinutesModal';
 
 const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     
-    // Modal state for Issue
+    // Modal state for Issue, Export, Share
     const [showIssueModal, setShowIssueModal] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     const [isIssuing, setIsIssuing] = useState(false);
 
     // Toast state
@@ -180,8 +185,27 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
                                     <Send className="w-3.5 h-3.5" /> Ban hành
                                 </button>
                             )}
+                            {minutes.status === 'published' && (
+                                <>
+                                    {(isHost || minutes.permissions?.canShare !== false) && (
+                                        <button 
+                                            onClick={() => setShowShareModal(true)}
+                                            className="px-3 py-1.5 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors flex items-center gap-1.5 shadow-sm"
+                                        >
+                                            <Share2 className="w-3.5 h-3.5 text-purple-600" /> Chia sẻ
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => setShowExportModal(true)}
+                                        className="px-3 py-1.5 bg-action-blue text-white rounded-xl text-xs font-bold hover:bg-glacier-blue transition-colors flex items-center gap-1.5 shadow-sm"
+                                    >
+                                        <Download className="w-3.5 h-3.5" /> Xuất file
+                                    </button>
+                                </>
+                            )}
                         </>
                     )}
+
                 </div>
             </div>
 
@@ -451,6 +475,19 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Export and Share Modals */}
+            <ExportMinutesModal 
+                minutesId={minutes.id}
+                open={showExportModal}
+                onClose={() => setShowExportModal(false)}
+            />
+
+            <ShareMinutesModal 
+                minutesId={minutes.id}
+                open={showShareModal}
+                onClose={() => setShowShareModal(false)}
+            />
         </div>
     );
 };

@@ -11,6 +11,7 @@ import MeetingPresenceTimeline from '../../component/MeetingPresenceTimeline';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
+import AddExternalParticipantModal from '../../component/AddExternalParticipantModal';
 
 const EmployeeMeetingDetail = () => {
     const { id } = useParams();
@@ -29,6 +30,7 @@ const EmployeeMeetingDetail = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+    const [showAddGuestModal, setShowAddGuestModal] = useState(false);
 
     // Edit fields
     const [editTitle, setEditTitle] = useState('');
@@ -64,6 +66,7 @@ const EmployeeMeetingDetail = () => {
      * sang shape phẳng mà UI dùng, giữ cả camelCase và snake_case để tương thích.
      */
     const normalizeMeetingDetail = (dto) => {
+        const meetingObj = dto.meeting || dto;
         const hostName = dto.host?.fullName || dto.organizer?.fullName || dto.hostName || dto.host_name || 'Chưa rõ';
         const hostId = dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id;
         const organizerId = dto.organizerId || dto.organizer_id || dto.organizer?.id;
@@ -81,12 +84,12 @@ const EmployeeMeetingDetail = () => {
         }));
         return {
             // Meeting core fields (dual casing for compatibility)
-            id: dto.id || dto.meetingId,
-            meetingId: dto.id || dto.meetingId,
-            meeting_code: dto.meetingCode || dto.meeting_code,
-            title: dto.title,
-            description: dto.description,
-            status: dto.status,
+            id: meetingObj.id || meetingObj.meetingId || dto.id || dto.meetingId,
+            meetingId: meetingObj.id || meetingObj.meetingId || dto.id || dto.meetingId,
+            meeting_code: meetingObj.meetingCode || meetingObj.meeting_code || dto.meetingCode || dto.meeting_code,
+            title: meetingObj.title || dto.title,
+            description: meetingObj.description || dto.description,
+            status: meetingObj.status || dto.status,
             // Host and Organizer
             host: hostName,
             hostId,
@@ -104,10 +107,10 @@ const EmployeeMeetingDetail = () => {
                 capacity: room.capacity,
             },
             // Time fields (dual casing)
-            startTime: dto.startTime || dto.start_time,
-            start_time: dto.startTime || dto.start_time,
-            endTime: dto.endTime || dto.end_time,
-            end_time: dto.endTime || dto.end_time,
+            startTime: meetingObj.startTime || meetingObj.start_time || dto.startTime || dto.start_time,
+            start_time: meetingObj.startTime || meetingObj.start_time || dto.startTime || dto.start_time,
+            endTime: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
+            end_time: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
             // Recording
             recordingEnabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
             recording_enabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
@@ -566,10 +569,20 @@ const EmployeeMeetingDetail = () => {
 
                     {/* Participants & Host */}
                     <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
-                        <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider border-b border-platinum-tint pb-3 mb-4 flex items-center gap-2">
-                            <Users className="w-4.5 h-4.5 text-action-blue" />
-                            Người tham dự ({meeting.participants?.length || 0})
-                        </h3>
+                        <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
+                            <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                                <Users className="w-4.5 h-4.5 text-action-blue" />
+                                Người tham dự ({meeting.participants?.length || 0})
+                            </h3>
+                            {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                <button
+                                    onClick={() => setShowAddGuestModal(true)}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                >
+                                    + Mời khách ngoài
+                                </button>
+                            )}
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
                                 <UserAvatar
@@ -944,6 +957,17 @@ const EmployeeMeetingDetail = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Add External Participant Modal */}
+            <AddExternalParticipantModal
+                meetingId={meeting.id}
+                open={showAddGuestModal}
+                onClose={() => setShowAddGuestModal(false)}
+                onSuccess={(msg) => {
+                    setSuccessMsg(msg);
+                    fetchMeeting();
+                }}
+            />
         </>
     );
 };
