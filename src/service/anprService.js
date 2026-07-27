@@ -91,3 +91,50 @@ export const getUnknownVehicles = async (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return await get(`/anpr/admin/unknown-vehicles${query ? `?${query}` : ''}`);
 };
+
+// ============================================================
+// M4: Vehicle Control List (Blocklist / Watchlist)
+// ============================================================
+
+/**
+ * Thêm xe vào danh sách kiểm soát (Watchlist/Blocklist)
+ * POST /anpr/admin/control-list
+ * @param {object} data - Payload (plate_raw, list_type, reason)
+ */
+export const createVehicleControlRecord = async (data) => {
+    return await post(`/anpr/admin/control-list`, data);
+};
+
+/**
+ * Lấy danh sách kiểm soát phương tiện
+ * GET /anpr/admin/control-list
+ */
+export const getVehicleControlList = async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return await get(`/anpr/admin/control-list${query ? `?${query}` : ''}`);
+};
+
+/**
+ * Lấy chi tiết một xe trong danh sách kiểm soát
+ * GET /anpr/admin/control-list/:id
+ */
+export const getVehicleControlRecordById = async (id) => {
+    return await get(`/anpr/admin/control-list/${id}`);
+};
+
+/**
+ * Cập nhật xe trong danh sách kiểm soát
+ * PATCH /anpr/admin/control-list/:id
+ * @param {object} data - Payload (reason, active)
+ */
+export const updateVehicleControlRecord = async (id, data) => {
+    return await patch(`/anpr/admin/control-list/${id}`, data);
+};
+
+/**
+ * Xóa xe khỏi danh sách kiểm soát
+ * DELETE /anpr/admin/control-list/:id
+ */
+export const deleteVehicleControlRecord = async (id) => {
+    return await del(`/anpr/admin/control-list/${id}`);
+};

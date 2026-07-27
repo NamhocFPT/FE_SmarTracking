@@ -75,7 +75,7 @@ const EmployeeLayout = () => {
     }, []);
 
     const displayName = currentUser?.fullName || 'Nhân viên';
-    const displayRole = 'Employee';
+    const displayRole = 'Nhân viên';
 
     return (
         <div className="min-h-screen flex flex-col bg-cloud-mist">

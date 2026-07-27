@@ -246,13 +246,33 @@ const InMeetingRoom = ({ isPublic = false }) => {
         try {
             const res = await getMeetingEmployee(id);
             if (res?.success && res.data) {
-                baseMeeting = res.data;
+                const dto = res.data;
+                const meetingObj = dto.meeting || dto;
+                baseMeeting = {
+                    ...dto,
+                    title: meetingObj.title || dto.title,
+                    status: meetingObj.status || dto.status,
+                    startTime: meetingObj.startTime || dto.startTime || meetingObj.start_time || dto.start_time,
+                    endTime: meetingObj.endTime || dto.endTime || meetingObj.end_time || dto.end_time,
+                    hostId: dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id,
+                    host_id: dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id,
+                };
             }
         } catch (e) {
             try {
                 const res = await getMeetingManager(id);
                 if (res?.success && res.data) {
-                    baseMeeting = res.data;
+                    const dto = res.data;
+                    const meetingObj = dto.meeting || dto;
+                    baseMeeting = {
+                        ...dto,
+                        title: meetingObj.title || dto.title,
+                        status: meetingObj.status || dto.status,
+                        startTime: meetingObj.startTime || dto.startTime || meetingObj.start_time || dto.start_time,
+                        endTime: meetingObj.endTime || dto.endTime || meetingObj.end_time || dto.end_time,
+                        hostId: dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id,
+                        host_id: dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id,
+                    };
                 }
             } catch (err) {}
         }
@@ -404,15 +424,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
         const loadNotes = async () => {
             try {
                 const res = await callWithFallback(listEmployeeNotes, listManagerNotes, id, { limit: 100 });
-                if (res?.success) setNotes(res.data.items || []);
+                if (res?.success) {
+                    setNotes(Array.isArray(res.data) ? res.data : (res.data?.items || []));
+                }
             } catch (err) {}
         };
+
         const loadAttendance = async () => {
             try {
                 const res = await callWithFallback(getEmployeeAttendees, getManagerAttendees, id);
-                if (res?.success) setAttendance(res.data.items || res.data || []);
+                if (res?.success) {
+                    const dataItems = res.data?.presentUsers || res.data?.items || (Array.isArray(res.data) ? res.data : []);
+                    setAttendance(dataItems);
+                }
             } catch (err) {}
         };
+
         useEffect(() => {
             let attendanceInterval;
             if (meetingState?.status === 'in_progress') {
@@ -676,6 +703,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     return next;
                 });
                 showToast('Cuộc họp đã kết thúc', 'info');
+                setTimeout(() => {
+                    navigate(isPublic ? '/' : '/employee');
+                }, 1000);
             } else {
                 showToast(res?.message || res?.error?.message || 'Lỗi khi kết thúc', 'error');
             }
@@ -683,6 +713,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
             showToast('Lỗi kết nối', 'error');
         } finally {
             setActionLoading(false);
+            setConfirmLeaveModal(false);
         }
     };
 
@@ -765,7 +796,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
         e.preventDefault();
         if (!noteInput.trim()) return;
         try {
-            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, { content: noteInput });
+            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, {
+                content: noteInput,
+                noteType: 'in_meeting'
+            });
             if (res?.success) {
                 setNoteInput('');
                 loadNotes();
@@ -1458,12 +1492,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 Ghi chú cuộc họp
                             </h3>
                             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                                {notes.map((note, idx) => (
-                                    <div key={idx} className="bg-slate-900 p-2 rounded-lg border border-indigo-900/30">
-                                        <div className="text-[10px] text-indigo-400 font-bold mb-1">{note.authorName}</div>
-                                        <div className="text-xs text-slate-300">{note.content}</div>
-                                    </div>
-                                ))}
+                                {notes.map((note, idx) => {
+                                    const authorName = note.author?.fullName || note.authorName || 'Chưa rõ';
+                                    return (
+                                        <div key={idx} className="bg-slate-900 p-2 rounded-lg border border-indigo-900/30">
+                                            <div className="text-[10px] text-indigo-400 font-bold mb-1">{authorName}</div>
+                                            <div className="text-xs text-slate-300">{note.content}</div>
+                                        </div>
+                                    );
+                                })}
                                 {notes.length === 0 && <p className="text-xs text-slate-500 italic">Chưa có ghi chú nào.</p>}
                             </div>
                             <form onSubmit={handleAddNote} className="flex gap-2">
@@ -1485,18 +1522,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 Điểm danh thiết bị
                             </h3>
                             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                                {attendance.map((att, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-slate-900 p-2 rounded-lg border border-indigo-900/30">
-                                        <div className="text-xs text-slate-300 font-semibold">{att.userFullName}</div>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                                            att.attendanceStatus === 'present' ? 'bg-emerald-950 text-emerald-400' :
-                                            att.attendanceStatus === 'late' ? 'bg-amber-950 text-amber-400' :
-                                            'bg-red-950 text-red-400'
-                                        }`}>
-                                            {att.attendanceStatus}
-                                        </span>
-                                    </div>
-                                ))}
+                                {attendance.map((att, idx) => {
+                                    const name = att.fullName || att.userFullName || 'Chưa rõ';
+                                    const status = att.presenceStatus || att.attendanceStatus || 'unknown';
+                                    return (
+                                        <div key={idx} className="flex items-center justify-between bg-slate-900 p-2 rounded-lg border border-indigo-900/30">
+                                            <div className="text-xs text-slate-300 font-semibold">{name}</div>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                                status === 'present' ? 'bg-emerald-950 text-emerald-400' :
+                                                status === 'maybe_present' || status === 'late' ? 'bg-amber-950 text-amber-400' :
+                                                'bg-red-950 text-red-400'
+                                            }`}>
+                                                {status}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                                 {attendance.length === 0 && <p className="text-xs text-slate-500 italic">Chưa có dữ liệu điểm danh từ thiết bị.</p>}
                             </div>
                         </div>
@@ -1548,19 +1589,34 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
                         <h3 className="text-lg font-bold text-white mb-2">Xác nhận rời phòng</h3>
                         <p className="text-sm text-slate-300 mb-6">Bạn có chắc chắn muốn rời phòng họp?</p>
-                        <div className="flex justify-end gap-3">
-                            <button 
-                                onClick={() => setConfirmLeaveModal(false)}
-                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors"
-                            >
-                                Hủy
-                            </button>
-                            <button 
-                                onClick={confirmLeave}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-red-600/20"
-                            >
-                                Rời đi
-                            </button>
+                        <div className="flex flex-col gap-2">
+                            {isHost && (
+                                <button 
+                                    onClick={handleEndMeeting}
+                                    disabled={actionLoading}
+                                    className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-red-600/20"
+                                >
+                                    {actionLoading ? 'Đang kết thúc...' : 'Kết thúc cuộc họp cho tất cả'}
+                                </button>
+                            )}
+                            <div className="flex gap-2 w-full">
+                                <button 
+                                    onClick={() => setConfirmLeaveModal(false)}
+                                    className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button 
+                                    onClick={confirmLeave}
+                                    className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                                        isHost 
+                                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50' 
+                                            : 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20'
+                                    }`}
+                                >
+                                    Rời đi
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

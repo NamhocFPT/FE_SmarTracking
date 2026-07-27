@@ -113,7 +113,7 @@ const ManagerLayout = () => {
     }, []);
 
     const displayName = currentUser?.fullName || 'Trưởng phòng';
-    const displayRole = 'Department Manager';
+    const displayRole = 'Trưởng phòng';
 
     return (
         <div className="min-h-screen flex flex-col bg-cloud-mist">

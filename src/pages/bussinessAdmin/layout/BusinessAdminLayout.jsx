@@ -26,6 +26,7 @@ const navigationItems = [
         children: [
             { label: 'Ghi hình', to: '/business-admin/recordings' },
             { label: 'Kiểm soát phương tiện', to: '/business-admin/anpr-management' },
+            { label: 'Trung tâm cảnh báo', to: '/business-admin/security-alerts' },
         ]
     },
     {
@@ -110,7 +111,7 @@ const BusinessAdminLayout = () => {
     }, []);
 
     const displayName = currentUser?.fullName || 'Quản trị viên';
-    const displayRole = 'Business Admin';
+    const displayRole = 'Quản trị nghiệp vụ';
 
     return (
         <div className="min-h-screen flex flex-col bg-cloud-mist">
