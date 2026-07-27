@@ -27,14 +27,21 @@ const Notifications = () => {
         try {
             const params = {
                 page,
-                limit,
-                status: filterType || undefined
+                limit
             };
             const res = await getNotifications(params);
             if (res?.success) {
-                setNotificationsList(res.data || []);
+                // Map BE data to FE expected properties
+                const mappedData = (res.data || []).map(item => ({
+                    ...item,
+                    title: item.subject,
+                    body: item.content,
+                    type: item.notificationType,
+                    read: false // BE chưa hỗ trợ tracking trạng thái đã đọc
+                }));
+                setNotificationsList(mappedData);
                 setTotalPages(res.meta?.totalPages || 1);
-                setTotalItems(res.meta?.total || (res.data?.length || 0));
+                setTotalItems(res.meta?.total || (mappedData.length || 0));
             } else {
                 throw new Error();
             }

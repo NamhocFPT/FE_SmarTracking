@@ -10,13 +10,24 @@ import {
 
 const MODULE_TRANSLATIONS = {
     'system_management': 'Quản trị hệ thống',
-    'gate_access': 'Kiểm soát vào ra',
+    'gate_access': 'Kiểm soát ra vào',
     'user_management': 'Quản lý người dùng',
     'device_management': 'Quản lý thiết bị',
     'role_management': 'Quản lý phân quyền',
     'attendance_management': 'Quản lý điểm danh',
     'meeting_management': 'Quản lý phòng họp',
     'zone_management': 'Quản lý khu vực',
+    'iot': 'Thiết bị IoT / Camera',
+    'ivss': 'Hệ thống Camera (IVSS)',
+    'anpr': 'Nhận diện biển số (ANPR)',
+    'alerts': 'Cảnh báo an ninh',
+    'meetings': 'Phòng họp & Đặt lịch',
+    'reports': 'Báo cáo thống kê',
+    'accounts': 'Quản lý tài khoản',
+    'recording': 'Ghi âm / Ghi hình',
+    'face': 'Nhận diện khuôn mặt',
+    'departments': 'Quản lý phòng ban',
+    'media': 'Quản lý phương tiện',
     'other': 'Các quyền khác'
 };
 
@@ -98,7 +109,7 @@ const RolePermissionManagement = () => {
             const res = await getRolePermissions(role.id);
             if (res?.success) {
                 // BE might return full permission objects or just IDs. Assuming full objects.
-                const assignedIds = (res.data || []).map(p => p.id);
+                const assignedIds = (res.data || []).map(p => p.permissionId || p.id);
                 setRolePermissions(assignedIds);
             }
         } catch (err) {

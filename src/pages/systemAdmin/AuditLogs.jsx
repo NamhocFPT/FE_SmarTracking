@@ -25,6 +25,23 @@ const ACTION_TRANSLATIONS = {
     'UPDATE_CONFIG': 'Cập nhật cấu hình hệ thống'
 };
 
+const formatActionName = (action) => {
+    if (!action) return '';
+    if (ACTION_TRANSLATIONS[action]) return ACTION_TRANSLATIONS[action];
+    
+    // Fallback translation rules for unknown actions
+    let formatted = action.toLowerCase().replace(/_/g, ' ');
+    formatted = formatted.replace('view detail', 'Xem chi tiết')
+                         .replace('read analytics', 'Xem thống kê')
+                         .replace('meeting cancel rate', 'tỷ lệ hủy họp')
+                         .replace('create', 'Tạo mới')
+                         .replace('update', 'Cập nhật')
+                         .replace('delete', 'Xóa');
+                         
+    // Capitalize first letter
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
 const ENTITY_TRANSLATIONS = {
     'auth': 'Hệ thống xác thực',
     'users': 'Quản lý tài khoản',
@@ -510,26 +527,26 @@ const AuditLogs = () => {
                                     logsList.map(log => (
                                         <tr key={log.id} className="hover:bg-cloud-mist/30 transition-colors">
                                             <td className="py-4 px-6 font-medium text-midnight-indigo whitespace-nowrap font-mono text-xs">
-                                                {formatTimestamp(log.timestamp)}
+                                                {formatTimestamp(log.createdAt || log.timestamp)}
                                             </td>
                                             <td className="py-4 px-6">
                                                 <div className="font-semibold text-midnight-indigo">{log.actorName}</div>
-                                                <div className="text-xs text-slate-blue font-mono">{log.actorEmail}</div>
+                                                <div className="text-xs text-slate-blue font-mono">{log.actorEmail || log.actorUserId || '-'}</div>
                                             </td>
                                             <td className="py-4 px-6">
-                                                <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${getActionBadge(log.action)}`}>
-                                                    {ACTION_TRANSLATIONS[log.action] || log.action}
+                                                <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${getActionBadge(log.actionType || log.action)}`}>
+                                                    {formatActionName(log.actionType || log.action)}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-xs font-semibold text-slate-blue uppercase">
-                                                {ENTITY_TRANSLATIONS[log.entity] || log.entity}
+                                                {ENTITY_TRANSLATIONS[log.entityType || log.entity] || (log.entityType || log.entity)}
                                             </td>
                                             <td className="py-4 px-6 text-slate-blue font-mono text-xs">
-                                                {log.ipAddress}
+                                                {log.ipAddress || '-'}
                                             </td>
                                             <td className="py-4 px-6">
-                                                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${getStatusBadge(log.status)}`}>
-                                                    {log.status === 'success' ? 'Thành công' : log.status === 'warning' ? 'Cảnh báo' : 'Thất bại'}
+                                                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${getStatusBadge(log.severity || log.status)}`}>
+                                                    {(log.severity === 'info' || log.status === 'success') ? 'Thành công' : (log.severity === 'warning' || log.status === 'warning') ? 'Cảnh báo' : 'Thất bại'}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-center">
@@ -615,20 +632,20 @@ const AuditLogs = () => {
                             <div className="grid grid-cols-2 gap-4 text-xs">
                                 <div>
                                     <span className="block text-slate-blue font-bold uppercase tracking-wider">Thời gian ghi nhận</span>
-                                    <span className="text-sm font-semibold text-midnight-indigo font-mono">{formatTimestamp(selectedLog.timestamp)}</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo font-mono">{formatTimestamp(selectedLog.createdAt || selectedLog.timestamp)}</span>
                                 </div>
                                 <div>
                                     <span className="block text-slate-blue font-bold uppercase tracking-wider">Địa chỉ IP thao tác</span>
-                                    <span className="text-sm font-semibold text-midnight-indigo font-mono">{selectedLog.ipAddress}</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo font-mono">{selectedLog.ipAddress || '-'}</span>
                                 </div>
                                 <div>
                                     <span className="block text-slate-blue font-bold uppercase tracking-wider">Tài khoản thực hiện</span>
-                                    <span className="text-sm font-semibold text-midnight-indigo">{selectedLog.actorName} ({selectedLog.actorEmail})</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo">{selectedLog.actorName} ({selectedLog.actorEmail || selectedLog.actorUserId || 'Hệ thống'})</span>
                                 </div>
                                 <div>
                                     <span className="block text-slate-blue font-bold uppercase tracking-wider">Phân hệ chuyên môn / Thao tác</span>
                                     <span className="text-sm font-semibold text-midnight-indigo uppercase font-mono">
-                                        {ENTITY_TRANSLATIONS[selectedLog.entity] || selectedLog.entity} / {ACTION_TRANSLATIONS[selectedLog.action] || selectedLog.action}
+                                        {ENTITY_TRANSLATIONS[selectedLog.entityType || selectedLog.entity] || (selectedLog.entityType || selectedLog.entity)} / {formatActionName(selectedLog.actionType || selectedLog.action)}
                                     </span>
                                 </div>
                             </div>
@@ -636,14 +653,14 @@ const AuditLogs = () => {
                             {/* Description */}
                             <div className="bg-cloud-mist/40 p-4 rounded-xl border border-outline-gray/50">
                                 <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1">Mô tả hành động</span>
-                                <p className="text-sm text-midnight-indigo font-medium">{selectedLog.description}</p>
+                                <p className="text-sm text-midnight-indigo font-medium">{selectedLog.description || 'Không có thông tin mô tả cho hành động này.'}</p>
                             </div>
 
                             {/* Raw JSON details formatted */}
                             <div className="border border-platinum-tint/70 p-4 rounded-2xl bg-white shadow-sm-1">
                                 <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-3 pb-2 border-b border-platinum-tint/50">Chi tiết thay đổi thông tin hệ thống</span>
                                 <div className="space-y-1">
-                                    {renderPayloadDetails(selectedLog.payload)}
+                                    {renderPayloadDetails(selectedLog.payload || { info: "Không có dữ liệu thay đổi chi tiết" })}
                                 </div>
                             </div>
                         </div>

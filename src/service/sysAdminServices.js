@@ -484,3 +484,104 @@ export const getUnmappedVerifies = async (params = {}) => {
 export const mapUnmappedVerify = async (data) => {
     return await post(`/face-access/unmapped-verifies/map`, data);
 };
+
+// ============================================================
+// B-M3: PERSON CONTROL LIST (Watchlist/Blocklist)
+// ============================================================
+
+export const getPersonControlList = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/person-control-list${query}`);
+};
+
+export const getPersonControlDetail = async (id) => {
+    return await get(`/person-control-list/${id}`);
+};
+
+export const createPersonControl = async (data) => {
+    return await post(`/person-control-list`, data);
+};
+
+export const updatePersonControl = async (id, data) => {
+    return await patch(`/person-control-list/${id}`, data);
+};
+
+export const deletePersonControl = async (id) => {
+    return await dele(`/person-control-list/${id}`);
+};
+
+// ============================================================
+// B-M4: VEHICLE CONTROL LIST & REGISTRATIONS (ANPR)
+// ============================================================
+
+export const getVehicleControlList = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/anpr/admin/control-list${query}`);
+};
+
+export const getVehicleControlDetail = async (id) => {
+    return await get(`/anpr/admin/control-list/${id}`);
+};
+
+export const createVehicleControl = async (data) => {
+    return await post(`/anpr/admin/control-list`, data);
+};
+
+export const updateVehicleControl = async (id, data) => {
+    return await patch(`/anpr/admin/control-list/${id}`, data);
+};
+
+export const deleteVehicleControl = async (id) => {
+    return await dele(`/anpr/admin/control-list/${id}`);
+};
+
+export const getAdminVehicleRegistrations = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/anpr/admin/vehicle-registrations${query}`);
+};
+
+// ============================================================
+// B-M9: VẬN HÀNH PHÒNG HỌP (No-Show, Early Vacancy, Room Status, Room Bookings)
+// ============================================================
+
+// B-M9.1 — Kiểm tra tác động xóa phòng
+export const getRoomDeletionImpact = async (roomId) => {
+    return await get(`/rooms/${roomId}/deletion-impact`);
+};
+
+// B-M9.2 — Trạng thái realtime tất cả phòng
+export const getRoomsRealtimeStatus = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/rooms/realtime-status${query}`);
+};
+
+// B-M9.3 — Trạng thái chi tiết 1 phòng
+export const getRoomStatus = async (roomId) => {
+    return await get(`/rooms/${roomId}/status`);
+};
+
+// B-M9.4 — Danh sách đặt phòng
+export const getRoomBookings = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/room-bookings${query}`);
+};
+
+// B-M9.5 — Lấy cấu hình No-Show
+export const getNoShowConfig = async () => {
+    return await get('/no-show-config');
+};
+
+// B-M9.6 — Cập nhật cấu hình No-Show (PUT, ≥1 field, forbidNonWhitelisted)
+export const updateNoShowConfig = async (data) => {
+    return await request('PUT', '/no-show-config', data);
+};
+
+// B-M9.7 — Lấy cấu hình Early Vacancy
+export const getEarlyVacancyConfig = async () => {
+    return await get('/early-vacancy-config');
+};
+
+// B-M9.8 — Cập nhật cấu hình Early Vacancy (PUT, ≥1 field, forbidNonWhitelisted)
+export const updateEarlyVacancyConfig = async (data) => {
+    return await request('PUT', '/early-vacancy-config', data);
+};

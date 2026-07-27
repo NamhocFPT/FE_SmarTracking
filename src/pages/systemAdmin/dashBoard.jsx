@@ -21,6 +21,23 @@ const ACTION_MAP = {
     'DELETE_USER': 'Xóa tài khoản',
 };
 
+const formatActionName = (action) => {
+    if (!action) return '';
+    if (ACTION_MAP[action]) return ACTION_MAP[action];
+    
+    // Fallback translation rules for unknown actions
+    let formatted = action.toLowerCase().replace(/_/g, ' ');
+    formatted = formatted.replace('view detail', 'Xem chi tiết')
+                         .replace('read analytics', 'Xem thống kê')
+                         .replace('meeting cancel rate', 'tỷ lệ hủy họp')
+                         .replace('create', 'Tạo mới')
+                         .replace('update', 'Cập nhật')
+                         .replace('delete', 'Xóa');
+                         
+    // Capitalize first letter
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
+
 const ENTITY_MAP = {
     'AUTH': 'Xác thực',
     'DEVICE': 'Thiết bị',
@@ -95,10 +112,10 @@ const DashBoard = () => {
                 totalLogsCount = logsRes.value.meta?.total || logsList.length;
             } else {
                 logsList = [
-                    { id: 1, action: 'USER_LOGIN', actor: 'admin@smrmpts.com', entity: 'AUTH', status: 'SUCCESS', createdAt: new Date(Date.now() - 500000).toISOString() },
-                    { id: 2, action: 'REGISTER_DEVICE', actor: 'admin@smrmpts.com', entity: 'DEVICE', status: 'SUCCESS', createdAt: new Date(Date.now() - 1500000).toISOString() },
-                    { id: 3, action: 'LOCK_USER', actor: 'admin@smrmpts.com', entity: 'USER', status: 'SUCCESS', createdAt: new Date(Date.now() - 3600000).toISOString() },
-                    { id: 4, action: 'UPDATE_CONFIG', actor: 'admin@smrmpts.com', entity: 'SYSTEM', status: 'SUCCESS', createdAt: new Date(Date.now() - 7200000).toISOString() },
+                    { id: 1, actionType: 'USER_LOGIN', actorName: 'Nguyễn Văn A', entityType: 'AUTH', severity: 'info', createdAt: new Date(Date.now() - 500000).toISOString() },
+                    { id: 2, actionType: 'REGISTER_DEVICE', actorName: 'Nguyễn Văn B', entityType: 'DEVICE', severity: 'info', createdAt: new Date(Date.now() - 1500000).toISOString() },
+                    { id: 3, actionType: 'LOCK_USER', actorName: 'Hệ thống', entityType: 'USER', severity: 'warning', createdAt: new Date(Date.now() - 3600000).toISOString() },
+                    { id: 4, actionType: 'UPDATE_CONFIG', actorName: 'Quản trị viên', entityType: 'SYSTEM', severity: 'info', createdAt: new Date(Date.now() - 7200000).toISOString() },
                 ];
                 totalLogsCount = logsList.length;
             }
@@ -410,6 +427,58 @@ const DashBoard = () => {
                         </div>
                         <span className="text-sm font-semibold text-midnight-indigo">Cấu hình chung</span>
                     </Link>
+
+                    {/* New Custom Shortcuts */}
+                    <Link
+                        to="/system-admin/security-alerts"
+                        className="flex flex-col items-center p-4 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/30 transition-all duration-200 text-center no-underline hover-lift"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <span className="text-sm font-semibold text-midnight-indigo">Trung tâm cảnh báo</span>
+                    </Link>
+
+                    <Link
+                        to="/system-admin/gate-access"
+                        className="flex flex-col items-center p-4 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/30 transition-all duration-200 text-center no-underline hover-lift"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <span className="text-sm font-semibold text-midnight-indigo">Ra vào cổng</span>
+                    </Link>
+
+                    <Link
+                        to="/system-admin/anpr-management"
+                        className="flex flex-col items-center p-4 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/30 transition-all duration-200 text-center no-underline hover-lift"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <rect x="3" y="11" width="18" height="8" rx="2" ry="2" />
+                                <path d="M19 11l-2-4H7L5 11" />
+                                <circle cx="7" cy="19" r="2" />
+                                <circle cx="17" cy="19" r="2" />
+                            </svg>
+                        </div>
+                        <span className="text-sm font-semibold text-midnight-indigo">Phương tiện (ANPR)</span>
+                    </Link>
+
+                    <Link
+                        to="/system-admin/zones"
+                        className="flex flex-col items-center p-4 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/30 transition-all duration-200 text-center no-underline hover-lift"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mb-2">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                            </svg>
+                        </div>
+                        <span className="text-sm font-semibold text-midnight-indigo">Khu vực (Zones)</span>
+                    </Link>
                 </div>
             </div>
 
@@ -475,15 +544,15 @@ const DashBoard = () => {
                                     <tr key={log.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/50 transition-colors">
                                         <td className="py-3.5 pr-2">
                                             <span className="text-sm font-semibold text-midnight-indigo">
-                                                {ACTION_MAP[log.action] || log.action}
+                                                {formatActionName(log.actionType)}
                                             </span>
                                         </td>
                                         <td className="py-3.5 pr-2">
-                                            <span className="text-sm text-slate-blue">{log.actor}</span>
+                                            <span className="text-sm text-slate-blue">{log.actorName}</span>
                                         </td>
                                         <td className="py-3.5 pr-2">
                                             <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-medium">
-                                                {ENTITY_MAP[log.entity] || log.entity}
+                                                {ENTITY_MAP[log.entityType] || log.entityType}
                                             </span>
                                         </td>
                                         <td className="py-3.5">

@@ -1,0 +1,479 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { 
+    ShieldAlert, Search, RefreshCw, AlertTriangle, CheckCircle, 
+    CheckSquare, Edit3, Eye, Clock, Shield, Filter 
+} from 'lucide-react';
+import { 
+    getSecurityAlerts, acknowledgeSecurityAlert, 
+    resolveSecurityAlert, bulkAcknowledgeSecurityAlerts 
+} from '../../service/securityAlertService';
+import { getZones } from '../../service/zoneServices';
+
+const SecurityAlerts = () => {
+    const [alerts, setAlerts] = useState([]);
+    const [zones, setZones] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null);
+    
+    // Pagination & Filters
+    const [filters, setFilters] = useState({
+        page: 1,
+        limit: 20,
+        status: '',
+        alert_type: '',
+        zone_id: ''
+    });
+    const [meta, setMeta] = useState(null);
+
+    // Bulk selection
+    const [selectedIds, setSelectedIds] = useState([]);
+
+    // Modals
+    const [resolveModal, setResolveModal] = useState({ open: false, alert: null });
+    const [resolutionNote, setResolutionNote] = useState('');
+
+    const fetchZones = async () => {
+        try {
+            const res = await getZones({ limit: 100 });
+            if (res?.success) setZones(res.data || []);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const fetchAlerts = useCallback(async (currentFilters = filters) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await getSecurityAlerts(currentFilters);
+            if (res?.success) {
+                setAlerts(res.data || []);
+                setMeta(res.meta);
+            } else {
+                setError(res?.message || 'Không thể tải danh sách cảnh báo.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Lỗi kết nối khi tải dữ liệu.');
+        } finally {
+            setLoading(false);
+        }
+    }, [filters]);
+
+    useEffect(() => {
+        fetchZones();
+    }, []);
+
+    useEffect(() => {
+        fetchAlerts(filters);
+        
+        // Polling every 10 seconds for new alerts
+        const intervalId = setInterval(() => {
+            fetchAlerts(filters);
+        }, 10000);
+        
+        return () => clearInterval(intervalId);
+    }, [filters, fetchAlerts]);
+
+    useEffect(() => {
+        if (successMessage || error) {
+            const timer = setTimeout(() => {
+                setSuccessMessage(null);
+                setError(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successMessage, error]);
+
+    const handleFilterChange = (key, value) => {
+        setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+        setSelectedIds([]); // reset selection when filter changes
+    };
+
+    const handleAcknowledge = async (id) => {
+        setActionLoading(true);
+        try {
+            const res = await acknowledgeSecurityAlert(id);
+            if (res?.success) {
+                setSuccessMessage('Đã xác nhận cảnh báo.');
+                fetchAlerts();
+            } else {
+                setError(res?.message || 'Lỗi khi xác nhận.');
+            }
+        } catch (err) {
+            setError('Lỗi kết nối.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleBulkAcknowledge = async () => {
+        if (selectedIds.length === 0) return;
+        setActionLoading(true);
+        try {
+            const res = await bulkAcknowledgeSecurityAlerts({ ids: selectedIds });
+            if (res?.success) {
+                setSuccessMessage(`Đã xác nhận ${selectedIds.length} cảnh báo.`);
+                setSelectedIds([]);
+                fetchAlerts();
+            } else {
+                setError(res?.message || 'Lỗi xác nhận hàng loạt.');
+            }
+        } catch (err) {
+            setError('Lỗi kết nối.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const openResolveModal = (alert) => {
+        setResolveModal({ open: true, alert });
+        setResolutionNote('');
+    };
+
+    const handleResolve = async (e) => {
+        e.preventDefault();
+        if (!resolutionNote.trim()) {
+            setError('Vui lòng nhập ghi chú xử lý.');
+            return;
+        }
+        setActionLoading(true);
+        try {
+            const res = await resolveSecurityAlert(resolveModal.alert.id, { resolution_note: resolutionNote });
+            if (res?.success) {
+                setSuccessMessage('Đã xử lý cảnh báo thành công.');
+                setResolveModal({ open: false, alert: null });
+                fetchAlerts();
+            } else {
+                setError(res?.message || 'Lỗi khi xử lý.');
+            }
+        } catch (err) {
+            setError('Lỗi kết nối.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const toggleSelect = (id, status) => {
+        if (status !== 'new') return; // Chỉ cho phép chọn status 'new'
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        const newAlerts = alerts.filter(a => a.status === 'new');
+        if (selectedIds.length === newAlerts.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(newAlerts.map(a => a.id));
+        }
+    };
+
+    const formatDateTime = (isoString) => {
+        if (!isoString) return 'N/A';
+        const d = new Date(isoString);
+        return d.toLocaleString('vi-VN', { 
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+    };
+
+    const getSeverityStyle = (severity) => {
+        switch (severity?.toLowerCase()) {
+            case 'high': case 'urgent': return 'bg-red-50 text-red-700 border-red-200';
+            case 'medium': return 'bg-orange-50 text-orange-700 border-orange-200';
+            case 'low': return 'bg-blue-50 text-blue-700 border-blue-200';
+            default: return 'bg-slate-50 text-slate-700 border-slate-200';
+        }
+    };
+
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'new': return <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700 border border-red-200"><span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5 animate-pulse" />Mới</span>;
+            case 'acknowledged': return <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-yellow-100 text-yellow-700 border border-yellow-200"><Clock className="w-3 h-3 mr-1" />Đã tiếp nhận</span>;
+            case 'resolved': return <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-green-100 text-green-700 border border-green-200"><CheckCircle className="w-3 h-3 mr-1" />Đã xử lý</span>;
+            default: return <span className="text-xs bg-slate-100 px-2 py-1 rounded">{status}</span>;
+        }
+    };
+
+    return (
+        <div className="h-full flex flex-col space-y-4 animate-fade-in-up">
+            {/* HEADER */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-platinum-tint">
+                <div>
+                    <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight flex items-center">
+                        <ShieldAlert className="w-7 h-7 mr-3 text-red-500" />
+                        Trung tâm Cảnh báo An ninh
+                    </h1>
+                    <p className="text-slate-blue text-sm mt-1 ml-10">
+                        Giám sát và xử lý các sự kiện an ninh, bất thường trong hệ thống.
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => fetchAlerts()}
+                        disabled={loading}
+                        className="inline-flex items-center justify-center p-2.5 text-slate-blue bg-cloud-mist/50 rounded-xl hover:bg-cloud-mist transition-colors"
+                        title="Làm mới"
+                    >
+                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={handleBulkAcknowledge}
+                            disabled={actionLoading}
+                            className="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-yellow-600 transition-all"
+                        >
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Tiếp nhận hàng loạt ({selectedIds.length})
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* MESSAGES */}
+            {(error || successMessage) && (
+                <div className={`p-4 rounded-xl border flex items-center ${error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                    {error ? <AlertTriangle className="w-5 h-5 mr-3 shrink-0" /> : <CheckCircle className="w-5 h-5 mr-3 shrink-0" />}
+                    <p className="text-sm font-medium">{error || successMessage}</p>
+                </div>
+            )}
+
+            {/* FILTERS */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-platinum-tint grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Trạng thái</label>
+                    <select 
+                        value={filters.status} 
+                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                    >
+                        <option value="">Tất cả</option>
+                        <option value="new">Mới</option>
+                        <option value="acknowledged">Đã tiếp nhận</option>
+                        <option value="resolved">Đã xử lý</option>
+                    </select>
+                </div>
+                <div className="relative">
+                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại cảnh báo</label>
+                    <select 
+                        value={filters.alert_type} 
+                        onChange={(e) => handleFilterChange('alert_type', e.target.value)}
+                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                    >
+                        <option value="">Tất cả</option>
+                        <option value="stranger">Người lạ</option>
+                        <option value="crowd">Đám đông</option>
+                        <option value="intrusion">Xâm nhập</option>
+                        <option value="person_watchlist_match">Đối tượng theo dõi</option>
+                        <option value="unknown_vehicle">Xe lạ</option>
+                        <option value="vehicle_control_match">Biển số theo dõi</option>
+                        <option value="device_error">Lỗi thiết bị</option>
+                    </select>
+                </div>
+                <div className="relative">
+                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Khu vực</label>
+                    <select 
+                        value={filters.zone_id} 
+                        onChange={(e) => handleFilterChange('zone_id', e.target.value)}
+                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                    >
+                        <option value="">Toàn hệ thống</option>
+                        {zones.map(z => (
+                            <option key={z.id} value={z.id}>{z.zone_name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="relative flex items-end">
+                    <button 
+                        onClick={() => setFilters({ page: 1, limit: 20, status: '', alert_type: '', zone_id: '' })}
+                        className="w-full px-4 py-2 bg-cloud-mist/50 text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist border border-platinum-tint transition-colors"
+                    >
+                        <Filter className="w-4 h-4 inline mr-2" /> Xóa bộ lọc
+                    </button>
+                </div>
+            </div>
+
+            {/* ALERTS TABLE */}
+            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-platinum-tint overflow-hidden flex flex-col min-h-0">
+                <div className="flex-1 overflow-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-cloud-mist/30 sticky top-0 z-10 border-b border-platinum-tint">
+                            <tr>
+                                <th className="p-4 w-12 text-center">
+                                    <input 
+                                        type="checkbox" 
+                                        className="w-4 h-4 rounded border-slate-300 text-action-blue focus:ring-action-blue"
+                                        checked={alerts.filter(a => a.status === 'new').length > 0 && selectedIds.length === alerts.filter(a => a.status === 'new').length}
+                                        onChange={toggleSelectAll}
+                                        disabled={alerts.filter(a => a.status === 'new').length === 0}
+                                    />
+                                </th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Thời gian</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Loại & Mức độ</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Vị trí</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Trạng thái</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-platinum-tint">
+                            {loading && alerts.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="p-8 text-center text-slate-blue">
+                                        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3" />
+                                        Đang tải dữ liệu...
+                                    </td>
+                                </tr>
+                            ) : alerts.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="p-12 text-center text-slate-blue">
+                                        <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                        <p className="text-lg font-medium text-midnight-indigo">Không có cảnh báo nào</p>
+                                        <p className="text-sm mt-1">Hệ thống đang an toàn hoặc không có dữ liệu khớp với bộ lọc.</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                alerts.map(alert => (
+                                    <tr key={alert.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="p-4 text-center">
+                                            <input 
+                                                type="checkbox"
+                                                className="w-4 h-4 rounded border-slate-300 text-action-blue focus:ring-action-blue cursor-pointer"
+                                                checked={selectedIds.includes(alert.id)}
+                                                onChange={() => toggleSelect(alert.id, alert.status)}
+                                                disabled={alert.status !== 'new'}
+                                            />
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-sm font-bold text-midnight-indigo">{formatDateTime(alert.triggered_at)}</p>
+                                            <p className="text-xs text-slate-blue mt-1">ID: {alert.id.substring(0,8)}...</p>
+                                        </td>
+                                        <td className="p-4">
+                                            <p className="text-sm font-bold text-midnight-indigo uppercase">{alert.alert_type.replace(/_/g, ' ')}</p>
+                                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityStyle(alert.severity)}`}>
+                                                {alert.severity?.toUpperCase() || 'NORMAL'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-sm text-midnight-indigo">
+                                            {zones.find(z => z.id === alert.zone_id)?.zone_name || 'Hệ thống'}
+                                        </td>
+                                        <td className="p-4">
+                                            {getStatusBadge(alert.status)}
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            {alert.status === 'new' && (
+                                                <button 
+                                                    onClick={() => handleAcknowledge(alert.id)}
+                                                    disabled={actionLoading}
+                                                    className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-semibold rounded-lg text-xs transition-colors"
+                                                >
+                                                    <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                                                    Tiếp nhận
+                                                </button>
+                                            )}
+                                            {alert.status === 'acknowledged' && (
+                                                <button 
+                                                    onClick={() => openResolveModal(alert)}
+                                                    disabled={actionLoading}
+                                                    className="inline-flex items-center px-3 py-1.5 bg-action-blue text-white hover:bg-glacier-blue font-semibold rounded-lg text-xs transition-colors"
+                                                >
+                                                    <Edit3 className="w-3.5 h-3.5 mr-1.5" />
+                                                    Xử lý ngay
+                                                </button>
+                                            )}
+                                            {alert.status === 'resolved' && (
+                                                <div className="flex flex-col items-end">
+                                                    <button 
+                                                        className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-xs"
+                                                    >
+                                                        <Eye className="w-3.5 h-3.5 mr-1.5" />
+                                                        Đã xử lý
+                                                    </button>
+                                                    <p className="text-[10px] text-slate-400 mt-1 truncate max-w-[150px]" title={alert.resolution_note}>
+                                                        Note: {alert.resolution_note}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* PAGINATION */}
+                {meta && meta.totalPages > 1 && (
+                    <div className="p-4 border-t border-platinum-tint bg-cloud-mist/30 flex items-center justify-between text-sm">
+                        <span className="text-slate-blue font-medium">Hiển thị {alerts.length} / {meta.total} cảnh báo</span>
+                        <div className="flex gap-2">
+                            <button 
+                                disabled={filters.page <= 1} 
+                                onClick={() => handleFilterChange('page', filters.page - 1)}
+                                className="px-3 py-1.5 bg-white border border-platinum-tint rounded-lg font-medium text-slate-blue hover:bg-cloud-mist disabled:opacity-50"
+                            >
+                                Trước
+                            </button>
+                            <span className="px-3 py-1.5 font-bold text-midnight-indigo">Trang {filters.page} / {meta.totalPages}</span>
+                            <button 
+                                disabled={filters.page >= meta.totalPages} 
+                                onClick={() => handleFilterChange('page', filters.page + 1)}
+                                className="px-3 py-1.5 bg-white border border-platinum-tint rounded-lg font-medium text-slate-blue hover:bg-cloud-mist disabled:opacity-50"
+                            >
+                                Sau
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* RESOLVE MODAL */}
+            {resolveModal.open && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-platinum-tint flex flex-col">
+                        <div className="px-6 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex justify-between items-center">
+                            <h3 className="font-bold text-midnight-indigo flex items-center">
+                                <ShieldAlert className="w-5 h-5 mr-2 text-action-blue" />
+                                Xử lý cảnh báo
+                            </h3>
+                            <button onClick={() => setResolveModal({ open: false, alert: null })} className="text-slate-blue hover:text-red-500 transition-colors">✕</button>
+                        </div>
+                        <form onSubmit={handleResolve} className="p-6">
+                            <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <p className="text-xs text-slate-blue font-bold uppercase mb-1">Loại sự kiện</p>
+                                <p className="text-sm font-bold text-midnight-indigo uppercase">{resolveModal.alert?.alert_type}</p>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-bold text-midnight-indigo mb-2">
+                                    Ghi chú kết quả xử lý <span className="text-red-500">*</span>
+                                </label>
+                                <textarea 
+                                    required
+                                    rows="4"
+                                    value={resolutionNote}
+                                    onChange={e => setResolutionNote(e.target.value)}
+                                    placeholder="Ghi rõ hành động đã thực hiện (VD: Đã mời người lạ ra khỏi phòng...)"
+                                    className="w-full px-4 py-3 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue focus:ring-1 focus:ring-action-blue resize-none"
+                                />
+                                <p className="text-xs text-slate-blue mt-2">Ghi chú này sẽ được lưu lại vĩnh viễn trong Audit Log.</p>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setResolveModal({ open: false, alert: null })} className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-platinum-tint rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
+                                <button type="submit" disabled={actionLoading} className="px-5 py-2.5 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue transition-colors flex items-center disabled:opacity-70">
+                                    {actionLoading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                                    Đóng cảnh báo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
+
+export default SecurityAlerts;
