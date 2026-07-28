@@ -143,7 +143,7 @@ const RealtimeRoomMonitor = () => {
         if (!noShowDetail?.caseId) return;
         setIsProcessing(true);
         try {
-            const res = await handleNoShowCase(noShowDetail.caseId, { action: 'IGNORE', reason: 'Bỏ qua bởi quản trị viên' });
+            const res = await handleNoShowCase(noShowDetail.caseId, { detectionStatus: 'dismissed', note: 'Bỏ qua bởi quản trị viên' });
             if (res?.success) {
                 setSuccessMsg('Đã bỏ qua cảnh báo No-show thành công.');
                 setSelectedNoShow(null);
@@ -257,8 +257,8 @@ const RealtimeRoomMonitor = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className={`p-5 rounded-2xl border shadow-sm-1 transition-all ${
-                            room.status === 'NO_SHOW' ? 'bg-red-50/50 border-red-200' : 
-                            room.status === 'IN_USE' ? 'bg-blue-50/50 border-blue-200' : 
+                            room.noShowStatus && ['risk', 'warning_sent', 'confirmed'].includes(room.noShowStatus) ? 'bg-red-50/50 border-red-200' : 
+                            room.currentStatus === 'occupied' ? 'bg-blue-50/50 border-blue-200' : 
                             'bg-white border-platinum-tint'
                         }`}
                     >
@@ -266,9 +266,23 @@ const RealtimeRoomMonitor = () => {
                             <div>
                                 <h3 className="font-bold text-midnight-indigo text-lg">{room.roomName}</h3>
                                 <div className="flex items-center gap-1 mt-1 text-xs font-semibold">
-                                    {room.status === 'AVAILABLE' && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5"/> Sẵn sàng</span>}
-                                    {room.status === 'IN_USE' && <span className="text-action-blue flex items-center gap-1"><Video className="w-3.5 h-3.5"/> Đang sử dụng</span>}
-                                    {room.status === 'NO_SHOW' && <span className="text-red-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5"/> Cảnh báo No-show</span>}
+                                    {room.noShowStatus && ['risk', 'warning_sent', 'confirmed'].includes(room.noShowStatus) ? (
+                                        <span className="text-red-600 flex items-center gap-1">
+                                            <AlertTriangle className="w-3.5 h-3.5"/> Cảnh báo No-show ({
+                                                room.noShowStatus === 'risk' ? 'Rủi ro' :
+                                                room.noShowStatus === 'warning_sent' ? 'Đã gửi cảnh báo' :
+                                                'Đã xác nhận'
+                                            })
+                                        </span>
+                                    ) : (
+                                        <>
+                                            {room.currentStatus === 'available' && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5"/> Sẵn sàng</span>}
+                                            {room.currentStatus === 'occupied' && <span className="text-action-blue flex items-center gap-1"><Video className="w-3.5 h-3.5"/> Đang sử dụng</span>}
+                                            {room.currentStatus === 'reserved' && <span className="text-amber-600 flex items-center gap-1"><Clock className="w-3.5 h-3.5"/> Được đặt trước</span>}
+                                            {room.currentStatus === 'maintenance' && <span className="text-gray-500 flex items-center gap-1"><XCircle className="w-3.5 h-3.5"/> Bảo trì</span>}
+                                            {room.currentStatus === 'inactive' && <span className="text-gray-400 flex items-center gap-1"><XCircle className="w-3.5 h-3.5"/> Không hoạt động</span>}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             <div className="bg-white p-2 rounded-xl shadow-sm border border-platinum-tint/50 flex flex-col items-center justify-center min-w-[50px]">
@@ -277,9 +291,9 @@ const RealtimeRoomMonitor = () => {
                             </div>
                         </div>
 
-                        {room.status === 'NO_SHOW' && (
+                        {room.noShowStatus && ['risk', 'warning_sent', 'confirmed'].includes(room.noShowStatus) && (
                             <button
-                                onClick={() => handleOpenNoShow(room)}
+                                onClick={() => handleOpenNoShow({ roomId: room.roomId, roomName: room.roomName })}
                                 className="w-full mt-2 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
                             >
                                 <Eye className="w-4 h-4" />
@@ -340,12 +354,21 @@ const RealtimeRoomMonitor = () => {
                                     <td className="px-4 py-3 font-semibold text-midnight-indigo">{caseItem.roomName || caseItem.roomId}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${
-                                            caseItem.status === 'PENDING' ? 'bg-red-100 text-red-700' :
-                                            caseItem.status === 'RELEASED' ? 'bg-green-100 text-green-700' :
-                                            caseItem.status === 'IGNORED' ? 'bg-slate-200 text-slate-700' :
+                                            caseItem.status === 'risk' ? 'bg-red-100 text-red-700' :
+                                            caseItem.status === 'confirmed' ? 'bg-orange-100 text-orange-700' :
+                                            caseItem.status === 'warning_sent' ? 'bg-yellow-100 text-yellow-700' :
+                                            caseItem.status === 'released' ? 'bg-green-100 text-green-700' :
+                                            caseItem.status === 'dismissed' ? 'bg-slate-200 text-slate-700' :
+                                            caseItem.status === 'resolved' ? 'bg-teal-100 text-teal-700' :
                                             'bg-blue-100 text-blue-700'
                                         }`}>
-                                            {caseItem.status}
+                                            {caseItem.status === 'risk' ? 'Có rủi ro' :
+                                             caseItem.status === 'confirmed' ? 'Đã xác nhận' :
+                                             caseItem.status === 'warning_sent' ? 'Đã gửi cảnh báo' :
+                                             caseItem.status === 'released' ? 'Đã giải phóng' :
+                                             caseItem.status === 'dismissed' ? 'Đã bỏ qua' :
+                                             caseItem.status === 'resolved' ? 'Đã giải quyết' :
+                                             caseItem.status}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-xs">{caseItem.detectedAt ? new Date(caseItem.detectedAt).toLocaleString('vi-VN') : '—'}</td>
@@ -418,7 +441,13 @@ const RealtimeRoomMonitor = () => {
                                             <div className="flex justify-between">
                                                 <span className="font-semibold text-midnight-indigo">Trạng thái:</span>
                                                 <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded font-bold text-xs">
-                                                    {noShowDetail.status}
+                                                    {noShowDetail.status === 'risk' ? 'Có rủi ro' :
+                                                     noShowDetail.status === 'confirmed' ? 'Đã xác nhận' :
+                                                     noShowDetail.status === 'warning_sent' ? 'Đã gửi cảnh báo' :
+                                                     noShowDetail.status === 'released' ? 'Đã giải phóng' :
+                                                     noShowDetail.status === 'dismissed' ? 'Đã bỏ qua' :
+                                                     noShowDetail.status === 'resolved' ? 'Đã giải quyết' :
+                                                     noShowDetail.status}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
@@ -449,14 +478,14 @@ const RealtimeRoomMonitor = () => {
                                 </button>
                                 <button
                                     onClick={() => setConfirmAction({ type: 'ignore', caseId: noShowDetail?.caseId })}
-                                    disabled={isProcessing || !noShowDetail}
+                                    disabled={isProcessing || !noShowDetail || ['resolved', 'dismissed', 'released'].includes(noShowDetail.status)}
                                     className="flex-1 px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-midnight-indigo bg-white hover:bg-cloud-mist disabled:opacity-50 flex items-center justify-center gap-1.5"
                                 >
                                     <XCircle className="w-4 h-4" /> Bỏ qua
                                 </button>
                                 <button
                                     onClick={() => setConfirmAction({ type: 'release', caseId: noShowDetail?.caseId })}
-                                    disabled={isProcessing || !noShowDetail}
+                                    disabled={isProcessing || !noShowDetail || ['resolved', 'dismissed', 'released'].includes(noShowDetail.status)}
                                     className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
                                 >
                                     <Unlock className="w-4 h-4" /> Giải phóng

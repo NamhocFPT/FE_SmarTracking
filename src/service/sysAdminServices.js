@@ -376,25 +376,7 @@ export const markAllNotificationsRead = async () => {
 };
 
 
-// ============================================================
-// VEHICLES ENDPOINTS
-// ============================================================
-export const getMyVehicles = async (params = {}) => {
-    const query = buildQuery(params);
-    return await get(`/vehicles/me${query}`);
-};
-
-export const registerVehicle = async (data) => {
-    return await post('/vehicles', data);
-};
-
-export const updateVehicle = async (id, data) => {
-    return await patch(`/vehicles/${id}`, data);
-};
-
-export const deleteVehicle = async (id) => {
-    return await dele(`/vehicles/${id}`);
-};
+// sync BE: Removed dead /vehicles api helper methods. Use anprService instead.
 
 // ============================================================
 // GATE ACCESS & TRAFFIC STATS (UC-107)
@@ -573,7 +555,7 @@ export const getNoShowConfig = async () => {
 
 // B-M9.6 — Cập nhật cấu hình No-Show (PUT, ≥1 field, forbidNonWhitelisted)
 export const updateNoShowConfig = async (data) => {
-    return await request('PUT', '/no-show-config', data);
+    return await request('/no-show-config', { method: 'PUT', body: data });
 };
 
 // B-M9.7 — Lấy cấu hình Early Vacancy
@@ -583,5 +565,5 @@ export const getEarlyVacancyConfig = async () => {
 
 // B-M9.8 — Cập nhật cấu hình Early Vacancy (PUT, ≥1 field, forbidNonWhitelisted)
 export const updateEarlyVacancyConfig = async (data) => {
-    return await request('PUT', '/early-vacancy-config', data);
+    return await request('/early-vacancy-config', { method: 'PUT', body: data });
 };
