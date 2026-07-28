@@ -17,9 +17,9 @@ import ChangePasswordModal from '../../../component/ChangePasswordModal';
  */
 const navigationItems = [
     {
-        label: 'Tổng quan',
+        label: 'Bảng điều khiển',
         to: '/system-admin',
-        end: true
+        end: true,
     },
 
     {
@@ -27,89 +27,104 @@ const navigationItems = [
         isDropdown: true,
         children: [
             {
-                label: 'Phân quyền hệ thống',
-                to: '/system-admin/roles-permissions'
+                label: 'Vai trò & Phân quyền',
+                to: '/system-admin/roles-permissions',
             },
             {
-                label: 'Nhật ký hệ thống',
-                to: '/system-admin/audit-logs'
+                label: 'Nhật ký kiểm toán',
+                to: '/system-admin/audit-logs',
             },
             {
-                label: 'Cài đặt hệ thống',
-                to: '/system-admin/settings'
-            }
-        ]
+                label: 'Cấu hình hệ thống',
+                to: '/system-admin/settings',
+            },
+        ],
     },
 
     {
-        label: 'Thiết bị & AI',
+        label: 'Hạ tầng & AI',
         isDropdown: true,
         children: [
             {
                 label: 'Thiết bị IoT',
-                to: '/system-admin/devices'
+                to: '/system-admin/devices',
             },
             {
-                label: 'Trang thiết bị',
-                to: '/system-admin/equipments'
+                label: 'Thiết bị',
+                to: '/system-admin/equipments',
             },
             {
-                label: 'Khu vực',
-                to: '/system-admin/zones'
+                label: 'Khu vực giám sát',
+                to: '/system-admin/zones',
             },
             {
-                label: 'Đối tượng theo dõi',
-                to: '/system-admin/person-control-list'
+                label: 'Danh sách giám sát',
+                to: '/system-admin/person-control-list',
             },
             {
-                label: 'Quản lý phòng họp',
-                to: '/system-admin/rooms'
+                label: 'Phòng họp',
+                to: '/system-admin/rooms',
             },
             {
-                label: 'Nhận diện xe (ANPR)',
-                to: '/system-admin/anpr-management'
+                label: 'Hệ thống ANPR',
+                to: '/system-admin/anpr-management',
             },
             {
-                label: 'Biển số theo dõi',
-                to: '/system-admin/vehicle-control-list'
+                label: 'Danh sách biển số giám sát',
+                to: '/system-admin/vehicle-control-list',
             },
             {
-                label: 'Lịch sử đăng ký xe',
-                to: '/system-admin/vehicle-registrations'
+                label: 'Đăng ký phương tiện',
+                to: '/system-admin/vehicle-registrations',
             },
             {
-                label: 'Kiểm soát ra vào cổng',
-                to: '/system-admin/gate-access'
+                label: 'Kiểm soát cổng',
+                to: '/system-admin/gate-access',
             },
             {
-                label: 'Trung tâm cảnh báo',
-                to: '/system-admin/security-alerts'
+                label: 'Cảnh báo an ninh',
+                to: '/system-admin/security-alerts',
             },
             {
-                label: 'Cấu hình luật cảnh báo',
-                to: '/system-admin/alert-rules'
-            }
-        ]
+                label: 'Quy tắc cảnh báo',
+                to: '/system-admin/alert-rules',
+            },
+        ],
     },
 
     {
-        label: 'Lịch họp',
+        label: 'Cuộc họp',
         isDropdown: true,
         children: [
             {
-                label: 'Lịch cá nhân',
-                to: '/system-admin/schedule'
+                label: 'Lịch của tôi',
+                to: '/system-admin/schedule',
             },
             {
-                label: 'Đăng ký họp',
-                to: '/system-admin/book'
+                label: 'Đăng ký cuộc họp',
+                to: '/system-admin/book',
             },
             {
-                label: 'Vận hành Phòng họp',
-                to: '/system-admin/room-operations'
-            }
-        ]
-    }
+                label: 'Vận hành phòng họp',
+                to: '/system-admin/room-operations',
+            },
+        ],
+    },
+
+    {
+        label: 'Báo cáo',
+        isDropdown: true,
+        children: [
+            {
+                label: 'Hiệu suất phòng họp',
+                to: '/system-admin/room-analytics',
+            },
+            {
+                label: 'Tỷ lệ đúng giờ',
+                to: '/system-admin/attendance-analytics',
+            },
+        ],
+    },
 ];
 
 const footerLinks = [

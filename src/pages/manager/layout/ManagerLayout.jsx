@@ -10,42 +10,51 @@ const navigationItems = [
     {
         label: 'Trang chủ',
         to: '/manager',
-        end: true
+        end: true,
     },
     {
-        label: 'Lịch họp',
+        label: 'Cuộc họp',
         isDropdown: true,
         children: [
             {
                 label: 'Lịch cá nhân',
-                to: '/manager/schedule'
+                to: '/manager/schedule',
             },
             {
                 label: 'Đăng ký họp',
-                to: '/manager/book'
-            }
-        ]
-    }
-    ,
-
+                to: '/manager/book',
+            },
+        ],
+    },
     {
-        label: 'Điều hành',
+        label: 'Phê duyệt',
         isDropdown: true,
         children: [
             {
-                label: 'Phê duyệt cuộc họp',
-                to: '/manager/meeting-approvals'
+                label: 'Cuộc họp',
+                to: '/manager/meeting-approvals',
             },
             {
-                label: 'Duyệt ảnh đại diện',
-                to: '/manager/avatar-submissions'
-            }
-        ]
+                label: 'Ảnh đại diện',
+                to: '/manager/avatar-submissions',
+            },
+        ],
     },
-
-
+    {
+        label: 'Báo cáo',
+        isDropdown: true,
+        children: [
+            {
+                label: 'Hiệu suất phòng họp',
+                to: '/manager/room-analytics',
+            },
+            {
+                label: 'Tỷ lệ đúng giờ',
+                to: '/manager/attendance-analytics',
+            },
+        ],
+    },
 ];
-
 const footerLinks = [
     { label: 'Hỗ trợ', to: '#' },
     { label: 'Tài liệu', to: '#' },
@@ -142,8 +151,8 @@ const ManagerLayout = () => {
                         >
                             {navigationItems.map((item) => (
                                 item.isDropdown ? (
-                                    <div 
-                                        key={item.label} 
+                                    <div
+                                        key={item.label}
                                         className="relative"
                                         onMouseEnter={() => setOpenDropdown(item.label)}
                                         onMouseLeave={() => setOpenDropdown(null)}
@@ -157,7 +166,7 @@ const ManagerLayout = () => {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                                             </svg>
                                         </button>
-                                        
+
                                         {openDropdown === item.label && (
                                             <div className="absolute top-full left-0 pt-1 w-48 z-50">
                                                 <div className="bg-white border border-platinum-tint rounded-xl shadow-lg overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">

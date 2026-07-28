@@ -10,37 +10,46 @@ import ChangePasswordModal from '../../../component/ChangePasswordModal';
  * Navigation items cho BusinessAdmin role
  */
 const navigationItems = [
-    { label: 'Tổng Quan', to: '/business-admin', end: true },
+    { label: 'Tổng quan', to: '/business-admin', end: true },
+
     {
-        label: 'Lịch họp',
+        label: 'Cuộc họp',
         isDropdown: true,
         children: [
             { label: 'Lịch cá nhân', to: '/business-admin/schedule' },
             { label: 'Đăng ký họp', to: '/business-admin/book' },
-
-        ]
+            { label: 'Quản lý cuộc họp', to: '/business-admin/meetings' },
+        ],
     },
+
     {
-        label: 'Camera AI',
+        label: 'Quản lý',
+        isDropdown: true,
+        children: [
+            { label: 'Phòng họp', to: '/business-admin/rooms' },
+            { label: 'Người dùng', to: '/business-admin/users' },
+            { label: 'Phòng ban', to: '/business-admin/departments' },
+        ],
+    },
+
+    {
+        label: 'AI Camera',
         isDropdown: true,
         children: [
             { label: 'Ghi hình', to: '/business-admin/recordings' },
             { label: 'Kiểm soát phương tiện', to: '/business-admin/anpr-management' },
-            { label: 'Trung tâm cảnh báo', to: '/business-admin/security-alerts' },
-        ]
+            { label: 'Cảnh báo AI', to: '/business-admin/security-alerts' },
+        ],
     },
+
     {
-        label: 'Tổ chức',
+        label: 'Báo cáo',
         isDropdown: true,
         children: [
-            { label: 'Người dùng', to: '/business-admin/users' },
-            { label: 'Phòng ban', to: '/business-admin/departments' },
-            { label: 'Cuộc họp', to: '/business-admin/meetings' },
-            { label: 'Phòng họp', to: '/business-admin/rooms' },
-        ]
+            { label: 'Hiệu suất phòng họp', to: '/business-admin/room-analytics' },
+            { label: 'Tỷ lệ đúng giờ', to: '/business-admin/attendance-analytics' },
+        ],
     },
-    // { label: 'Báo cáo', to: '#' },
-    // { label: 'Cài đặt', to: '#' }
 ];
 
 const footerLinks = [
@@ -140,8 +149,8 @@ const BusinessAdminLayout = () => {
                         >
                             {navigationItems.map((item) => (
                                 item.isDropdown ? (
-                                    <div 
-                                        key={item.label} 
+                                    <div
+                                        key={item.label}
                                         className="relative"
                                         onMouseEnter={() => setOpenDropdown(item.label)}
                                         onMouseLeave={() => setOpenDropdown(null)}
@@ -155,7 +164,7 @@ const BusinessAdminLayout = () => {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                                             </svg>
                                         </button>
-                                        
+
                                         {openDropdown === item.label && (
                                             <div className="absolute top-full left-0 pt-1 w-48 z-50">
                                                 <div className="bg-white border border-platinum-tint rounded-xl shadow-lg overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">

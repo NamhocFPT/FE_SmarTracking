@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import UserAvatar from '../../component/UserAvatar';
 import {
     getUsers,
+    getUsersForManagement,
     createUser,
     updateUser,
     updateUserRoles,
@@ -105,9 +106,9 @@ const UserManagement = () => {
                 search: search.trim() || undefined,
                 roleId: selectedRole || undefined,
                 departmentId: selectedDept || undefined,
-                locked: selectedStatus === 'LOCKED' ? true : selectedStatus === 'ACTIVE' ? false : undefined
+                accountStatus: selectedStatus || undefined
             };
-            const res = await getUsers(params);
+            const res = await getUsersForManagement(params);
             if (res?.success) {
                 setUsersList(res.data || []);
                 setTotalPages(res.meta?.totalPages || 1);
@@ -600,8 +601,10 @@ const UserManagement = () => {
                         className="px-3 py-2 border border-platinum-tint rounded-xl text-sm text-slate-blue focus:outline-none focus:border-action-blue"
                     >
                         <option value="">Tất cả trạng thái</option>
-                        <option value="ACTIVE">Hoạt động</option>
-                        <option value="LOCKED">Bị khóa</option>
+                        <option value="active">Hoạt động</option>
+                        <option value="locked">Bị khóa</option>
+                        <option value="inactive">Tạm dừng</option>
+                        <option value="pending_reset">Chờ đổi mật khẩu</option>
                     </select>
                 </div>
             </div>
@@ -663,23 +666,37 @@ const UserManagement = () => {
                                                 {user.phoneNumber || user.phone || 'Chưa cung cấp'}
                                             </td>
                                             <td className="py-4 px-6 text-sm text-midnight-indigo font-medium">
-                                                {user.departments?.map(d => d.name).join(', ') || 'Chưa phân bổ'}
+                                                {(() => {
+                                                    const deptId = user.departmentId || (user.departments && user.departments[0]?.id) || (user.department?.id);
+                                                    const dept = departments.find(d => d.id === deptId || d.uuid === deptId);
+                                                    return dept ? dept.name || dept.roomName || dept.departmentName : 'Chưa phân bổ';
+                                                })()}
                                             </td>
                                             <td className="py-4 px-6">
                                                 <div className="flex flex-wrap gap-1">
-                                                    {user.roles?.map(r => (
-                                                        <span key={r.id} className="inline-flex text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
-                                                            {r.name}
-                                                        </span>
-                                                    )) || <span className="text-xs text-steel-gray">Chưa phân quyền</span>}
+                                                    {user.roles?.map((r, idx) => {
+                                                        const roleCode = typeof r === 'string' ? r : r.code || r.name;
+                                                        const roleObj = roles.find(role => role.code === roleCode || role.name === roleCode || role.id === roleCode);
+                                                        const roleName = roleObj ? roleObj.name : roleCode;
+                                                        return (
+                                                            <span key={idx} className="inline-flex text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
+                                                                {roleName}
+                                                            </span>
+                                                        );
+                                                    }) || <span className="text-xs text-steel-gray">Chưa phân quyền</span>}
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${(user.accountStatus === 'locked' || user.locked)
-                                                    ? 'bg-red-50 text-red-700'
-                                                    : 'bg-green-50 text-green-700'
-                                                    }`}>
-                                                    {(user.accountStatus === 'locked' || user.locked) ? 'Bị khóa' : 'Hoạt động'}
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                                    (user.accountStatus === 'locked' || user.locked) ? 'bg-red-50 text-red-700' :
+                                                    user.accountStatus === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                                                    user.accountStatus === 'pending_reset' ? 'bg-amber-50 text-amber-700' :
+                                                    'bg-green-50 text-green-700'
+                                                }`}>
+                                                    {(user.accountStatus === 'locked' || user.locked) ? 'Bị khóa' :
+                                                     user.accountStatus === 'inactive' ? 'Tạm dừng' :
+                                                     user.accountStatus === 'pending_reset' ? 'Chờ đổi mk' :
+                                                     'Hoạt động'}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-right space-x-2">
@@ -1140,12 +1157,17 @@ const UserManagement = () => {
                                     <div>
                                         <h4 className="text-lg font-bold text-midnight-indigo leading-tight">{selectedUserDetail.fullName}</h4>
                                         <p className="text-sm text-slate-blue mt-0.5">{selectedUserDetail.email}</p>
-                                        <div className="flex gap-1.5 mt-1">
-                                            {selectedUserDetail.roles?.map(r => (
-                                                <span key={r.id} className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
-                                                    {r.roleName || r.name}
-                                                </span>
-                                            ))}
+                                        <div className="flex gap-1.5 mt-1 flex-wrap">
+                                            {selectedUserDetail.roles?.map((r, idx) => {
+                                                const roleCode = typeof r === 'string' ? r : r.code || r.name;
+                                                const roleObj = roles.find(role => role.code === roleCode || role.name === roleCode || role.id === roleCode);
+                                                const roleName = roleObj ? roleObj.name : roleCode;
+                                                return (
+                                                    <span key={idx} className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
+                                                        {roleName}
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </div>
@@ -1173,7 +1195,11 @@ const UserManagement = () => {
                                             <div>
                                                 <span className="text-slate-blue block text-xs">Phòng ban:</span>
                                                 <span className="font-semibold text-midnight-indigo">
-                                                    {selectedUserDetail.department?.departmentName || selectedUserDetail.department?.name || 'Chưa phân bổ'}
+                                                    {(() => {
+                                                        const deptId = selectedUserDetail.departmentId || (selectedUserDetail.departments && selectedUserDetail.departments[0]?.id) || (selectedUserDetail.department?.id);
+                                                        const dept = departments.find(d => d.id === deptId || d.uuid === deptId);
+                                                        return dept ? dept.name || dept.roomName || dept.departmentName : 'Chưa phân bổ';
+                                                    })()}
                                                 </span>
                                             </div>
                                             <div>
