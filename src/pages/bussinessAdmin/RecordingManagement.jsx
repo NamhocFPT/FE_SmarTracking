@@ -11,7 +11,7 @@ import {
 import { 
     Video, Download, Trash2, Search, RefreshCw, 
     Play, Clock, Calendar, CheckCircle, AlertTriangle, 
-    HardDrive, Info, Film, XCircle
+    HardDrive, Info, Film, XCircle, EyeOff
 } from 'lucide-react';
 
 const RecordingManagement = () => {
@@ -60,7 +60,7 @@ const RecordingManagement = () => {
                 limit,
                 search: search.trim() || undefined,
                 roomId: selectedRoom || undefined,
-                status: 'COMPLETED'
+                status: 'completed'
             };
             const meetingsRes = await getMeetings(meetingParams);
             if (!meetingsRes?.success || !meetingsRes.data?.length) {
@@ -94,9 +94,12 @@ const RecordingManagement = () => {
             });
 
             const allMedia = (await Promise.all(mediaPromises)).flat();
-            // Lọc theo status nếu có
+            // Lọc theo status hoặc ẩn nếu có
             const filtered = statusFilter
-                ? allMedia.filter(f => f.status === statusFilter || f.visibility === statusFilter)
+                ? allMedia.filter(f => {
+                    if (statusFilter === 'hidden') return f.isActive === false;
+                    return f.status === statusFilter;
+                  })
                 : allMedia;
             setRecordingsList(filtered);
         } catch (err) {
@@ -124,19 +127,18 @@ const RecordingManagement = () => {
         }
     }, [successMessage]);
 
-    // Visibility Handler — dùng media-files API
-    const toggleVisibility = async (rec) => {
+    // Visibility Handler — dùng media-files API (Chỉ ẩn 1 chiều)
+    const hideRecording = async (rec) => {
         try {
-            const newStatus = rec.status === 'HIDDEN' ? 'COMPLETED' : 'HIDDEN';
-            const res = await updateMediaVisibility(rec.id, { visibility: newStatus });
+            const res = await updateMediaVisibility(rec.id, { action: 'hide' });
             if (res?.success) {
-                setSuccessMessage('Cập nhật trạng thái hiển thị thành công.');
+                setSuccessMessage('Đã ẩn video thành công.');
                 fetchRecordingsList();
             } else {
-                setError('Lỗi cập nhật trạng thái hiển thị.');
+                setError('Lỗi ẩn video.');
             }
         } catch (err) {
-            setError('Lỗi kết nối khi cập nhật trạng thái.');
+            setError('Lỗi kết nối khi ẩn video.');
         }
     };
 
@@ -284,9 +286,9 @@ const RecordingManagement = () => {
                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
                     >
                         <option value="">Tất cả trạng thái</option>
-                        <option value="COMPLETED">Hoàn thành (Đầy đủ)</option>
-                        <option value="PARTIAL">Bị gián đoạn (Một phần)</option>
-                        <option value="FAILED">Lỗi ghi hình</option>
+                        <option value="stopped">Hoàn thành (Đầy đủ)</option>
+                        <option value="failed">Lỗi ghi hình</option>
+                        <option value="hidden">Đã ẩn</option>
                     </select>
                 </div>
             </div>
@@ -337,35 +339,53 @@ const RecordingManagement = () => {
                                         <td className="px-6 py-4 text-xs font-medium text-slate-700">
                                             <div className="flex items-center gap-1.5">
                                                 <Clock className="w-3.5 h-3.5 text-slate-blue/70" />
-                                                {rec.status !== 'FAILED' ? formatDuration(rec.durationSec) : '--'}
+                                                {rec.status !== 'failed' && rec.status !== 'FAILED' ? formatDuration(rec.durationSec) : '--'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-xs font-semibold text-slate-600">
                                             <div className="flex items-center gap-1.5">
                                                 <HardDrive className="w-3.5 h-3.5 text-slate-blue/70" />
-                                                {rec.status !== 'FAILED' ? formatBytes(rec.fileSizeBytes) : '--'}
+                                                {rec.status !== 'failed' && rec.status !== 'FAILED' ? formatBytes(rec.fileSizeBytes) : '--'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {rec.status === 'COMPLETED' && (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700">
-                                                    Hoàn thành
+                                            {rec.isActive === false ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                                                    Đã ẩn
                                                 </span>
-                                            )}
-                                            {rec.status === 'PARTIAL' && (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-50 text-yellow-700" title="Video bị ngắt giữa chừng">
-                                                    Một phần
-                                                </span>
-                                            )}
-                                            {rec.status === 'FAILED' && (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700" title={rec.errorMessage}>
-                                                    Thất bại
-                                                </span>
+                                            ) : (
+                                                <>
+                                                    {(rec.status === 'stopped' || rec.status === 'COMPLETED') && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700">
+                                                            Hoàn thành
+                                                        </span>
+                                                    )}
+                                                    {rec.status === 'recording' && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 animate-pulse">
+                                                            Đang ghi
+                                                        </span>
+                                                    )}
+                                                    {rec.status === 'paused' && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-50 text-yellow-700">
+                                                            Tạm dừng
+                                                        </span>
+                                                    )}
+                                                    {(rec.status === 'starting' || rec.status === 'processing') && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700">
+                                                            Đang xử lý
+                                                        </span>
+                                                    )}
+                                                    {(rec.status === 'failed' || rec.status === 'FAILED') && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700" title={rec.errorMessage}>
+                                                            Thất bại
+                                                        </span>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                {rec.status !== 'FAILED' && (
+                                                {rec.status !== 'failed' && rec.status !== 'FAILED' && (
                                                     <>
                                                         <button
                                                             onClick={() => setPreviewVideo(rec)}
@@ -383,13 +403,22 @@ const RecordingManagement = () => {
                                                         </button>
                                                     </>
                                                 )}
-                                                {rec.status === 'FAILED' && rec.errorMessage && (
+                                                {(rec.status === 'failed' || rec.status === 'FAILED') && rec.errorMessage && (
                                                     <button
                                                         onClick={() => alert(`Lỗi: ${rec.errorMessage}`)}
                                                         className="p-1.5 hover:text-red-700 hover:bg-red-50 text-slate-blue rounded-lg transition-colors"
                                                         title="Xem chi tiết lỗi"
                                                     >
                                                         <Info className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {rec.isActive !== false && (
+                                                    <button
+                                                        onClick={() => hideRecording(rec)}
+                                                        className="p-1.5 hover:text-amber-600 hover:bg-amber-50 text-slate-blue rounded-lg transition-colors"
+                                                        title="Ẩn video"
+                                                    >
+                                                        <EyeOff className="w-4 h-4" />
                                                     </button>
                                                 )}
                                                 <button

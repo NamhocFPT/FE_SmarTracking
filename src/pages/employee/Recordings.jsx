@@ -43,10 +43,16 @@ const EmployeeRecordings = () => {
         setErrorMsg(null);
         try {
             // Bước 1: Lấy lịch cuộc họp đã qua
+            const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const defaultTo = new Date().toISOString().split('T')[0];
+            const fromStr = `${startDate || defaultFrom}T00:00:00+07:00`;
+            const toStr = `${endDate || defaultTo}T23:59:59+07:00`;
+
             const scheduleParams = {
-                status: 'COMPLETED',
-                from: startDate || undefined,
-                to: endDate || undefined,
+                from: fromStr,
+                to: toStr,
+                view: 'list',
+                status: ['completed']
             };
             const scheduleRes = await getMySchedule(scheduleParams);
             

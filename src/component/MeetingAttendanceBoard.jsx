@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users, Clock, CheckCircle, AlertTriangle, AlertCircle, XCircle, Edit3, Save, X, RotateCcw
@@ -67,10 +68,19 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const payload = {
-                attendanceStatus: editingRecord.newStatus
-            };
-            const res = await updateAttendanceStatus(meetingId, editingRecord.id, payload);
+            let res;
+            if (editingRecord.attendanceStatus === 'not_checked_in' || !editingRecord.id) {
+                // If not checked in yet, we must create a manual check-in record
+                res = await manualAttendanceCheckIn(meetingId, { 
+                    userId: editingRecord.userId,
+                    checkInTime: new Date().toISOString()
+                });
+            } else {
+                // If record exists, update the status using its record ID
+                res = await updateAttendanceStatus(meetingId, editingRecord.id, { 
+                    attendanceStatus: editingRecord.newStatus 
+                });
+            }
             if (res?.success) {
                 setSuccessMsg('Đã cập nhật trạng thái điểm danh.');
                 setEditingRecord(null);
@@ -259,19 +269,19 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-platinum-tint bg-white text-[10px] font-bold text-slate-blue uppercase tracking-wider">
+                            <tr className="border-b border-platinum-tint bg-white text-[10px] font-bold text-slate-blue uppercase tracking-wider whitespace-nowrap">
                                 <th className="px-5 py-3">Người tham dự</th>
                                 <th className="px-5 py-3">Vai trò</th>
                                 <th className="px-5 py-3">Trạng thái</th>
                                 <th className="px-5 py-3">Check-in lúc</th>
-                                {canManage && <th className="px-5 py-3">Nguồn</th>}
+                                {canManage && <th className="px-5 py-3">Nguồn / Phương thức</th>}
                                 {canManage && <th className="px-5 py-3 text-right">Thao tác</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-platinum-tint text-sm bg-white">
                             {items?.length > 0 ? items.map((item) => (
                                 <tr key={item.userId} className="hover:bg-cloud-mist/20 transition-colors">
-                                    <td className="px-5 py-3">
+                                    <td className="px-5 py-3 whitespace-nowrap">
                                         <div className="flex items-center gap-3">
                                             <UserAvatar user={{ avatarUrl: item.avatarUrl, fullName: item.fullName }} className="w-8 h-8 rounded-full" />
                                             <div>
@@ -280,21 +290,26 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-5 py-3">
+                                    <td className="px-5 py-3 whitespace-nowrap">
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                                             item.participantRole === 'host' ? 'bg-blue-50 text-action-blue' : 'bg-cloud-mist text-slate-blue'
                                         }`}>
                                             {item.participantRole === 'host' ? 'Chủ trì' : 'Khách mời'}
                                         </span>
                                     </td>
-                                    <td className="px-5 py-3">
+                                    <td className="px-5 py-3 whitespace-nowrap">
                                         {renderStatusBadge(item.attendanceStatus, item.isLate, item.lateMinutes)}
                                     </td>
-                                    <td className="px-5 py-3 text-[11px] font-medium text-slate-600">
-                                        {item.checkInTime ? new Date(item.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                    <td className="px-5 py-3 text-[11px] font-medium text-slate-600 whitespace-nowrap">
+                                        {item.checkInTime ? (
+                                            <div className="flex flex-col">
+                                                <span>{new Date(item.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[9px] text-slate-400 font-normal">{new Date(item.checkInTime).toLocaleDateString('vi-VN')}</span>
+                                            </div>
+                                        ) : '--:--'}
                                     </td>
                                     {canManage && (
-                                        <td className="px-5 py-3">
+                                        <td className="px-5 py-3 whitespace-nowrap">
                                             <div className="flex flex-col gap-0.5">
                                                 {item.checkInMethod && (
                                                     <span className="text-[10px] font-semibold text-slate-700">
@@ -345,100 +360,108 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
             </div>
 
             {/* Edit Status Modal */}
-            <AnimatePresence>
-                {editingRecord && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white rounded-2xl border border-platinum-tint shadow-sm-3 max-w-sm w-full p-6 space-y-4"
-                        >
-                            <div className="flex items-center justify-between border-b border-platinum-tint pb-3">
-                                <h3 className="text-sm font-bold text-midnight-indigo">Cập nhật điểm danh</h3>
-                                <button onClick={() => setEditingRecord(null)} className="text-slate-blue hover:text-midnight-indigo">
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <div className="space-y-3">
-                                <p className="text-xs text-slate-blue">
-                                    Người tham dự: <span className="font-bold text-midnight-indigo">{editingRecord.fullName}</span>
-                                </p>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1.5">Trạng thái mới</label>
-                                    <select
-                                        value={editingRecord.newStatus}
-                                        onChange={(e) => setEditingRecord({ ...editingRecord, newStatus: e.target.value })}
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
-                                    >
-                                        <option value="present">Có mặt</option>
-                                        <option value="absent">Vắng mặt</option>
-                                        <option value="not_checked_in">Chưa điểm danh</option>
-                                    </select>
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {editingRecord && (
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-white rounded-2xl border border-platinum-tint shadow-sm-3 max-w-sm w-full p-6 space-y-4"
+                            >
+                                <div className="flex items-center justify-between border-b border-platinum-tint pb-3">
+                                    <h3 className="text-sm font-bold text-midnight-indigo">Cập nhật điểm danh</h3>
+                                    <button onClick={() => setEditingRecord(null)} className="text-slate-blue hover:text-midnight-indigo">
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button
-                                    onClick={() => setEditingRecord(null)}
-                                    className="px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue hover:bg-cloud-mist transition-colors"
-                                    disabled={isSaving}
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    onClick={handleSaveEdit}
-                                    className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-                                    disabled={isSaving}
-                                >
-                                    {isSaving ? 'Đang lưu...' : <><Save className="w-3.5 h-3.5" /> Lưu trạng thái</>}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                                <div className="space-y-3">
+                                    <p className="text-xs text-slate-blue">
+                                        Người tham dự: <span className="font-bold text-midnight-indigo">{editingRecord.fullName}</span>
+                                    </p>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1.5">Trạng thái mới</label>
+                                        <select
+                                            value={editingRecord.newStatus}
+                                            onChange={(e) => setEditingRecord({ ...editingRecord, newStatus: e.target.value })}
+                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
+                                        >
+                                            <option value="present">Có mặt</option>
+                                            <option value="absent">Vắng mặt</option>
+                                            <option value="late">Đến muộn</option>
+                                            <option value="left_early">Về sớm</option>
+                                            <option value="pending_review">Chờ duyệt</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <button
+                                        onClick={() => setEditingRecord(null)}
+                                        className="px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue hover:bg-cloud-mist transition-colors"
+                                        disabled={isSaving}
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        onClick={handleSaveEdit}
+                                        className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? 'Đang lưu...' : <><Save className="w-3.5 h-3.5" /> Lưu trạng thái</>}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* Invalidate Confirm Modal */}
-            <AnimatePresence>
-                {invalidateRecord && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white rounded-2xl border border-platinum-tint shadow-sm-3 max-w-sm w-full p-6 space-y-4"
-                        >
-                            <div className="flex flex-col items-center text-center space-y-3">
-                                <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <RotateCcw className="w-6 h-6" />
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {invalidateRecord && (
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-white rounded-2xl border border-platinum-tint shadow-sm-3 max-w-sm w-full p-6 space-y-4"
+                            >
+                                <div className="flex flex-col items-center text-center space-y-3">
+                                    <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                                        <RotateCcw className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-midnight-indigo">Hủy hiệu lực điểm danh?</h3>
+                                        <p className="text-xs text-slate-blue mt-1.5 leading-relaxed">
+                                            Bạn có chắc chắn muốn hủy kết quả check-in của <span className="font-bold text-midnight-indigo">{invalidateRecord.fullName}</span>? Người này sẽ được đánh dấu lại thành "Chưa điểm danh".
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-midnight-indigo">Hủy hiệu lực điểm danh?</h3>
-                                    <p className="text-xs text-slate-blue mt-1.5 leading-relaxed">
-                                        Bạn có chắc chắn muốn hủy kết quả check-in của <span className="font-bold text-midnight-indigo">{invalidateRecord.fullName}</span>? Người này sẽ được đánh dấu lại thành "Chưa điểm danh".
-                                    </p>
+                                <div className="flex justify-center gap-3 pt-3 border-t border-platinum-tint">
+                                    <button
+                                        onClick={() => setInvalidateRecord(null)}
+                                        className="px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue hover:bg-cloud-mist transition-colors"
+                                        disabled={isSaving}
+                                    >
+                                        Hủy bỏ
+                                    </button>
+                                    <button
+                                        onClick={handleInvalidate}
+                                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? 'Đang xử lý...' : 'Đồng ý hủy'}
+                                    </button>
                                 </div>
-                            </div>
-                            <div className="flex justify-center gap-3 pt-3 border-t border-platinum-tint">
-                                <button
-                                    onClick={() => setInvalidateRecord(null)}
-                                    className="px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue hover:bg-cloud-mist transition-colors"
-                                    disabled={isSaving}
-                                >
-                                    Hủy bỏ
-                                </button>
-                                <button
-                                    onClick={handleInvalidate}
-                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-                                    disabled={isSaving}
-                                >
-                                    {isSaving ? 'Đang xử lý...' : 'Đồng ý hủy'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 };

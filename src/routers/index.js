@@ -6,6 +6,8 @@ import Error403 from '../pages/Error/403';
 import Error404 from '../pages/Error/404';
 import Error500 from '../pages/Error/500';
 import ProtectedRoute from './ProtectedRoute';
+import RoomUsageAnalytics from '../pages/shared/RoomUsageAnalytics';
+import EmployeeOnTimeAnalytics from '../pages/shared/EmployeeOnTimeAnalytics';
 
 // SystemAdmin Layout + Pages
 import SystemAdminLayout from '../pages/systemAdmin/layout/SystemAdminLayout';
@@ -181,6 +183,14 @@ export const router = [
             {
                 path: 'in-meeting/:id',
                 element: <InMeetingRoom />
+            },
+            {
+                path: 'room-analytics',
+                element: <RoomUsageAnalytics />
+            },
+            {
+                path: 'attendance-analytics',
+                element: <EmployeeOnTimeAnalytics />
             }
         ]
     },
@@ -253,6 +263,14 @@ export const router = [
             {
                 path: 'in-meeting/:id',
                 element: <InMeetingRoom />
+            },
+            {
+                path: 'room-analytics',
+                element: <RoomUsageAnalytics />
+            },
+            {
+                path: 'attendance-analytics',
+                element: <EmployeeOnTimeAnalytics />
             }
         ]
     },
@@ -310,6 +328,14 @@ export const router = [
                 path: 'my-vehicles',
                 element: <MyVehicles />
             },
+            {
+                path: 'room-analytics',
+                element: <RoomUsageAnalytics />
+            },
+            {
+                path: 'attendance-analytics',
+                element: <EmployeeOnTimeAnalytics />
+            }
         ]
     },
 
