@@ -44,7 +44,8 @@ export const updateMyVehicle = async (id, data) => {
  * @param {object} data - { status: 'ACTIVE' | 'INACTIVE' }
  */
 export const toggleMyVehicleStatus = async (id, data) => {
-    return await patch(`/anpr/vehicle-registrations/${id}/status`, data);
+    const beStatus = (data.status === 'ACTIVE' || data.status === 'active') ? 'active' : 'disabled';
+    return await patch(`/anpr/vehicle-registrations/${id}/status`, { status: beStatus });
 };
 
 /**

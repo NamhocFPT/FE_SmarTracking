@@ -22,7 +22,11 @@ const MyVehicles = () => {
         try {
             const res = await getMyVehicles();
             if (res && res.success && res.data) {
-                setVehicles(res.data);
+                const normalized = (res.data || []).map(v => ({
+                    ...v,
+                    status: (v.status === 'active' || v.status === 'ACTIVE') ? 'ACTIVE' : 'INACTIVE'
+                }));
+                setVehicles(normalized);
             } else {
                 setVehicles([]);
             }

@@ -64,11 +64,18 @@ const VehicleRegistrations = () => {
     };
 
     const getStatusDisplay = (status) => {
-        switch (status) {
-            case 'APPROVED': return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded border border-green-200">Đã duyệt</span>;
-            case 'PENDING': return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded border border-orange-200">Chờ duyệt</span>;
-            case 'REJECTED': return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200">Từ chối</span>;
-            default: return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{status}</span>;
+        const s = (status || '').toLowerCase();
+        switch (s) {
+            case 'active':
+            case 'approved':
+                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded border border-green-200">Đang hoạt động</span>;
+            case 'pending':
+                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded border border-orange-200">Chờ duyệt</span>;
+            case 'disabled':
+            case 'rejected':
+                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200">Tạm dừng</span>;
+            default:
+                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{status}</span>;
         }
     };
 
