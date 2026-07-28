@@ -120,6 +120,25 @@ export const request = async (path, options = {}) => {
 };
 
 const handleResponse = async (response) => {
+    const contentType = response.headers.get('Content-Type') || '';
+    if (
+        contentType.includes('spreadsheetml') || 
+        contentType.includes('excel') || 
+        contentType.includes('pdf') || 
+        contentType.includes('octet-stream')
+    ) {
+        try {
+            const blob = await response.blob();
+            return {
+                success: true,
+                isBlob: true,
+                data: blob
+            };
+        } catch (e) {
+            console.error('Lỗi đọc blob:', e);
+        }
+    }
+
     let result;
     try {
         result = await response.json();

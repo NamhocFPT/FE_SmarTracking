@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, AlertTriangle, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Lock, AlertTriangle, Eye, EyeOff, CheckCircle, Check, X } from 'lucide-react';
 import { changePassword } from '../service/authService';
 
 const ChangePasswordModal = ({ isOpen, onClose }) => {
@@ -20,6 +20,29 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
 
     if (!isOpen) return null;
 
+    // Password criteria analysis
+    const hasMinLength = formData.newPassword.length >= 8;
+    const hasUppercase = /[A-Z]/.test(formData.newPassword);
+    const hasLowercase = /[a-z]/.test(formData.newPassword);
+    const hasDigit = /[0-9]/.test(formData.newPassword);
+    const hasSpecial = /[@$!%*?&\-_#^()+={}[\]|\\:;<>,.?/`~'"]/.test(formData.newPassword);
+
+    const getStrength = () => {
+        if (!formData.newPassword) return { score: 0, label: 'Chưa nhập', color: 'bg-slate-200', textColor: 'text-slate-400' };
+        let score = 0;
+        if (hasMinLength) score++;
+        if (hasUppercase) score++;
+        if (hasLowercase) score++;
+        if (hasDigit) score++;
+        if (hasSpecial) score++;
+
+        if (score <= 2) return { score, label: 'Yếu', color: 'bg-red-500', textColor: 'text-red-500' };
+        if (score <= 4) return { score, label: 'Trung bình', color: 'bg-amber-500', textColor: 'text-amber-500' };
+        return { score, label: 'Mạnh', color: 'bg-green-500', textColor: 'text-green-500' };
+    };
+
+    const strength = getStrength();
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
@@ -36,8 +59,8 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
             return;
         }
 
-        if (formData.newPassword.length < 8) {
-            setError('Mật khẩu mới phải có ít nhất 8 ký tự.');
+        if (!hasMinLength || !hasUppercase || !hasLowercase || !hasDigit || !hasSpecial) {
+            setError('Mật khẩu mới chưa đáp ứng đủ các quy tắc bảo mật.');
             return;
         }
 
@@ -48,7 +71,8 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
 
         setLoading(true);
         try {
-            const res = await changePassword(formData.oldPassword, formData.newPassword);
+            // BE ChangePasswordDto: { currentPassword, newPassword, confirmPassword }
+            const res = await changePassword(formData.oldPassword, formData.newPassword, formData.confirmPassword);
             if (res?.success) {
                 setSuccessMessage('Đổi mật khẩu thành công!');
                 // Clear form
@@ -146,7 +170,38 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
                                 {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
-                        <p className="text-[10px] text-slate-blue mt-1">Tối thiểu 8 ký tự.</p>
+
+                        {/* Password Strength Meter */}
+                        {formData.newPassword && (
+                            <div className="mt-2 space-y-2 animate-fade-in-up">
+                                <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-blue">Độ mạnh mật khẩu:</span>
+                                    <span className={`font-bold ${strength.textColor}`}>{strength.label}</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex gap-0.5">
+                                    <div className={`h-full flex-1 transition-all duration-300 ${strength.score >= 1 ? strength.color : 'bg-slate-200'}`} />
+                                    <div className={`h-full flex-1 transition-all duration-300 ${strength.score >= 3 ? strength.color : 'bg-slate-200'}`} />
+                                    <div className={`h-full flex-1 transition-all duration-300 ${strength.score >= 5 ? strength.color : 'bg-slate-200'}`} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] pt-1">
+                                    <span className={`flex items-center gap-1 ${hasMinLength ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {hasMinLength ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Tối thiểu 8 ký tự
+                                    </span>
+                                    <span className={`flex items-center gap-1 ${hasUppercase ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {hasUppercase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Có chữ in hoa (A-Z)
+                                    </span>
+                                    <span className={`flex items-center gap-1 ${hasLowercase ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {hasLowercase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Có chữ thường (a-z)
+                                    </span>
+                                    <span className={`flex items-center gap-1 ${hasDigit ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {hasDigit ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Có chữ số (0-9)
+                                    </span>
+                                    <span className={`flex items-center gap-1 col-span-2 ${hasSpecial ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {hasSpecial ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} Có ký tự đặc biệt (!, @, #, $, %,...)
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Confirm Password */}

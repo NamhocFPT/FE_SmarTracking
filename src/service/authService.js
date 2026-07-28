@@ -53,8 +53,8 @@ export const confirmPasswordReset = async (email, otp, newPassword, confirmPassw
  * @param {string} confirmPassword
  * @returns {Promise<object>} response envelope
  */
-export const changePassword = async (oldPassword, newPassword) => {
-    return await patch('/auth/change-password', { oldPassword, newPassword });
+export const changePassword = async (currentPassword, newPassword, confirmPassword) => {
+    return await patch('/auth/change-password', { currentPassword, newPassword, confirmPassword });
 };
 
 /**
