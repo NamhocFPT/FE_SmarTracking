@@ -89,17 +89,75 @@ export const request = async (path, options = {}) => {
 
         // Handle 401 Unauthorized for non-public endpoints
         if (response.status === 401 && !isPublic) {
-            clearTokens();
-            window.dispatchEvent(new Event('auth-expired'));
-            throw {
-                success: false,
-                error: {
-                    message: 'Phiên làm việc hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.',
-                    code: 'AUTH_EXPIRED',
+            const refreshToken = getRefreshToken();
+            if (refreshToken) {
+                if (!isRefreshing) {
+                    isRefreshing = true;
+                    try {
+                        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ refreshToken }),
+                        });
+                        const refreshResult = await refreshResponse.json();
+
+                        if (refreshResponse.ok && refreshResult.success) {
+                            const { accessToken: newAccess, refreshToken: newRefresh } = refreshResult.data;
+                            setTokens(newAccess, newRefresh);
+                            isRefreshing = false;
+                            onRefreshed(newAccess);
+
+                            // Retry this initiating request immediately with the new token
+                            config.headers['Authorization'] = `Bearer ${newAccess}`;
+                            const retriedResponse = await fetch(url, config);
+                            return handleResponse(retriedResponse);
+                        } else {
+                            isRefreshing = false;
+                            clearTokens();
+                            window.dispatchEvent(new Event('auth-expired'));
+                            throw {
+                                success: false,
+                                error: {
+                                    message: 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.',
+                                    code: 'AUTH_EXPIRED',
+                                    requestId: refreshResult.requestId !== 'unknown' ? refreshResult.requestId : null
+                                },
+                                requestId: refreshResult.requestId !== 'unknown' ? refreshResult.requestId : null
+                            };
+                        }
+                    } catch (refreshErr) {
+                        isRefreshing = false;
+                        clearTokens();
+                        window.dispatchEvent(new Event('auth-expired'));
+                        throw refreshErr;
+                    }
+                } else {
+                    // Queue original request until refresh is done
+                    const retryOriginalRequest = new Promise((resolve) => {
+                        subscribeTokenRefresh((newToken) => {
+                            config.headers['Authorization'] = `Bearer ${newToken}`;
+                            resolve(fetch(url, config));
+                        });
+                    });
+                    const retriedResponse = await retryOriginalRequest;
+                    return handleResponse(retriedResponse);
+                }
+            } else {
+                clearTokens();
+                window.dispatchEvent(new Event('auth-expired'));
+                throw {
+                    success: false,
+                    error: {
+                        message: 'Phiên làm việc hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.',
+                        code: 'AUTH_EXPIRED',
+                        requestId: null
+                    },
                     requestId: null
-                },
-                requestId: null
-            };
+                };
+            }
         }
 
         return handleResponse(response);
