@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { getStrangerAlerts } from '../service/businessAdminServices';
+import { acknowledgeSecurityAlert, resolveSecurityAlert } from '../service/securityAlertService';
 import { 
     ShieldAlert, CheckCircle, Search, UserX, Activity, 
     AlertCircle, RefreshCw, FileX
@@ -11,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * FE-2: StrangerAlerts — CHỈ hiển thị cảnh báo khuôn mặt lạ (stranger alerts)
  * - KHÔNG có mapping user (đã tách sang UnmappedVerifyReview)
  * - KHÔNG có ảnh base64 (BE chỉ trả metadata: id, deviceCode, roomName, capturedAt)
- * - Nút resolve: TẠM ẨN (BE chưa có endpoint PATCH /face-access/stranger-alerts/:id/resolve)
+ * - sync BE: Resolve stranger alerts via Security Alerts endpoints. Must acknowledge first.
  */
 const StrangerAlerts = () => {
     const [alerts, setAlerts] = useState([]);
@@ -22,8 +23,53 @@ const StrangerAlerts = () => {
     // Filter
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Detail modal
+    // Detail modal & Resolution note state
     const [selectedAlert, setSelectedAlert] = useState(null);
+    const [resolutionNote, setResolutionNote] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleAcknowledge = async () => {
+        if (!selectedAlert) return;
+        setIsSubmitting(true);
+        try {
+            const res = await acknowledgeSecurityAlert(selectedAlert.id);
+            if (res?.success) {
+                setSuccessMsg('Đã xác nhận cảnh báo an ninh.');
+                setSelectedAlert(prev => ({ ...prev, status: 'acknowledged' }));
+                fetchAlerts();
+            } else {
+                throw new Error(res?.message || 'Không thể xác nhận cảnh báo.');
+            }
+        } catch (err) {
+            alert(err.message || 'Lỗi khi xác nhận cảnh báo.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleResolve = async () => {
+        if (!selectedAlert) return;
+        if (!resolutionNote.trim()) {
+            alert('Vui lòng nhập ghi chú xử lý.');
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const res = await resolveSecurityAlert(selectedAlert.id, { resolution_note: resolutionNote });
+            if (res?.success) {
+                setSuccessMsg('Cảnh báo đã được giải quyết thành công.');
+                setSelectedAlert(null);
+                setResolutionNote('');
+                fetchAlerts();
+            } else {
+                throw new Error(res?.message || 'Không thể giải quyết cảnh báo.');
+            }
+        } catch (err) {
+            alert(err.message || 'Lỗi khi giải quyết cảnh báo.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const fetchAlerts = useCallback(async () => {
         setLoading(true);
@@ -166,9 +212,18 @@ const StrangerAlerts = () => {
                                 <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
                                     <UserX className="w-4 h-4" />
                                 </div>
-                                <div>
+                                <div className="flex flex-wrap gap-1">
                                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold border border-red-100">
                                         Stranger
+                                    </span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                        a.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                                        a.status === 'acknowledged' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-red-100 text-red-700 animate-pulse'
+                                    }`}>
+                                        {a.status === 'resolved' ? 'Đã xử lý' :
+                                         a.status === 'acknowledged' ? 'Đã xác nhận' :
+                                         'Mới'}
                                     </span>
                                 </div>
                             </div>
@@ -255,28 +310,65 @@ const StrangerAlerts = () => {
                                             <span className="font-semibold text-midnight-indigo">Phát hiện lúc:</span>
                                             <span>{selectedAlert.capturedAt ? new Date(selectedAlert.capturedAt).toLocaleString('vi-VN') : '—'}</span>
                                         </div>
+                                        <div className="flex justify-between">
+                                            <span className="font-semibold text-midnight-indigo">Trạng thái:</span>
+                                            <span className={`px-2 py-0.5 font-bold rounded text-xs uppercase ${
+                                                selectedAlert.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                                                selectedAlert.status === 'acknowledged' ? 'bg-yellow-100 text-yellow-700' :
+                                                'bg-red-100 text-red-700'
+                                            }`}>
+                                                {selectedAlert.status === 'resolved' ? 'Đã xử lý' :
+                                                 selectedAlert.status === 'acknowledged' ? 'Đã xác nhận' :
+                                                 'Mới'}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div className="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-100 text-center">
-                                        ⚠ BE chưa có endpoint đánh dấu xử lý (resolve). Nút xử lý sẽ được kích hoạt khi BE hỗ trợ.
-                                    </div>
+                                    {selectedAlert.status === 'acknowledged' && (
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-bold text-slate-blue uppercase">Ghi chú xử lý</label>
+                                            <textarea
+                                                value={resolutionNote}
+                                                onChange={(e) => setResolutionNote(e.target.value)}
+                                                placeholder="Nhập chi tiết ghi chú xử lý..."
+                                                className="w-full p-2.5 bg-cloud-mist border border-platinum-tint rounded-xl text-xs text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                                rows="3"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {selectedAlert.status === 'resolved' && (
+                                        <div className="text-xs text-green-700 bg-green-50 p-3 rounded-lg border border-green-100 text-center font-semibold">
+                                            Cảnh báo này đã được giải quyết hoàn tất.
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 flex gap-3">
                                     <button
-                                        onClick={() => setSelectedAlert(null)}
+                                        onClick={() => { setSelectedAlert(null); setResolutionNote(''); }}
                                         className="flex-1 px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue bg-white hover:bg-cloud-mist"
                                     >
                                         Đóng
                                     </button>
-                                    {/* Nút resolve: TẠM DISABLE — BE chưa có endpoint */}
-                                    <button
-                                        disabled
-                                        className="flex-1 px-4 py-2 bg-slate-200 text-slate-400 rounded-xl text-xs font-bold cursor-not-allowed"
-                                        title="BE chưa có endpoint PATCH /face-access/stranger-alerts/:id/resolve"
-                                    >
-                                        Đánh dấu đã xử lý
-                                    </button>
+                                    {(!selectedAlert.status || selectedAlert.status === 'new') && (
+                                        <button
+                                            onClick={handleAcknowledge}
+                                            disabled={isSubmitting}
+                                            className="flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                                        >
+                                            Xác nhận
+                                        </button>
+                                    )}
+                                    {selectedAlert.status === 'acknowledged' && (
+                                        <button
+                                            onClick={handleResolve}
+                                            disabled={isSubmitting || !resolutionNote.trim()}
+                                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                                        >
+                                            Giải quyết
+                                        </button>
+                                    )}
                                 </div>
                             </motion.div>
                         </div>

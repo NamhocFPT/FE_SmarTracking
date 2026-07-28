@@ -67,6 +67,11 @@ export const getUsers = async (params = {}) => {
     return await get(`/users${query}`);
 };
 
+export const getUsersForManagement = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/users/manage${query}`);
+};
+
 export const getUserById = async (userId) => {
     return await get(`/users/${userId}`);
 };
@@ -202,10 +207,9 @@ export const getStrangerAlerts = async (params = {}) => {
     return await get(`/face-access/stranger-alerts${query}`);
 };
 
-// NOTE: BE chưa có endpoint PATCH /face-access/stranger-alerts/:id/resolve
-// Tạm giữ function nhưng UI sẽ disable nút resolve
 export const resolveStrangerAlert = async (alertId, data) => {
-    return await patch(`/face-access/stranger-alerts/${alertId}/resolve`, data);
+    // sync BE: Redirect to real security-alerts endpoint
+    return await post(`/security-alerts/${alertId}/resolve`, { resolution_note: data.resolution_note || data.reason || '' });
 };
 
 export const createRoom = async (data) => {
