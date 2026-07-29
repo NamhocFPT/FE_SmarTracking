@@ -28,8 +28,10 @@ const footerLinks = [
 const EmployeeLayout = () => {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [openDropdown, setOpenDropdown] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const profileMenuRef = useRef(null);
+    const navRef = useRef(null);
     const navigate = useNavigate();
 
     // Load user info from localStorage
@@ -49,6 +51,9 @@ const EmployeeLayout = () => {
         const handleClickOutside = (event) => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
                 setIsProfileMenuOpen(false);
+            }
+            if (navRef.current && !navRef.current.contains(event.target)) {
+                setOpenDropdown(null);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -104,23 +109,66 @@ const EmployeeLayout = () => {
 
                         {/* Navigation */}
                         <nav
+                            ref={navRef}
                             aria-label="Primary navigation"
                             className="hidden md:flex items-center gap-1"
                         >
                             {navigationItems.map((item) => (
-                                <NavLink
-                                    key={item.label}
-                                    to={item.to}
-                                    end={item.end || false}
-                                    className={({ isActive }) =>
-                                        `px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 no-underline whitespace-nowrap ${isActive
-                                            ? 'text-action-blue bg-blue-50'
-                                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
-                                        }`
-                                    }
-                                >
-                                    {item.label}
-                                </NavLink>
+                                item.isDropdown ? (
+                                    <div
+                                        key={item.label}
+                                        className="relative"
+                                        onMouseEnter={() => setOpenDropdown(item.label)}
+                                        onMouseLeave={() => setOpenDropdown(null)}
+                                    >
+                                        <button
+                                            onClick={() => setOpenDropdown(openDropdown === item.label ? null : item.label)}
+                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist flex items-center gap-1 bg-transparent border-0"
+                                        >
+                                            {item.label}
+                                            <svg className={`w-4 h-4 transition-transform ${openDropdown === item.label ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        {openDropdown === item.label && (
+                                            <div className="absolute top-full left-0 pt-1 w-48 z-50">
+                                                <div className="bg-white border border-platinum-tint rounded-xl shadow-lg overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
+                                                    {item.children.map(child => (
+                                                        <NavLink
+                                                            key={child.label}
+                                                            to={child.to}
+                                                            end={child.end || false}
+                                                            onClick={() => setOpenDropdown(null)}
+                                                            className={({ isActive }) =>
+                                                                `block px-4 py-2.5 text-sm transition-colors no-underline ${isActive
+                                                                    ? 'text-action-blue bg-blue-50 font-bold'
+                                                                    : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
+                                                                }`
+                                                            }
+                                                        >
+                                                            {child.label}
+                                                        </NavLink>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <NavLink
+                                        key={item.label}
+                                        to={item.to}
+                                        end={item.end || false}
+                                        className={({ isActive }) =>
+                                            `px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 no-underline whitespace-nowrap ${isActive
+                                                ? 'text-action-blue bg-blue-50'
+                                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
+                                            }`
+                                        }
+                                    >
+                                        {item.label}
+                                    </NavLink>
+                                )
                             ))}
                         </nav>
                     </div>
