@@ -6,18 +6,51 @@ import BiometricReminderModal from '../../../component/BiometricReminder/Biometr
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
 import NotificationBell from '../../../component/NotificationBell';
+import { 
+    Home, 
+    Calendar, 
+    PlusCircle, 
+    FileText,
+    ChevronDown
+} from 'lucide-react';
+
+const chunkArray = (arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+};
 
 const navigationItems = [
-    { label: 'Trang chủ', to: '/employee', end: true },
+    { 
+        label: 'Trang chủ', 
+        to: '/employee', 
+        end: true,
+        icon: Home 
+    },
     {
         label: 'Cuộc họp',
         isDropdown: true,
+        icon: Calendar,
         children: [
-            { label: 'Lịch cá nhân', to: '/employee/schedule' },
-            { label: 'Đăng ký họp', to: '/employee/book' },
+            { 
+                label: 'Lịch cá nhân', 
+                to: '/employee/schedule',
+                icon: Calendar 
+            },
+            { 
+                label: 'Đăng ký họp', 
+                to: '/employee/book',
+                icon: PlusCircle 
+            },
         ]
     },
-    { label: 'Tài liệu họp', to: '/employee/recordings' }
+    { 
+        label: 'Tài liệu họp', 
+        to: '/employee/recordings',
+        icon: FileText 
+    }
 ];
 
 const footerLinks = [
@@ -108,7 +141,6 @@ const EmployeeLayout = () => {
                             </span>
                         </NavLink>
 
-                        {/* Navigation */}
                         <nav
                             ref={navRef}
                             aria-label="Primary navigation"
@@ -124,32 +156,41 @@ const EmployeeLayout = () => {
                                     >
                                         <button
                                             onClick={() => setOpenDropdown(openDropdown === item.label ? null : item.label)}
-                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist flex items-center gap-1 bg-transparent border-0"
+                                            className="px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist flex items-center gap-1.5 bg-transparent border-0"
                                         >
-                                            {item.label}
-                                            <svg className={`w-4 h-4 transition-transform ${openDropdown === item.label ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                            </svg>
+                                            {item.icon && <item.icon className="w-4 h-4 text-slate-400" />}
+                                            <span>{item.label}</span>
+                                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === item.label ? 'rotate-180 text-midnight-indigo' : 'text-slate-400'}`} />
                                         </button>
 
                                         {openDropdown === item.label && (
-                                            <div className="absolute top-full left-0 pt-1 w-48 z-50">
-                                                <div className="bg-white border border-platinum-tint rounded-xl shadow-lg overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
-                                                    {item.children.map(child => (
-                                                        <NavLink
-                                                            key={child.label}
-                                                            to={child.to}
-                                                            end={child.end || false}
-                                                            onClick={() => setOpenDropdown(null)}
-                                                            className={({ isActive }) =>
-                                                                `block px-4 py-2.5 text-sm transition-colors no-underline ${isActive
-                                                                    ? 'text-action-blue bg-blue-50 font-bold'
-                                                                    : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
-                                                                }`
-                                                            }
-                                                        >
-                                                            {child.label}
-                                                        </NavLink>
+                                            <div className="absolute top-full left-0 pt-1 z-50 min-w-max">
+                                                <div className="bg-white border border-platinum-tint/80 rounded-2xl shadow-xl p-2.5 flex gap-4 items-stretch animate-in fade-in slide-in-from-top-1 duration-150">
+                                                    {chunkArray(item.children, 3).map((chunk, chunkIdx) => (
+                                                        <div key={chunkIdx} className="flex gap-4 items-stretch">
+                                                            {chunkIdx > 0 && (
+                                                                <div className="w-px bg-platinum-tint/60 self-stretch my-1" aria-hidden="true" />
+                                                            )}
+                                                            <div className="flex flex-col gap-1 min-w-[170px]">
+                                                                {chunk.map(child => (
+                                                                    <NavLink
+                                                                        key={child.label}
+                                                                        to={child.to}
+                                                                        end={child.end || false}
+                                                                        onClick={() => setOpenDropdown(null)}
+                                                                        className={({ isActive }) =>
+                                                                            `flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all no-underline ${isActive
+                                                                                ? 'text-action-blue bg-blue-50/70 font-bold'
+                                                                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60'
+                                                                            }`
+                                                                        }
+                                                                    >
+                                                                        {child.icon && <child.icon className="w-4 h-4 flex-shrink-0 text-slate-400" />}
+                                                                        <span className="truncate">{child.label}</span>
+                                                                    </NavLink>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
@@ -161,13 +202,14 @@ const EmployeeLayout = () => {
                                         to={item.to}
                                         end={item.end || false}
                                         className={({ isActive }) =>
-                                            `px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 no-underline whitespace-nowrap ${isActive
-                                                ? 'text-action-blue bg-blue-50'
+                                            `px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-200 no-underline whitespace-nowrap flex items-center gap-1.5 ${isActive
+                                                ? 'text-action-blue bg-blue-50 font-bold'
                                                 : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
                                             }`
                                         }
                                     >
-                                        {item.label}
+                                        {item.icon && <item.icon className="w-4 h-4 text-slate-400" />}
+                                        <span>{item.label}</span>
                                     </NavLink>
                                 )
                             ))}
