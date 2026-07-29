@@ -1,5 +1,32 @@
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.smartracking.io.vn/api/v1';
 
+const decodeUnicodeEscapes = (obj) => {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') {
+        if (obj.includes('\\u')) {
+            try {
+                return obj.replace(/\\u([0-9a-fA-F]{4})/g, (match, grp) => {
+                    return String.fromCharCode(parseInt(grp, 16));
+                });
+            } catch (e) {
+                return obj;
+            }
+        }
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(decodeUnicodeEscapes);
+    }
+    if (typeof obj === 'object') {
+        const decoded = {};
+        for (const [key, value] of Object.entries(obj)) {
+            decoded[key] = decodeUnicodeEscapes(value);
+        }
+        return decoded;
+    }
+    return obj;
+};
+
 // Token storage helpers
 export const getAccessToken = () => localStorage.getItem('accessToken');
 export const getRefreshToken = () => localStorage.getItem('refreshToken');
@@ -199,7 +226,8 @@ const handleResponse = async (response) => {
 
     let result;
     try {
-        result = await response.json();
+        const parsed = await response.json();
+        result = decodeUnicodeEscapes(parsed);
     } catch (e) {
         throw {
             success: false,
