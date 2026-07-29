@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import UserAvatar from '../../component/UserAvatar';
 import {
     getUsers,
@@ -25,6 +26,7 @@ import {
  * UC-ACC-01 ~ UC-ACC-07: Account Management for SystemAdmin
  */
 const UserManagement = () => {
+    const navigate = useNavigate();
     // States
     const [usersList, setUsersList] = useState([]);
     const [departments, setDepartments] = useState([]);
@@ -717,6 +719,16 @@ const UserManagement = () => {
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => navigate(`/business-admin/user-journey?userId=${user.id || user.uuid}`)}
+                                                    title="Xem hành trình di chuyển"
+                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                                     </svg>
                                                 </button>
                                                 <button

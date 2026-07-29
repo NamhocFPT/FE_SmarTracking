@@ -353,45 +353,45 @@ const BiometricReminderModal = () => {
                                 {/* Option A: Use Avatar */}
                                 <div 
                                     onClick={() => hasAvatar && setView('confirm_avatar')}
-                                    className={`relative p-5 rounded-2xl border-2 transition-all flex flex-col items-center justify-between text-center select-none group h-48 ${
+                                    className={`relative p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-between text-center select-none group h-40 ${
                                         hasAvatar 
                                             ? 'border-platinum-tint hover:border-action-blue hover:bg-action-blue/5 cursor-pointer' 
                                             : 'border-platinum-tint/40 opacity-50 cursor-not-allowed bg-cloud-mist/10'
                                     }`}
                                 >
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="w-16 h-16 rounded-full overflow-hidden bg-cloud-mist border border-platinum-tint flex items-center justify-center">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-12 h-12 rounded-full overflow-hidden bg-cloud-mist border border-platinum-tint flex items-center justify-center">
                                             {hasAvatar ? (
                                                 <img src={userProfile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                             ) : (
-                                                <Image className="w-6 h-6 text-slate-blue/60" />
+                                                <Image className="w-5 h-5 text-slate-blue/60" />
                                             )}
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-midnight-indigo text-sm">Sử dụng Ảnh đại diện</h4>
-                                            <p className="text-[10px] text-slate-blue mt-1 leading-normal">Lấy trực tiếp ảnh đại diện hiện tại để gửi phê duyệt FaceID</p>
+                                            <h4 className="font-bold text-midnight-indigo text-xs">Sử dụng Ảnh đại diện</h4>
+                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Lấy trực tiếp ảnh đại diện hiện tại để gửi phê duyệt FaceID</p>
                                         </div>
                                     </div>
                                     {!hasAvatar && (
-                                        <span className="text-[9px] text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Chưa có avatar</span>
+                                        <span className="text-[8px] text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Chưa có avatar</span>
                                     )}
                                 </div>
 
                                 {/* Option B: Take Camera */}
                                 <div 
                                     onClick={() => setView('webcam')}
-                                    className="p-5 rounded-2xl border-2 border-platinum-tint hover:border-action-blue hover:bg-action-blue/5 transition-all flex flex-col items-center justify-between text-center cursor-pointer select-none group h-48"
+                                    className="p-4 rounded-2xl border-2 border-platinum-tint hover:border-action-blue hover:bg-action-blue/5 transition-all flex flex-col items-center justify-between text-center cursor-pointer select-none group h-40"
                                 >
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="w-16 h-16 rounded-full bg-action-blue/10 flex items-center justify-center text-action-blue group-hover:scale-105 transition-transform duration-300">
-                                            <Camera className="w-8 h-8" />
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-12 h-12 rounded-full bg-action-blue/10 flex items-center justify-center text-action-blue group-hover:scale-105 transition-transform duration-300">
+                                            <Camera className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-midnight-indigo text-sm">Chụp ảnh bằng Webcam</h4>
-                                            <p className="text-[10px] text-slate-blue mt-1 leading-normal">Chụp ảnh trực tiếp có hướng dẫn AI giúp tối ưu độ nét nhận diện</p>
+                                            <h4 className="font-bold text-midnight-indigo text-xs">Chụp ảnh bằng Webcam</h4>
+                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Chụp ảnh trực tiếp có hướng dẫn AI giúp tối ưu độ nét nhận diện</p>
                                         </div>
                                     </div>
-                                    <span className="text-[9px] text-action-blue font-bold bg-action-blue/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Hỗ trợ hướng dẫn</span>
+                                    <span className="text-[8px] text-action-blue font-bold bg-action-blue/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Hỗ trợ hướng dẫn</span>
                                 </div>
                             </div>
                         </div>
@@ -408,11 +408,11 @@ const BiometricReminderModal = () => {
                             </div>
 
                             <div className="flex flex-col items-center gap-4 py-4">
-                                <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-action-blue/20 shadow-md">
+                                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-action-blue/20 shadow-md">
                                     <img src={userProfile?.avatarUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
                                 </div>
-                                <p className="text-center text-xs text-slate-blue max-w-sm">
-                                    Hệ thống sẽ tải xuống ảnh đại diện hiện tại của bạn và gửi cho quản lý duyệt làm ảnh sinh trắc học FaceID.
+                                <p className="text-center text-xs text-slate-blue max-w-xs">
+                                    Hệ thống sẽ sử dụng ảnh đại diện hiện tại của bạn và gửi phê duyệt làm ảnh sinh trắc học FaceID.
                                 </p>
                             </div>
 
@@ -480,7 +480,7 @@ const BiometricReminderModal = () => {
                             </div>
 
                             {/* Camera Area */}
-                            <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-slate-950 border border-platinum-tint flex items-center justify-center">
+                            <div className="relative w-full max-w-[340px] aspect-[4/3] mx-auto rounded-2xl overflow-hidden bg-slate-950 border border-platinum-tint flex items-center justify-center">
                                 {cameraError ? (
                                     <div className="p-6 text-center text-rose-400 text-xs flex flex-col items-center gap-2">
                                         <AlertCircle className="w-8 h-8" />
@@ -504,7 +504,7 @@ const BiometricReminderModal = () => {
                                         {/* Biometric Scan Overlay Target Guides */}
                                         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
                                             {/* Oval Frame Mask */}
-                                            <div className={`w-48 h-64 sm:w-56 sm:h-72 rounded-[50%] border-4 transition-all duration-500 relative flex items-center justify-center ${
+                                            <div className={`w-32 h-44 sm:w-36 sm:h-48 rounded-[50%] border-4 transition-all duration-500 relative flex items-center justify-center ${
                                                 webcamStep === 'aligning' ? 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]' :
                                                 webcamStep === 'too_far' ? 'border-dashed border-yellow-500 scale-[0.8] shadow-[0_0_15px_rgba(234,179,8,0.5)]' :
                                                 webcamStep === 'too_close' ? 'border-dashed border-yellow-500 scale-[1.25] shadow-[0_0_15px_rgba(234,179,8,0.5)]' :

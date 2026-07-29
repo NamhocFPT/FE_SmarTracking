@@ -26,6 +26,7 @@ import { getDevices, getAdminVehicleTrafficStats, getAdminGateAccessHistory } fr
 import { getZones } from '../../service/zoneServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getVehicleControlList } from '../../service/anprService';
+import { getBusinessAdminSummary } from '../../service/campusService';
 import DashboardBanner from '../../component/DashboardBanner';
 
 // Premium color palettes
@@ -68,6 +69,8 @@ const DashBoard = () => {
         devicesOnline: 0,
         devicesTotal: 0,
         blocklistActive: 0,
+        vehicleControlHitsToday: 0,
+        securityAlertsBySeverity: null,
     });
     const [recentAlerts, setRecentAlerts] = useState([]);
     const [zonesList, setZonesList] = useState([]);
@@ -276,13 +279,14 @@ const DashBoard = () => {
             const todayEnd = new Date();
             todayEnd.setHours(23, 59, 59, 999);
 
-            const [devicesRes, zonesRes, alertsRes, trafficRes, blocklistRes, gateHistoryRes] = await Promise.allSettled([
+            const [devicesRes, zonesRes, alertsRes, trafficRes, blocklistRes, gateHistoryRes, summaryRes] = await Promise.allSettled([
                 getDevices({ limit: 100 }),
                 getZones({ limit: 100 }),
                 getSecurityAlerts({ status: 'new', limit: 5 }),
                 getAdminVehicleTrafficStats({ from: todayStart.toISOString(), to: todayEnd.toISOString(), group_by: 'day' }),
                 getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 }),
-                getAdminGateAccessHistory({ from: todayStart.toISOString(), to: todayEnd.toISOString(), limit: 5 })
+                getAdminGateAccessHistory({ from: todayStart.toISOString(), to: todayEnd.toISOString(), limit: 5 }),
+                getBusinessAdminSummary()
             ]);
 
             let devList = [];
@@ -338,6 +342,21 @@ const DashBoard = () => {
                 gateEventsToday = 142;
             }
 
+            // CDB-RS-001: business-admin-summary — nguồn tổng hợp chính thức từ BE, ưu tiên hơn số tự suy từ list /zones khi có sẵn
+            let zonesActive = zonesData.filter(z => z.status === 'active').length;
+            let zonesTotal = zonesData.length;
+            let vehicleControlHitsToday = 0;
+            let securityAlertsBySeverity = null;
+            if (summaryRes.status === 'fulfilled' && summaryRes.value?.success) {
+                const summary = summaryRes.value.data;
+                if (summary?.zoneOccupancy) {
+                    zonesActive = summary.zoneOccupancy.zonesWithDataCount ?? zonesActive;
+                    zonesTotal = summary.zoneOccupancy.totalZoneCount ?? zonesTotal;
+                }
+                vehicleControlHitsToday = summary?.vehicleControlHitsToday ?? 0;
+                securityAlertsBySeverity = summary?.securityAlertsBySeverity ?? null;
+            }
+
             setZonesList(zonesData.slice(0, 6));
             setRecentAlerts(alertsData.slice(0, 5));
             setVehicleWatchlist(blocklistData.slice(0, 5));
@@ -345,11 +364,13 @@ const DashBoard = () => {
             setCampusStats({
                 gateEventsToday,
                 newAlertsCount: alertsData.length,
-                zonesActive: zonesData.filter(z => z.status === 'active').length,
-                zonesTotal: zonesData.length,
+                zonesActive,
+                zonesTotal,
                 devicesOnline: devList.filter(d => d.status === 'ONLINE').length,
                 devicesTotal: devList.length,
                 blocklistActive: blocklistData.filter(v => v.list_type === 'blocklist').length,
+                vehicleControlHitsToday,
+                securityAlertsBySeverity,
             });
         } catch {
             // Giữ giá trị mặc định nếu toàn bộ request thất bại (vd RBAC chưa mở cho BUSINESS_ADMIN)
@@ -524,6 +545,17 @@ const DashBoard = () => {
                             <div className="mt-4">
                                 <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.newAlertsCount}</h3>
                                 <p className="text-xs text-red-600 font-semibold mt-1">Cần xem xét</p>
+                                {campusStats.securityAlertsBySeverity && (
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {Object.entries(campusStats.securityAlertsBySeverity).map(([severity, count]) => (
+                                            count > 0 && (
+                                                <span key={severity} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize ${SEVERITY_STYLES[severity] || 'bg-slate-100 text-slate-600'}`}>
+                                                    {severity}: {count}
+                                                </span>
+                                            )
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -634,7 +666,7 @@ const DashBoard = () => {
             {/* ================= SECURITY & ACCESS TAB ================= */}
             {activeTab === 'security' && (
                 <motion.div variants={itemVariants} className="space-y-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm font-semibold text-slate-blue">Xe trong danh sách kiểm soát</span>
@@ -671,6 +703,19 @@ const DashBoard = () => {
                             <div className="mt-4">
                                 <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.gateEventsToday}</h3>
                                 <p className="text-xs text-slate-blue mt-1">Qua các cổng/khu vực</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Lượt khớp danh sách kiểm soát hôm nay</span>
+                                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                                    <Car className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.vehicleControlHitsToday}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Xe khớp blocklist/watchlist</p>
                             </div>
                         </div>
                     </div>

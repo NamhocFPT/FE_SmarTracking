@@ -30,6 +30,7 @@ import VehicleControlList from '../pages/systemAdmin/VehicleControlList';
 import VehicleRegistrations from '../pages/systemAdmin/VehicleRegistrations';
 import RoomOperations from '../pages/systemAdmin/RoomOperations';
 import RoomAccessLogs from '../pages/systemAdmin/RoomAccessLogs';
+import UserJourney from '../pages/shared/UserJourney';
 // BusinessAdmin Layout + Pages
 import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLayout';
 import BusinessDashboard from '../pages/bussinessAdmin/dashBoard';
@@ -174,6 +175,10 @@ export const router = [
                 element: <GateAccessManagement />
             },
             {
+                path: 'user-journey',
+                element: <UserJourney />
+            },
+            {
                 path: 'book',
                 element: <BookMeeting />
             },
@@ -262,6 +267,10 @@ export const router = [
                 element: <GateAccessManagement />
             },
             {
+                path: 'user-journey',
+                element: <UserJourney />
+            },
+            {
                 path: 'person-control-list',
                 element: <PersonControlList />
             },
@@ -348,6 +357,10 @@ export const router = [
             {
                 path: 'my-vehicles',
                 element: <MyVehicles />
+            },
+            {
+                path: 'user-journey',
+                element: <UserJourney />
             },
             {
                 path: 'room-analytics',

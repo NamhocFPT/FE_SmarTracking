@@ -7,9 +7,10 @@ import {
 } from 'recharts';
 import {
     Clock, Award, ShieldAlert, Video, BookOpen, PlusCircle, CheckCircle, AlertCircle, ArrowRight,
-    Calendar, TrendingUp, BarChart2
+    Calendar, TrendingUp, BarChart2, LogIn, Car
 } from 'lucide-react';
 import DashboardBanner from '../../component/DashboardBanner';
+import { getEmployeeSummary } from '../../service/campusService';
 
 const COLORS = ['#006BFF', '#FFAE00', '#FF3B30'];
 
@@ -57,6 +58,10 @@ const EmployeeHomePage = () => {
         meetingsToday: 0
     });
 
+    // Campus summary (CDB-RS-001: GET /campus-dashboard/employee-summary)
+    const [campusSummary, setCampusSummary] = useState(null);
+    const [campusSummaryLoading, setCampusSummaryLoading] = useState(true);
+
     // Analytics states (from former dashboard)
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [personalStats, setPersonalStats] = useState({
@@ -67,6 +72,25 @@ const EmployeeHomePage = () => {
     });
     const [attendanceBreakdown, setAttendanceBreakdown] = useState([]);
     const [meetingsTrend, setMeetingsTrend] = useState([]);
+
+    // Load campus dashboard summary (gate access, vehicle status, meetings today)
+    useEffect(() => {
+        let isMounted = true;
+        setCampusSummaryLoading(true);
+        getEmployeeSummary()
+            .then((res) => {
+                if (isMounted && res?.success) {
+                    setCampusSummary(res.data);
+                }
+            })
+            .catch(() => {
+                // Giữ campusSummary = null, UI tự hiện fallback/empty-state bên dưới
+            })
+            .finally(() => {
+                if (isMounted) setCampusSummaryLoading(false);
+            });
+        return () => { isMounted = false; };
+    }, []);
 
     // Load Overview Data
     useEffect(() => {
@@ -205,14 +229,16 @@ const EmployeeHomePage = () => {
                         className="space-y-8"
                     >
                         {/* Quick Status Bar */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
                                     <Clock className="w-6 h-6" />
                                 </div>
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-blue uppercase">Họp trong ngày</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">{quickStats.meetingsToday} cuộc họp</h3>
+                                    <h3 className="text-xl font-bold text-midnight-indigo">
+                                        {campusSummaryLoading ? '...' : (campusSummary?.meetingsToday ?? quickStats.meetingsToday)} cuộc họp
+                                    </h3>
                                 </div>
                             </div>
 
@@ -227,12 +253,41 @@ const EmployeeHomePage = () => {
                             </div>
 
                             <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                                    <Video className="w-6 h-6" />
+                                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <LogIn className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Video cuộc họp</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">Đã ghi hình</h3>
+                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Lượt vào cổng hôm nay</h4>
+                                    <h3 className="text-xl font-bold text-midnight-indigo">
+                                        {campusSummaryLoading ? '...' : (campusSummary?.gateAccessToday ?? 0)} lượt
+                                    </h3>
+                                </div>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                    <Car className="w-6 h-6" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Trạng thái phương tiện của tôi</h4>
+                                    {campusSummaryLoading ? (
+                                        <h3 className="text-xl font-bold text-midnight-indigo">...</h3>
+                                    ) : campusSummary?.vehicleStatus ? (
+                                        <h3 className="text-base font-bold text-midnight-indigo truncate">
+                                            {campusSummary.vehicleStatus.plateNumber}
+                                            <span className={`ml-2 text-[11px] font-bold px-2 py-0.5 rounded-full ${campusSummary.vehicleStatus.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                {campusSummary.vehicleStatus.status === 'active' ? 'Đang hoạt động' : 'Tạm dừng'}
+                                            </span>
+                                        </h3>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/employee/my-vehicles')}
+                                            className="text-sm font-bold text-action-blue hover:underline"
+                                        >
+                                            Chưa đăng ký xe — Đăng ký ngay
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

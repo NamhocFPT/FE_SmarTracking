@@ -24,7 +24,7 @@ const MyVehicles = () => {
             if (res && res.success && res.data) {
                 const normalized = (res.data || []).map(v => ({
                     ...v,
-                    status: (v.status === 'active' || v.status === 'ACTIVE') ? 'ACTIVE' : 'INACTIVE'
+                    status: (v.status === 'active' || v.status === 'ACTIVE') ? 'active' : 'disabled'
                 }));
                 setVehicles(normalized);
             } else {
@@ -76,7 +76,7 @@ const MyVehicles = () => {
 
     const handleToggleStatus = async (vehicle) => {
         try {
-            const newStatus = vehicle.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+            const newStatus = vehicle.status === 'active' ? 'disabled' : 'active';
             await toggleMyVehicleStatus(vehicle.id, { status: newStatus });
             fetchVehicles();
         } catch (err) {
@@ -166,9 +166,9 @@ const MyVehicles = () => {
                                         </td>
                                         <td className="py-4 px-6">
                                             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                                                vehicle.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-steel-gray/20 text-slate-blue'
+                                                vehicle.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-steel-gray/20 text-slate-blue'
                                             }`}>
-                                                {vehicle.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm vô hiệu'}
+                                                {vehicle.status === 'active' ? 'Đang hoạt động' : 'Tạm vô hiệu'}
                                             </span>
                                         </td>
                                         <td className="py-4 px-6 text-sm text-slate-blue max-w-xs truncate">
@@ -179,7 +179,7 @@ const MyVehicles = () => {
                                                 onClick={() => handleToggleStatus(vehicle)}
                                                 className="text-xs font-semibold px-3 py-1.5 rounded bg-cloud-mist text-slate-blue hover:text-midnight-indigo border border-outline-gray transition-colors"
                                             >
-                                                {vehicle.status === 'ACTIVE' ? 'Tạm dừng' : 'Kích hoạt'}
+                                                {vehicle.status === 'active' ? 'Tạm dừng' : 'Kích hoạt'}
                                             </button>
                                             <button 
                                                 onClick={() => handleOpenModal(vehicle)}

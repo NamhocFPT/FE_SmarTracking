@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
-import { Sparkles, Video, ShieldAlert, Cpu } from 'lucide-react';
+import { Sparkles, Video, ShieldAlert, Cpu, Car, CheckCircle, Wifi } from 'lucide-react';
 
 const slideVariants = {
     enter: (direction) => ({
@@ -83,9 +83,9 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
 
     const slides = [
         {
-            tag: 'Real-time Presence Tracking',
-            title: 'Hệ thống Ghi Nhận Hiện Diện Thông Minh',
-            description: 'Giám sát không gian phòng họp bằng Camera AI & Cảm biến chuyển động. Tự động nhận diện khuôn mặt và đếm số người tham gia để điểm danh chính xác mà không cần thẻ hay vân tay.',
+            tag: 'AI Security Monitoring',
+            title: 'Giám Sát An Ninh Camera AI 24/7',
+            description: 'Camera AI giám sát toàn bộ khuôn viên theo thời gian thực, tự động nhận diện khuôn mặt và phát hiện xâm nhập bất thường để cảnh báo tức thời cho đội an ninh.',
             badgeColor: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40',
             gradient: 'from-midnight-indigo via-[#152a55] to-emerald-950',
             icon: <Video className="w-5 h-5 text-emerald-400 drop-shadow-md" />,
@@ -123,6 +123,43 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
             )
         },
         {
+            tag: 'Vehicle Access Control',
+            title: 'Kiểm Soát Ra Vào Bằng Nhận Diện Biển Số (ANPR)',
+            description: 'Camera ANPR tự động đọc biển số xe ra/vào cổng, đối chiếu danh sách kiểm soát và tự động mở barrier — không cần bảo vệ kiểm tra thủ công từng lượt xe.',
+            badgeColor: 'bg-royal-amethyst/25 text-purple-200 border-royal-amethyst/40',
+            gradient: 'from-[#1c1440] via-[#2a1a52] to-purple-950',
+            icon: <Car className="w-5 h-5 text-purple-300 drop-shadow-md" />,
+            interactiveElement: (
+                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center gap-4 p-4 cursor-pointer select-none">
+                    {/* Gate barrier */}
+                    <div className="relative w-full h-8 flex items-center justify-start" style={{ transform: "translateZ(15px)" }}>
+                        <div className="absolute left-1 w-2 h-9 bg-white/20 rounded-sm" />
+                        <motion.div
+                            className="absolute left-2 w-24 h-1.5 rounded-full origin-left bg-gradient-to-r from-red-400 via-white to-white shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+                            animate={{ rotate: [0, 0, -65, -65, 0] }}
+                            transition={{ duration: 5, repeat: Infinity, times: [0, 0.15, 0.35, 0.75, 1], ease: 'easeInOut' }}
+                        />
+                        <motion.div
+                            className="absolute left-16 w-5 h-3 rounded-sm bg-white/70"
+                            animate={{ x: [0, 90, 90, 0], opacity: [1, 1, 0, 0] }}
+                            transition={{ duration: 5, repeat: Infinity, times: [0, 0.3, 0.5, 1], ease: 'easeInOut' }}
+                        />
+                    </div>
+                    {/* Plate recognition reveal */}
+                    <motion.div
+                        className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-lg"
+                        style={{ transform: "translateZ(25px)" }}
+                        animate={{ opacity: [0, 0, 1, 1, 0], y: [8, 8, 0, 0, 8] }}
+                        transition={{ duration: 5, repeat: Infinity, times: [0, 0.35, 0.5, 0.85, 1] }}
+                    >
+                        <span className="text-sm font-black text-blue-950 tracking-wider font-mono">30A-123.45</span>
+                        <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    </motion.div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-purple-200/80">Đã nhận diện — Cho phép qua</span>
+                </TiltCard>
+            )
+        },
+        {
             tag: 'Automated Optimization',
             title: 'Giải Phóng Phòng Trực Quan (No-Show)',
             description: 'Tối ưu hóa tài nguyên phòng họp. Nếu không phát hiện hiện diện sau 10 phút so với lịch trình, hệ thống sẽ tự động hủy lịch giữ phòng và gửi thông báo giải phóng không gian.',
@@ -153,34 +190,53 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
             )
         },
         {
-            tag: 'Data-driven Analytics',
-            title: 'Báo Cáo & Phân Tích Thông Minh',
-            description: 'Theo dõi chi tiết tỷ lệ lấp đầy phòng, thời gian họp trung bình và kỷ luật đúng giờ của toàn thể nhân sự. Xuất file báo cáo dễ dàng hỗ trợ nhà quản lý đưa ra quyết định tối ưu.',
+            tag: 'IoT Device Health',
+            title: 'Giám Sát Thiết Bị IoT Toàn Khuôn Viên',
+            description: 'Theo dõi tình trạng hoạt động của toàn bộ camera, cảm biến và thiết bị IoT theo thời gian thực trên một sơ đồ mạng lưới duy nhất — phát hiện mất kết nối ngay lập tức.',
             badgeColor: 'bg-sky-500/25 text-sky-300 border-sky-500/40',
             gradient: 'from-[#0b172a] via-[#10203a] to-blue-950',
             icon: <Cpu className="w-5 h-5 text-sky-400 drop-shadow-md" />,
             interactiveElement: (
-                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex items-center justify-center p-4 cursor-pointer">
-                    <div className="w-full h-full flex items-end justify-between gap-1.5 pt-4" style={{ transform: "translateZ(15px)" }}>
-                        {[40, 70, 55, 90, 65, 80].map((h, i) => (
-                            <motion.div
+                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex items-center justify-center cursor-pointer">
+                    <div className="relative w-full h-full" style={{ transform: "translateZ(20px)" }}>
+                        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 224 160">
+                            <line x1="112" y1="80" x2="40" y2="24" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
+                            <line x1="112" y1="80" x2="184" y2="24" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
+                            <line x1="112" y1="80" x2="34" y2="132" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
+                            <line x1="112" y1="80" x2="188" y2="128" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
+                        </svg>
+
+                        {/* Center hub */}
+                        <div
+                            className="absolute w-11 h-11 rounded-full bg-sky-500/30 border border-sky-400/60 flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.5)]"
+                            style={{ top: 80, left: 112, transform: 'translate(-50%, -50%)' }}
+                        >
+                            <Wifi className="w-5 h-5 text-sky-200" />
+                        </div>
+
+                        {/* Orbiting devices */}
+                        {[
+                            { top: 24, left: 40, status: 'online' },
+                            { top: 24, left: 184, status: 'online' },
+                            { top: 132, left: 34, status: 'offline' },
+                            { top: 128, left: 188, status: 'online' },
+                        ].map((d, i) => (
+                            <div
                                 key={i}
-                                className="w-full bg-gradient-to-t from-sky-600 to-sky-300 rounded-t-sm shadow-[0_0_8px_rgba(56,189,248,0.5)]"
-                                style={{ height: `${h}%` }}
-                                whileHover={{ height: '98%', backgroundColor: '#00D1FF', filter: 'brightness(1.2)' }}
-                                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                            />
+                                className="absolute w-6 h-6 rounded-lg bg-black/30 border border-white/10 flex items-center justify-center"
+                                style={{ top: d.top, left: d.left, transform: 'translate(-50%, -50%)' }}
+                            >
+                                {d.status === 'online' ? (
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+                                    </span>
+                                ) : (
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
+                                )}
+                            </div>
                         ))}
                     </div>
-                    {/* Floating target metric */}
-                    <motion.div 
-                        className="absolute top-2 right-2 bg-sky-500/20 border border-sky-400/50 px-2 py-0.5 rounded text-[10px] font-bold text-sky-200 backdrop-blur-md shadow-lg"
-                        style={{ transform: "translateZ(25px)" }}
-                        animate={{ y: [0, -5, 0] }}
-                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                    >
-                        +18.5%
-                    </motion.div>
                 </TiltCard>
             )
         }

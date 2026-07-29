@@ -8,6 +8,7 @@ import {
 import { getZones } from '../../service/zoneServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getVehicleControlList } from '../../service/anprService';
+import { getBusinessAdminSummary } from '../../service/campusService';
 import { ShieldAlert, MapPin, Car, LogIn, ArrowRight, Calendar, BarChart3 as BarChart3Icon, Clock, DoorOpen } from 'lucide-react';
 import DashboardBanner from '../../component/DashboardBanner';
 
@@ -89,6 +90,8 @@ const DashBoard = () => {
         zonesActive: 0,
         zonesTotal: 0,
         blocklistActive: 0,
+        vehicleControlHitsToday: 0,
+        securityAlertsBySeverity: null,
     });
     const [recentAlerts, setRecentAlerts] = useState([]);
     const [zonesList, setZonesList] = useState([]);
@@ -124,13 +127,14 @@ const DashBoard = () => {
             const todayEnd = new Date();
             todayEnd.setHours(23, 59, 59, 999);
 
-            const [devicesRes, logsRes, zonesRes, alertsRes, trafficRes, blocklistRes] = await Promise.allSettled([
+            const [devicesRes, logsRes, zonesRes, alertsRes, trafficRes, blocklistRes, summaryRes] = await Promise.allSettled([
                 getDevices({ limit: 100 }),
                 getAuditLogs({ limit: 100 }),
                 getZones({ limit: 100 }),
                 getSecurityAlerts({ status: 'new', limit: 5 }),
                 getAdminVehicleTrafficStats({ from: todayStart.toISOString(), to: todayEnd.toISOString(), group_by: 'day' }),
-                getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 })
+                getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 }),
+                getBusinessAdminSummary()
             ]);
 
             let devList = [];
@@ -214,14 +218,31 @@ const DashBoard = () => {
                 gateEventsToday = 186;
             }
 
+            // CDB-RS-001: business-admin-summary — nguồn tổng hợp chính thức từ BE, ưu tiên hơn số tự suy từ list /zones khi có sẵn (SYSTEM_ADMIN cũng có quyền 200)
+            let zonesActive = zonesData.filter(z => z.status === 'active').length;
+            let zonesTotal = zonesData.length;
+            let vehicleControlHitsToday = 0;
+            let securityAlertsBySeverity = null;
+            if (summaryRes.status === 'fulfilled' && summaryRes.value?.success) {
+                const summary = summaryRes.value.data;
+                if (summary?.zoneOccupancy) {
+                    zonesActive = summary.zoneOccupancy.zonesWithDataCount ?? zonesActive;
+                    zonesTotal = summary.zoneOccupancy.totalZoneCount ?? zonesTotal;
+                }
+                vehicleControlHitsToday = summary?.vehicleControlHitsToday ?? 0;
+                securityAlertsBySeverity = summary?.securityAlertsBySeverity ?? null;
+            }
+
             setZonesList(zonesData.slice(0, 6));
             setRecentAlerts(alertsData.slice(0, 5));
             setCampusStats({
                 gateEventsToday,
                 newAlertsCount: alertsData.length,
-                zonesActive: zonesData.filter(z => z.status === 'active').length,
-                zonesTotal: zonesData.length,
+                zonesActive,
+                zonesTotal,
                 blocklistActive: blocklistCount,
+                vehicleControlHitsToday,
+                securityAlertsBySeverity,
             });
 
         } catch (err) {
@@ -318,6 +339,17 @@ const DashBoard = () => {
                             <div className="mt-4">
                                 <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.newAlertsCount}</h3>
                                 <p className="text-xs text-red-600 font-semibold mt-1">Chưa xử lý</p>
+                                {campusStats.securityAlertsBySeverity && (
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {Object.entries(campusStats.securityAlertsBySeverity).map(([severity, count]) => (
+                                            count > 0 && (
+                                                <span key={severity} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize ${SEVERITY_STYLES[severity] || 'bg-slate-100 text-slate-600'}`}>
+                                                    {severity}: {count}
+                                                </span>
+                                            )
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -359,6 +391,7 @@ const DashBoard = () => {
                             <div className="mt-4">
                                 <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.blocklistActive}</h3>
                                 <p className="text-xs text-slate-blue mt-1">Blocklist đang hiệu lực</p>
+                                <p className="text-xs text-orange-600 font-semibold mt-1">{campusStats.vehicleControlHitsToday} lượt khớp hôm nay</p>
                             </div>
                         </div>
 

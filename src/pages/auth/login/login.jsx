@@ -51,53 +51,47 @@ const socialButtons = [
     },
 ];
 
+const featureCardIconWrapClassName =
+    "relative flex items-center justify-center w-8 h-8 rounded-lg bg-[#e6eff8] flex-shrink-0";
+
+const IconGate = (
+    <svg className="w-[18px] h-[18px] text-[#0059bb]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H3" />
+    </svg>
+);
+
+const IconCalendar = (
+    <svg className="w-[18px] h-[18px] text-[#0059bb]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+    </svg>
+);
+
+const IconCar = (
+    <svg className="w-[18px] h-[18px] text-[#0059bb]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+    </svg>
+);
+
 const featureCards = [
     {
         id: "security",
-        iconSrc: icon3,
-        iconAlt: "Giám sát 24/7",
-        iconClassName: "relative w-5 h-4 flex-shrink-0",
-        label: "Giám sát 24/7",
-        title: "Giám sát 24/7",
-        wrapperClassName:
-            "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        cardClassName:
-            "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        textWrapperClassName: "relative flex-grow min-w-0 flex items-center",
-        textClassName:
-            "[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words",
+        icon: <img className="relative w-5 h-4 flex-shrink-0" alt="Giám sát Camera AI" src={icon3} />,
+        title: "Giám sát Camera AI",
     },
     {
-        id: "recognition",
-        iconSrc: icon4,
-        iconAlt: "Nhận diện thông minh",
-        iconClassName: "relative w-[18px] h-[18px] flex-shrink-0",
-        label: "Nhận diện thông minh",
-        title: "Nhận diện thông minh",
-        wrapperClassName:
-            "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        cardClassName:
-            "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        textWrapperClassName: "relative flex-grow min-w-0 flex items-center",
-        textClassName:
-            "[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words",
+        id: "access-control",
+        icon: IconGate,
+        title: "Kiểm soát xe ANPR",
     },
     {
-        id: "comprehensive",
-        iconSrc: icon5,
-        iconAlt: "Quản lý toàn diện",
-        iconClassName: "relative w-[17px] h-[16.99px] flex-shrink-0",
-        label: "Quản lý toàn diện",
-        title: "Quản lý toàn diện",
-        wrapperClassName:
-            "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        cardClassName:
-            "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
-        textWrapperClassName: "relative flex-grow min-w-0 flex items-center",
-        textClassName:
-            "[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words",
+        id: "alerts",
+        icon: <img className="relative w-[17px] h-[16.99px] flex-shrink-0" alt="Cảnh báo thời gian thực" src={icon5} />,
+        title: "Cảnh báo thời gian thực",
     },
 ];
+
+const featureCardClassName =
+    "relative w-full min-h-[72px] flex items-center gap-3 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]";
 
 /**
  * Determines redirect path based on user roles from API response.
@@ -235,7 +229,7 @@ const Login = () => {
             // Handle error response matching backend envelope
             let rawMessage = err.error?.message || err.message || "";
             let message = "Đăng nhập thất bại. Vui lòng thử lại.";
-            
+
             if (rawMessage.toLowerCase().includes("invalid credentials") || rawMessage.toLowerCase().includes("unauthorized")) {
                 message = "Sai email hoặc mật khẩu. Vui lòng thử lại.";
             } else if (rawMessage.toLowerCase().includes("not found")) {
@@ -245,7 +239,7 @@ const Login = () => {
             } else if (rawMessage) {
                 message = rawMessage; // Fallback to backend message if it's not a generic english one
             }
-            
+
             setError(message);
         } finally {
             setLoading(false);
@@ -478,86 +472,47 @@ const Login = () => {
                 </section>
                 <section
                     aria-label="Giới thiệu tính năng"
-                    className="hidden lg:flex flex-col w-[586.75px] h-[737.44px] relative"
+                    className="hidden lg:flex flex-col w-[586.75px] max-w-full gap-9"
                 >
-                    <div className="flex flex-col w-[calc(100%_-_48px)] items-start gap-[22.8px] absolute top-0 left-12">
+                    <div className="flex flex-col w-full items-start gap-6">
                         <div className="inline-flex items-center px-4 py-2 relative flex-[0_0_auto] bg-[#e6eff8] rounded-full">
                             <div className="relative flex items-center w-fit mt-[-1.00px] [font-family:'Inter-Bold',Helvetica] font-bold text-[#0059bb] text-xs tracking-[1.20px] leading-3 whitespace-nowrap">
-                                CAMPUS TRACKING PLATFORM
+                                CAMPUS OPERATIONS PLATFORM
                             </div>
                         </div>
-                        <div className="max-w-[500px] w-[500px] h-[121px] pt-[1.2px] pb-0 px-0 flex flex-col items-start relative">
-                            <h2 className="relative self-stretch h-[120px] mt-[-1.00px] [font-family:'Plus_Jakarta_Sans-Bold',Helvetica] font-bold text-[#0059bb] text-5xl tracking-[-0.96px] leading-[60px]">
-                                Giám sát khuôn viên
+                        <div className="max-w-[500px] w-full flex flex-col items-start">
+                            <h2 className="relative self-stretch mt-[-1.00px] [font-family:'Plus_Jakarta_Sans-Bold',Helvetica] font-bold text-[#0059bb] text-5xl tracking-[-0.96px] leading-[60px]">
+                                Số hóa khuôn viên
                                 <br />
-                                toàn diện, thông minh
+                                Nâng tầm vận hành
                             </h2>
                         </div>
-                        <div className="flex flex-col max-w-[480px] w-[480px] items-start relative flex-[0_0_auto]">
-                            <p className="relative w-fit mt-[-1.00px] mr-[-83.00px] [font-family:'Montserrat-Medium',Helvetica] font-medium text-[#3e6186] text-lg tracking-[0] leading-[28.8px]">
-                                An ninh, không gian, cuộc họp và thiết bị — kết nối trên
-                                <br />
-                                một nền tảng duy nhất, vận hành hiện đại và chuyên nghiệp.
+                        <div className="flex flex-col max-w-[500px] w-full items-start">
+                            <p className="relative w-full mt-[-1.00px] [font-family:'Montserrat-Medium',Helvetica] font-medium text-[#3e6186] text-lg tracking-[0] leading-[28.8px]">
+                                An ninh, ra vào, phòng họp và bãi xe — tự động hóa và đồng bộ
+                                theo thời gian thực, chỉ trên một nền tảng duy nhất.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex flex-col w-[calc(100%_-_48px)] items-start absolute top-[277px] left-12">
+                    <div className="relative w-full">
                         <div className="absolute w-full h-full top-0 left-0 bg-[#0059bb] rounded-3xl blur-md opacity-5 pointer-events-none" />
                         <div className="flex-col items-start p-2 self-stretch flex-[0_0_auto] rounded-3xl overflow-hidden border-[#dbe4ed80] flex relative w-full bg-white border border-solid shadow-[0px_10px_30px_#0000000d]">
                             <div
-                                className="relative self-stretch w-full rounded-[18px] aspect-[1.78] bg-cover bg-[50%_50%]"
+                                className="relative self-stretch w-full rounded-[18px] aspect-[1.35] bg-cover bg-[50%_50%]"
                                 style={{ backgroundImage: `url(${backgroundPng})` }}
                             />
-
-                            <div className="inline-flex items-center gap-[11.99px] px-5 py-3 absolute top-[25px] right-[25px] bg-[#ffffffcc] rounded-xl border border-solid border-[#ffffff80] backdrop-blur-[6px] backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(6px)_brightness(100%)]">
-                                <div className="absolute w-full h-full top-0 left-0 bg-[#ffffff01] rounded-xl shadow-[0px_4px_6px_-4px_#0000001a,0px_10px_15px_-3px_#0000001a]" />
-                                <div className="inline-flex flex-col items-start p-2 relative flex-[0_0_auto] bg-[#87b1fd] rounded-lg">
-                                    <img
-                                        className="relative w-6 h-3"
-                                        alt=""
-                                        aria-hidden="true"
-                                        src={icon2}
-                                    />
-                                </div>
-                                <div className="inline-flex flex-col items-start relative flex-[0_0_auto]">
-                                    <div className="flex flex-col items-start relative self-stretch w-full flex-[0_0_auto]">
-                                        <div className="relative flex items-center w-fit mt-[-1.00px] [font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[10px] tracking-[0] leading-[15px] whitespace-nowrap">
-                                            Tỷ lệ sử dụng
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-start pt-0 pb-[0.59px] px-0 relative self-stretch w-full flex-[0_0_auto] -mt-px">
-                                        <div className="relative flex items-center w-[52.14px] mt-[-1.00px] [font-family:'Inter-Bold',Helvetica] font-bold text-[#141d23] text-base tracking-[0] leading-[25.6px]">
-                                            84.5%
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="inline-flex items-center gap-3 px-6 py-3 absolute left-[25px] bottom-[25px] bg-[#ffffffe6] rounded-full border border-solid border-[#ffffff80] backdrop-blur-[6px] backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(6px)_brightness(100%)]">
-                                <div className="absolute w-full h-full top-0 left-0 bg-[#ffffff01] rounded-full shadow-[0px_4px_6px_-4px_#0000001a,0px_10px_15px_-3px_#0000001a]" />
-                                <div className="relative w-3 h-3 bg-[#ba1a1a] rounded-full" />
-                                <div className="inline-flex flex-col items-start relative flex-[0_0_auto]">
-                                    <div className="relative flex items-center w-fit mt-[-1.00px] [font-family:'Inter-SemiBold',Helvetica] font-semibold text-[#141d23] text-sm tracking-[0.28px] leading-[14px] whitespace-nowrap">
-                                        Phòng Apollo đang họp
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 grid-rows-[73px] w-[calc(100%_-_48px)] h-[73px] gap-6 absolute top-[618px] left-12">
+                    <div className="grid grid-cols-3 gap-4 w-full">
                         {featureCards.map((card) => (
-                            <article key={card.id} className={card.cardClassName}>
-                                <div className="inline-flex flex-col items-start relative flex-[0_0_auto]">
-                                    <img
-                                        className={card.iconClassName}
-                                        alt={card.iconAlt}
-                                        src={card.iconSrc}
-                                    />
+                            <article key={card.id} className={featureCardClassName}>
+                                <div className={featureCardIconWrapClassName}>
+                                    {card.icon}
                                 </div>
-                                <div className={card.textWrapperClassName}>
-                                    <div className={card.textClassName}>
+                                <div className="relative flex-grow min-w-0 flex items-center">
+                                    <div className="[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words">
                                         {card.title}
                                     </div>
                                 </div>

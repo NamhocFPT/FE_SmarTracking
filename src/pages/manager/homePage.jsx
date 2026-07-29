@@ -25,6 +25,7 @@ import {
     exportMeetingActivity,
     getDepartments
 } from '../../service/managerServices';
+import { getManagerSummary } from '../../service/campusService';
 import DashboardBanner from '../../component/DashboardBanner';
 
 const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
@@ -82,6 +83,10 @@ const ManagerHomePage = () => {
     const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
     const [submittingAction, setSubmittingAction] = useState(false);
     const [modalError, setModalError] = useState(null); // lỗi riêng cho modal action
+
+    // Campus summary (CDB-RS-001: GET /campus-dashboard/manager-summary)
+    const [campusSummary, setCampusSummary] = useState(null);
+    const [campusSummaryLoading, setCampusSummaryLoading] = useState(true);
 
     const fetchPendingRequests = useCallback(async () => {
         setLoadingOverview(true);
@@ -368,6 +373,25 @@ const ManagerHomePage = () => {
         loadContext();
     }, [fetchPendingRequests]);
 
+    // Load campus dashboard summary (team presence, on-time rate this week)
+    useEffect(() => {
+        let isMounted = true;
+        setCampusSummaryLoading(true);
+        getManagerSummary()
+            .then((res) => {
+                if (isMounted && res?.success) {
+                    setCampusSummary(res.data);
+                }
+            })
+            .catch(() => {
+                // Giữ campusSummary = null, UI tự hiện fallback bên dưới
+            })
+            .finally(() => {
+                if (isMounted) setCampusSummaryLoading(false);
+            });
+        return () => { isMounted = false; };
+    }, []);
+
     // Fetch dashboard data when tab switches to 'analytics'
     useEffect(() => {
         if (activeTab === 'analytics' && currentUser) {
@@ -483,8 +507,13 @@ const ManagerHomePage = () => {
                                     <Calendar className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Lịch họp hôm nay</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">4 cuộc họp</h3>
+                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Tỷ lệ đúng giờ tuần này</h4>
+                                    <h3 className="text-xl font-bold text-midnight-indigo">
+                                        {campusSummaryLoading ? '...' : `${campusSummary?.onTimeRateThisWeek?.rate ?? 0}%`}
+                                    </h3>
+                                    {!campusSummaryLoading && campusSummary?.onTimeRateThisWeek?.sampleSize < 5 && (
+                                        <p className="text-[11px] text-slate-blue mt-0.5">Trên {campusSummary.onTimeRateThisWeek.sampleSize} mẫu (số liệu còn ít)</p>
+                                    )}
                                 </div>
                             </div>
 
@@ -499,6 +528,32 @@ const ManagerHomePage = () => {
                                     </h3>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Team Presence Today (CDB-RS-001: campus-dashboard/manager-summary) */}
+                        <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm">
+                            <h2 className="text-sm font-bold text-midnight-indigo mb-3">Hiện diện team hôm nay</h2>
+                            {campusSummaryLoading ? (
+                                <p className="text-sm text-slate-blue">Đang tải...</p>
+                            ) : campusSummary?.teamPresenceToday ? (
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 h-3 rounded-full bg-cloud-mist overflow-hidden">
+                                        <div
+                                            className="h-full bg-emerald-500 rounded-full transition-all"
+                                            style={{
+                                                width: `${campusSummary.teamPresenceToday.totalCount
+                                                    ? Math.round((campusSummary.teamPresenceToday.presentCount / campusSummary.teamPresenceToday.totalCount) * 100)
+                                                    : 0}%`
+                                            }}
+                                        />
+                                    </div>
+                                    <span className="text-sm font-bold text-midnight-indigo whitespace-nowrap">
+                                        {campusSummary.teamPresenceToday.presentCount}/{campusSummary.teamPresenceToday.totalCount} thành viên có mặt
+                                    </span>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-blue">Không có dữ liệu hiện diện team.</p>
+                            )}
                         </div>
 
                         {/* Quick Shortcuts */}

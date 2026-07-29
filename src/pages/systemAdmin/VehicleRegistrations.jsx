@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Car, RefreshCw, CheckCircle, 
-    AlertTriangle, Filter, Eye, User, FileText
+    Car, RefreshCw, 
+    AlertTriangle, Filter, User, FileText
 } from 'lucide-react';
 import {
     getAdminVehicleRegistrations
@@ -67,13 +67,9 @@ const VehicleRegistrations = () => {
         const s = (status || '').toLowerCase();
         switch (s) {
             case 'active':
-            case 'approved':
-                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded border border-green-200">Đang hoạt động</span>;
-            case 'pending':
-                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded border border-orange-200">Chờ duyệt</span>;
+                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded border border-green-200">Hoạt động</span>;
             case 'disabled':
-            case 'rejected':
-                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200">Tạm dừng</span>;
+                return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200">Vô hiệu</span>;
             default:
                 return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{status}</span>;
         }
@@ -139,7 +135,7 @@ const VehicleRegistrations = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-cloud-mist/50 border-b border-platinum-tint">
                             <tr>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Nhân viên</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Chủ xe</th>
                                 <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Biển số</th>
                                 <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Loại xe</th>
                                 <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Ghi chú</th>
@@ -180,8 +176,8 @@ const VehicleRegistrations = () => {
                                                     <User className="w-4 h-4" />
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-midnight-indigo">{reg.user?.full_name || 'Không rõ'}</div>
-                                                    <div className="text-[11px] text-slate-blue">{reg.user?.email || '-'}</div>
+                                                    <div className="font-bold text-midnight-indigo">{reg.owner?.full_name || 'Không rõ'}</div>
+                                                    <div className="text-[11px] text-slate-blue">{reg.owner?.email || '-'}</div>
                                                 </div>
                                             </div>
                                         </td>
