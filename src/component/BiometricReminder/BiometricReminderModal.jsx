@@ -87,12 +87,7 @@ const BiometricReminderModal = () => {
         }
     };
 
-    // Clean up webcam on view change or modal close
-    useEffect(() => {
-        return () => {
-            stopWebcam();
-        };
-    }, [view, open]);
+
 
     const handleDismiss = () => {
         try {
@@ -169,6 +164,25 @@ const BiometricReminderModal = () => {
             setCameraError('Không thể truy cập camera. Vui lòng cấp quyền sử dụng camera cho trình duyệt.');
         }
     };
+
+    // Clean up and initialize webcam on view change or modal close
+    useEffect(() => {
+        if (view === 'webcam' && open) {
+            startWebcam();
+        } else {
+            stopWebcam();
+        }
+        return () => {
+            stopWebcam();
+        };
+    }, [view, open]);
+
+    // Bind stream to video element when stream is ready
+    useEffect(() => {
+        if (cameraStream && videoRef.current) {
+            videoRef.current.srcObject = cameraStream;
+        }
+    }, [cameraStream]);
 
     const runWebcamGuideSequence = () => {
         if (timerRef.current) clearInterval(timerRef.current);
@@ -365,7 +379,7 @@ const BiometricReminderModal = () => {
 
                                 {/* Option B: Take Camera */}
                                 <div 
-                                    onClick={() => { setView('webcam'); startWebcam(); }}
+                                    onClick={() => setView('webcam')}
                                     className="p-5 rounded-2xl border-2 border-platinum-tint hover:border-action-blue hover:bg-action-blue/5 transition-all flex flex-col items-center justify-between text-center cursor-pointer select-none group h-48"
                                 >
                                     <div className="flex flex-col items-center gap-3">
