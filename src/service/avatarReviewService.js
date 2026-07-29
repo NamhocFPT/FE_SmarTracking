@@ -1,22 +1,22 @@
 import { get, post } from '../utils/request';
 
-/** GET /api/v1/admin/avatar-submissions */
+/** GET /api/v1/admin/biometric-submissions */
 export const getAvatarSubmissions = async (params = {}) => {
     const cleaned = Object.fromEntries(
         Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
     );
     const query = new URLSearchParams(cleaned).toString();
-    return get(`/admin/avatar-submissions${query ? `?${query}` : ''}`);
+    return get(`/admin/biometric-submissions${query ? `?${query}` : ''}`);
 };
 
-/** GET /api/v1/admin/avatar-submissions/:id */
-export const getAvatarSubmissionDetail = async (id) => get(`/admin/avatar-submissions/${id}`);
+/** GET /api/v1/admin/biometric-submissions/:id */
+export const getAvatarSubmissionDetail = async (id) => get(`/admin/biometric-submissions/${id}`);
 
-/** GET /api/v1/admin/avatar-submissions/:id/download-url */
-export const getAvatarDownloadUrl = async (id) => get(`/admin/avatar-submissions/${id}/download-url`);
+/** GET /api/v1/admin/biometric-submissions/:id/download-url */
+export const getAvatarDownloadUrl = async (id) => get(`/admin/biometric-submissions/${id}/download-url`);
 
-/** POST /api/v1/admin/avatar-submissions/:id/approve */
-export const approveAvatarSubmission = async (id) => post(`/admin/avatar-submissions/${id}/approve`, {});
+/** POST /api/v1/admin/biometric-submissions/:id/approve */
+export const approveAvatarSubmission = async (id) => post(`/admin/biometric-submissions/${id}/approve`, {});
 
-/** POST /api/v1/admin/avatar-submissions/:id/reject  body: { reason } */
-export const rejectAvatarSubmission = async (id, reason) => post(`/admin/avatar-submissions/${id}/reject`, { reason });
+/** POST /api/v1/admin/biometric-submissions/:id/reject  body: { reason } */
+export const rejectAvatarSubmission = async (id, reason) => post(`/admin/biometric-submissions/${id}/reject`, { reason });

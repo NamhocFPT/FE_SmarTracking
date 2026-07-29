@@ -4,8 +4,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { get } from '../../utils/request';
 import { updateSelfProfile } from '../../service/employeeServices';
-import { getAvatarStatus } from '../../service/avatarService';
-import AvatarUploadForm from '../../component/AvatarReminder/AvatarUploadForm';
+import { getBiometricStatus, updateSelfAvatar } from '../../service/avatarService';
+import BiometricUploadForm from '../../component/BiometricReminder/BiometricUploadForm';
 
 const STATUS_LABEL = {
     not_uploaded: { label: "Chưa nộp ảnh", badge: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -59,9 +59,19 @@ const Profile = () => {
     const [editMode, setEditMode] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
-    const [avatarStatus, setAvatarStatus] = useState(null);
-    const [avatarStatusLoading, setAvatarStatusLoading] = useState(false);
+    
+    // Biometric ID photo status
+    const [biometricStatus, setBiometricStatus] = useState(null);
+    const [biometricStatusLoading, setBiometricStatusLoading] = useState(false);
+    const [biometricModalOpen, setBiometricModalOpen] = useState(false);
+    
+    // Avatar display photo status
     const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+    const [avatarFile, setAvatarFile] = useState(null);
+    const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
+    const [avatarUploadError, setAvatarUploadError] = useState(null);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
     const [profile, setProfile] = useState(null);
     const [formData, setFormData] = useState({
         fullName: "",
@@ -122,18 +132,18 @@ const Profile = () => {
         }
     }, [defaultMockEmail, defaultMockCode, defaultMockTitle, roleLabel]);
 
-    const fetchAvatarStatus = useCallback(async () => {
-        setAvatarStatusLoading(true);
+    const fetchBiometricStatus = useCallback(async () => {
+        setBiometricStatusLoading(true);
         try {
-            const res = await getAvatarStatus();
-            if (res?.success && res.data) setAvatarStatus(res.data);
+            const res = await getBiometricStatus();
+            if (res?.success && res.data) setBiometricStatus(res.data);
         } catch {} finally {
-            setAvatarStatusLoading(false);
+            setBiometricStatusLoading(false);
         }
     }, []);
 
     useEffect(() => { fetchProfileData(); }, [fetchProfileData]);
-    useEffect(() => { fetchAvatarStatus(); }, [fetchAvatarStatus]);
+    useEffect(() => { fetchBiometricStatus(); }, [fetchBiometricStatus]);
 
     useEffect(() => {
         if (successMessage) { const t = setTimeout(() => setSuccessMessage(null), 3000); return () => clearTimeout(t); }
@@ -142,26 +152,61 @@ const Profile = () => {
         if (error) { const t = setTimeout(() => setError(null), 3000); return () => clearTimeout(t); }
     }, [error]);
 
-    const handleAvatarChange = (e) => {
+    const handleAvatarFileSelect = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (!file.type.startsWith("image/")) {
-            setError("Định dạng tệp không được hỗ trợ. Vui lòng chọn ảnh (.png, .jpg, .jpeg).");
+            setAvatarUploadError("Định dạng tệp không được hỗ trợ. Vui lòng chọn ảnh (.png, .jpg, .jpeg, .webp).");
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
-            setError("Dung lượng ảnh vượt quá giới hạn 5MB. Vui lòng chọn ảnh khác.");
+            setAvatarUploadError("Dung lượng ảnh vượt quá giới hạn 5MB. Vui lòng chọn ảnh khác.");
             return;
         }
-        setFormData(prev => ({ ...prev, avatarFile: file, avatarPreview: URL.createObjectURL(file) }));
+        setAvatarFile(file);
+        setAvatarPreviewUrl(URL.createObjectURL(file));
+        setAvatarUploadError(null);
     };
 
-    const handleAvatarUploadSuccess = () => {
-        fetchAvatarStatus();
-        setFormData(prev => ({ ...prev, avatarFile: null }));
-        setError(null);
-        setSuccessMessage("Ảnh đại diện đã được gửi đi và đang chờ duyệt.");
-        setAvatarModalOpen(false);
+    const handleAvatarUpload = async () => {
+        if (!avatarFile) return;
+        setUploadingAvatar(true);
+        setAvatarUploadError(null);
+        try {
+            const res = await updateSelfAvatar(avatarFile);
+            if (res?.success && res.data?.avatarUrl) {
+                const newUrl = res.data.avatarUrl;
+                setProfile(prev => ({ ...prev, avatarUrl: newUrl }));
+                setFormData(prev => ({ ...prev, avatarPreview: newUrl }));
+                
+                // Update local storage
+                const localUserStr = localStorage.getItem("user");
+                if (localUserStr) {
+                    try {
+                        const localUser = JSON.parse(localUserStr);
+                        localUser.avatarUrl = newUrl;
+                        localStorage.setItem("user", JSON.stringify(localUser));
+                        window.dispatchEvent(new Event("storage"));
+                    } catch (e) {}
+                }
+                setSuccessMessage("Cập nhật ảnh đại diện thành công.");
+                setAvatarModalOpen(false);
+                setAvatarFile(null);
+                setAvatarPreviewUrl(null);
+            } else {
+                setAvatarUploadError(res?.error?.message || "Cập nhật ảnh đại diện thất bại.");
+            }
+        } catch (err) {
+            setAvatarUploadError(err?.error?.message || "Lỗi kết nối hệ thống.");
+        } finally {
+            setUploadingAvatar(false);
+        }
+    };
+
+    const handleBiometricUploadSuccess = () => {
+        fetchBiometricStatus();
+        setSuccessMessage("Ảnh sinh trắc học đã được gửi đi và đang chờ duyệt.");
+        setBiometricModalOpen(false);
     };
 
     const handleSubmit = async (e) => {
@@ -286,18 +331,28 @@ const Profile = () => {
                         <span className="inline-flex text-[10px] px-2.5 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">{roleLabel}</span>
                     </div>
 
-                    {!avatarStatusLoading && avatarStatus && (
+                    {!biometricStatusLoading && biometricStatus && (
                         <div className="w-full mt-3">
                             <div className="w-full flex flex-col p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                <span className="block text-[10px] font-bold text-slate-blue uppercase">Trạng thái duyệt ảnh đại diện</span>
-                                <span className={"inline-flex self-start mt-1.5 text-[10px] px-2 py-0.5 rounded-full font-semibold " + ((STATUS_LABEL[avatarStatus.avatarReviewStatus] || STATUS_LABEL.not_uploaded).badge)}>
-                                    {(STATUS_LABEL[avatarStatus.avatarReviewStatus] || STATUS_LABEL.not_uploaded).label}
+                                <span className="block text-[10px] font-bold text-slate-blue uppercase text-left">Trạng thái duyệt ảnh FaceID</span>
+                                <span className={"inline-flex self-start mt-1.5 text-[10px] px-2 py-0.5 rounded-full font-semibold " + ((STATUS_LABEL[biometricStatus.biometricReviewStatus] || STATUS_LABEL.not_uploaded).badge)}>
+                                    {(STATUS_LABEL[biometricStatus.biometricReviewStatus] || STATUS_LABEL.not_uploaded).label}
                                 </span>
-                                {avatarStatus.avatarReviewStatus === "rejected" && avatarStatus.message && (
-                                    <p className="text-[10px] text-red-600 mt-1.5 text-left leading-relaxed">{avatarStatus.message}</p>
+                                {biometricStatus.biometricReviewStatus === "rejected" && biometricStatus.message && (
+                                    <p className="text-[10px] text-red-600 mt-1.5 text-left leading-relaxed">{biometricStatus.message}</p>
                                 )}
-                                {avatarStatus.avatarReviewStatus === "approved" && (
-                                    <p className="text-[10px] text-green-600 mt-1.5 text-left">Ảnh hiện tại đã được duyệt.</p>
+                                {biometricStatus.biometricReviewStatus === "approved" && (
+                                    <p className="text-[10px] text-green-600 mt-1.5 text-left">Ảnh sinh trắc học đã được duyệt.</p>
+                                )}
+                                
+                                {(biometricStatus.biometricReviewStatus === "rejected" || biometricStatus.biometricReviewStatus === "not_uploaded") && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setBiometricModalOpen(true)}
+                                        className="mt-3 w-full py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                    >
+                                        Nộp ảnh sinh trắc học FaceID
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -338,63 +393,83 @@ const Profile = () => {
                                 </button>
                             ) : (
                                 <div className="flex gap-2">
-                                    <button type="button" onClick={handleCancel} className="px-3 py-1.5 border border-platinum-tint bg-white text-slate-blue hover:bg-cloud-mist rounded-lg text-xs font-semibold transition-all">Hủy</button>
-                                    <button onClick={handleSubmit} disabled={updating} className="px-3 py-1.5 bg-action-blue hover:bg-glacier-blue text-white rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center justify-center">{updating ? "Đang lưu..." : "Lưu thay đổi"}</button>
+                                    <button onClick={handleSubmit} disabled={updating} className="px-4 py-2 bg-action-blue text-white rounded-lg text-xs font-semibold disabled:opacity-50">
+                                        Lưu lại
+                                    </button>
+                                    <button onClick={handleCancel} className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue rounded-lg text-xs font-semibold">
+                                        Hủy
+                                    </button>
                                 </div>
                             )}
                         </div>
-                        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã nhân viên</label>
-                                <input type="text" disabled value={profile?.employeeCode || ""} className="w-full px-3 py-2 border border-platinum-tint bg-cloud-mist rounded-xl text-sm text-steel-gray focus:outline-none cursor-not-allowed" />
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Họ và tên</label>
+                                    <input
+                                        type="text"
+                                        disabled={!editMode || updating}
+                                        value={formData.fullName}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                                        required
+                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue disabled:bg-cloud-mist/30 text-midnight-indigo font-medium"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Số điện thoại</label>
+                                    <input
+                                        type="text"
+                                        disabled={!editMode || updating}
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue disabled:bg-cloud-mist/30 text-midnight-indigo font-medium"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ Email</label>
-                                <input type="email" disabled value={profile?.email || ""} className="w-full px-3 py-2 border border-platinum-tint bg-cloud-mist rounded-xl text-sm text-steel-gray focus:outline-none cursor-not-allowed" />
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Mã nhân viên</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo block px-3 py-2 bg-cloud-mist/30 border border-platinum-tint/50 rounded-xl">{profile?.employeeCode || ""}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Địa chỉ Email</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo block px-3 py-2 bg-cloud-mist/30 border border-platinum-tint/50 rounded-xl">{profile?.email || ""}</span>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Họ và Tên</label>
-                                <input type="text" required disabled={!editMode} value={formData.fullName} onChange={(e) => setFormData({...formData, fullName: e.target.value})} className={"w-full px-3 py-2 border rounded-xl text-sm transition-all focus:outline-none " + (editMode ? "border-platinum-tint focus:border-action-blue bg-white text-midnight-indigo" : "border-platinum-tint/60 bg-cloud-mist/55 text-slate-blue cursor-not-allowed")} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Số điện thoại</label>
-                                <input type="text" disabled={!editMode} value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="Chưa cập nhật số điện thoại" className={"w-full px-3 py-2 border rounded-xl text-sm transition-all focus:outline-none " + (editMode ? "border-platinum-tint focus:border-action-blue bg-white text-midnight-indigo" : "border-platinum-tint/60 bg-cloud-mist/55 text-slate-blue cursor-not-allowed")} />
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Phòng ban</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo block px-3 py-2 bg-cloud-mist/30 border border-platinum-tint/50 rounded-xl">{profile?.department?.departmentName || profile?.department?.name || "Chưa có"}</span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Chức vụ</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo block px-3 py-2 bg-cloud-mist/30 border border-platinum-tint/50 rounded-xl">{profile?.positionTitle || "Chưa có"}</span>
+                                </div>
                             </div>
                         </form>
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
-                        <div className="border-b border-platinum-tint/60 pb-4 mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-action-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            <h2 className="text-base font-bold text-midnight-indigo">Cấu trúc tổ chức</h2>
+                        <div className="border-b border-platinum-tint/60 pb-4 mb-4">
+                            <h2 className="text-base font-bold text-midnight-indigo">Cơ cấu quản lý</h2>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100/70 flex items-start gap-3.5 transition-all hover:shadow-sm">
-                                <div className="p-2 bg-blue-100/80 rounded-lg text-action-blue flex-shrink-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="flex items-center gap-3.5 text-left">
+                                <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <span className="block text-[11px] font-bold text-slate-blue/85 uppercase tracking-wider">Phòng ban</span>
-                                    <span className="text-sm font-bold text-midnight-indigo mt-1 block">{profile?.department?.departmentName || profile?.department?.name || profile?.departments?.[0]?.name || profile?.departments?.[0]?.departmentName || "Chưa phân bổ phòng ban"}</span>
+                                    <span className="block text-[11px] font-bold text-slate-blue/85 uppercase tracking-wider">Bộ phận trực thuộc</span>
+                                    <span className="text-sm font-bold text-midnight-indigo mt-1 block">{profile?.department?.departmentName || profile?.department?.name || "Chưa trực thuộc"}</span>
                                 </div>
                             </div>
-                            <div className="p-4 rounded-xl bg-amber-50/45 border border-amber-100/70 flex items-start gap-3.5 transition-all hover:shadow-sm">
-                                <div className="p-2 bg-amber-100/70 rounded-lg text-amber-600 flex-shrink-0">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 004 0M7 10h10M7 14h10" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span className="block text-[11px] font-bold text-slate-blue/85 uppercase tracking-wider">Chức danh / Vị trí</span>
-                                    <span className="text-sm font-bold text-midnight-indigo mt-1 block">{profile?.positionTitle || "Chưa thiết lập chức danh"}</span>
-                                </div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100/70 flex items-start gap-3.5 transition-all hover:shadow-sm">
-                                <div className="p-2 bg-purple-100/80 rounded-lg text-purple-600 flex-shrink-0">
+                            <div className="flex items-center gap-3.5 text-left">
+                                <div className="w-10 h-10 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
@@ -429,7 +504,7 @@ const Profile = () => {
                 </div>
             </div>
 
-            {/* Avatar Upload Modal */}
+            {/* Direct Avatar Upload Modal */}
             {createPortal(
                 <AnimatePresence>
                     {avatarModalOpen && (
@@ -449,7 +524,12 @@ const Profile = () => {
                                     <h3 className="text-base font-bold text-midnight-indigo">Cập nhật ảnh đại diện</h3>
                                     <button
                                         type="button"
-                                        onClick={() => setAvatarModalOpen(false)}
+                                        onClick={() => {
+                                            setAvatarModalOpen(false);
+                                            setAvatarFile(null);
+                                            setAvatarPreviewUrl(null);
+                                            setAvatarUploadError(null);
+                                        }}
                                         className="p-1 rounded-full text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60 transition-colors"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -458,10 +538,99 @@ const Profile = () => {
                                     </button>
                                 </div>
                                 
-                                <AvatarUploadForm 
+                                <div className="space-y-4">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="relative w-28 h-28 rounded-full overflow-hidden ring-4 ring-action-blue/10 bg-gradient-to-tr from-action-blue to-glacier-blue flex items-center justify-center text-white text-3xl font-extrabold select-none">
+                                            {avatarPreviewUrl ? (
+                                                <img src={avatarPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                                            ) : formData.avatarPreview ? (
+                                                <img src={formData.avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg className="w-10 h-10 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                            )}
+                                        </div>
+
+                                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold transition-all shadow-sm">
+                                            Chọn ảnh đại diện
+                                            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarFileSelect} />
+                                        </label>
+                                        <span className="text-[10px] text-steel-gray">Hỗ trợ JPG, PNG, WEBP — tối đa 5MB</span>
+                                    </div>
+
+                                    {avatarUploadError && (
+                                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-start gap-2">
+                                            <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                            <span>{avatarUploadError}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-3 pt-2 border-t border-platinum-tint mt-4">
+                                        <button
+                                            type="button"
+                                            onClick={handleAvatarUpload}
+                                            disabled={uploadingAvatar || !avatarFile}
+                                            className="flex-1 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+                                        >
+                                            {uploadingAvatar ? "Đang tải lên..." : "Lưu ảnh đại diện"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAvatarModalOpen(false);
+                                                setAvatarFile(null);
+                                                setAvatarPreviewUrl(null);
+                                                setAvatarUploadError(null);
+                                            }}
+                                            className="py-2 px-4 border border-platinum-tint bg-white text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-all"
+                                        >
+                                            Hủy
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
+
+            {/* Biometric FaceID Upload Modal */}
+            {createPortal(
+                <AnimatePresence>
+                    {biometricModalOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4"
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-white rounded-2xl border border-platinum-tint shadow-lg w-full max-w-md p-6"
+                            >
+                                <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
+                                    <h3 className="text-base font-bold text-midnight-indigo">Nộp ảnh sinh trắc học FaceID</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setBiometricModalOpen(false)}
+                                        className="p-1 rounded-full text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                
+                                <BiometricUploadForm 
                                     compact 
-                                    onSuccess={handleAvatarUploadSuccess} 
-                                    onCancel={() => setAvatarModalOpen(false)} 
+                                    onSuccess={handleBiometricUploadSuccess} 
+                                    onCancel={() => setBiometricModalOpen(false)} 
                                 />
                             </motion.div>
                         </motion.div>

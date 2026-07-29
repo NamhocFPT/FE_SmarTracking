@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { getAvatarStatus } from '../../service/avatarService';
-import AvatarUploadForm from './AvatarUploadForm';
+import { getBiometricStatus } from '../../service/avatarService';
+import BiometricUploadForm from './BiometricUploadForm';
 
 const STATUS_LABEL = {
     not_uploaded: { label: 'Chưa nộp ảnh', badge: 'bg-amber-50 text-amber-700 border border-amber-200' },
@@ -10,9 +10,9 @@ const STATUS_LABEL = {
     approved: { label: 'Đã duyệt', badge: 'bg-green-50 text-green-700 border border-green-200' },
 };
 
-const AvatarReminderModal = () => {
+const BiometricReminderModal = () => {
     const [open, setOpen] = useState(false);
-    const [avatarData, setAvatarData] = useState(null);
+    const [biometricData, setBiometricData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -25,15 +25,15 @@ const AvatarReminderModal = () => {
                 const user = JSON.parse(userStr);
                 const userId = user.id || 'anon';
 
-                const dismissed = sessionStorage.getItem('avatarPopupDismissed_' + userId);
+                const dismissed = sessionStorage.getItem('biometricPopupDismissed_' + userId);
                 if (dismissed === 'true') { setLoading(false); return; }
 
-                const res = await getAvatarStatus();
+                const res = await getBiometricStatus();
                 if (cancelled) return;
                 if (res?.success && res.data) {
                     const data = res.data;
-                    setAvatarData(data);
-                    if (data.shouldShowAvatarPopup === true) {
+                    setBiometricData(data);
+                    if (data.shouldShowBiometricPopup === true) {
                         setOpen(true);
                     }
                 }
@@ -53,7 +53,7 @@ const AvatarReminderModal = () => {
             const userStr = localStorage.getItem('user');
             if (userStr) {
                 const user = JSON.parse(userStr);
-                sessionStorage.setItem('avatarPopupDismissed_' + (user.id || 'anon'), 'true');
+                sessionStorage.setItem('biometricPopupDismissed_' + (user.id || 'anon'), 'true');
             }
         } catch {}
         setOpen(false);
@@ -64,8 +64,8 @@ const AvatarReminderModal = () => {
             const userStr = localStorage.getItem('user');
             if (userStr) {
                 const user = JSON.parse(userStr);
-                user.avatarReviewStatus = 'pending_review';
-                user.shouldShowAvatarPopup = false;
+                user.biometricReviewStatus = 'pending_review';
+                user.shouldShowBiometricPopup = false;
                 localStorage.setItem('user', JSON.stringify(user));
                 window.dispatchEvent(new Event('storage'));
             }
@@ -75,12 +75,12 @@ const AvatarReminderModal = () => {
 
     if (!open || loading) return null;
 
-    const status = avatarData?.avatarReviewStatus || 'not_uploaded';
+    const status = biometricData?.biometricReviewStatus || 'not_uploaded';
     const statusInfo = STATUS_LABEL[status] || STATUS_LABEL.not_uploaded;
 
     const title = status === 'rejected'
-        ? 'Ảnh đại diện của bạn đã bị từ chối'
-        : 'Bạn chưa nộp ảnh đại diện';
+        ? 'Ảnh sinh trắc học FaceID của bạn đã bị từ chối'
+        : 'Bạn chưa nộp ảnh sinh trắc học FaceID';
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
@@ -106,15 +106,15 @@ const AvatarReminderModal = () => {
                 </div>
 
                 {/* Message from backend */}
-                {avatarData?.message && (
+                {biometricData?.message && (
                     <div className="px-6 pb-1">
-                        <p className="text-xs text-slate-blue leading-relaxed">{avatarData.message}</p>
+                        <p className="text-xs text-slate-blue leading-relaxed">{biometricData.message}</p>
                     </div>
                 )}
 
-                {/* Body: AvatarUploadForm */}
+                {/* Body: BiometricUploadForm */}
                 <div className="px-6 pb-5 pt-3">
-                    <AvatarUploadForm
+                    <BiometricUploadForm
                         compact
                         onSuccess={handleUploadSuccess}
                         onCancel={handleDismiss}
@@ -137,4 +137,4 @@ const AvatarReminderModal = () => {
     );
 };
 
-export default AvatarReminderModal;
+export default BiometricReminderModal;

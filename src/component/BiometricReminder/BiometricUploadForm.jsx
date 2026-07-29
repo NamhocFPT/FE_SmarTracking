@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { submitAvatar } from '../../service/avatarService';
+import { submitBiometric } from '../../service/avatarService';
 
 const ERROR_MAP = {
-    AVATAR_FILE_REQUIRED: 'Vui lòng chọn một ảnh để tải lên.',
-    AVATAR_FILE_TOO_LARGE: 'Ảnh vượt quá dung lượng cho phép (tối đa 5MB).',
-    AVATAR_FILE_TYPE_INVALID: 'Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, WEBP.',
-    AVATAR_CONSENT_REQUIRED: 'Bạn cần đồng ý cho phép sử dụng ảnh cho mục đích nhận diện khuôn mặt trước khi tiếp tục.',
+    BIOMETRIC_FILE_REQUIRED: 'Vui lòng chọn một ảnh để tải lên.',
+    BIOMETRIC_FILE_TOO_LARGE: 'Ảnh vượt quá dung lượng cho phép (tối đa 5MB).',
+    BIOMETRIC_FILE_TYPE_INVALID: 'Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, WEBP.',
+    BIOMETRIC_CONSENT_REQUIRED: 'Bạn cần đồng ý cho phép sử dụng ảnh cho mục đích nhận diện khuôn mặt trước khi tiếp tục.',
     ACCOUNT_NOT_ACTIVE: 'Tài khoản của bạn hiện không ở trạng thái hoạt động.',
-    AVATAR_ALREADY_PENDING_REVIEW: 'Ảnh đại diện của bạn đang chờ duyệt, vui lòng đợi kết quả trước khi nộp ảnh khác.',
-    AVATAR_STORAGE_FAILED: 'Không thể lưu ảnh vào hệ thống lưu trữ. Vui lòng thử lại.',
-    AVATAR_UPLOAD_FAILED: 'Có lỗi xảy ra khi xử lý ảnh. Vui lòng thử lại sau.',
+    BIOMETRIC_ALREADY_PENDING_REVIEW: 'Ảnh sinh trắc học của bạn đang chờ duyệt, vui lòng đợi kết quả trước khi nộp ảnh khác.',
+    BIOMETRIC_STORAGE_FAILED: 'Không thể lưu ảnh vào hệ thống lưu trữ. Vui lòng thử lại.',
+    BIOMETRIC_UPLOAD_FAILED: 'Có lỗi xảy ra khi xử lý ảnh. Vui lòng thử lại sau.',
 };
 
 const mapError = (code) => ERROR_MAP[code] || 'Đã xảy ra lỗi hệ thống. Vui lòng thử lại.';
@@ -56,7 +56,7 @@ const validateMagicBytes = (file) => {
     });
 };
 
-const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
+const BiometricUploadForm = ({ onSuccess, onCancel, compact }) => {
     const [file, setFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [consentAgreed, setConsentAgreed] = useState(false);
@@ -107,7 +107,7 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
         setSubmitting(true);
         setError(null);
         try {
-            const res = await submitAvatar(file, true);
+            const res = await submitBiometric(file, true);
             if (res?.success) {
                 onSuccess?.(res.data);
             } else {
@@ -124,7 +124,7 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
     return (
         <div className={compact ? 'space-y-4' : 'space-y-5'}>
             {!compact && (
-                <h3 className="text-base font-bold text-midnight-indigo">Tải lên ảnh đại diện</h3>
+                <h3 className="text-base font-bold text-midnight-indigo">Tải lên ảnh FaceID</h3>
             )}
 
             {/* File picker area */}
@@ -180,7 +180,7 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
                     disabled={submitting || !file || !consentAgreed}
                     className="flex-1 py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                    {submitting ? 'Đang gửi...' : 'Gửi ảnh'}
+                    {submitting ? 'Đang gửi...' : 'Gửi ảnh FaceID'}
                 </button>
                 {onCancel && (
                     <button
@@ -196,4 +196,4 @@ const AvatarUploadForm = ({ onSuccess, onCancel, compact }) => {
     );
 };
 
-export default AvatarUploadForm;
+export default BiometricUploadForm;

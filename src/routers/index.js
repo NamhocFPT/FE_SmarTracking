@@ -45,7 +45,7 @@ import ManagerHomePage from '../pages/manager/homePage';
 import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
-import AvatarSubmissionsReview from '../pages/manager/AvatarSubmissionsReview';
+import BiometricSubmissionsReview from '../pages/manager/BiometricSubmissionsReview';
 
 // Employee Layout + Pages
 import EmployeeLayout from '../pages/employee/layout/EmployeeLayout';
@@ -342,8 +342,8 @@ export const router = [
                 element: <Notifications />
             },
             {
-                path: 'avatar-submissions',
-                element: <AvatarSubmissionsReview />
+                path: 'biometric-submissions',
+                element: <BiometricSubmissionsReview />
             },
             {
                 path: 'my-vehicles',

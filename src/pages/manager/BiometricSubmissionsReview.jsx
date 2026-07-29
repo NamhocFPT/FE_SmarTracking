@@ -19,18 +19,18 @@ const STATUS_MAP = {
 };
 
 const ERROR_MAP = {
-    AVATAR_SUBMISSION_NOT_FOUND: "Không tìm thấy yêu cầu duyệt ảnh này.",
-    AVATAR_SUBMISSION_NOT_PENDING: "Yêu cầu này đã được xử lý trước đó.",
-    AVATAR_REJECTION_REASON_REQUIRED: "Vui lòng nhập lý do từ chối.",
-    AVATAR_REJECTION_REASON_TOO_LONG: "Lý do từ chối không được vượt quá 500 ký tự.",
-    AVATAR_MEDIA_NOT_FOUND: "Không tìm thấy ảnh gốc của yêu cầu này.",
-    AVATAR_DOWNLOAD_URL_FAILED: "Không thể tải ảnh lúc này. Vui lòng thử lại.",
-    AVATAR_APPROVE_FAILED: "Không thể duyệt ảnh này. Vui lòng thử lại.",
-    AVATAR_REJECT_FAILED: "Không thể từ chối ảnh này. Vui lòng thử lại.",
+    BIOMETRIC_SUBMISSION_NOT_FOUND: "Không tìm thấy yêu cầu duyệt ảnh sinh trắc học này.",
+    BIOMETRIC_SUBMISSION_NOT_PENDING: "Yêu cầu này đã được xử lý trước đó.",
+    BIOMETRIC_REJECTION_REASON_REQUIRED: "Vui lòng nhập lý do từ chối.",
+    BIOMETRIC_REJECTION_REASON_TOO_LONG: "Lý do từ chối không được vượt quá 500 ký tự.",
+    BIOMETRIC_MEDIA_NOT_FOUND: "Không tìm thấy ảnh gốc của yêu cầu này.",
+    BIOMETRIC_DOWNLOAD_URL_FAILED: "Không thể tải ảnh lúc này. Vui lòng thử lại.",
+    BIOMETRIC_APPROVE_FAILED: "Không thể duyệt ảnh này. Vui lòng thử lại.",
+    BIOMETRIC_REJECT_FAILED: "Không thể từ chối ảnh này. Vui lòng thử lại.",
     FORBIDDEN: "Bạn không có quyền thực hiện hành động này.",
 };
 
-const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete }) => {
+const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete }) => {
     const [detail, setDetail] = useState(null);
     const [downloadUrl, setDownloadUrl] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(true);
@@ -79,7 +79,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
     }, [faceProfileId]);
 
     const handleApprove = async () => {
-        if (!window.confirm("Bạn có chắc chắn muốn duyệt ảnh đại diện này?")) return;
+        if (!window.confirm("Bạn có chắc chắn muốn duyệt ảnh sinh trắc học này?")) return;
         setActionLoading(true);
         setActionError(null);
         try {
@@ -92,7 +92,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
             }
         } catch (err) {
             const code = err?.error?.code;
-            if (code === "AVATAR_SUBMISSION_NOT_PENDING") {
+            if (code === "BIOMETRIC_SUBMISSION_NOT_PENDING") {
                 setActionError("Yêu cầu này đã được xử lý bởi quản trị viên khác.");
                 setTimeout(() => { onActionComplete?.(); onClose(); }, 1500);
             } else {
@@ -117,7 +117,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
             }
         } catch (err) {
             const code = err?.error?.code;
-            if (code === "AVATAR_SUBMISSION_NOT_PENDING") {
+            if (code === "BIOMETRIC_SUBMISSION_NOT_PENDING") {
                 setActionError("Yêu cầu này đã được xử lý bởi quản trị viên khác.");
                 setTimeout(() => { onActionComplete?.(); onClose(); }, 1500);
             } else {
@@ -139,7 +139,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
             <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                 <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
-                    <h3 className="font-bold text-midnight-indigo">Chi tiết yêu cầu duyệt ảnh</h3>
+                    <h3 className="font-bold text-midnight-indigo">Chi tiết yêu cầu duyệt ảnh sinh trắc học</h3>
                     <button onClick={onClose} className="text-slate-blue hover:text-midnight-indigo">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -165,7 +165,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
                                         <div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"></div>
                                     </div>
                                 ) : downloadUrl ? (
-                                    <img src={downloadUrl} alt="Avatar submission" className="w-48 h-48 object-cover rounded-xl border border-platinum-tint" />
+                                    <img src={downloadUrl} alt="Biometric submission" className="w-48 h-48 object-cover rounded-xl border border-platinum-tint" />
                                 ) : (
                                     <div className="w-48 h-48 bg-cloud-mist rounded-xl flex items-center justify-center text-xs text-slate-blue">
                                         {detail.hasPreview ? "Không thể tải ảnh" : "Ảnh không khả dụng"}
@@ -303,7 +303,7 @@ const AvatarSubmissionDetailModal = ({ faceProfileId, onClose, onActionComplete 
     );
 };
 
-const AvatarSubmissionsReview = () => {
+const BiometricSubmissionsReview = () => {
     const [submissions, setSubmissions] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -395,8 +395,8 @@ const AvatarSubmissionsReview = () => {
     return (
         <div className="space-y-6 animate-fade-in-up">
             <div>
-                <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Duyệt ảnh đại diện</h1>
-                <p className="text-slate-blue text-sm mt-1">Xem xét và duyệt/từ chối ảnh đại diện do người dùng gửi lên.</p>
+                <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Duyệt ảnh sinh trắc học FaceID</h1>
+                <p className="text-slate-blue text-sm mt-1">Xem xét và duyệt/từ chối ảnh sinh trắc học do người dùng gửi lên.</p>
             </div>
 
             {successMessage && (
@@ -462,7 +462,7 @@ const AvatarSubmissionsReview = () => {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-cloud-mist border-b border-platinum-tint">
-                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-blue uppercase">Avatar</th>
+                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-blue uppercase">Gương mặt</th>
                                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-blue uppercase">Họ tên</th>
                                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-blue uppercase">Email</th>
                                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-blue uppercase">Mã NV</th>
@@ -547,7 +547,7 @@ const AvatarSubmissionsReview = () => {
 
             {/* Detail modal */}
             {selectedId && (
-                <AvatarSubmissionDetailModal
+                <BiometricSubmissionDetailModal
                     faceProfileId={selectedId}
                     onClose={() => setSelectedId(null)}
                     onActionComplete={handleActionComplete}
@@ -557,4 +557,4 @@ const AvatarSubmissionsReview = () => {
     );
 };
 
-export default AvatarSubmissionsReview;
+export default BiometricSubmissionsReview;
