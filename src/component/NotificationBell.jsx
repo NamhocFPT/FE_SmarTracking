@@ -25,12 +25,18 @@ const NotificationBell = ({ basePath }) => {
     const [feedItems, setFeedItems] = useState([]);
     const containerRef = useRef(null);
 
+    // EMPLOYEE không có permission security_alert.read (đúng thiết kế BE, xem Plan.md mục 1)
+    // — gọi /security-alerts ở role này chỉ gây 403 vô ích, nên bỏ qua hẳn lời gọi.
+    const canReadSecurityAlerts = basePath !== '/employee';
+
     const fetchFeed = useCallback(async () => {
         setLoading(true);
         try {
             const [notiRes, alertsRes] = await Promise.allSettled([
                 getNotifications({ page: 1, limit: 5 }),
-                getSecurityAlerts({ status: 'new', limit: 5 }),
+                canReadSecurityAlerts
+                    ? getSecurityAlerts({ status: 'new', limit: 5 })
+                    : Promise.resolve(null),
             ]);
 
             const notiItems = (notiRes.status === 'fulfilled' && notiRes.value?.success)
@@ -79,7 +85,7 @@ const NotificationBell = ({ basePath }) => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [canReadSecurityAlerts]);
 
     useEffect(() => {
         fetchFeed();

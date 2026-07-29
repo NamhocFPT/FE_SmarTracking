@@ -48,29 +48,34 @@ const EmployeeRecordings = () => {
             const fromStr = `${startDate || defaultFrom}T00:00:00+07:00`;
             const toStr = `${endDate || defaultTo}T23:59:59+07:00`;
 
+            // Gửi đúng hợp đồng /me/schedule
+            // - view: 'month' (bắt buộc)
+            // - status: ['completed', 'completed'] (phải là array để pass IsEnum({each:true}) tránh lỗi Express parsing)
             const scheduleParams = {
                 from: fromStr,
                 to: toStr,
-                view: 'list',
-                status: ['completed']
+                view: 'month',
+                status: ['completed', 'completed']
             };
             const scheduleRes = await getMySchedule(scheduleParams);
             
-            if (!scheduleRes?.success || !scheduleRes.data?.length) {
+            const meetings = scheduleRes.data?.items || scheduleRes.data || [];
+            if (!scheduleRes?.success || !meetings.length) {
                 setRecordings([]);
                 return;
             }
 
             // Bước 2: Lấy media-files cho từng meeting
-            const meetings = scheduleRes.data;
             const mediaPromises = meetings.map(async (meeting) => {
+                const actualMeetingId = meeting.meetingId || meeting.id;
+                if (!actualMeetingId) return null;
                 try {
-                    const mediaRes = await getMeetingMediaFiles(meeting.id);
+                    const mediaRes = await getMeetingMediaFiles(actualMeetingId);
                     if (mediaRes?.success && mediaRes.data?.length > 0) {
                         return {
-                            meetingId: meeting.id,
+                            meetingId: actualMeetingId,
                             meetingTitle: meeting.title || meeting.subject || 'Cuộc họp không có tiêu đề',
-                            roomName: meeting.roomName || meeting.room?.name || '—',
+                            roomName: meeting.room?.roomName || meeting.roomName || meeting.room?.name || '—',
                             hostName: meeting.organizerName || meeting.organizer?.fullName || '—',
                             startTime: meeting.startTime || meeting.scheduledStart,
                             durationMinutes: meeting.durationMinutes || null,
