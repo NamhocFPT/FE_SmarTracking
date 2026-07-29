@@ -184,9 +184,9 @@ const RoomAccessLogs = () => {
                             className="w-full pl-9 pr-4 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue bg-cloud-mist/10 text-midnight-indigo font-semibold appearance-none"
                         >
                             <option value="">-- Chọn phòng họp --</option>
-                            {rooms.map(room => (
-                                <option key={room.id} value={room.id}>
-                                    {room.roomName} {room.siteName ? `(${room.siteName})` : ''}
+                            {rooms.map((room, idx) => (
+                                <option key={room.id || idx} value={room.id}>
+                                    {room.roomName || room.room_name} {(room.siteName || room.site_name) ? `(${room.siteName || room.site_name})` : ''}
                                 </option>
                             ))}
                         </select>
