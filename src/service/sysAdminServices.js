@@ -496,10 +496,7 @@ export const deletePersonControl = async (id) => {
 // B-M4: VEHICLE CONTROL LIST & REGISTRATIONS (ANPR)
 // ============================================================
 
-export const getVehicleControlList = async (params = {}) => {
-    const query = buildQuery(params);
-    return await get(`/anpr/admin/control-list${query}`);
-};
+export { getVehicleControlList } from './anprService';
 
 export const getVehicleControlDetail = async (id) => {
     return await get(`/anpr/admin/control-list/${id}`);
