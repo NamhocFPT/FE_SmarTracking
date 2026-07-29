@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAdminGateAccessLogs, getAdminGateAccessHistory, getAdminVehicleTrafficStats, getAdminGateAccessHistoryDetail } from '../../service/sysAdminServices';
-import { Search, Filter, Shield, Clock, Camera, Car, Calendar, BarChart2, List, Activity, User, Maximize2, X, RefreshCw } from 'lucide-react';
+import { Filter, Shield, BarChart2, List, Activity, User, X, RefreshCw } from 'lucide-react';
 
 export default function GateAccessManagement() {
     const [activeTab, setActiveTab] = useState('logs'); // 'logs', 'sessions', 'stats'
@@ -13,47 +13,50 @@ export default function GateAccessManagement() {
 
     // Logs State
     const [logs, setLogs] = useState([]);
+    const [logsPage, setLogsPage] = useState(1);
 
     // Sessions State
     const [sessions, setSessions] = useState([]);
-    const [selectedSession, setSelectedSession] = useState(null);
+    const [sessionsPage, setSessionsPage] = useState(1);
     const [sessionDetail, setSessionDetail] = useState(null);
     const [showSessionModal, setShowSessionModal] = useState(false);
 
     // Stats State
     const [stats, setStats] = useState(null);
 
-    useEffect(() => {
-        if (activeTab === 'logs') fetchLogs();
-        if (activeTab === 'sessions') fetchSessions();
-        if (activeTab === 'stats') fetchStats();
-    }, [activeTab]);
+    const itemsPerPage = 10;
 
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
             const res = await getAdminGateAccessLogs({ from: fromDate + 'T00:00:00Z', to: toDate + 'T23:59:59Z', limit: 50 });
-            if (res?.success) setLogs(res.data);
+            if (res?.success) {
+                setLogs(res.data || []);
+                setLogsPage(1);
+            }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fromDate, toDate]);
 
-    const fetchSessions = async () => {
+    const fetchSessions = useCallback(async () => {
         setLoading(true);
         try {
             const res = await getAdminGateAccessHistory({ from: fromDate + 'T00:00:00Z', to: toDate + 'T23:59:59Z', limit: 50 });
-            if (res?.success) setSessions(res.data);
+            if (res?.success) {
+                setSessions(res.data || []);
+                setSessionsPage(1);
+            }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fromDate, toDate]);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         setLoading(true);
         try {
             const res = await getAdminVehicleTrafficStats({ from: fromDate + 'T00:00:00Z', to: toDate + 'T23:59:59Z', group_by: 'day' });
@@ -63,11 +66,17 @@ export default function GateAccessManagement() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [fromDate, toDate]);
+
+    useEffect(() => {
+        if (activeTab === 'logs') fetchLogs();
+        if (activeTab === 'sessions') fetchSessions();
+        if (activeTab === 'stats') fetchStats();
+    }, [activeTab, fetchLogs, fetchSessions, fetchStats]);
 
     const handleViewSession = async (session) => {
-        setSelectedSession(session);
         setShowSessionModal(true);
+        setSessionDetail(null);
         try {
             const res = await getAdminGateAccessHistoryDetail(session.id);
             if (res?.success) setSessionDetail(res.data);
@@ -87,6 +96,18 @@ export default function GateAccessManagement() {
         const s = seconds % 60;
         return `${m}p ${s}s`;
     };
+
+    // Paginate helper variables for Logs
+    const logsIndexOfLast = logsPage * itemsPerPage;
+    const logsIndexOfFirst = logsIndexOfLast - itemsPerPage;
+    const currentLogs = logs.slice(logsIndexOfFirst, logsIndexOfLast);
+    const logsTotalPages = Math.ceil(logs.length / itemsPerPage);
+
+    // Paginate helper variables for Sessions
+    const sessionsIndexOfLast = sessionsPage * itemsPerPage;
+    const sessionsIndexOfFirst = sessionsIndexOfLast - itemsPerPage;
+    const currentSessions = sessions.slice(sessionsIndexOfFirst, sessionsIndexOfLast);
+    const sessionsTotalPages = Math.ceil(sessions.length / itemsPerPage);
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -159,11 +180,11 @@ export default function GateAccessManagement() {
                     transition={{ duration: 0.2 }}
                 >
                     {activeTab === 'logs' && (
-                        <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
+                        <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden p-5 space-y-4">
+                            <div className="overflow-x-auto border border-outline-gray rounded-xl">
+                                <table className="w-full text-left border-collapse text-xs">
                                     <thead>
-                                        <tr className="bg-cloud-mist/50 text-[10px] font-bold text-slate-blue uppercase tracking-wider">
+                                        <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold">
                                             <th className="px-4 py-3 border-b border-platinum-tint">Thời gian</th>
                                             <th className="px-4 py-3 border-b border-platinum-tint">Khu vực</th>
                                             <th className="px-4 py-3 border-b border-platinum-tint">Hướng</th>
@@ -172,7 +193,7 @@ export default function GateAccessManagement() {
                                         </tr>
                                     </thead>
                                     <tbody className="text-xs">
-                                        {logs.length > 0 ? logs.map(log => (
+                                        {currentLogs.length > 0 ? currentLogs.map(log => (
                                             <tr key={log.id} className="hover:bg-cloud-mist/30 border-b border-platinum-tint/50 last:border-0">
                                                 <td className="px-4 py-3 font-medium text-midnight-indigo">{formatDateTime(log.access_time)}</td>
                                                 <td className="px-4 py-3">{log.zone_name || '-'}</td>
@@ -190,45 +211,123 @@ export default function GateAccessManagement() {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pagination logs */}
+                            {!loading && logsTotalPages > 1 && (
+                                <div className="flex justify-between items-center pt-4">
+                                    <span className="text-[11px] text-slate-blue">
+                                        Hiển thị {logsIndexOfFirst + 1} - {Math.min(logsIndexOfLast, logs.length)} trong tổng số {logs.length} lượt nhật ký
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={() => setLogsPage(prev => Math.max(1, prev - 1))}
+                                            disabled={logsPage === 1}
+                                            className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                        >
+                                            Trước
+                                        </button>
+                                        {[...Array(logsTotalPages)].map((_, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => setLogsPage(i + 1)}
+                                                className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${
+                                                    logsPage === i + 1 
+                                                        ? 'bg-action-blue text-white border-action-blue' 
+                                                        : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
+                                                }`}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={() => setLogsPage(prev => Math.min(logsTotalPages, prev + 1))}
+                                            disabled={logsPage === logsTotalPages}
+                                            className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                        >
+                                            Sau
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {activeTab === 'sessions' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {sessions.length > 0 ? sessions.map(session => (
-                                <div key={session.id} className="bg-white rounded-2xl border border-platinum-tint shadow-sm p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h3 className="font-bold text-midnight-indigo font-mono text-sm">{session.plate_number || 'Chưa nhận diện'}</h3>
-                                            <p className="text-[10px] font-medium text-slate-blue mt-0.5">{session.zone_name}</p>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {currentSessions.length > 0 ? currentSessions.map(session => (
+                                    <div key={session.id} className="bg-white rounded-2xl border border-platinum-tint shadow-sm p-4 hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h3 className="font-bold text-midnight-indigo font-mono text-sm">{session.plate_number || 'Chưa nhận diện'}</h3>
+                                                <p className="text-[10px] font-medium text-slate-blue mt-0.5">{session.zone_name}</p>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${session.session_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {session.session_status === 'completed' ? 'Đã hoàn thành' : 'Đang trong bãi'}
+                                            </span>
                                         </div>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${session.session_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                            {session.session_status === 'completed' ? 'Đã hoàn thành' : 'Đang trong bãi'}
-                                        </span>
+                                        <div className="space-y-2 text-xs mb-4">
+                                            <div className="flex justify-between border-b border-platinum-tint/30 pb-1">
+                                                <span className="text-slate-blue">Vào:</span>
+                                                <span className="font-medium">{formatDateTime(session.check_in_time)}</span>
+                                            </div>
+                                            <div className="flex justify-between border-b border-platinum-tint/30 pb-1">
+                                                <span className="text-slate-blue">Ra:</span>
+                                                <span className="font-medium">{formatDateTime(session.check_out_time)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-slate-blue">Lưu bãi:</span>
+                                                <span className="font-bold text-action-blue">{formatDuration(session.duration_seconds)}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleViewSession(session)}
+                                            className="w-full py-2 bg-cloud-mist hover:bg-platinum-tint text-midnight-indigo rounded-xl text-xs font-bold transition-colors"
+                                        >
+                                            Xem chi tiết
+                                        </button>
                                     </div>
-                                    <div className="space-y-2 text-xs mb-4">
-                                        <div className="flex justify-between border-b border-platinum-tint/30 pb-1">
-                                            <span className="text-slate-blue">Vào:</span>
-                                            <span className="font-medium">{formatDateTime(session.check_in_time)}</span>
-                                        </div>
-                                        <div className="flex justify-between border-b border-platinum-tint/30 pb-1">
-                                            <span className="text-slate-blue">Ra:</span>
-                                            <span className="font-medium">{formatDateTime(session.check_out_time)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-blue">Lưu bãi:</span>
-                                            <span className="font-bold text-action-blue">{formatDuration(session.duration_seconds)}</span>
-                                        </div>
+                                )) : (
+                                    <div className="col-span-full py-12 text-center text-slate-blue bg-white rounded-2xl border border-platinum-tint">Không có phiên ghép cặp nào</div>
+                                )}
+                            </div>
+
+                            {/* Pagination sessions */}
+                            {!loading && sessionsTotalPages > 1 && (
+                                <div className="bg-white p-4 rounded-2xl border border-platinum-tint shadow-sm flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-blue">
+                                        Hiển thị {sessionsIndexOfFirst + 1} - {Math.min(sessionsIndexOfLast, sessions.length)} trong tổng số {sessions.length} phiên ghép cặp
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={() => setSessionsPage(prev => Math.max(1, prev - 1))}
+                                            disabled={sessionsPage === 1}
+                                            className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                        >
+                                            Trước
+                                        </button>
+                                        {[...Array(sessionsTotalPages)].map((_, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => setSessionsPage(i + 1)}
+                                                className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${
+                                                    sessionsPage === i + 1 
+                                                        ? 'bg-action-blue text-white border-action-blue' 
+                                                        : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
+                                                }`}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={() => setSessionsPage(prev => Math.min(sessionsTotalPages, prev + 1))}
+                                            disabled={sessionsPage === sessionsTotalPages}
+                                            className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                        >
+                                            Sau
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => handleViewSession(session)}
-                                        className="w-full py-2 bg-cloud-mist hover:bg-platinum-tint text-midnight-indigo rounded-xl text-xs font-bold transition-colors"
-                                    >
-                                        Xem chi tiết
-                                    </button>
                                 </div>
-                            )) : (
-                                <div className="col-span-full py-12 text-center text-slate-blue bg-white rounded-2xl border border-platinum-tint">Không có phiên ghép cặp nào</div>
                             )}
                         </div>
                     )}
@@ -372,7 +471,7 @@ export default function GateAccessManagement() {
     );
 }
 
-// Icon helper components missing above
+// Icon helper components
 const ArrowRight = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
 );
