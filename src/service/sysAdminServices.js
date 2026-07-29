@@ -387,7 +387,7 @@ export const markAllNotificationsRead = async () => {
  */
 export const getAdminGateAccessLogs = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/gate-access-logs${query}`); // Based on B-P1.2, it's GET /admin/gate-access-logs but FE spec usually puts admin prefix if BE has it. Wait, the spec says `GET /api/v1/admin/gate-access-logs`.
+    return await get(`/admin/gate-access-logs${query}`);
 };
 
 /**
