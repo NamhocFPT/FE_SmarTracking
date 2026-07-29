@@ -66,6 +66,10 @@ const navigationItems = [
                 to: '/system-admin/rooms',
             },
             {
+                label: 'Nhật ký ra/vào phòng',
+                to: '/system-admin/room-access-logs',
+            },
+            {
                 label: 'Hệ thống ANPR',
                 to: '/system-admin/anpr-management',
             },

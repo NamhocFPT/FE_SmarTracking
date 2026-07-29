@@ -567,3 +567,8 @@ export const getEarlyVacancyConfig = async () => {
 export const updateEarlyVacancyConfig = async (data) => {
     return await request('/early-vacancy-config', { method: 'PUT', body: data });
 };
+
+// UC-IVSS-02 — Nhật ký ra/vào phòng họp
+export const getRoomAccessLog = async (roomId, date) => {
+    return await get(`/ivss/rooms/${roomId}/access-log${date ? `?date=${date}` : ''}`);
+};

@@ -29,6 +29,7 @@ import PersonControlList from '../pages/systemAdmin/PersonControlList';
 import VehicleControlList from '../pages/systemAdmin/VehicleControlList';
 import VehicleRegistrations from '../pages/systemAdmin/VehicleRegistrations';
 import RoomOperations from '../pages/systemAdmin/RoomOperations';
+import RoomAccessLogs from '../pages/systemAdmin/RoomAccessLogs';
 // BusinessAdmin Layout + Pages
 import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLayout';
 import BusinessDashboard from '../pages/bussinessAdmin/dashBoard';
@@ -165,6 +166,10 @@ export const router = [
                 element: <RoomOperations />
             },
             {
+                path: 'room-access-logs',
+                element: <RoomAccessLogs />
+            },
+            {
                 path: 'gate-access',
                 element: <GateAccessManagement />
             },
@@ -247,6 +252,22 @@ export const router = [
             {
                 path: 'anpr-management',
                 element: <ANPRManagement />
+            },
+            {
+                path: 'zones',
+                element: <ZoneManagement />
+            },
+            {
+                path: 'gate-access',
+                element: <GateAccessManagement />
+            },
+            {
+                path: 'person-control-list',
+                element: <PersonControlList />
+            },
+            {
+                path: 'vehicle-control-list',
+                element: <VehicleControlList />
             },
             {
                 path: 'book',
