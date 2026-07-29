@@ -5,6 +5,7 @@ import logo from '../../../assets/images/logo.png';
 import BiometricReminderModal from '../../../component/BiometricReminder/BiometricReminderModal';
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
+import NotificationBell from '../../../component/NotificationBell';
 
 /**
  * Navigation items cho BusinessAdmin role
@@ -39,6 +40,7 @@ const navigationItems = [
             { label: 'Ghi hình', to: '/business-admin/recordings' },
             { label: 'Khu vực giám sát', to: '/business-admin/zones' },
             { label: 'Kiểm soát cổng', to: '/business-admin/gate-access' },
+            { label: 'Hành trình khuôn viên', to: '/business-admin/user-journey' },
             { label: 'Kiểm soát phương tiện', to: '/business-admin/anpr-management' },
             { label: 'Danh sách biển số kiểm soát', to: '/business-admin/vehicle-control-list' },
             { label: 'Danh sách giám sát người', to: '/business-admin/person-control-list' },
@@ -214,18 +216,7 @@ const BusinessAdminLayout = () => {
                     {/* Right: Notification + Profile */}
                     <div className="flex items-center gap-4">
                         {/* Notification bell */}
-                        <button
-                            type="button"
-                            aria-label="Notifications"
-                            onClick={() => navigate('/business-admin/notifications')}
-                            className="relative p-2 rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors duration-200"
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" aria-hidden="true" />
-                        </button>
+                        <NotificationBell basePath="/business-admin" />
 
                         {/* Divider */}
                         <div className="w-px h-6 bg-platinum-tint" aria-hidden="true" />
