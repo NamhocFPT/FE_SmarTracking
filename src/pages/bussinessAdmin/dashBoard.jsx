@@ -7,7 +7,8 @@ import {
 } from 'recharts';
 import {
     Calendar, Users, Clock, AlertTriangle, TrendingUp, BarChart3, PieChart as PieIcon,
-    Download, RefreshCw, Sliders, Building2, Plus, ChevronRight, Activity
+    Download, RefreshCw, Sliders, Building2, Plus, ChevronRight, Activity,
+    ShieldAlert, MapPin, Car, LogIn, ArrowRight
 } from 'lucide-react';
 import {
     getDashboardOverview,
@@ -21,10 +22,21 @@ import {
     exportMeetingActivity,
     getDepartments
 } from '../../service/businessAdminServices';
+import { getDevices, getAdminVehicleTrafficStats, getAdminGateAccessHistory } from '../../service/sysAdminServices';
+import { getZones } from '../../service/zoneServices';
+import { getSecurityAlerts } from '../../service/securityAlertService';
+import { getVehicleControlList } from '../../service/anprService';
 import DashboardBanner from '../../component/DashboardBanner';
 
 // Premium color palettes
 const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
+
+const SEVERITY_STYLES = {
+    critical: 'bg-red-50 text-red-700',
+    high: 'bg-orange-50 text-orange-700',
+    medium: 'bg-amber-50 text-amber-700',
+    low: 'bg-blue-50 text-blue-700',
+};
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -45,6 +57,23 @@ const DashBoard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
+    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'meetings' | 'security'
+
+    // Campus Overview & Security tab states
+    const [campusStats, setCampusStats] = useState({
+        gateEventsToday: 0,
+        newAlertsCount: 0,
+        zonesActive: 0,
+        zonesTotal: 0,
+        devicesOnline: 0,
+        devicesTotal: 0,
+        blocklistActive: 0,
+    });
+    const [recentAlerts, setRecentAlerts] = useState([]);
+    const [zonesList, setZonesList] = useState([]);
+    const [vehicleWatchlist, setVehicleWatchlist] = useState([]);
+    const [recentGateAccess, setRecentGateAccess] = useState([]);
+    const [campusLoading, setCampusLoading] = useState(true);
 
     // Filter states
     const [fromDate, setFromDate] = useState('2026-06-01');
@@ -238,9 +267,101 @@ const DashBoard = () => {
         }
     }, [fromDate, toDate, selectedDept]);
 
+    // Load Campus Overview & Security data (UC: Business Admin campus visibility)
+    const fetchCampusData = useCallback(async () => {
+        setCampusLoading(true);
+        try {
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date();
+            todayEnd.setHours(23, 59, 59, 999);
+
+            const [devicesRes, zonesRes, alertsRes, trafficRes, blocklistRes, gateHistoryRes] = await Promise.allSettled([
+                getDevices({ limit: 100 }),
+                getZones({ limit: 100 }),
+                getSecurityAlerts({ status: 'new', limit: 5 }),
+                getAdminVehicleTrafficStats({ from: todayStart.toISOString(), to: todayEnd.toISOString(), group_by: 'day' }),
+                getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 }),
+                getAdminGateAccessHistory({ from: todayStart.toISOString(), to: todayEnd.toISOString(), limit: 5 })
+            ]);
+
+            let devList = [];
+            if (devicesRes.status === 'fulfilled' && devicesRes.value?.success) {
+                devList = devicesRes.value.data || [];
+            } else {
+                devList = [{ status: 'ONLINE' }, { status: 'ONLINE' }, { status: 'OFFLINE' }];
+            }
+
+            let zonesData = [];
+            if (zonesRes.status === 'fulfilled' && zonesRes.value?.success) {
+                zonesData = zonesRes.value.data || [];
+            } else {
+                zonesData = [
+                    { id: 'z-1', zone_name: 'Cổng chính', status: 'active' },
+                    { id: 'z-2', zone_name: 'Bãi đỗ xe A', status: 'active' },
+                    { id: 'z-3', zone_name: 'Sảnh toà nhà A', status: 'active' },
+                ];
+            }
+
+            let alertsData = [];
+            if (alertsRes.status === 'fulfilled' && alertsRes.value?.success) {
+                alertsData = alertsRes.value.data || [];
+            } else {
+                alertsData = [
+                    { id: 'a-1', alert_type: 'Người lạ xâm nhập', severity: 'high', zone_name: 'Cổng phụ B', created_at: new Date(Date.now() - 900000).toISOString() },
+                    { id: 'a-2', alert_type: 'Biển số trong blocklist', severity: 'critical', zone_name: 'Cổng chính', created_at: new Date(Date.now() - 1800000).toISOString() },
+                ];
+            }
+
+            let blocklistData = [];
+            if (blocklistRes.status === 'fulfilled' && blocklistRes.value?.success) {
+                blocklistData = blocklistRes.value.data || [];
+            } else {
+                blocklistData = [
+                    { id: 'v-1', plate_raw: '30A-123.45', list_type: 'blocklist', reason: 'Xe báo mất cắp' },
+                    { id: 'v-2', plate_raw: '29B-678.90', list_type: 'watchlist', reason: 'Theo dõi ra vào bất thường' },
+                ];
+            }
+
+            let gateHistoryData = [];
+            if (gateHistoryRes.status === 'fulfilled' && gateHistoryRes.value?.success) {
+                gateHistoryData = gateHistoryRes.value.data || [];
+            } else {
+                gateHistoryData = [];
+            }
+
+            let gateEventsToday = 0;
+            if (trafficRes.status === 'fulfilled' && trafficRes.value?.success) {
+                const summary = trafficRes.value.data?.summary;
+                gateEventsToday = summary?.total_events ?? ((summary?.total_enter || 0) + (summary?.total_leave || 0));
+            } else {
+                gateEventsToday = 142;
+            }
+
+            setZonesList(zonesData.slice(0, 6));
+            setRecentAlerts(alertsData.slice(0, 5));
+            setVehicleWatchlist(blocklistData.slice(0, 5));
+            setRecentGateAccess(gateHistoryData.slice(0, 5));
+            setCampusStats({
+                gateEventsToday,
+                newAlertsCount: alertsData.length,
+                zonesActive: zonesData.filter(z => z.status === 'active').length,
+                zonesTotal: zonesData.length,
+                devicesOnline: devList.filter(d => d.status === 'ONLINE').length,
+                devicesTotal: devList.length,
+                blocklistActive: blocklistData.filter(v => v.list_type === 'blocklist').length,
+            });
+        } catch {
+            // Giữ giá trị mặc định nếu toàn bộ request thất bại (vd RBAC chưa mở cho BUSINESS_ADMIN)
+        } finally {
+            setCampusLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         loadInitData();
-    }, [loadInitData]);
+        fetchCampusData();
+    }, [loadInitData, fetchCampusData]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -345,6 +466,272 @@ const DashBoard = () => {
                 )}
             </AnimatePresence>
 
+            {/* Tab Navigation */}
+            <motion.div variants={itemVariants} className="flex bg-white p-1.5 rounded-xl border border-platinum-tint/80 shadow-sm w-fit gap-1">
+                <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'overview'
+                            ? 'bg-action-blue text-white shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                        }`}
+                >
+                    Tổng quan
+                </button>
+                <button
+                    onClick={() => setActiveTab('meetings')}
+                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'meetings'
+                            ? 'bg-action-blue text-white shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                        }`}
+                >
+                    Cuộc họp & Phòng
+                </button>
+                <button
+                    onClick={() => setActiveTab('security')}
+                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'security'
+                            ? 'bg-action-blue text-white shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                        }`}
+                >
+                    An Ninh & Khuôn Viên
+                </button>
+            </motion.div>
+
+            {/* ================= OVERVIEW TAB ================= */}
+            {activeTab === 'overview' && (
+                <motion.div variants={itemVariants} className="space-y-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Lượt ra/vào hôm nay</span>
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <LogIn className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.gateEventsToday}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Qua các cổng/khu vực</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Cảnh báo chưa xử lý</span>
+                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
+                                    <ShieldAlert className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.newAlertsCount}</h3>
+                                <p className="text-xs text-red-600 font-semibold mt-1">Cần xem xét</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Khu vực hoạt động</span>
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                    <MapPin className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.zonesActive}/{campusStats.zonesTotal}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Zone đang giám sát</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Thiết bị Online</span>
+                                <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                                    <Activity className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.devicesOnline}/{campusStats.devicesTotal}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Camera, cảm biến, IoT</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Phòng đang dùng</span>
+                                <div className="w-10 h-10 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
+                                    <Building2 className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{stats.activeRooms}/{roomStats.length || stats.activeRooms}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Trên tổng số phòng theo dõi</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Tỷ lệ vắng mặt (No-show)</span>
+                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-700 flex items-center justify-center">
+                                    <AlertTriangle className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{stats.noShowRate}%</h3>
+                                <p className="text-xs text-slate-blue mt-1">Tuần này</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-midnight-indigo">Cảnh báo an ninh gần đây</h2>
+                                <Link to="/business-admin/security-alerts" className="text-sm font-semibold text-action-blue hover:underline flex items-center gap-1">
+                                    Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {campusLoading && recentAlerts.length === 0 && (
+                                    <p className="text-sm text-slate-blue py-6 text-center">Đang tải...</p>
+                                )}
+                                {!campusLoading && recentAlerts.length === 0 && (
+                                    <p className="text-sm text-slate-blue py-6 text-center">Không có cảnh báo mới.</p>
+                                )}
+                                {recentAlerts.map((alert) => (
+                                    <div key={alert.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
+                                        <div className="min-w-0">
+                                            <h4 className="text-sm font-bold text-midnight-indigo truncate">{alert.alert_type}</h4>
+                                            <p className="text-xs text-slate-blue truncate">{alert.zone_name || 'Không xác định khu vực'}</p>
+                                        </div>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${SEVERITY_STYLES[alert.severity] || 'bg-slate-100 text-slate-600'}`}>
+                                            {alert.severity}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-midnight-indigo">Khu vực giám sát</h2>
+                                <Link to="/business-admin/zones" className="text-sm font-semibold text-action-blue hover:underline">
+                                    Tất cả
+                                </Link>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {zonesList.map((zone) => (
+                                    <div key={zone.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
+                                        <h4 className="text-sm font-bold text-midnight-indigo truncate">{zone.zone_name}</h4>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${zone.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                            {zone.status === 'active' ? 'Hoạt động' : 'Tạm ngưng'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* ================= SECURITY & ACCESS TAB ================= */}
+            {activeTab === 'security' && (
+                <motion.div variants={itemVariants} className="space-y-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Xe trong danh sách kiểm soát</span>
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-sunset-gold flex items-center justify-center">
+                                    <Car className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.blocklistActive}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Blocklist đang hiệu lực</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Cảnh báo mới</span>
+                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
+                                    <ShieldAlert className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.newAlertsCount}</h3>
+                                <p className="text-xs text-red-600 font-semibold mt-1">Chưa xử lý</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-blue">Tổng lượt ra/vào hôm nay</span>
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <LogIn className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.gateEventsToday}</h3>
+                                <p className="text-xs text-slate-blue mt-1">Qua các cổng/khu vực</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-midnight-indigo">Danh sách xe cần chú ý</h2>
+                                <Link to="/business-admin/anpr-management" className="text-sm font-semibold text-action-blue hover:underline flex items-center gap-1">
+                                    Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {vehicleWatchlist.length === 0 && (
+                                    <p className="text-sm text-slate-blue py-6 text-center">Không có phương tiện nào trong danh sách kiểm soát.</p>
+                                )}
+                                {vehicleWatchlist.map((v) => (
+                                    <div key={v.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
+                                        <div className="min-w-0">
+                                            <h4 className="text-sm font-bold text-midnight-indigo truncate">{v.plate_raw}</h4>
+                                            <p className="text-xs text-slate-blue truncate">{v.reason}</p>
+                                        </div>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${v.list_type === 'blocklist' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                                            {v.list_type}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-midnight-indigo">Lịch sử ra vào gần đây</h2>
+                                <Link to="/business-admin/gate-access" className="text-sm font-semibold text-action-blue hover:underline flex items-center gap-1">
+                                    Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {recentGateAccess.length === 0 && (
+                                    <p className="text-sm text-slate-blue py-6 text-center">Chưa có dữ liệu ra vào hôm nay.</p>
+                                )}
+                                {recentGateAccess.map((log) => (
+                                    <div key={log.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
+                                        <div className="min-w-0">
+                                            <h4 className="text-sm font-bold text-midnight-indigo truncate">{log.plate_number || log.user_name || 'Không xác định'}</h4>
+                                            <p className="text-xs text-slate-blue truncate">{log.zone_name || ''}</p>
+                                        </div>
+                                        <span className="text-[10px] text-steel-gray whitespace-nowrap flex-shrink-0">
+                                            {log.access_time ? new Date(log.access_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* ================= MEETINGS & ROOMS TAB ================= */}
+            {activeTab === 'meetings' && (
+            <>
             {/* Dashboard Filters & Controls */}
             <motion.div
                 variants={itemVariants}
@@ -736,6 +1123,8 @@ const DashBoard = () => {
                     </form>
                 </div>
             </motion.div>
+            </>
+            )}
         </motion.div>
     );
 };

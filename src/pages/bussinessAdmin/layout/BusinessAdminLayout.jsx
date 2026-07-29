@@ -33,12 +33,16 @@ const navigationItems = [
     },
 
     {
-        label: 'AI Camera',
+        label: 'An Ninh & Khuôn Viên',
         isDropdown: true,
         children: [
             { label: 'Ghi hình', to: '/business-admin/recordings' },
+            { label: 'Khu vực giám sát', to: '/business-admin/zones' },
+            { label: 'Kiểm soát cổng', to: '/business-admin/gate-access' },
             { label: 'Kiểm soát phương tiện', to: '/business-admin/anpr-management' },
-            { label: 'Cảnh báo AI', to: '/business-admin/security-alerts' },
+            { label: 'Danh sách biển số kiểm soát', to: '/business-admin/vehicle-control-list' },
+            { label: 'Danh sách giám sát người', to: '/business-admin/person-control-list' },
+            { label: 'Cảnh báo an ninh', to: '/business-admin/security-alerts' },
         ],
     },
 

@@ -53,12 +53,12 @@ const socialButtons = [
 
 const featureCards = [
     {
-        id: "support",
+        id: "security",
         iconSrc: icon3,
-        iconAlt: "Phản hồi 24/7",
+        iconAlt: "Giám sát 24/7",
         iconClassName: "relative w-5 h-4 flex-shrink-0",
-        label: "Phản hồi 24/7",
-        title: "Phản hồi 24/7",
+        label: "Giám sát 24/7",
+        title: "Giám sát 24/7",
         wrapperClassName:
             "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
         cardClassName:
@@ -68,12 +68,12 @@ const featureCards = [
             "[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words",
     },
     {
-        id: "accuracy",
+        id: "recognition",
         iconSrc: icon4,
-        iconAlt: "Dữ liệu chính xác",
+        iconAlt: "Nhận diện thông minh",
         iconClassName: "relative w-[18px] h-[18px] flex-shrink-0",
-        label: "Dữ liệu chính xác",
-        title: "Dữ liệu chính xác",
+        label: "Nhận diện thông minh",
+        title: "Nhận diện thông minh",
         wrapperClassName:
             "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
         cardClassName:
@@ -83,12 +83,12 @@ const featureCards = [
             "[font-family:'Inter-Regular',Helvetica] font-normal text-[#414754] text-[12px] md:text-[13px] tracking-[0] leading-[1.3] text-left block break-words",
     },
     {
-        id: "saving",
+        id: "comprehensive",
         iconSrc: icon5,
-        iconAlt: "Tiết kiệm năng lượng",
+        iconAlt: "Quản lý toàn diện",
         iconClassName: "relative w-[17px] h-[16.99px] flex-shrink-0",
-        label: "Tiết kiệm năng lượng",
-        title: "Tiết kiệm năng lượng",
+        label: "Quản lý toàn diện",
+        title: "Quản lý toàn diện",
         wrapperClassName:
             "relative w-full h-[73px] flex items-center gap-2.5 p-3 bg-white rounded-xl border border-solid border-[#dbe4ed4c] shadow-[0px_10px_30px_#0000000d]",
         cardClassName:
@@ -483,21 +483,21 @@ const Login = () => {
                     <div className="flex flex-col w-[calc(100%_-_48px)] items-start gap-[22.8px] absolute top-0 left-12">
                         <div className="inline-flex items-center px-4 py-2 relative flex-[0_0_auto] bg-[#e6eff8] rounded-full">
                             <div className="relative flex items-center w-fit mt-[-1.00px] [font-family:'Inter-Bold',Helvetica] font-bold text-[#0059bb] text-xs tracking-[1.20px] leading-3 whitespace-nowrap">
-                                REAL-TIME PRESENCE TRACKING
+                                CAMPUS TRACKING PLATFORM
                             </div>
                         </div>
                         <div className="max-w-[500px] w-[500px] h-[121px] pt-[1.2px] pb-0 px-0 flex flex-col items-start relative">
                             <h2 className="relative self-stretch h-[120px] mt-[-1.00px] [font-family:'Plus_Jakarta_Sans-Bold',Helvetica] font-bold text-[#0059bb] text-5xl tracking-[-0.96px] leading-[60px]">
-                                Giám sát phòng họp
+                                Giám sát khuôn viên
                                 <br />
-                                thông minh
+                                toàn diện, thông minh
                             </h2>
                         </div>
                         <div className="flex flex-col max-w-[480px] w-[480px] items-start relative flex-[0_0_auto]">
                             <p className="relative w-fit mt-[-1.00px] mr-[-83.00px] [font-family:'Montserrat-Medium',Helvetica] font-medium text-[#3e6186] text-lg tracking-[0] leading-[28.8px]">
-                                Kết nối thông minh, vận hành tối ưu. Trải nghiệm không gian
+                                An ninh, không gian, cuộc họp và thiết bị — kết nối trên
                                 <br />
-                                làm việc số hiện đại và chuyên nghiệp.
+                                một nền tảng duy nhất, vận hành hiện đại và chuyên nghiệp.
                             </p>
                         </div>
                     </div>

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.smartracking.io.vn/api/v1';
 
 // Token storage helpers
 export const getAccessToken = () => localStorage.getItem('accessToken');
@@ -180,9 +180,9 @@ export const request = async (path, options = {}) => {
 const handleResponse = async (response) => {
     const contentType = response.headers.get('Content-Type') || '';
     if (
-        contentType.includes('spreadsheetml') || 
-        contentType.includes('excel') || 
-        contentType.includes('pdf') || 
+        contentType.includes('spreadsheetml') ||
+        contentType.includes('excel') ||
+        contentType.includes('pdf') ||
         contentType.includes('octet-stream')
     ) {
         try {

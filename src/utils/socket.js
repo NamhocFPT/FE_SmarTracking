@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'http://localhost:3000';
+const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'https://api.smartracking.io.vn';
 
 let socket = null;
 
