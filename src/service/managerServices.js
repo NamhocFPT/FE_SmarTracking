@@ -182,6 +182,14 @@ export const getMeetingPresence = async (meetingId) => {
     return await get(`/ivss/meetings/${meetingId}/presence`);
 };
 
+export const getUserPresence = async (meetingId, userId) => {
+    return await get(`/ivss/meetings/${meetingId}/presence/${userId}`);
+};
+
+export const getMeetingPresenceReport = async (meetingId) => {
+    return await get(`/ivss/meetings/${meetingId}/presence/report`);
+};
+
 /**
  * UC-SM-02: Chỉnh sửa cuộc họp
  */

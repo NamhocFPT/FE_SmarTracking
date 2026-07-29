@@ -8,6 +8,7 @@ import {
 import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/managerServices';
 import UserAvatar from '../../component/UserAvatar';
 import MeetingAttendanceBoard from '../../component/MeetingAttendanceBoard';
+import MeetingPresenceIVSS from '../../component/MeetingPresenceIVSS';
 import NotificationActionsPanel from '../../component/NotificationActionsPanel';
 import ImportParticipantsModal from '../../component/ImportParticipantsModal';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
@@ -67,6 +68,7 @@ const ManagerMeetingDetail = () => {
     const [transcriptQuery, setTranscriptQuery] = useState('');
     const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
     const [activeRightTab, setActiveRightTab] = useState('transcript');
+    const [activeAttendanceTab, setActiveAttendanceTab] = useState('attendance'); // 'attendance' or 'ivss'
 
     /**
      * Chuẩn hoá DTO lồng nhau từ API GET /meetings/:id
@@ -808,8 +810,40 @@ const ManagerMeetingDetail = () => {
 
                 {/* Attendance Board Section */}
                 {meeting && (meeting.status !== 'cancelled') && (
-                    <div className="pt-4 border-t border-platinum-tint/50">
-                        <MeetingAttendanceBoard meetingId={meeting.id} />
+                    <div className="pt-6 border-t border-platinum-tint space-y-4">
+                        {/* Tab Switcher */}
+                        <div className="flex border-b border-platinum-tint bg-white rounded-t-2xl px-2 pt-2">
+                            <button
+                                onClick={() => setActiveAttendanceTab('attendance')}
+                                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${
+                                    activeAttendanceTab === 'attendance' 
+                                        ? 'border-action-blue text-action-blue font-extrabold' 
+                                        : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                }`}
+                            >
+                                Điểm danh thủ công
+                            </button>
+                            <button
+                                onClick={() => setActiveAttendanceTab('ivss')}
+                                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${
+                                    activeAttendanceTab === 'ivss' 
+                                        ? 'border-action-blue text-action-blue font-extrabold' 
+                                        : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                }`}
+                            >
+                                Hiện diện thực tế (Camera AI - IVSS)
+                            </button>
+                        </div>
+
+                        {activeAttendanceTab === 'attendance' ? (
+                            <MeetingAttendanceBoard meetingId={meeting.id} />
+                        ) : (
+                            <MeetingPresenceIVSS 
+                                meetingId={meeting.id} 
+                                meetingStartTime={meeting.startTime} 
+                                meetingEndTime={meeting.endTime} 
+                            />
+                        )}
                     </div>
                 )}
 
