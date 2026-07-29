@@ -288,17 +288,16 @@ const SystemAdminLayout = () => {
                             </span>
                         </NavLink>
 
-                        {/* Navigation */}
                         <nav
                             ref={navRef}
                             aria-label="Primary navigation"
-                            className="hidden md:flex items-center gap-1"
+                            className="hidden md:flex items-center gap-1 relative"
                         >
                             {navigationItems.map((item) => (
                                 item.isDropdown ? (
                                     <div
                                         key={item.label}
-                                        className="relative"
+                                        className=""
                                         onMouseEnter={() => setOpenDropdown(item.label)}
                                         onMouseLeave={() => setOpenDropdown(null)}
                                     >
