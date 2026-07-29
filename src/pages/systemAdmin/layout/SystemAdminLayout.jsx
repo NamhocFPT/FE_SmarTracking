@@ -297,7 +297,7 @@ const SystemAdminLayout = () => {
                                 item.isDropdown ? (
                                     <div
                                         key={item.label}
-                                        className=""
+                                        className={item.label === 'Hạ tầng & AI' ? '' : 'relative'}
                                         onMouseEnter={() => setOpenDropdown(item.label)}
                                         onMouseLeave={() => setOpenDropdown(null)}
                                     >

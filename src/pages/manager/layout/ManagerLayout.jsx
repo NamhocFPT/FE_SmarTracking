@@ -191,13 +191,13 @@ const ManagerLayout = () => {
                         <nav
                             ref={navRef}
                             aria-label="Primary navigation"
-                            className="hidden md:flex items-center gap-1 relative"
+                            className="hidden md:flex items-center gap-1"
                         >
                             {navigationItems.map((item) => (
                                 item.isDropdown ? (
                                     <div
                                         key={item.label}
-                                        className=""
+                                        className="relative"
                                         onMouseEnter={() => setOpenDropdown(item.label)}
                                         onMouseLeave={() => setOpenDropdown(null)}
                                     >
