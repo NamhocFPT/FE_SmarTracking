@@ -77,9 +77,20 @@ const TiltCard = ({ children, className }) => {
     );
 };
 
-const DashboardBanner = ({ roleName = 'Admin' }) => {
+const DashboardBanner = ({ roleName = 'bạn' }) => {
     const [[page, direction], setPage] = useState([0, 0]);
     const [isHovered, setIsHovered] = useState(false);
+    const [userName, setUserName] = useState('');
+
+    // Lấy tên thật của user đang đăng nhập (đã lưu ở localStorage lúc login) thay vì chỉ hiện tên role chung chung
+    useEffect(() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem('user') || 'null');
+            if (stored?.fullName) setUserName(stored.fullName);
+        } catch {
+            // silent — fallback dùng roleName bên dưới
+        }
+    }, []);
 
     const slides = [
         {
@@ -272,7 +283,7 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
             <div className="absolute -top-12 -left-12 w-64 h-64 rounded-full bg-action-blue/20 blur-3xl mix-blend-screen" style={{ transform: "translateZ(-100px)" }} />
             <div className="absolute -bottom-12 -right-12 w-72 h-72 rounded-full bg-royal-amethyst/20 blur-3xl mix-blend-screen" style={{ transform: "translateZ(-50px)" }} />
 
-            <div className="relative z-10 p-6 md:p-10 text-white min-h-[260px] flex items-center">
+            <div className="relative z-10 p-6 md:p-10 text-white h-[300px] flex items-center overflow-hidden">
                 <AnimatePresence initial={false} custom={direction} mode="popLayout">
                     <motion.div
                         key={page}
@@ -281,27 +292,30 @@ const DashboardBanner = ({ roleName = 'Admin' }) => {
                         initial="enter"
                         animate="center"
                         exit="exit"
-                        className="w-full flex flex-col md:flex-row items-center justify-between gap-10"
+                        className="!w-full flex flex-col md:flex-row items-center justify-between gap-10"
                         style={{ transformStyle: "preserve-3d" }}
                     >
                         {/* Left Side: Copy/Content */}
-                        <div className="flex-1 space-y-5 max-w-2xl text-center md:text-left" style={{ transform: "translateZ(30px)" }}>
-                            <div className="flex items-center justify-center md:justify-start gap-3 flex-wrap">
-                                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-white/10 backdrop-blur-md text-sky-100 border border-white/20 shadow-lg">
-                                    <Sparkles className="w-4 h-4 animate-pulse text-amber-300 drop-shadow-md" />
-                                    Xin chào, {roleName}!
-                                </span>
-                                <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold border ${activeSlide.badgeColor} uppercase tracking-wider shadow-lg backdrop-blur-md`}>
+                        <div className="flex-1 space-y-4 max-w-2xl text-center md:text-left" style={{ transform: "translateZ(30px)" }}>
+                            <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Sparkles className="w-5 h-5 animate-pulse text-amber-300 drop-shadow-md flex-shrink-0" />
+                                    <span className="text-xl md:text-2xl font-extrabold text-white drop-shadow-sm truncate">
+                                        Xin chào, {userName || roleName}!
+                                    </span>
+                                </div>
+
+                                <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold border ${activeSlide.badgeColor} uppercase tracking-wider shadow-lg backdrop-blur-md flex-shrink-0`}>
                                     {activeSlide.icon}
                                     {activeSlide.tag}
                                 </span>
                             </div>
 
                             <div className="space-y-3">
-                                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-50 to-white/70 drop-shadow-sm">
+                                <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-50 to-white/70 drop-shadow-sm line-clamp-2">
                                     {activeSlide.title}
                                 </h2>
-                                <p className="text-white/85 text-sm md:text-base leading-relaxed font-medium max-w-xl">
+                                <p className="text-white/85 text-sm md:text-base leading-relaxed font-medium max-w-xl line-clamp-2">
                                     {activeSlide.description}
                                 </p>
                             </div>
