@@ -173,8 +173,8 @@ export const startMeeting = async (id) => {
  * BE: GET /media-files/:fileId/secure-download
  * @param {string} fileId - ID file media (lấy từ GET /meetings/:meetingId/media-files)
  */
-export const getMediaFileSecureDownload = async (fileId) => {
-    return await get(`/media-files/${fileId}/secure-download`);
+export const getMediaFile = async (fileId) => {
+    return await get(`/media-files/${fileId}`);
 };
 
 /**

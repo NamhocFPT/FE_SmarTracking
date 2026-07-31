@@ -4,9 +4,10 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     getMeetingMediaFiles, 
-    getMediaFileSecureDownload,
-    getRooms,
+    getMediaFile,
+    getMediaFilePlayback,
     updateMediaVisibility,
+    getRooms,
     getMeetings
 } from '../../service/businessAdminServices';
 
@@ -142,7 +143,7 @@ const RecordingManagement = () => {
     // Download Handler — dùng media-files API
     const handleDownload = async (rec) => {
         try {
-            const res = await getMediaFileSecureDownload(rec.id);
+            const res = await getMediaFile(rec.id);
             if (res?.success && res.data?.downloadUrl) {
                 window.open(res.data.downloadUrl, '_blank');
                 setSuccessMessage(`Đã tạo liên kết tải xuống cho video: ${rec.meetingTitle}`);

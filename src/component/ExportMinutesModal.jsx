@@ -4,7 +4,7 @@ import {
     FileText, X, Download, CheckCircle, AlertTriangle,
     Clock, RefreshCw, FileDown
 } from 'lucide-react';
-import { exportMinutes } from '../service/businessAdminServices';
+import { exportMinutes, getMediaFile } from '../service/businessAdminServices';
 import usePollJob from '../hooks/usePollJob';
 import { motion } from 'framer-motion';
 
@@ -29,10 +29,21 @@ const ExportMinutesModal = ({ minutesId, open, onClose }) => {
     const { status, progress, isPolling, error: pollError } = usePollJob(jobId, {
         intervalMs: 2000,
         maxAttempts: 90,
-        onCompleted: (job) => {
+        onCompleted: async (job) => {
             // Khi completed, lấy downloadUrl từ result
-            const url = job.result?.downloadUrl || job.result?.fileUrl || null;
-            setDownloadUrl(url);
+            if (job.result?.outputFileId) {
+                try {
+                    const res = await getMediaFile(job.result.outputFileId);
+                    if (res?.success && res.data?.downloadUrl) {
+                        setDownloadUrl(res.data.downloadUrl);
+                    }
+                } catch (e) {
+                    console.error('Failed to get download url', e);
+                }
+            } else {
+                const url = job.result?.downloadUrl || job.result?.fileUrl || null;
+                setDownloadUrl(url);
+            }
         },
         onFailed: () => {},
     });

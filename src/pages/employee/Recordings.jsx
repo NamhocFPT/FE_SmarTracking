@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMySchedule, getMeetingMediaFiles, getMediaFileSecureDownload } from '../../service/employeeServices';
+import { getMySchedule, getMeetingMediaFiles, getMediaFile } from '../../service/employeeServices';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -126,7 +126,7 @@ const EmployeeRecordings = () => {
         }
         setDownloadingId(fileId);
         try {
-            const res = await getMediaFileSecureDownload(fileId);
+            const res = await getMediaFile(fileId);
             if (res?.success && res.data?.downloadUrl) {
                 window.open(res.data.downloadUrl, '_blank');
                 setSuccessMsg(fileType === 'video' || fileType === 'audio' ? `Đang mở ${fileType === 'video' ? 'video' : 'audio'}...` : 'Đang tải xuống tệp...');
