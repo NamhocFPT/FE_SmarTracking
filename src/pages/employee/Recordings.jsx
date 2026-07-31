@@ -6,7 +6,7 @@ import {
     RefreshCw, AlertCircle, CheckCircle, FileAudio,
     FolderOpen, WifiOff
 } from 'lucide-react';
-import { getMySchedule, getMeetingMediaFiles } from '../../service/employeeServices';
+import { getMySchedule, getMeetingMediaFiles, getMediaFileSecureDownload } from '../../service/employeeServices';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -118,23 +118,27 @@ const EmployeeRecordings = () => {
     }, [errorMsg]);
 
     /**
-     * FE-4: Playback dùng /media-files/:fileId/playback (stream)
-     * Gắn trực tiếp vào <video src> hoặc window.open
+     * Playback/tải file: lấy signed URL có gắn token qua /media-files/:fileId/secure-download
+     * (KHÔNG gọi thẳng URL tương đối — route cần JWT, <a>/window.open trực tiếp sẽ 401/404).
      */
-    const handlePlayback = (fileId, fileType) => {
+    const handlePlayback = async (fileId, fileType) => {
         if (!fileId) {
             setErrorMsg('Tệp tin này hiện không khả dụng.');
             return;
         }
-        // Stream URL — gắn trực tiếp, KHÔNG parse JSON
-        const playbackUrl = `/api/v1/media-files/${fileId}/playback`;
-        if (fileType === 'video' || fileType === 'audio') {
-            window.open(playbackUrl, '_blank');
-            setSuccessMsg(`Đang mở ${fileType === 'video' ? 'video' : 'audio'}...`);
-        } else {
-            // Transcript / document download
-            window.open(playbackUrl, '_blank');
-            setSuccessMsg(`Đang tải xuống tệp...`);
+        setDownloadingId(fileId);
+        try {
+            const res = await getMediaFileSecureDownload(fileId);
+            if (res?.success && res.data?.downloadUrl) {
+                window.open(res.data.downloadUrl, '_blank');
+                setSuccessMsg(fileType === 'video' || fileType === 'audio' ? `Đang mở ${fileType === 'video' ? 'video' : 'audio'}...` : 'Đang tải xuống tệp...');
+            } else {
+                setErrorMsg(res?.message || 'Không thể tạo liên kết tải xuống.');
+            }
+        } catch (err) {
+            setErrorMsg(err?.message || err?.error?.message || 'Lỗi khi tải tệp. Vui lòng thử lại.');
+        } finally {
+            setDownloadingId(null);
         }
     };
 

@@ -40,13 +40,9 @@ const MeetingManagement = () => {
         try {
             const res = await getRooms({ limit: 100 });
             if (res?.success) setRooms(res.data || []);
-        } catch {
-            setRooms([
-                { id: 'r-1', roomName: 'Phòng Apollo 101' },
-                { id: 'r-2', roomName: 'Phòng Athena 102' },
-                { id: 'r-3', roomName: 'Phòng Zeus 201' },
-                { id: 'r-4', roomName: 'Phòng Hermes 302' }
-            ]);
+        } catch (err) {
+            console.error('Failed to load rooms', err);
+            setRooms([]);
         }
     }, []);
 
@@ -64,23 +60,12 @@ const MeetingManagement = () => {
             if (res?.success) {
                 setMeetingsList(res.data || []);
             } else {
-                throw new Error();
+                setMeetingsList([]);
+                setError(res?.message || 'Không thể tải danh sách cuộc họp.');
             }
-        } catch {
-            // Local mock fallback
-            const mockMeetings = [
-                { id: 'm-1', title: 'Họp Kick-off Dự án SmarTracking', roomId: 'r-1', roomName: 'Phòng Apollo 101', startTime: '2026-06-12T09:00:00+07:00', endTime: '2026-06-12T10:30:00+07:00', organizer: 'Nguyễn Văn A', status: 'scheduled', description: 'Họp triển khai dự án.' },
-                { id: 'm-2', title: 'Đánh giá Tiến độ Sprint 1', roomId: 'r-2', roomName: 'Phòng Athena 102', startTime: '2026-06-12T11:00:00+07:00', endTime: '2026-06-12T12:00:00+07:00', organizer: 'Lê Thị B', status: 'completed', description: 'Review code sprint 1.' },
-                { id: 'm-3', title: 'Họp Ban giám đốc Tháng 6', roomId: 'r-3', roomName: 'Phòng Zeus 201', startTime: '2026-06-13T14:00:00+07:00', endTime: '2026-06-13T16:00:00+07:00', organizer: 'Trần Hữu C', status: 'cancelled', description: 'Họp tổng kết tháng.' }
-            ];
-            let filtered = mockMeetings;
-            if (search.trim()) {
-                filtered = filtered.filter(m => m.title.toLowerCase().includes(search.toLowerCase()));
-            }
-            if (selectedRoom) {
-                filtered = filtered.filter(m => m.roomId === selectedRoom);
-            }
-            setMeetingsList(filtered);
+        } catch (err) {
+            setMeetingsList([]);
+            setError(err?.message || err?.error?.message || 'Lỗi kết nối khi tải danh sách cuộc họp. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
@@ -132,59 +117,36 @@ const MeetingManagement = () => {
         e.preventDefault();
         setError(null);
         try {
-            const payload = {
-                title: formData.title,
-                roomId: formData.roomId,
-                startTime: new Date(formData.startTime).toISOString(),
-                endTime: new Date(formData.endTime).toISOString(),
-                description: formData.description,
-                organizer: formData.organizer
-            };
-
             let res;
             if (modalMode === 'create') {
+                // CreateMeetingDto (BE) không nhận field `organizer` — không gửi.
+                const payload = {
+                    title: formData.title,
+                    roomId: formData.roomId,
+                    startTime: new Date(formData.startTime).toISOString(),
+                    endTime: new Date(formData.endTime).toISOString(),
+                    description: formData.description
+                };
                 res = await createMeeting(payload);
             } else {
+                // UpdateMeetingDto (PATCH /meetings/:id) chỉ nhận title/description —
+                // roomId/startTime/endTime đổi qua route riêng (/room, /time), không gộp ở đây.
+                const payload = {
+                    title: formData.title,
+                    description: formData.description
+                };
                 res = await updateMeeting(selectedMeeting.id, payload);
             }
 
-            if (res?.success || !res) {
+            if (res?.success) {
                 setSuccessMessage(modalMode === 'create' ? 'Tạo cuộc họp thành công!' : 'Cập nhật cuộc họp thành công!');
                 setIsModalOpen(false);
                 fetchMeetingsList();
             } else {
-                setError(res?.message || 'Có lỗi xảy ra.');
+                setError(res?.message || 'Có lỗi xảy ra, vui lòng thử lại.');
             }
-        } catch {
-            if (modalMode === 'create') {
-                const roomName = rooms.find(r => r.id === formData.roomId)?.roomName || 'Phòng họp';
-                const newM = {
-                    id: 'm-' + Math.random().toString(36).substr(2, 5),
-                    title: formData.title,
-                    roomId: formData.roomId,
-                    roomName,
-                    startTime: formData.startTime + ':00+07:00',
-                    endTime: formData.endTime + ':00+07:00',
-                    organizer: formData.organizer,
-                    status: 'scheduled',
-                    description: formData.description
-                };
-                setMeetingsList(prev => [...prev, newM]);
-                setSuccessMessage('Đã mô phỏng: Tạo cuộc họp thành công!');
-            } else {
-                setMeetingsList(prev => prev.map(m => m.id === selectedMeeting.id ? {
-                    ...m,
-                    title: formData.title,
-                    roomId: formData.roomId,
-                    roomName: rooms.find(r => r.id === formData.roomId)?.roomName || m.roomName,
-                    startTime: formData.startTime + ':00+07:00',
-                    endTime: formData.endTime + ':00+07:00',
-                    organizer: formData.organizer,
-                    description: formData.description
-                } : m));
-                setSuccessMessage('Đã mô phỏng: Cập nhật cuộc họp thành công!');
-            }
-            setIsModalOpen(false);
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi lưu cuộc họp. Vui lòng thử lại.');
         }
     };
 
@@ -193,13 +155,14 @@ const MeetingManagement = () => {
         setError(null);
         try {
             const res = await cancelMeeting(meetingId);
-            if (res?.success || !res) {
+            if (res?.success) {
                 setSuccessMessage('Huỷ cuộc họp thành công!');
                 fetchMeetingsList();
+            } else {
+                setError(res?.message || 'Không thể huỷ cuộc họp.');
             }
-        } catch {
-            setMeetingsList(prev => prev.map(m => m.id === meetingId ? { ...m, status: 'cancelled' } : m));
-            setSuccessMessage('Đã mô phỏng: Huỷ cuộc họp thành công!');
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi huỷ cuộc họp. Vui lòng thử lại.');
         }
     };
 
@@ -321,7 +284,7 @@ const MeetingManagement = () => {
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6 text-sm text-midnight-indigo font-medium">
-                                                {m.organizer}
+                                                {m.organizerName || m.organizer || '—'}
                                             </td>
                                             <td className="py-4 px-6 text-sm">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${

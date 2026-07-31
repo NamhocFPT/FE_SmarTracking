@@ -15,6 +15,7 @@ const ExportReportModal = ({ isOpen, onClose }) => {
     const [jobId, setJobId] = useState(null);
     const [jobStatus, setJobStatus] = useState(''); // queued, running, completed, failed
     const [outputFileId, setOutputFileId] = useState(null);
+    const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
         if (!isOpen) {
@@ -88,9 +89,22 @@ const ExportReportModal = ({ isOpen, onClose }) => {
         }
     };
 
-    const getDownloadLink = () => {
-        // Direct media files endpoint
-        return `/api/v1/media-files/${outputFileId}`;
+    const handleDownload = async () => {
+        if (!outputFileId) return;
+        setDownloading(true);
+        setError(null);
+        try {
+            const res = await get(`/media-files/${outputFileId}/secure-download`);
+            if (res?.success && res.data?.downloadUrl) {
+                window.open(res.data.downloadUrl, '_blank');
+            } else {
+                setError(res?.message || 'Không thể tạo liên kết tải xuống.');
+            }
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Lỗi khi tải xuống báo cáo. Vui lòng thử lại.');
+        } finally {
+            setDownloading(false);
+        }
     };
 
     return createPortal(
@@ -124,13 +138,14 @@ const ExportReportModal = ({ isOpen, onClose }) => {
                                 <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
                                 <p>Báo cáo đã sẵn sàng tải về!</p>
                             </div>
-                            <a 
-                                href={getDownloadLink()}
-                                download
-                                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
+                            <button
+                                type="button"
+                                onClick={handleDownload}
+                                disabled={downloading}
+                                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-60"
                             >
-                                <Download className="w-4 h-4" /> Tải xuống file ({format.toUpperCase()})
-                            </a>
+                                {downloading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Tải xuống file ({format.toUpperCase()})
+                            </button>
                         </div>
                     )}
 
