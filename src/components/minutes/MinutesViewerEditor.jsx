@@ -125,8 +125,8 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
             </AnimatePresence>
 
             {/* Header */}
-            <div className="p-5 border-b border-platinum-tint flex flex-col sm:flex-row justify-between items-center gap-4 bg-cloud-mist/30">
-                <div className="flex items-center gap-3">
+            <div className="p-5 border-b border-platinum-tint flex flex-col sm:flex-row flex-wrap justify-between items-center gap-4 bg-cloud-mist/30">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
                     <FileText className="w-5 h-5 text-action-blue" />
                     <div>
                         <div className="flex items-center gap-2">
@@ -148,7 +148,7 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
                     {isEditing ? (
                         <>
                             <button 
@@ -328,8 +328,8 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
                         <Target className="w-4 h-4 text-emerald-600" /> Các công việc cần làm (Action Items)
                     </h4>
                     
-                    <div className="overflow-x-auto pb-2 scrollbar-thin">
-                        <table className="w-full text-left border-collapse">
+                    <div className="overflow-x-auto pb-2 scrollbar-thin w-full">
+                        <table className="w-full text-left border-collapse min-w-[650px]">
                             <thead>
                                 <tr className="border-b border-platinum-tint bg-cloud-mist/50">
                                     <th className="p-3 text-[10px] font-bold text-slate-blue uppercase">Công việc</th>

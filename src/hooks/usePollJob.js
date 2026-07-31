@@ -24,6 +24,17 @@ const usePollJob = (jobId, { intervalMs = 2000, maxAttempts = 60, onCompleted, o
     const attemptsRef = useRef(0);
     const timerRef = useRef(null);
 
+    const onCompletedRef = useRef(onCompleted);
+    const onFailedRef = useRef(onFailed);
+
+    useEffect(() => {
+        onCompletedRef.current = onCompleted;
+    }, [onCompleted]);
+
+    useEffect(() => {
+        onFailedRef.current = onFailed;
+    }, [onFailed]);
+
     const stopPolling = useCallback(() => {
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -40,7 +51,7 @@ const usePollJob = (jobId, { intervalMs = 2000, maxAttempts = 60, onCompleted, o
             stopPolling();
             const timeoutErr = 'Quá thời gian chờ. Vui lòng kiểm tra lại sau.';
             setError(timeoutErr);
-            onFailed?.(timeoutErr);
+            onFailedRef.current?.(timeoutErr);
             return;
         }
 
@@ -55,18 +66,18 @@ const usePollJob = (jobId, { intervalMs = 2000, maxAttempts = 60, onCompleted, o
             if (job.status === 'completed') {
                 setResult(job.result);
                 stopPolling();
-                onCompleted?.(job);
+                onCompletedRef.current?.(job);
             } else if (job.status === 'failed') {
                 stopPolling();
                 const failErr = job.error || 'Xuất file thất bại.';
                 setError(failErr);
-                onFailed?.(failErr);
+                onFailedRef.current?.(failErr);
             }
         } catch (e) {
             // Network error — tiếp tục poll, không dừng
             console.warn('[usePollJob] Poll error:', e.message);
         }
-    }, [jobId, maxAttempts, stopPolling, onCompleted, onFailed]);
+    }, [jobId, maxAttempts, stopPolling]);
 
     useEffect(() => {
         if (!jobId) {

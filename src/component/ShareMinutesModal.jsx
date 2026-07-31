@@ -63,7 +63,7 @@ const ShareMinutesModal = ({ minutesId, open, onClose }) => {
         const delayDebounce = setTimeout(async () => {
             setSearchingUsers(true);
             try {
-                const res = await getUsers({ q: searchQuery });
+                const res = await getUsers({ search: searchQuery });
                 if (res?.success && Array.isArray(res.data)) {
                     // Filter out users who already have access
                     const sharedUserIds = shares.map(s => s.userId || s.user_id || s.user?.id);
@@ -259,7 +259,7 @@ const ShareMinutesModal = ({ minutesId, open, onClose }) => {
                             <div className="space-y-2 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                                 {shares.map(s => {
                                     const u = s.user || {};
-                                    const uName = u.fullName || u.full_name || s.fullName || s.full_name || 'Nhân sự';
+                                    const uName = u.fullName || u.full_name || s.userFullName || s.fullName || s.full_name || 'Nhân sự';
                                     const uEmail = u.email || s.email || '';
                                     const uId = u.id || s.userId || s.user_id;
                                     return (

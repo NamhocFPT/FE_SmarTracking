@@ -34,17 +34,17 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
 
     const validateAndSetFile = (selectedFile) => {
         if (!selectedFile) return;
-        
+        const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
         // Cảnh báo nếu > 50MB (50 * 1024 * 1024 bytes)
-        if (selectedFile.size > 52428800) {
-            setErrorMsg('Dung lượng file vượt quá giới hạn 50MB.');
+        if (selectedFile.size > MAX_FILE_SIZE) {
+            setErrorMsg('Dung lượng file vượt quá giới hạn 500MB.');
             setStatus('error');
             return;
         }
 
         const validTypes = ['audio/mpeg', 'audio/wav', 'audio/x-m4a', 'audio/mp4', 'audio/aac'];
         // Tạm thời nới lỏng validate mime types vì m4a có thể trả type rỗng
-        
+
         setFile(selectedFile);
         setStatus('idle');
         setErrorMsg('');
@@ -62,7 +62,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
             if (!uploadRes?.success) {
                 throw new Error(uploadRes?.error?.message || uploadRes?.message || 'Lỗi khi tải lên tệp âm thanh.');
             }
-            
+
             const recordingSessionId = uploadRes.data?.recordingSessionId;
             if (!recordingSessionId) throw new Error('Không nhận được phiên ghi âm từ máy chủ.');
 
@@ -113,7 +113,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
             {/* Nền trang trí */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-200/50 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-40 h-40 bg-action-blue/10 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none" />
-            
+
             <h3 className="text-sm font-bold text-midnight-indigo uppercase tracking-wider flex items-center gap-2 mb-4 relative z-10">
                 <UploadCloud className="w-5 h-5 text-action-blue" />
                 Cập nhật bản ghi âm
@@ -121,11 +121,10 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
 
             {/* Vùng kéo thả */}
             <div
-                className={`relative z-10 border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all duration-300 ${
-                    isDragging
-                        ? 'border-action-blue bg-blue-50/50 scale-[1.02]'
-                        : 'border-platinum-tint/80 bg-cloud-mist/40 hover:bg-cloud-mist'
-                } ${file ? 'border-none bg-transparent' : ''}`}
+                className={`relative z-10 border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all duration-300 ${isDragging
+                    ? 'border-action-blue bg-blue-50/50 scale-[1.02]'
+                    : 'border-platinum-tint/80 bg-cloud-mist/40 hover:bg-cloud-mist'
+                    } ${file ? 'border-none bg-transparent' : ''}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -156,7 +155,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
                         />
                     </>
                 ) : (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="w-full bg-white border border-platinum-tint rounded-2xl p-4 shadow-sm flex items-center gap-4"
@@ -197,7 +196,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
                                     </span>
                                 </div>
                                 <div className="w-full h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                                    <motion.div 
+                                    <motion.div
                                         className="h-full bg-action-blue rounded-full"
                                         initial={{ width: '0%' }}
                                         animate={{ width: '100%' }}
@@ -206,7 +205,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {status === 'processing' && (
                             <div className="flex items-center gap-3 p-4 bg-purple-50/50 rounded-xl border border-purple-100 text-purple-700">
                                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -233,7 +232,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
 
             {/* Nút Thực Hiện */}
             {file && status === 'idle' && (
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="mt-4 flex justify-end relative z-10"
