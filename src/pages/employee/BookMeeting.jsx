@@ -66,6 +66,7 @@ const BookMeeting = () => {
     const [newAgendaTitle, setNewAgendaTitle] = useState('');
     const [newAgendaDuration, setNewAgendaDuration] = useState('15');
     const [newAgendaFile, setNewAgendaFile] = useState(null);
+    const [agendaInputError, setAgendaInputError] = useState('');
 
     // Data lists
     const [departments, setDepartments] = useState([]);
@@ -255,15 +256,22 @@ const BookMeeting = () => {
     };
 
     const handleAddAgenda = () => {
-        if (!newAgendaTitle.trim()) return;
+        if (!newAgendaTitle.trim()) {
+            setAgendaInputError('Vui lòng nhập tên chương trình họp.');
+            return;
+        }
         const duration = Number(newAgendaDuration);
-        if (isNaN(duration) || duration <= 0) return;
-
-        if (agendaTotalDuration + duration > meetingDuration) {
-            setErrorMsg(`Tổng thời lượng chương trình họp (${agendaTotalDuration + duration} phút) vượt quá thời lượng cuộc họp (${meetingDuration} phút).`);
+        if (isNaN(duration) || duration <= 0) {
+            setAgendaInputError('Vui lòng nhập thời lượng chương trình hợp lệ (lớn hơn 0).');
             return;
         }
 
+        if (agendaTotalDuration + duration > meetingDuration) {
+            setAgendaInputError(`Tổng thời lượng chương trình họp (${agendaTotalDuration + duration} phút) vượt quá thời lượng cuộc họp (${meetingDuration} phút).`);
+            return;
+        }
+
+        setAgendaInputError('');
         setErrorMsg('');
         setAgendaList(prev => [
             ...prev,
@@ -577,9 +585,7 @@ const BookMeeting = () => {
                 try {
                     await replaceAgendas(meetingId, agendaList.map(item => ({
                         title: item.title,
-                        plannedDurationMinutes: Number(item.durationMin),
-                        fileName: item.file ? item.file.name : null,
-                        fileSize: item.file ? item.file.size : null
+                        plannedDurationMinutes: Number(item.durationMin)
                     })));
                 } catch (subErr) {
                     console.error('Failed to save agenda', subErr);
@@ -651,7 +657,8 @@ const BookMeeting = () => {
         setAlternativeRooms([]);
     };
 
-    const isManagerOrAdmin = currentUser?.role === 'Manager' || currentUser?.role === 'BusinessAdmin' || currentUser?.role === 'SystemAdmin';
+    // BE trả roleCode dạng UPPER_SNAKE trong currentUser.roles[] (mảng object), không phải field `role` string PascalCase.
+    const isManagerOrAdmin = currentUser?.roles?.some(r => ['MANAGER', 'BUSINESS_ADMIN', 'SYSTEM_ADMIN'].includes(r.roleCode || r.role_code));
 
     if (loadingData) {
         return (
@@ -1251,7 +1258,10 @@ const BookMeeting = () => {
                                                 <input
                                                     type="text"
                                                     value={newAgendaTitle}
-                                                    onChange={(e) => setNewAgendaTitle(e.target.value)}
+                                                    onChange={(e) => {
+                                                        setNewAgendaTitle(e.target.value);
+                                                        setAgendaInputError('');
+                                                    }}
                                                     placeholder="Chủ đề / Nội dung thảo luận..."
                                                     className="w-full px-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
                                                 />
@@ -1260,7 +1270,10 @@ const BookMeeting = () => {
                                                 <input
                                                     type="number"
                                                     value={newAgendaDuration}
-                                                    onChange={(e) => setNewAgendaDuration(e.target.value)}
+                                                    onChange={(e) => {
+                                                        setNewAgendaDuration(e.target.value);
+                                                        setAgendaInputError('');
+                                                    }}
                                                     min="1"
                                                     placeholder="Phút"
                                                     className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo text-center"
@@ -1302,6 +1315,13 @@ const BookMeeting = () => {
                                                 </button>
                                             )}
                                         </div>
+
+                                        {agendaInputError && (
+                                            <div className="flex items-center gap-1.5 mt-2 text-rose-500 bg-rose-50 px-3 py-2 rounded-lg border border-rose-100 animate-fade-in-up">
+                                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                                <p className="text-xs font-medium">{agendaInputError}</p>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Agenda List */}
