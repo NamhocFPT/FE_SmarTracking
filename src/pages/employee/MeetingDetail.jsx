@@ -111,8 +111,8 @@ const EmployeeMeetingDetail = () => {
             endTime: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
             end_time: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
             // Recording
-            recordingEnabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
-            recording_enabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
+            recordingEnabled: dto.recordingConfig?.allowRecording || dto.recordingEnabled || dto.recording_enabled || false,
+            recording_enabled: dto.recordingConfig?.allowRecording || dto.recordingEnabled || dto.recording_enabled || false,
             // Participants & Agenda
             participants,
             agenda,
