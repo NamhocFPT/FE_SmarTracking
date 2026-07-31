@@ -1,3 +1,4 @@
+import { AlertTriangle, BarChart2, Box, Calendar, Camera, Car, ChevronDown, ClipboardList, Clock, Cpu, DoorOpen, FileText, HardDrive, Home, Key, LogIn, Map, MapPin, PieChart, PlusCircle, Settings, ShieldAlert, Sliders, User, Users } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout } from '../../../service/authService';
@@ -6,33 +7,7 @@ import BiometricReminderModal from '../../../component/BiometricReminder/Biometr
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
 import NotificationBell from '../../../component/NotificationBell';
-import { 
-    Home, 
-    Settings, 
-    ShieldAlert, 
-    FileText, 
-    Sliders, 
-    Cpu, 
-    HardDrive, 
-    Box, 
-    Map, 
-    Users, 
-    DoorOpen, 
-    LogIn, 
-    Camera, 
-    ClipboardList, 
-    Car, 
-    Key, 
-    MapPin, 
-    AlertTriangle, 
-    Calendar, 
-    User, 
-    PlusCircle, 
-    BarChart2, 
-    PieChart, 
-    Clock,
-    ChevronDown
-} from 'lucide-react';
+
 
 const chunkArray = (arr, size) => {
     const chunks = [];
@@ -311,9 +286,9 @@ const SystemAdminLayout = () => {
                                         </button>
 
                                         {openDropdown === item.label && (
-                                            <div className="absolute top-full left-0 pt-1 z-50 min-w-max">
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-1 z-50 min-w-max">
                                                 <div className="bg-white border border-platinum-tint/80 rounded-2xl shadow-xl p-2.5 flex gap-4 items-stretch animate-in fade-in slide-in-from-top-1 duration-150">
-                                                    {chunkArray(item.children, 3).map((chunk, chunkIdx) => (
+                                                    {chunkArray(item.children, item.children.length > 6 ? Math.ceil(item.children.length / 2) : item.children.length > 3 ? 3 : item.children.length).map((chunk, chunkIdx) => (
                                                         <div key={chunkIdx} className="flex gap-4 items-stretch">
                                                             {chunkIdx > 0 && (
                                                                 <div className="w-px bg-platinum-tint/60 self-stretch my-1" aria-hidden="true" />
