@@ -181,21 +181,8 @@ const EmployeeFaceRegistration = () => {
         try {
             // Step 1: Upload raw image as biometric submission
             const uploadRes = await submitBiometric(capturedFile, true);
-            const fileId = uploadRes.data?.imageFile?.id || uploadRes.data?.fileId || "file-9fbca62a-8c5e-4bb5-a6e5-4f466b039454";
-
-            // Step 2: Associate face profile with account
-            const userId = currentUser?.id || 'emp-uuid';
-            const payload = {
-                deviceId: "d7f1be30-5dc9-4a92-9118-8eb0c8d1976a",
-                devicePersonId: `person-${userId}`,
-                devicePersonCode: employeeCode,
-                primaryImageFileId: fileId,
-                consentAt: new Date().toISOString(),
-                modelVersion: "v2.1"
-            };
-
-            const regRes = await registerFaceProfile(userId, payload);
-            if (regRes?.success || uploadRes?.success) {
+            
+            if (uploadRes?.success) {
                 // Check if user has display avatar
                 if (!currentUser?.avatarUrl) {
                     setStep('avatar_sync');
@@ -203,7 +190,7 @@ const EmployeeFaceRegistration = () => {
                     setStep('success');
                 }
             } else {
-                setError(regRes?.error?.message || 'Liên kết dữ liệu khuôn mặt thất bại.');
+                setError(uploadRes?.message || uploadRes?.error?.message || 'Gửi dữ liệu khuôn mặt thất bại.');
                 setStep('scanner');
                 startWebcam();
             }
