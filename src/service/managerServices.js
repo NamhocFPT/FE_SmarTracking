@@ -83,21 +83,31 @@ export const getManagerNoShowStats = async (params = {}) => {
  * @param {object} params - { approvalStatus, page, limit, requestType, targetRoomId, requestedById, from, to, q, sortBy, sortOrder }
  */
 export const getPendingMeetingRequests = async (params = {}) => {
-    const query = new URLSearchParams({
-        approvalStatus: params.approvalStatus || 'pending',
+    const queryObj = {
         page: params.page || 1,
         limit: params.limit || 20,
-        ...(params.requestType && { requestType: params.requestType }),
-        ...(params.targetRoomId && { targetRoomId: params.targetRoomId }),
-        ...(params.requestedById && { requestedById: params.requestedById }),
-        ...(params.from && { from: params.from }),
-        ...(params.to && { to: params.to }),
-        ...(params.q && { q: params.q }),
-        ...(params.sortBy && { sortBy: params.sortBy }),
-        ...(params.sortOrder && { sortOrder: params.sortOrder }),
-    }).toString();
+    };
+    
+    if (params.approvalStatus) {
+        queryObj.approvalStatus = params.approvalStatus;
+    } else {
+        queryObj.approvalStatus = 'pending';
+    }
 
-    return await get(`/meeting-requests?${query}`);
+    if (params.requestType) queryObj.requestType = params.requestType;
+    if (params.targetRoomId) queryObj.targetRoomId = params.targetRoomId;
+    if (params.requestedById) queryObj.requestedById = params.requestedById;
+    if (params.from) queryObj.from = params.from;
+    if (params.to) queryObj.to = params.to;
+    if (params.q) queryObj.q = params.q;
+    
+    // Fix snake_case to camelCase for backend whitelist
+    if (params.sortBy) {
+        queryObj.sortBy = params.sortBy === 'requested_at' ? 'requestedAt' : params.sortBy;
+    }
+    if (params.sortOrder) queryObj.sortOrder = params.sortOrder;
+
+    return await get(`/meeting-requests${buildQuery(queryObj)}`);
 };
 
 /**

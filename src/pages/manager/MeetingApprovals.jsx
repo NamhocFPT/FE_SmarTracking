@@ -69,9 +69,7 @@ const MeetingApprovals = () => {
                 limit: limit,
                 q: searchVal.trim() || undefined,
                 from: fromDate || undefined,
-                to: toDate || undefined,
-                sortBy: 'requested_at',
-                sortOrder: 'desc'
+                to: toDate || undefined
             };
             const res = await getPendingMeetingRequests(params);
             if (res?.success) {

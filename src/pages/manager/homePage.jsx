@@ -187,14 +187,13 @@ const ManagerHomePage = () => {
         delivery: 'download'
     });
 
-    const fetchDashboardData = useCallback(async (deptId) => {
+    const fetchDashboardData = useCallback(async () => {
         setLoadingAnalytics(true);
         setError(null);
         try {
             const params = {
                 from: fromDate,
-                to: toDate,
-                departmentId: deptId || undefined
+                to: toDate
             };
 
             const [
@@ -395,7 +394,7 @@ const ManagerHomePage = () => {
     // Fetch dashboard data when tab switches to 'analytics'
     useEffect(() => {
         if (activeTab === 'analytics' && currentUser) {
-            fetchDashboardData(currentUser.departmentId);
+            fetchDashboardData();
         }
     }, [activeTab, currentUser, fetchDashboardData]);
 
@@ -785,7 +784,7 @@ const ManagerHomePage = () => {
                             </div>
                             <div>
                                 <button
-                                    onClick={() => currentUser && fetchDashboardData(currentUser.departmentId)}
+                                    onClick={() => fetchDashboardData()}
                                     className="px-5 py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2"
                                 >
                                     <RefreshCw className="w-4 h-4" /> Làm mới
@@ -865,7 +864,7 @@ const ManagerHomePage = () => {
                                             <h2 className="text-base font-bold text-midnight-indigo">Số lượng cuộc họp theo tuần</h2>
                                             <p className="text-xs text-slate-blue">Biến động hoạt động đặt phòng của phòng ban</p>
                                         </div>
-                                        <div className="h-[250px] w-full mt-4">
+                                        <div className="h-[250px] w-full mt-4 min-w-0 min-h-[250px]">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart data={meetingsTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                     <defs>
@@ -892,7 +891,7 @@ const ManagerHomePage = () => {
                                             </h2>
                                             <p className="text-xs text-slate-blue">Tỷ lệ phân phối trạng thái cuộc họp phòng ban</p>
                                         </div>
-                                        <div className="h-[180px] w-full relative flex items-center justify-center">
+                                        <div className="h-[180px] w-full relative flex items-center justify-center min-w-0 min-h-[180px]">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <PieChart>
                                                     <Pie
@@ -950,7 +949,7 @@ const ManagerHomePage = () => {
                                             <h2 className="text-base font-bold text-midnight-indigo">Thời lượng họp thực tế và đặt lịch của phòng ban</h2>
                                             <p className="text-xs text-slate-blue">So sánh số giờ giữ phòng (Booked) và số giờ có hiện diện thực tế (Actual)</p>
                                         </div>
-                                        <div className="h-[250px] w-full mt-4">
+                                        <div className="h-[250px] w-full mt-4 min-w-0 min-h-[250px]">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={roomStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7EDF6" />
