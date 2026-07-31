@@ -1,3 +1,4 @@
+import { AlertCircle, Calendar, CheckCircle, Clock, Home, Plus, RefreshCw, Search, Users, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -8,7 +9,7 @@ import {
     cancelMeeting,
     getRooms
 } from '../../service/businessAdminServices';
-import { Calendar, Plus, Clock, Home, XCircle, Search, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+
 
 const MeetingManagement = () => {
     const [meetingsList, setMeetingsList] = useState([]);
@@ -170,6 +171,10 @@ const MeetingManagement = () => {
         <div className="space-y-6 animate-fade-in-up">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Users className="w-3.5 h-3.5" />
+                        Cuộc họp
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý cuộc họp</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Theo dõi lịch đặt họp của doanh nghiệp, thực hiện các thao tập đặt lịch họp mới và quản trị thông tin cuộc họp.

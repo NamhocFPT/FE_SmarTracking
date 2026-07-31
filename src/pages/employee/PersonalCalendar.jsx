@@ -1,9 +1,7 @@
+import { AlertTriangle, Calendar as CalendarIcon, CheckCircle, ChevronLeft, ChevronRight, Clock, Filter, Grid, Info, List, MapPin, User, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    Calendar as CalendarIcon, Clock, MapPin, User, ChevronLeft, ChevronRight,
-    Filter, Info, AlertTriangle, CheckCircle, XCircle, Grid, List
-} from 'lucide-react';
+
 import { getMySchedule } from '../../service/employeeServices';
 
 const STATUS_CONFIG = {

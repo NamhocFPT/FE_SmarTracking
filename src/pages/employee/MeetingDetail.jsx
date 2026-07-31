@@ -1,10 +1,9 @@
+import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, Video, X } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    Calendar, Clock, MapPin, Users, Video, Edit3, Trash2,
-    Check, Play, Pause, Search, List, AlertTriangle, Upload, X, FileText, Download
-} from 'lucide-react';
+
 import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
 import MeetingPresenceTimeline from '../../component/MeetingPresenceTimeline';
@@ -491,6 +490,10 @@ const EmployeeMeetingDetail = () => {
                                 </span>
                             )}
                         </div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                            <Users className="w-3.5 h-3.5" />
+                            Chi tiết cuộc họp
+                        </span>
                         <h1 className="text-xl md:text-2xl font-bold text-midnight-indigo leading-snug">{meeting.title}</h1>
                         <p className="text-slate-blue text-xs">{meeting.description || 'Không có mô tả cuộc họp'}</p>
                     </div>

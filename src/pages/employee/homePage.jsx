@@ -1,3 +1,4 @@
+import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, LogIn, PlusCircle, ShieldAlert, TrendingUp, Video } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -5,10 +6,7 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
-import {
-    Clock, Award, ShieldAlert, Video, BookOpen, PlusCircle, CheckCircle, AlertCircle, ArrowRight,
-    Calendar, TrendingUp, BarChart2, LogIn, Car
-} from 'lucide-react';
+
 import DashboardBanner from '../../component/DashboardBanner';
 import { getEmployeeSummary } from '../../service/campusService';
 

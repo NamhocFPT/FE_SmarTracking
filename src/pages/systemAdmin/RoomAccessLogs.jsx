@@ -1,21 +1,11 @@
+import { AlertTriangle, ArrowUpDown, Building, Calendar, CheckCircle2, Clock, DoorOpen, Filter, RotateCw, Search, ShieldAlert, Users } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { 
     getRooms, 
     getRoomAccessLog 
 } from '../../service/sysAdminServices';
-import { 
-    Calendar, 
-    Clock, 
-    Search, 
-    AlertTriangle, 
-    CheckCircle2, 
-    ShieldAlert, 
-    RotateCw,
-    Users,
-    Filter,
-    ArrowUpDown,
-    Building
-} from 'lucide-react';
+
 
 const formatVietnameseDateTime = (isoString) => {
     if (!isoString) return '—';
@@ -164,6 +154,10 @@ const RoomAccessLogs = () => {
         <div className="max-w-[1440px] mx-auto space-y-6">
             {/* Header Title */}
             <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                    <DoorOpen className="w-3.5 h-3.5" />
+                    Phòng họp
+                </span>
                 <h1 className="text-xl md:text-2xl font-bold text-midnight-indigo flex items-center gap-2">
                     <ShieldAlert className="w-6.5 h-6.5 text-action-blue" />
                     Nhật ký ra/vào phòng họp

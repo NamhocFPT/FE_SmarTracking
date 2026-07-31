@@ -1,12 +1,8 @@
+import { AlertTriangle, ArrowLeft, Check, ChevronRight, Clock, Edit2, Mic, MicOff, PauseCircle, Play, PlayCircle, Shield, Smile, Sparkles, StopCircle, Users, Video as VideoIcon, VideoOff, Volume2, VolumeX } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    Mic, MicOff, Video as VideoIcon, VideoOff, Shield, 
-    Smile, Play, Clock, ChevronRight, Edit2, Check,
-    AlertTriangle, Volume2, VolumeX, ArrowLeft, Sparkles, Users,
-    StopCircle, PauseCircle, PlayCircle
-} from 'lucide-react';
+
 import { getSocket, subscribeToMeeting } from '../../utils/socket';
 import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, endMeeting as endEmployee, getPresentAttendees as getEmployeeAttendees, getMeetingAttendance as getEmployeeAttendance, createMeetingNote as createEmployeeNote, listMeetingNotes as listEmployeeNotes, startVideoRecording as startEmployeeVideoRecording, pauseVideoRecording as pauseEmployeeVideoRecording, resumeVideoRecording as resumeEmployeeVideoRecording, stopVideoRecording as stopEmployeeVideoRecording, getRecordingStatus as getEmployeeRecordingStatus, getMeetingMediaFiles as getEmployeeMediaFiles } from '../../service/employeeServices';
 import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes, startVideoRecording as startManagerVideoRecording, pauseVideoRecording as pauseManagerVideoRecording, resumeVideoRecording as resumeManagerVideoRecording, stopVideoRecording as stopManagerVideoRecording, getRecordingStatus as getManagerRecordingStatus, getMeetingMediaFiles as getManagerMediaFiles } from '../../service/managerServices';

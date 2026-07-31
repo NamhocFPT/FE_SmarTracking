@@ -1,8 +1,7 @@
+import { AlertTriangle, Building2, CheckCircle, Clock, DoorOpen, Info, RefreshCw, Save, Settings, Zap } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-    Settings, RefreshCw, Save, AlertTriangle, CheckCircle,
-    Clock, Building2, Zap, Info
-} from 'lucide-react';
+
+
 import {
     getNoShowConfig, updateNoShowConfig,
     getEarlyVacancyConfig, updateEarlyVacancyConfig,
@@ -274,6 +273,10 @@ const RoomOperations = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <DoorOpen className="w-3.5 h-3.5" />
+                        Phòng họp
+                    </span>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Vận hành Phòng họp</h1>
                     <p className="text-slate-blue text-sm mt-1">Cấu hình các ngưỡng No-Show, tự động giải phóng và trạng thái phòng theo thời gian thực.</p>
                 </div>

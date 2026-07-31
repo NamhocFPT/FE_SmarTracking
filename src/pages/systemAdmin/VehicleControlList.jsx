@@ -1,9 +1,8 @@
+import { AlertTriangle, Car, CheckCircle, Edit3, Eye, Filter, Plus, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
-import {
-    Car, RefreshCw, Plus, Edit3, Trash2, CheckCircle,
-    AlertTriangle, Filter, Eye, X, ShieldAlert
-} from 'lucide-react';
+
 import {
     getVehicleControlList,
     createVehicleControl,
@@ -187,6 +186,10 @@ const VehicleControlList = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Car className="w-3.5 h-3.5" />
+                        Phương tiện
+                    </span>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Biển số Theo dõi</h1>
                     <p className="text-slate-blue text-sm mt-1">Quản lý danh sách chặn và phương tiện cần giám sát tự động (ANPR).</p>
                 </div>

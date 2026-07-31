@@ -1,8 +1,7 @@
+import { AlertTriangle, Car, FileText, Filter, RefreshCw, User } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-    Car, RefreshCw, 
-    AlertTriangle, Filter, User, FileText
-} from 'lucide-react';
+
+
 import {
     getAdminVehicleRegistrations
 } from '../../service/sysAdminServices';
@@ -83,6 +82,10 @@ const VehicleRegistrations = () => {
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 mb-2">
                         <FileText className="w-3.5 h-3.5" />
                         Kiểm soát Phương tiện
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Car className="w-3.5 h-3.5" />
+                        Phương tiện
                     </span>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Lịch sử Đăng ký Xe</h1>
                     <p className="text-slate-blue text-sm mt-1">Tra cứu danh sách các phương tiện đã được đăng ký bởi nhân viên.</p>

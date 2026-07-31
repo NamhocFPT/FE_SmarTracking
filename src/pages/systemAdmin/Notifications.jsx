@@ -1,3 +1,4 @@
+import { AlertTriangle, Bell, Calendar, CheckCircle, CheckSquare, Clock, Eye, EyeOff, Info, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -5,10 +6,7 @@ import {
     markNotificationRead, 
     markAllNotificationsRead 
 } from '../../service/sysAdminServices';
-import { 
-    Bell, CheckCircle, Info, Calendar, Clock, AlertTriangle, 
-    CheckSquare, RefreshCw, Eye, EyeOff
-} from 'lucide-react';
+
 
 const Notifications = () => {
     const [notificationsList, setNotificationsList] = useState([]);

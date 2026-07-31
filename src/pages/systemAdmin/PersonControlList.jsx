@@ -1,9 +1,8 @@
+import { AlertTriangle, CheckCircle, Edit3, Eye, Filter, Plus, RefreshCw, Trash2, UserCheck, UserX, Users, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
-import {
-    Users, RefreshCw, Plus, Edit3, Trash2, CheckCircle,
-    AlertTriangle, Filter, Eye, X, UserX, UserCheck
-} from 'lucide-react';
+
 import {
     getPersonControlList,
     createPersonControl,
@@ -196,6 +195,10 @@ const PersonControlList = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Users className="w-3.5 h-3.5" />
+                        Đối tượng
+                    </span>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Đối tượng theo dõi</h1>
                     <p className="text-slate-blue text-sm mt-1">Quản lý danh sách đen và các cá nhân cần theo dõi đặc biệt.</p>
                 </div>

@@ -1,4 +1,6 @@
+import { Cpu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import {
     getDevices,
@@ -444,6 +446,10 @@ const DeviceManagement = () => {
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Cpu className="w-3.5 h-3.5" />
+                        IoT
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý thiết bị IoT</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Khai báo, giám sát tình trạng sức khỏe kết nối và điều phối RTSP stream cho camera/face terminal.

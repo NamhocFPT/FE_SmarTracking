@@ -1,4 +1,6 @@
+import { Building } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import UserAvatar from '../../component/UserAvatar';
 import {
@@ -469,6 +471,10 @@ const DepartmentManagement = () => {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Building className="w-3.5 h-3.5" />
+                        Phòng ban
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý phòng ban</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Thiết lập cơ cấu tổ chức, tạo mới phòng ban và sắp xếp thành viên trong hệ thống.

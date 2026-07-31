@@ -1,8 +1,6 @@
+import { Award, BarChart3, Building2, Calendar, ChevronRight, Clock, FileText, Grid, Info, TrendingUp, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    Building2, Calendar, FileText, BarChart3, Clock, 
-    TrendingUp, Info, ChevronRight, X, Grid, Award
-} from 'lucide-react';
+
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, ResponsiveContainer, BarChart, Bar, Cell

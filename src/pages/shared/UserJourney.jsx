@@ -1,11 +1,8 @@
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Calendar, CalendarCheck, Car, Check, Clock, Eye, Map, MapPin, RefreshCw, Search, Sparkles, User } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+
 import { useSearchParams } from 'react-router-dom';
-import { 
-    Calendar, User, Car, Eye, MapPin, 
-    AlertCircle, RefreshCw, CalendarCheck, Search,
-    ArrowUpRight, ArrowDownLeft, Check,
-    Clock, Sparkles
-} from 'lucide-react';
+
 import { getUsers } from '../../service/businessAdminServices';
 import { getUserJourney } from '../../service/campusService';
 
@@ -202,6 +199,10 @@ const UserJourney = () => {
                         <Sparkles className="w-6 h-6" />
                     </div>
                     <div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                            <Map className="w-3.5 h-3.5" />
+                            Hành trình
+                        </span>
                         <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Hành trình khuôn viên</h1>
                         <p className="text-slate-blue text-sm mt-0.5">Theo dõi lịch trình hoạt động tổng hợp của một nhân viên trong ngày.</p>
                     </div>

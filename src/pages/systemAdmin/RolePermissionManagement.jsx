@@ -1,12 +1,12 @@
+import { AlertTriangle, CheckCircle, Key, Plus, RefreshCw, Save, Search, Shield, Trash2, UserCog } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import { 
     getRoles, getPermissions, getRolePermissions, 
     assignRolePermissions, createRole, updateRole, deleteRole
 } from '../../service/permissionServices';
-import { 
-    Shield, Plus, Save, AlertTriangle, Key, Search, RefreshCw, CheckCircle, Trash2
-} from 'lucide-react';
+
 
 const MODULE_TRANSLATIONS = {
     'system_management': 'Quản trị hệ thống',
@@ -221,6 +221,10 @@ const RolePermissionManagement = () => {
         <div className="p-6 h-full flex flex-col bg-snow-white">
             <div className="flex justify-between items-center mb-6 animate-fade-in-up">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <UserCog className="w-3.5 h-3.5" />
+                        Phân quyền
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý Phân quyền</h1>
                     <p className="text-sm text-slate-blue mt-1">Cấu hình các vai trò và gán quyền chi tiết cho từng vai trò trong hệ thống.</p>
                 </div>

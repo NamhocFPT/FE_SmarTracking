@@ -1,7 +1,8 @@
+import { Activity, BarChart2, Filter, List, LogOut, RefreshCw, Shield, User, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAdminGateAccessLogs, getAdminGateAccessHistory, getAdminVehicleTrafficStats, getAdminGateAccessHistoryDetail } from '../../service/sysAdminServices';
-import { Filter, Shield, BarChart2, List, Activity, User, X, RefreshCw } from 'lucide-react';
+
 
 export default function GateAccessManagement() {
     const [activeTab, setActiveTab] = useState('logs'); // 'logs', 'sessions', 'stats'
@@ -113,6 +114,10 @@ export default function GateAccessManagement() {
         <div className="p-6 max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <LogOut className="w-3.5 h-3.5" />
+                        Cổng ra vào
+                    </span>
                     <h1 className="text-2xl font-black text-midnight-indigo flex items-center gap-2">
                         <Shield className="w-7 h-7 text-action-blue" /> Kiểm Soát Ra Vào Cổng
                     </h1>

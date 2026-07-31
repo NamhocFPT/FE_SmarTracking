@@ -1,4 +1,6 @@
+import { Settings } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { getSystemConfigs, updateSystemConfig } from '../../service/sysAdminServices';
 
 /**
@@ -235,6 +237,10 @@ const SystemSettings = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Settings className="w-3.5 h-3.5" />
+                        Hệ thống
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Cài đặt hệ thống</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Cấu hình các tham số toàn cục, chính sách No-show, tự động giải phóng phòng và các quy tắc nghiệp vụ.

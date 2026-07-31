@@ -1,12 +1,10 @@
+import { AlertTriangle, Calendar, CheckCircle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Info, LayoutGrid, List, RefreshCw, Search, Users, X, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import {
-    Calendar, Clock, AlertTriangle, CheckCircle2, XCircle, RefreshCw,
-    Search, Eye, Info, X, ChevronLeft, ChevronRight, Users, FileText,
-    LayoutGrid, List
-} from 'lucide-react';
+
 import {
     getPendingMeetingRequests,
     approveMeetingRequest,
@@ -212,6 +210,10 @@ const MeetingApprovals = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-platinum-tint pb-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Phê duyệt
+                    </span>
                     <h1 className="text-xl md:text-2xl font-extrabold text-midnight-indigo leading-tight">
                         Phê duyệt cuộc họp
                     </h1>

@@ -1,11 +1,9 @@
+import { AlertCircle, Calendar, CheckCircle, FileAudio, FileText, FolderOpen, Play, RefreshCw, Search, User, Video, WifiOff } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    Video, FileText, Play, Search, Calendar, User,
-    RefreshCw, AlertCircle, CheckCircle, FileAudio,
-    FolderOpen, WifiOff
-} from 'lucide-react';
+
 import { getMySchedule, getMeetingMediaFiles, getMediaFileSecureDownload } from '../../service/employeeServices';
 
 const containerVariants = {
@@ -179,6 +177,10 @@ const EmployeeRecordings = () => {
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 mb-2">
                         <Video className="w-3.5 h-3.5" />
                         Kho lưu trữ
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Video className="w-3.5 h-3.5" />
+                        Ghi hình
                     </span>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Bản ghi & Tài liệu cuộc họp</h1>
                     <p className="text-slate-blue text-sm">Quản lý, nghe lại video/audio và tải xuống tài liệu transcript của các cuộc họp đã diễn ra.</p>

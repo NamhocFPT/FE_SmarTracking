@@ -1,9 +1,8 @@
+import { AlertTriangle, CheckCircle, CheckSquare, Clock, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
-import { 
-    ShieldAlert, Search, RefreshCw, AlertTriangle, CheckCircle, 
-    CheckSquare, Edit3, Eye, Clock, Shield, Filter 
-} from 'lucide-react';
+
 import { 
     getSecurityAlerts, acknowledgeSecurityAlert, 
     resolveSecurityAlert, bulkAcknowledgeSecurityAlerts 
@@ -204,6 +203,10 @@ const SecurityAlerts = () => {
             {/* HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-platinum-tint">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        An ninh
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight flex items-center">
                         <ShieldAlert className="w-7 h-7 mr-3 text-red-500" />
                         Trung tâm Cảnh báo An ninh

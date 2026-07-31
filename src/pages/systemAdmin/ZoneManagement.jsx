@@ -1,15 +1,13 @@
+import { AlertTriangle, Camera, CheckCircle, Edit2, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, Trash2, Video } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import { 
     getZones, getZoneById, createZone, updateZone, 
     deleteZone, assignDeviceToZone, removeDeviceFromZone 
 } from '../../service/zoneServices';
 import { getDevices } from '../../service/sysAdminServices';
-import { 
-    Map, Plus, Search, MapPin, Edit2, Trash2, 
-    RefreshCw, AlertTriangle, Monitor, Video, Shield,
-    CheckCircle, Camera, Server
-} from 'lucide-react';
+
 
 const ZoneManagement = () => {
     // Data states
@@ -217,6 +215,10 @@ const ZoneManagement = () => {
             {/* HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm-1 border border-platinum-tint">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Khu vực
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý khu vực (Zones)</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Thiết lập các khu vực giám sát và gán camera AI để quản lý hiện diện.

@@ -1,3 +1,4 @@
+import { BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Fingerprint, Home, MapPin, PieChart, PlusCircle, Shield } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout } from '../../../service/authService';
@@ -6,20 +7,7 @@ import BiometricReminderModal from '../../../component/BiometricReminder/Biometr
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
 import NotificationBell from '../../../component/NotificationBell';
-import { 
-    Home, 
-    Calendar, 
-    PlusCircle, 
-    CheckSquare, 
-    FileCheck, 
-    Fingerprint, 
-    Shield, 
-    MapPin, 
-    BarChart2, 
-    PieChart, 
-    Clock,
-    ChevronDown
-} from 'lucide-react';
+
 
 const chunkArray = (arr, size) => {
     const chunks = [];

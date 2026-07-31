@@ -1,3 +1,4 @@
+import { Activity, AlertCircle, CheckCircle, DoorOpen, Edit2, FileWarning, Home, List, Plus, RefreshCw, ShieldAlert, Trash2, UserCheck, Users } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -7,7 +8,7 @@ import {
     updateRoom,
     deleteRoom
 } from '../../service/businessAdminServices';
-import { Plus, Edit2, Trash2, Home, CheckCircle, AlertCircle, Users, RefreshCw, Activity, List, ShieldAlert, FileWarning, UserCheck } from 'lucide-react';
+
 import RealtimeRoomMonitor from '../../component/RealtimeRoomMonitor';
 import StrangerAlerts from '../../component/StrangerAlerts';
 import UnmappedVerifyReview from '../../component/UnmappedVerifyReview';
@@ -152,6 +153,10 @@ const RoomManagement = () => {
         <div className="space-y-6 animate-fade-in-up">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <DoorOpen className="w-3.5 h-3.5" />
+                        Phòng họp
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý phòng họp</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Cấu hình cơ sở vật chất, sức chứa và kiểm tra trạng thái khả dụng của các phòng họp thông minh.

@@ -1,8 +1,6 @@
+import { AlertCircle, Calendar, ChevronRight, Clock, FileText, Info, TrendingUp, User, UserCheck, Users, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    Clock, Calendar, FileText, UserCheck, AlertCircle, 
-    TrendingUp, Info, ChevronRight, X, User, Users
-} from 'lucide-react';
+
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend 

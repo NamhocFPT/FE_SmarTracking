@@ -1,10 +1,10 @@
+import { AlertTriangle, ArrowLeft, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    Calendar, Clock, Users, ShieldAlert, Video, Mic, Plus, Trash2, Check, AlertTriangle, ArrowLeft, Info, HelpCircle, Search, ChevronRight, CheckCircle2, X, FileSpreadsheet, Upload, Download, Paperclip
-} from 'lucide-react';
+
 import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers, getUserById, getUserPublicProfile } from '../../service/employeeServices';
 import { getDepartments } from '../../service/businessAdminServices';
 import * as XLSX from 'xlsx';
@@ -673,6 +673,10 @@ const BookMeeting = () => {
         <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
             <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                    <CalendarPlus className="w-3.5 h-3.5" />
+                    Đặt lịch
+                </span>
                 <h1 className="text-xl sm:text-2xl font-bold text-midnight-indigo">Đặt lịch & Đăng ký phòng họp</h1>
                 <p className="text-xs text-slate-blue">Lên kế hoạch cuộc họp, thiết lập chương trình (agenda) và kiểm tra chính sách bảo mật</p>
             </div>

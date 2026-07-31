@@ -1,4 +1,6 @@
+import { User } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -268,6 +270,10 @@ const Profile = () => {
     return (
         <div className="space-y-6 animate-fade-in-up max-w-5xl mx-auto">
             <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                    <User className="w-3.5 h-3.5" />
+                    Cá nhân
+                </span>
                 <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Hồ sơ cá nhân</h1>
                 <p className="text-slate-blue text-sm mt-1">Xem chi tiết thông tin hồ sơ của bạn và cấu hình sinh trắc học FaceID.</p>
             </div>

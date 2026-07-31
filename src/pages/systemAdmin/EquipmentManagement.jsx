@@ -1,11 +1,10 @@
+import { AlertTriangle, Cpu, MapPin, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment } from '../../service/equipmentServices';
 import { getRooms } from '../../service/businessAdminServices';
-import { 
-    Plus, Search, RefreshCw, AlertTriangle, Monitor, 
-    Video, Mic, Speaker, MapPin, Wrench, Package, Cpu, Trash2
-} from 'lucide-react';
+
 
 const EquipmentManagement = () => {
     // Data states
@@ -220,6 +219,10 @@ const EquipmentManagement = () => {
         <div className="p-6 h-full flex flex-col bg-snow-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-fade-in-up">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Monitor className="w-3.5 h-3.5" />
+                        Thiết bị
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý Trang thiết bị</h1>
                     <p className="text-sm text-slate-blue mt-1">Quản lý danh sách, điều phối phòng và theo dõi tình trạng thiết bị.</p>
                 </div>

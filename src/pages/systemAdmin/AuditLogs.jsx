@@ -1,4 +1,6 @@
+import { Activity } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
 import { getAuditLogs } from '../../service/sysAdminServices';
 
@@ -380,6 +382,10 @@ const AuditLogs = () => {
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Activity className="w-3.5 h-3.5" />
+                        Nhật ký
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Nhật ký hệ thống</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Theo dõi lịch sử vận hành, ghi nhận thao tác của quản trị viên và các cảnh báo khẩn cấp.

@@ -1,4 +1,6 @@
+import { Car } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+
 import { 
     getAdminVehicleHistory, 
     adminRegisterVehicle, 
@@ -105,6 +107,10 @@ const ANPRManagement = () => {
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-fade-in-up pb-10">
             <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                    <Car className="w-3.5 h-3.5" />
+                    Biển số
+                </span>
                 <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý nhận diện biển số (ANPR)</h1>
                 <p className="text-slate-blue text-sm mt-1">
                     Theo dõi lịch sử vào ra, quản lý biển lạ và đăng ký phương tiện cho nhân sự.

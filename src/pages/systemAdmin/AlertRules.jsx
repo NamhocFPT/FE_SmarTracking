@@ -1,9 +1,8 @@
+import { AlertTriangle, Bell, BellRing, CheckCircle, Edit3, Eye, Filter, Mail, Plus, Power, PowerOff, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
+
 import { createPortal } from 'react-dom';
-import {
-    ShieldAlert, RefreshCw, Plus, Edit3, Trash2, CheckCircle, 
-    AlertTriangle, Filter, Eye, Power, PowerOff, X, Bell, Mail
-} from 'lucide-react';
+
 import {
     getAlertRules,
     createAlertRule,
@@ -283,6 +282,10 @@ const AlertRules = () => {
             {/* HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-platinum-tint">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <BellRing className="w-3.5 h-3.5" />
+                        Cảnh báo
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight flex items-center">
                         <ShieldAlert className="w-7 h-7 mr-3 text-action-blue" />
                         Cấu hình Luật Cảnh báo

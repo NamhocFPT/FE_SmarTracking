@@ -1,4 +1,6 @@
+import { Car } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+
 import { getMyVehicles, createMyVehicle, updateMyVehicle, toggleMyVehicleStatus, deleteMyVehicle } from '../../service/anprService';
 
 const MyVehicles = () => {
@@ -100,6 +102,10 @@ const MyVehicles = () => {
             <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up pb-8">
             <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
                 <div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                        <Car className="w-3.5 h-3.5" />
+                        Phương tiện
+                    </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Phương tiện cá nhân</h1>
                     <p className="text-slate-blue text-sm mt-1">
                         Quản lý biển số xe của bạn để tự động nhận diện (ANPR) khi ra vào bãi đỗ.
