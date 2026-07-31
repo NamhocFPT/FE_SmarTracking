@@ -69,6 +69,11 @@ const ManagerMeetingDetail = () => {
     const [activeRightTab, setActiveRightTab] = useState('transcript');
     const [activeAttendanceTab, setActiveAttendanceTab] = useState('attendance'); // 'attendance' or 'ivss'
 
+    // Pagination for long lists
+    const [agendaPage, setAgendaPage] = useState(1);
+    const [participantsPage, setParticipantsPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
+
     /**
      * Chuẩn hoá DTO lồng nhau từ API GET /meetings/:id
      * Map { meeting, host, organizer, room, participants, agendas, recordingConfig }
@@ -113,8 +118,8 @@ const ManagerMeetingDetail = () => {
             start_time: meetingObj.startTime || meetingObj.start_time || dto.startTime || dto.start_time,
             endTime: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
             end_time: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
-            recordingEnabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
-            recording_enabled: dto.recordingConfig?.enableVideo || dto.recordingEnabled || dto.recording_enabled || false,
+            recordingEnabled: dto.recordingConfig?.allowRecording || dto.recordingEnabled || dto.recording_enabled || false,
+            recording_enabled: dto.recordingConfig?.allowRecording || dto.recordingEnabled || dto.recording_enabled || false,
             participants,
             agenda,
         };
@@ -487,36 +492,44 @@ const ManagerMeetingDetail = () => {
                 )}
 
                 {/* Title & Banner Info */}
-                <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2 space-y-4">
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 pb-4 border-b border-platinum-tint/60">
-                        <div className="space-y-3 w-full">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${meeting.status === 'scheduled' ? 'bg-blue-50 text-action-blue border border-blue-150' :
+                <div className="bg-white p-6 md:p-8 rounded-2xl border border-platinum-tint shadow-sm-2 relative overflow-hidden space-y-6">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                        <Users className="w-48 h-48 text-midnight-indigo" />
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-6 pb-6 border-b border-platinum-tint/60 relative z-10">
+                        <div className="space-y-4 w-full">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <span className={`px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1.5 ${
+                                    meeting.status === 'scheduled' ? 'bg-blue-50 text-action-blue border border-blue-200' :
                                     meeting.status === 'in_progress' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                        meeting.status === 'completed' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                                            'bg-red-50 text-red-700 border border-red-200'
-                                    }`}>
+                                    meeting.status === 'completed' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                                    'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${meeting.status === 'in_progress' ? 'bg-emerald-500 animate-pulse' : 'bg-current'}`} />
                                     {meeting.status === 'scheduled' ? 'Đã xếp lịch' :
-                                        meeting.status === 'in_progress' ? 'Đang họp' :
-                                            meeting.status === 'completed' ? 'Đã kết thúc' : 'Đã hủy'}
+                                     meeting.status === 'in_progress' ? 'Đang họp' :
+                                     meeting.status === 'completed' ? 'Đã kết thúc' : 'Đã hủy'}
                                 </span>
                                 {meeting.recordingEnabled && (
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 flex items-center gap-1">
+                                    <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-red-50 text-red-600 border border-red-100 flex items-center gap-1.5 shadow-sm">
                                         <Video className="w-3.5 h-3.5" /> Tự động ghi hình
                                     </span>
                                 )}
                                 {meeting.meeting_code && (
-                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 font-mono">
-                                        Mã cuộc họp: {meeting.meeting_code}
+                                    <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-sm font-mono flex items-center gap-1.5">
+                                        Mã cuộc họp: <span className="text-midnight-indigo">{meeting.meeting_code}</span>
                                     </span>
                                 )}
                             </div>
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
-                                <Users className="w-3.5 h-3.5" />
-                                Chi tiết cuộc họp
-                            </span>
-                            <h1 className="text-xl md:text-2xl font-bold text-midnight-indigo leading-snug">{meeting.title}</h1>
-                            <p className="text-slate-blue text-xs">{meeting.description || 'Không có mô tả cuộc họp'}</p>
+                            <div className="space-y-2">
+                                <h1 className="text-2xl md:text-3xl font-extrabold text-midnight-indigo leading-tight tracking-tight">
+                                    {meeting.title}
+                                </h1>
+                                <p className="text-sm text-slate-blue/80 max-w-3xl leading-relaxed">
+                                    {meeting.description || 'Không có mô tả cuộc họp'}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -600,30 +613,57 @@ const ManagerMeetingDetail = () => {
                                 )}
                             </div>
                             {meeting.agenda && meeting.agenda.length > 0 ? (
-                                <div className="space-y-4">
-                                    {meeting.agenda.map((item, idx) => (
-                                        <div key={idx} className="flex gap-4 items-start relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-0 before:w-0.5 before:bg-platinum-tint last:before:hidden">
-                                            <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-action-blue/10 border border-action-blue flex items-center justify-center text-[9px] font-bold text-action-blue">
-                                                {idx + 1}
-                                            </div>
-                                            <div className="flex-1 bg-cloud-mist/55 p-3 rounded-xl border border-outline-gray/60">
-                                                <div className="flex justify-between items-center">
-                                                    <h4 className="font-semibold text-midnight-indigo text-xs sm:text-sm flex items-center gap-2">
-                                                        {item.title}
-                                                        {item.file && <FileText className="w-4 h-4 text-action-blue shrink-0" title={item.file.name} />}
-                                                    </h4>
-                                                    <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded font-bold">{item.durationMin} phút</span>
+                                <div className="flex flex-col h-full">
+                                    <div className="space-y-4 flex-1">
+                                        {meeting.agenda.slice((agendaPage - 1) * ITEMS_PER_PAGE, agendaPage * ITEMS_PER_PAGE).map((item, idx) => {
+                                            const actualIdx = (agendaPage - 1) * ITEMS_PER_PAGE + idx;
+                                            return (
+                                            <div key={actualIdx} className="flex gap-4 items-start relative pl-6 before:absolute before:left-2 before:top-2 before:bottom-0 before:w-0.5 before:bg-platinum-tint last:before:hidden">
+                                                <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-action-blue/10 border border-action-blue flex items-center justify-center text-[9px] font-bold text-action-blue">
+                                                    {actualIdx + 1}
+                                                </div>
+                                                <div className="flex-1 bg-cloud-mist/55 p-3 rounded-xl border border-outline-gray/60">
+                                                    <div className="flex justify-between items-center">
+                                                        <h4 className="font-semibold text-midnight-indigo text-xs sm:text-sm flex items-center gap-2">
+                                                            {item.title}
+                                                            {item.file && <FileText className="w-4 h-4 text-action-blue shrink-0" title={item.file.name} />}
+                                                        </h4>
+                                                        <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded font-bold">{item.durationMin} phút</span>
+                                                    </div>
                                                 </div>
                                             </div>
+                                        )})}
+                                    </div>
+                                    {meeting.agenda.length > ITEMS_PER_PAGE && (
+                                        <div className="flex justify-between items-center mt-4 pt-3 border-t border-platinum-tint">
+                                            <button 
+                                                disabled={agendaPage === 1} 
+                                                onClick={() => setAgendaPage(p => p - 1)} 
+                                                className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
+                                            >
+                                                Trước
+                                            </button>
+                                            <span className="text-[10px] font-bold text-slate-blue">
+                                                Trang {agendaPage} / {Math.ceil(meeting.agenda.length / ITEMS_PER_PAGE)}
+                                            </span>
+                                            <button 
+                                                disabled={agendaPage === Math.ceil(meeting.agenda.length / ITEMS_PER_PAGE)} 
+                                                onClick={() => setAgendaPage(p => p + 1)} 
+                                                className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
+                                            >
+                                                Sau
+                                            </button>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-xs text-slate-blue italic text-center py-4">Chưa có Agenda nào được cấu hình cho cuộc họp này.</p>
                             )}
                         </div>
+                    </div>
 
-                        {/* Participants & Host */}
+                    {/* Right: Participants & Host */}
+                    <div className="lg:col-span-1 space-y-4">
                         <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
                             <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
                                 <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
@@ -639,160 +679,194 @@ const ManagerMeetingDetail = () => {
                                     </button>
                                 )}
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
-                                    <UserAvatar
-                                        user={hostUser}
-                                        name={hostName}
-                                        className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
-                                    />
-                                    <div className="truncate">
-                                        <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Người chủ trì</span>
-                                        <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
-                                    </div>
-                                </div>
-
-                                {meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName).map(p => (
-                                    <div key={p.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center gap-3">
-                                        <UserAvatar
-                                            user={p}
-                                            className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
-                                        />
-                                        <div className="truncate">
-                                            <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Người tham dự</span>
-                                            <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
+                            <div className="flex flex-col h-full">
+                                <div className="grid grid-cols-1 gap-4 flex-1">
+                                    {participantsPage === 1 && (
+                                        <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
+                                            <UserAvatar
+                                                user={hostUser}
+                                                name={hostName}
+                                                className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
+                                            />
+                                            <div className="truncate">
+                                                <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Người chủ trì</span>
+                                                <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )}
+                                    
+                                    {(() => {
+                                        const filtered = meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName) || [];
+                                        const paginated = filtered.slice((participantsPage - 1) * ITEMS_PER_PAGE, participantsPage * ITEMS_PER_PAGE);
+                                        
+                                        return (
+                                            <>
+                                                {paginated.map(p => (
+                                                    <div key={p.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center gap-3">
+                                                        <UserAvatar
+                                                            user={p}
+                                                            className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
+                                                        />
+                                                        <div className="truncate">
+                                                            <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Người tham dự</span>
+                                                            <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {filtered.length > ITEMS_PER_PAGE && (
+                                                    <div className="flex justify-between items-center mt-2 pt-3 border-t border-platinum-tint">
+                                                        <button 
+                                                            disabled={participantsPage === 1} 
+                                                            onClick={() => setParticipantsPage(p => p - 1)} 
+                                                            className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
+                                                        >
+                                                            Trước
+                                                        </button>
+                                                        <span className="text-[10px] font-bold text-slate-blue">
+                                                            Trang {participantsPage} / {Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                                        </span>
+                                                        <button 
+                                                            disabled={participantsPage === Math.ceil(filtered.length / ITEMS_PER_PAGE)} 
+                                                            onClick={() => setParticipantsPage(p => p + 1)} 
+                                                            className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
+                                                        >
+                                                            Sau
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Right: Media & Recording & Transcript */}
-                    <div className="lg:col-span-1 space-y-4">
-                        {/* Tabs cho Right Panel */}
-                        <div className="flex border-b border-platinum-tint bg-white rounded-t-2xl px-2 pt-2">
-                            <button
-                                onClick={() => setActiveRightTab('transcript')}
-                                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'transcript' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
-                            >
-                                Bản ghi (STT)
-                            </button>
-                            <button
-                                onClick={() => setActiveRightTab('minutes')}
-                                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'minutes' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
-                            >
-                                Biên bản (AI)
-                            </button>
-                        </div>
-
-                        {activeRightTab === 'transcript' ? (
-                            meeting.recordingEnabled && isCompleted ? (
-                                <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 space-y-5">
-                                    <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider border-b border-platinum-tint pb-3 flex items-center gap-2">
-                                        <Video className="w-4.5 h-4.5 text-red-600" />
-                                        Video ghi hình & Bản ghi chữ
-                                    </h3>
-
-
-                                    {/* Real or Mock Player */}
-                                    {videoMedia ? (
-                                        <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner">
-                                            <video src={videoMedia.fileUrl} controls className="w-full h-full" />
-                                        </div>
-                                    ) : (
-                                        <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner group">
-                                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/80 to-transparent flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                <span className="text-[10px] font-semibold bg-red-600/90 text-white px-2 py-0.5 rounded self-start uppercase">Xem lại cuộc họp</span>
-                                                <span className="text-[10.5px] font-mono text-slate-300 self-end">
-                                                    {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')} / 2:00
-                                                </span>
-                                            </div>
-
-                                            <button
-                                                onClick={() => setIsPlaying(!isPlaying)}
-                                                className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/35 backdrop-blur-md flex items-center justify-center text-white transition-all shadow-md transform active:scale-95 z-10"
-                                            >
-                                                {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Transcript Area */}
-                                    {transcriptMedia ? (
-                                        <div className="pt-2">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="text-xs font-bold text-midnight-indigo">Bản ghi chữ cuộc họp</span>
-                                                <a href={transcriptMedia.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-action-blue rounded-lg text-xs font-bold hover:bg-blue-100">
-                                                    <Download className="w-3.5 h-3.5" />
-                                                    Tải bản ghi chữ
-                                                </a>
-                                            </div>
-                                            <div className="text-xs text-slate-blue italic text-center p-4 bg-cloud-mist/30 rounded-xl border border-platinum-tint">
-                                                Tính năng hiển thị trực tiếp bản dịch đang được phát triển. Vui lòng tải xuống file gốc để xem.
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3 pt-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-xs font-bold text-midnight-indigo">Bản ghi chữ cuộc họp</span>
-                                                <div className="relative w-36">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Tìm từ khóa..."
-                                                        value={transcriptQuery}
-                                                        onChange={(e) => setTranscriptQuery(e.target.value)}
-                                                        className="w-full pl-7 pr-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] focus:outline-none focus:border-action-blue"
-                                                    />
-                                                    <Search className="w-3.5 h-3.5 text-slate-blue absolute left-2 top-2" />
-                                                </div>
-                                            </div>
-
-                                            <div className="h-48 overflow-y-auto border border-outline-gray rounded-xl p-3 bg-cloud-mist/30 space-y-3 text-[11px] pr-1.5 scrollbar-thin">
-                                                {filteredTranscript.map((segment, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        onClick={() => setCurrentTime(segment.time)}
-                                                        className={`p-2 rounded-lg border cursor-pointer transition-colors ${idx === activeSegmentIndex && isPlaying
-                                                            ? 'bg-blue-50/80 border-blue-200 shadow-sm'
-                                                            : 'bg-white border-outline-gray/60 hover:bg-cloud-mist'
-                                                            }`}
-                                                    >
-                                                        <div className="flex justify-between items-center mb-1 text-[9.5px]">
-                                                            <span className="font-bold text-midnight-indigo">{segment.speaker}</span>
-                                                            <span className="text-slate-blue font-mono font-bold">
-                                                                {Math.floor(segment.time / 60)}:{(segment.time % 60).toString().padStart(2, '0')}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-slate-blue leading-relaxed">{segment.text}</p>
-                                                    </div>
-                                                ))}
-                                                {filteredTranscript.length === 0 && (
-                                                    <p className="text-center italic text-slate-blue py-6">Không tìm thấy nội dung phù hợp.</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 text-center py-8 text-slate-blue">
-                                    <Video className="w-8 h-8 mx-auto text-platinum-tint mb-2.5" />
-                                    <h4 className="text-xs font-bold text-midnight-indigo uppercase">Không có Video ghi hình</h4>
-                                    <p className="text-[11px] mt-1 leading-relaxed text-slate-blue/80">
-                                        {meeting.recordingEnabled
-                                            ? 'Bản ghi hình và bản ghi chữ cuộc họp sẽ khả dụng sau khi cuộc họp kết thúc.'
-                                            : 'Cuộc họp này không đăng ký chế độ tự động ghi hình.'}
-                                    </p>
-                                </div>
-                            )
-                        ) : (
-                            <MinutesTabContent 
-                                meetingId={meeting.id} 
-                                isHost={canManage} 
-                                transcriptStatus={meeting.recordingEnabled && isCompleted ? 'ready' : 'empty'} 
-                            />
-                        )}
+                {/* Bottom: Media & Recording & Transcript */}
+                <div className="w-full space-y-4 mt-6">
+                    {/* Tabs cho Right Panel */}
+                    <div className="flex border-b border-platinum-tint bg-white rounded-t-2xl px-2 pt-2">
+                        <button
+                            onClick={() => setActiveRightTab('transcript')}
+                            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'transcript' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
+                        >
+                            Bản ghi (STT)
+                        </button>
+                        <button
+                            onClick={() => setActiveRightTab('minutes')}
+                            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'minutes' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
+                        >
+                            Biên bản (AI)
+                        </button>
                     </div>
+
+                    {activeRightTab === 'transcript' ? (
+                        meeting.recordingEnabled && isCompleted ? (
+                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 space-y-5">
+                                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider border-b border-platinum-tint pb-3 flex items-center gap-2">
+                                    <Video className="w-4.5 h-4.5 text-red-600" />
+                                    Video ghi hình & Bản ghi chữ
+                                </h3>
+
+
+                                {/* Real or Mock Player */}
+                                {videoMedia ? (
+                                    <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner">
+                                        <video src={videoMedia.fileUrl} controls className="w-full h-full" />
+                                    </div>
+                                ) : (
+                                    <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner group">
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/80 to-transparent flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                            <span className="text-[10px] font-semibold bg-red-600/90 text-white px-2 py-0.5 rounded self-start uppercase">Xem lại cuộc họp</span>
+                                            <span className="text-[10.5px] font-mono text-slate-300 self-end">
+                                                {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')} / 2:00
+                                            </span>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setIsPlaying(!isPlaying)}
+                                            className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/35 backdrop-blur-md flex items-center justify-center text-white transition-all shadow-md transform active:scale-95 z-10"
+                                        >
+                                            {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Transcript Area */}
+                                {transcriptMedia ? (
+                                    <div className="pt-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-bold text-midnight-indigo">Bản ghi chữ cuộc họp</span>
+                                            <a href={transcriptMedia.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-action-blue rounded-lg text-xs font-bold hover:bg-blue-100">
+                                                <Download className="w-3.5 h-3.5" />
+                                                Tải bản ghi chữ
+                                            </a>
+                                        </div>
+                                        <div className="text-xs text-slate-blue italic text-center p-4 bg-cloud-mist/30 rounded-xl border border-platinum-tint">
+                                            Tính năng hiển thị trực tiếp bản dịch đang được phát triển. Vui lòng tải xuống file gốc để xem.
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-bold text-midnight-indigo">Bản ghi chữ cuộc họp</span>
+                                            <div className="relative w-36">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Tìm từ khóa..."
+                                                    value={transcriptQuery}
+                                                    onChange={(e) => setTranscriptQuery(e.target.value)}
+                                                    className="w-full pl-7 pr-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] focus:outline-none focus:border-action-blue"
+                                                />
+                                                <Search className="w-3.5 h-3.5 text-slate-blue absolute left-2 top-2" />
+                                            </div>
+                                        </div>
+
+                                        <div className="h-48 overflow-y-auto border border-outline-gray rounded-xl p-3 bg-cloud-mist/30 space-y-3 text-[11px] pr-1.5 scrollbar-thin">
+                                            {filteredTranscript.map((segment, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    onClick={() => setCurrentTime(segment.time)}
+                                                    className={`p-2 rounded-lg border cursor-pointer transition-colors ${idx === activeSegmentIndex && isPlaying
+                                                        ? 'bg-blue-50/80 border-blue-200 shadow-sm'
+                                                        : 'bg-white border-outline-gray/60 hover:bg-cloud-mist'
+                                                        }`}
+                                                >
+                                                    <div className="flex justify-between items-center mb-1 text-[9.5px]">
+                                                        <span className="font-bold text-midnight-indigo">{segment.speaker}</span>
+                                                        <span className="text-slate-blue font-mono font-bold">
+                                                            {Math.floor(segment.time / 60)}:{(segment.time % 60).toString().padStart(2, '0')}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-slate-blue leading-relaxed">{segment.text}</p>
+                                                </div>
+                                            ))}
+                                            {filteredTranscript.length === 0 && (
+                                                <p className="text-center italic text-slate-blue py-6">Không tìm thấy nội dung phù hợp.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 text-center py-8 text-slate-blue">
+                                <Video className="w-8 h-8 mx-auto text-platinum-tint mb-2.5" />
+                                <h4 className="text-xs font-bold text-midnight-indigo uppercase">Không có Video ghi hình</h4>
+                                <p className="text-[11px] mt-1 leading-relaxed text-slate-blue/80">
+                                    {meeting.recordingEnabled
+                                        ? 'Bản ghi hình và bản ghi chữ cuộc họp sẽ khả dụng sau khi cuộc họp kết thúc.'
+                                        : 'Cuộc họp này không đăng ký chế độ tự động ghi hình.'}
+                                </p>
+                            </div>
+                        )
+                    ) : (
+                        <MinutesTabContent 
+                            meetingId={meeting.id} 
+                            isHost={canManage} 
+                            transcriptStatus={meeting.recordingEnabled && isCompleted ? 'ready' : 'empty'} 
+                        />
+                    )}
                 </div>
 
                 {/* Attendance Board Section */}
