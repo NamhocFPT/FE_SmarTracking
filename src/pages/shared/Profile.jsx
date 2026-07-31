@@ -235,15 +235,10 @@ const Profile = () => {
                 window.dispatchEvent(new Event("storage"));
                 fetchProfileData();
             } else {
-                setSuccessMessage("Đã mô phỏng cập nhật thông tin cá nhân thành công.");
-                setEditMode(false);
-                localUser.fullName = payload.fullName;
-                localStorage.setItem("user", JSON.stringify(localUser));
-                window.dispatchEvent(new Event("storage"));
-                setProfile(prev => ({ ...prev, fullName: payload.fullName, phoneNumber: payload.phoneNumber }));
+                setError(res?.message || "Không thể cập nhật thông tin cá nhân.");
             }
         } catch (err) {
-            setError(err.message || "Thao tác thất bại. Không thể kết nối tới server.");
+            setError(err?.message || err?.error?.message || "Thao tác thất bại. Không thể kết nối tới server.");
         } finally {
             setUpdating(false);
         }

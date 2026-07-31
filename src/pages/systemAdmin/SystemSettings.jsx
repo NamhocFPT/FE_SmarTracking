@@ -183,9 +183,7 @@ const SystemSettings = () => {
             setSuccessMessage('Cập nhật chính sách và tham số cấu hình hệ thống thành công.');
             setDbConfigs({ ...configs });
         } catch (err) {
-            // Offline/Simulation Mode Support
-            setSuccessMessage('Đã mô phỏng: Cập nhật cấu hình thành công (Chế độ ngoại tuyến).');
-            setDbConfigs({ ...configs });
+            setError(err?.message || err?.error?.message || 'Không thể cập nhật cấu hình hệ thống. Vui lòng thử lại.');
         } finally {
             setSaving(false);
         }
@@ -207,9 +205,8 @@ const SystemSettings = () => {
                     await Promise.all(updatePromises);
                     setSuccessMessage('Đã cập nhật cấu hình hệ thống thành công (Đã bỏ qua cảnh báo ngưỡng thấp).');
                     setDbConfigs({ ...configs });
-                } catch {
-                    setSuccessMessage('Đã mô phỏng: Cập nhật cấu hình thành công (Bỏ qua cảnh báo ngưỡng thấp - Chế độ ngoại tuyến).');
-                    setDbConfigs({ ...configs });
+                } catch (err) {
+                    setError(err?.message || err?.error?.message || 'Không thể cập nhật cấu hình hệ thống. Vui lòng thử lại.');
                 } finally {
                     setSaving(false);
                 }

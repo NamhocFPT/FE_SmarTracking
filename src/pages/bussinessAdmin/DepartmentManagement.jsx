@@ -251,20 +251,8 @@ const DepartmentManagement = () => {
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi tạo phòng ban.');
             }
-        } catch {
-            setSuccessMessage(`Đã mô phỏng: Tạo thành công phòng ban "${formData.name}".`);
-            setIsCreateModalOpen(false);
-            setDepartmentsList(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    name: formData.name,
-                    description: formData.description,
-                    memberCount: 0,
-                    createdAt: new Date().toISOString()
-                }
-            ]);
-            resetForm();
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể tạo phòng ban. Vui lòng thử lại.');
         }
     };
 
@@ -287,13 +275,8 @@ const DepartmentManagement = () => {
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi cập nhật.');
             }
-        } catch {
-            setSuccessMessage(`Đã mô phỏng: Cập nhật thành công phòng ban "${formData.name}".`);
-            setIsEditModalOpen(false);
-            setDepartmentsList(prev => 
-                prev.map(d => d.id === selectedDept.id ? { ...d, name: formData.name, description: formData.description } : d)
-            );
-            resetForm();
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể cập nhật phòng ban. Vui lòng thử lại.');
         }
     };
 
@@ -359,23 +342,8 @@ const DepartmentManagement = () => {
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi tạo tài khoản.');
             }
-        } catch {
-            setSuccessMessage(`Đã mô phỏng: Tạo thành công tài khoản "${userFormData.fullName}".`);
-            setIsUserCreateModalOpen(false);
-            setMembersList(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    email: userFormData.email,
-                    fullName: userFormData.fullName,
-                    phone: userFormData.phone,
-                    locked: false,
-                    roles: roles.filter(r => userFormData.roleIds.includes(r.id)),
-                    departments: [{ id: selectedDept.id, name: selectedDept.name }]
-                }
-            ]);
-            // Increment mock count
-            setDepartmentsList(prev => prev.map(d => d.id === selectedDept.id ? { ...d, memberCount: (d.memberCount || 0) + 1 } : d));
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể tạo tài khoản. Vui lòng thử lại.');
         }
     };
 
@@ -399,17 +367,8 @@ const DepartmentManagement = () => {
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi cập nhật.');
             }
-        } catch {
-            setSuccessMessage(`Đã mô phỏng: Cập nhật tài khoản "${userFormData.fullName}" thành công.`);
-            setIsUserEditModalOpen(false);
-            setMembersList(prev => 
-                prev.map(u => u.id === selectedUser.id ? { 
-                    ...u, 
-                    fullName: userFormData.fullName, 
-                    phone: userFormData.phone,
-                    roles: roles.filter(r => userFormData.roleIds.includes(r.id))
-                } : u)
-            );
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể cập nhật tài khoản. Vui lòng thử lại.');
         }
     };
 
@@ -427,9 +386,8 @@ const DepartmentManagement = () => {
             } else {
                 setError(res?.message || 'Không thể thay đổi trạng thái khóa.');
             }
-        } catch {
-            setMembersList(prev => prev.map(u => u.id === user.id ? { ...u, locked: !isUserCurrentlyLocked, accountStatus: isUserCurrentlyLocked ? 'active' : 'locked' } : u));
-            setSuccessMessage(`Đã mô phỏng: ${isUserCurrentlyLocked ? 'Mở khóa' : 'Khóa'} tài khoản ${user.fullName}.`);
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể thay đổi trạng thái khóa. Vui lòng thử lại.');
         }
     };
 
@@ -446,11 +404,8 @@ const DepartmentManagement = () => {
             } else {
                 setError(res?.message || 'Không thể xóa tài khoản.');
             }
-        } catch {
-            setMembersList(prev => prev.filter(u => u.id !== user.id));
-            setSuccessMessage(`Đã mô phỏng xóa tài khoản ${user.fullName}.`);
-            // Decrement mock count
-            setDepartmentsList(prev => prev.map(d => d.id === selectedDept.id ? { ...d, memberCount: Math.max((d.memberCount || 0) - 1, 0) } : d));
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
         }
     };
 

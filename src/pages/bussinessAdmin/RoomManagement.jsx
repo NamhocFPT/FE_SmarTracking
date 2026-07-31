@@ -120,28 +120,15 @@ const RoomManagement = () => {
                 res = await updateRoom(selectedRoom.id, payload);
             }
 
-            if (res?.success || !res) {
+            if (res?.success) {
                 setSuccessMessage(modalMode === 'create' ? 'Thêm phòng họp thành công!' : 'Cập nhật phòng họp thành công!');
                 setIsModalOpen(false);
                 fetchRoomsList();
             } else {
                 setError(res?.message || 'Có lỗi xảy ra.');
             }
-        } catch {
-            // Local mock simulation
-            if (modalMode === 'create') {
-                const newRoom = {
-                    id: 'r-' + Math.random().toString(36).substr(2, 5),
-                    ...formData,
-                    capacity: parseInt(formData.capacity, 10)
-                };
-                setRoomsList(prev => [...prev, newRoom]);
-                setSuccessMessage('Đã mô phỏng: Thêm phòng họp thành công!');
-            } else {
-                setRoomsList(prev => prev.map(r => r.id === selectedRoom.id ? { ...r, ...formData, capacity: parseInt(formData.capacity, 10) } : r));
-                setSuccessMessage('Đã mô phỏng: Cập nhật phòng họp thành công!');
-            }
-            setIsModalOpen(false);
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi lưu phòng họp. Vui lòng thử lại.');
         }
     };
 
@@ -150,13 +137,14 @@ const RoomManagement = () => {
         setError(null);
         try {
             const res = await deleteRoom(roomId);
-            if (res?.success || !res) {
+            if (res?.success) {
                 setSuccessMessage('Đã xoá phòng họp thành công!');
                 fetchRoomsList();
+            } else {
+                setError(res?.message || 'Không thể xoá phòng họp.');
             }
-        } catch {
-            setRoomsList(prev => prev.filter(r => r.id !== roomId));
-            setSuccessMessage('Đã mô phỏng: Xoá phòng họp thành công!');
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể xoá phòng họp. Vui lòng thử lại.');
         }
     };
 

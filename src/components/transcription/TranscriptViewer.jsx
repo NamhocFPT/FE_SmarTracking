@@ -4,11 +4,11 @@ import {
     Search, FileText, CheckCircle, AlertTriangle, 
     RefreshCw, Edit3, Save, X, Loader2
 } from 'lucide-react';
-import { 
-    getTranscriptionJobs, 
-    getTranscript, 
-    updateTranscriptSegment, 
-    updateTranscriptStatus 
+import {
+    getTranscriptionJobs,
+    getTranscript,
+    updateTranscriptSegments,
+    updateTranscriptStatus
 } from '../../service/transcriptionServices';
 
 const TranscriptViewer = ({ meetingId, isHost }) => {
@@ -19,8 +19,9 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     
     // Edit state
     const [editingSegmentId, setEditingSegmentId] = useState(null);
-    const [editForm, setEditForm] = useState({ text: '', speakerLabel: '' });
+    const [editForm, setEditForm] = useState({ text: '', speakerLabel: '', revisionNote: '' });
     const [isSaving, setIsSaving] = useState(false);
+    const [isChangingStatus, setIsChangingStatus] = useState(false);
     
     const [errorMsg, setErrorMsg] = useState('');
     const [toast, setToast] = useState(null); // { message, type }
@@ -105,26 +106,27 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     const handleEditClick = (segment) => {
         if (!isHost) return;
         setEditingSegmentId(segment.segmentId);
-        setEditForm({ text: segment.text, speakerLabel: segment.speakerLabel || '' });
+        setEditForm({ text: segment.text, speakerLabel: segment.speakerLabel || '', revisionNote: '' });
     };
 
     const handleSaveEdit = async () => {
         if (!editingSegmentId || !transcript) return;
         setIsSaving(true);
         try {
-            const res = await updateTranscriptSegment(transcript.transcriptId, editingSegmentId, {
-                text: editForm.text,
-                speakerLabel: editForm.speakerLabel
-            });
-            
-            if (res?.success) {
+            const res = await updateTranscriptSegments(
+                transcript.transcriptId,
+                [{ segmentId: editingSegmentId, text: editForm.text, speakerLabel: editForm.speakerLabel }],
+                editForm.revisionNote || undefined
+            );
+
+            if (res?.success && res.data?.updatedSegments?.includes(editingSegmentId)) {
                 showToast('Cập nhật nội dung thành công!');
-                // Update local state instead of refetching everything
+                // BE chỉ trả về danh sách segmentId đã sửa + metadata audit — nội dung mới lấy từ editForm cục bộ
                 setTranscript(prev => ({
                     ...prev,
-                    segments: prev.segments.map(seg => 
-                        seg.segmentId === editingSegmentId 
-                        ? { ...seg, text: editForm.text, speakerLabel: editForm.speakerLabel } 
+                    segments: prev.segments.map(seg =>
+                        seg.segmentId === editingSegmentId
+                        ? { ...seg, text: editForm.text, speakerLabel: editForm.speakerLabel }
                         : seg
                     )
                 }));
@@ -132,23 +134,32 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                 showToast('Lỗi khi cập nhật', 'error');
             }
         } catch (err) {
-            showToast(err.message || 'Lỗi kết nối', 'error');
+            showToast(err?.error?.message || err?.message || 'Lỗi kết nối', 'error');
         } finally {
             setIsSaving(false);
             setEditingSegmentId(null);
         }
     };
 
-    const handleApprove = async () => {
-        if (!transcript) return;
+    const handleStatusChange = async (newStatus) => {
+        if (!transcript || isChangingStatus) return;
+        setIsChangingStatus(true);
         try {
-            const res = await updateTranscriptStatus(transcript.transcriptId, 'approved');
+            const res = await updateTranscriptStatus(transcript.transcriptId, newStatus);
             if (res?.success) {
-                showToast('Đã duyệt toàn bộ biên bản!');
-                setTranscript(prev => ({ ...prev, status: 'approved' }));
+                showToast(newStatus === 'approved' ? 'Đã duyệt toàn bộ biên bản!' : 'Đã đánh dấu đã xem.');
+                setTranscript(prev => ({ ...prev, status: res.data?.status || newStatus }));
+            } else {
+                showToast(res?.message || 'Không thể chuyển trạng thái.', 'error');
             }
         } catch (err) {
-            showToast('Không thể duyệt biên bản', 'error');
+            if (err?.error?.code === 'INVALID_TRANSCRIPT_STATUS_TRANSITION') {
+                showToast('Transcript đã ở trạng thái cuối, không thể chuyển tiếp.', 'error');
+            } else {
+                showToast(err?.error?.message || err?.message || 'Không thể chuyển trạng thái.', 'error');
+            }
+        } finally {
+            setIsChangingStatus(false);
         }
     };
 
@@ -252,10 +263,20 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                         <Search className="w-3.5 h-3.5 text-slate-blue absolute left-2.5 top-2" />
                     </div>
                     
-                    {isHost && transcript?.status !== 'approved' && (
+                    {isHost && transcript?.status === 'draft' && (
                         <button
-                            onClick={handleApprove}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shrink-0 shadow-sm"
+                            onClick={() => handleStatusChange('reviewed')}
+                            disabled={isChangingStatus}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shrink-0 shadow-sm disabled:opacity-50"
+                        >
+                            <CheckCircle className="w-3.5 h-3.5" /> Đánh dấu đã xem
+                        </button>
+                    )}
+                    {isHost && transcript?.status === 'reviewed' && (
+                        <button
+                            onClick={() => handleStatusChange('approved')}
+                            disabled={isChangingStatus}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shrink-0 shadow-sm disabled:opacity-50"
                         >
                             <CheckCircle className="w-3.5 h-3.5" /> Duyệt toàn bộ
                         </button>
@@ -325,6 +346,13 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                                         value={editForm.text}
                                         onChange={(e) => setEditForm(prev => ({...prev, text: e.target.value}))}
                                         className="w-full min-h-[60px] p-2 text-xs border border-platinum-tint rounded-lg focus:outline-none focus:border-action-blue focus:ring-1 focus:ring-action-blue resize-none leading-relaxed"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={editForm.revisionNote}
+                                        onChange={(e) => setEditForm(prev => ({...prev, revisionNote: e.target.value}))}
+                                        placeholder="Ghi chú lý do sửa (tuỳ chọn)"
+                                        className="w-full p-2 text-[11px] border border-platinum-tint rounded-lg focus:outline-none focus:border-action-blue focus:ring-1 focus:ring-action-blue"
                                     />
                                     <div className="flex justify-end gap-2">
                                         <button 

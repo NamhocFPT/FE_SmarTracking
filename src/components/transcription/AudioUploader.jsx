@@ -8,6 +8,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [status, setStatus] = useState('idle'); // idle, uploading, processing, success, error
     const [errorMsg, setErrorMsg] = useState('');
+    const [featureDisabled, setFeatureDisabled] = useState(false);
     const fileInputRef = useRef(null);
 
     const handleDragOver = (e) => {
@@ -88,9 +89,24 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
 
         } catch (err) {
             setStatus('error');
-            setErrorMsg(err.message || 'Có lỗi xảy ra trong quá trình xử lý.');
+            if (err?.error?.code === 'TRANSCRIPTION_DISABLED') {
+                setFeatureDisabled(true);
+                setErrorMsg('Tính năng Speech-to-Text hiện đang bị tắt. Vui lòng liên hệ quản trị viên.');
+            } else {
+                setErrorMsg(err?.error?.message || err?.message || 'Có lỗi xảy ra trong quá trình xử lý.');
+            }
         }
     };
+
+    if (featureDisabled) {
+        return (
+            <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-sm-2 rounded-3xl p-6 text-center">
+                <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-midnight-indigo">Tính năng Speech-to-Text hiện đang bị tắt</p>
+                <p className="text-xs text-slate-blue mt-1">Vui lòng liên hệ quản trị viên hệ thống để biết thêm chi tiết.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-sm-2 rounded-3xl p-6 relative overflow-hidden">

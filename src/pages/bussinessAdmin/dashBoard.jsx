@@ -412,10 +412,10 @@ const DashBoard = () => {
             if (res?.success) {
                 setSuccessMsg(`Yêu cầu xuất báo cáo thành công! Mã tiến trình: ${res.data?.jobId || 'N/A'}. Báo cáo đang được chuẩn bị để tải xuống.`);
             } else {
-                setSuccessMsg('Đã mô phỏng gửi yêu cầu xuất file báo cáo hoạt động cuộc họp (định dạng Excel) thành công.');
+                setError(res?.message || 'Không thể tạo yêu cầu xuất báo cáo.');
             }
-        } catch {
-            setSuccessMsg('Đã mô phỏng gửi yêu cầu xuất file báo cáo hoạt động cuộc họp (định dạng Excel) thành công.');
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Lỗi khi gửi yêu cầu xuất báo cáo. Vui lòng thử lại.');
         } finally {
             setIsExporting(false);
         }

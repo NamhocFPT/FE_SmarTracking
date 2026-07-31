@@ -278,22 +278,10 @@ const EmployeeMeetingDetail = () => {
                 setIsEditModalOpen(false);
                 fetchMeeting();
             } else {
-                // Mock local success
-                setMeeting(prev => ({
-                    ...prev,
-                    title: editTitle,
-                    room: rooms.find(r => r.id === editRoomId) || prev.room,
-                    startTime: startISO,
-                    endTime: endISO,
-                    recordingEnabled: editRecordingEnabled,
-                    participants: users.filter(u => editParticipants.includes(u.id))
-                }));
-                setSuccessMsg('Đã mô phỏng cập nhật thông tin cuộc họp.');
-                setIsEditModalOpen(false);
+                setError(res?.message || 'Không thể cập nhật cuộc họp.');
             }
         } catch (err) {
-            setError(err.message || 'Lỗi cập nhật cuộc họp.');
-            setIsEditModalOpen(false);
+            setError(err?.message || err?.error?.message || 'Lỗi cập nhật cuộc họp. Vui lòng thử lại.');
         }
     };
 
@@ -306,14 +294,10 @@ const EmployeeMeetingDetail = () => {
                 setIsCancelConfirmOpen(false);
                 fetchMeeting();
             } else {
-                // Mock local cancel
-                setMeeting(prev => ({ ...prev, status: 'cancelled' }));
-                setSuccessMsg('Đã mô phỏng hủy cuộc họp.');
-                setIsCancelConfirmOpen(false);
+                setError(res?.message || 'Không thể hủy cuộc họp.');
             }
         } catch (err) {
-            setError(err.message || 'Lỗi hủy cuộc họp.');
-            setIsCancelConfirmOpen(false);
+            setError(err?.message || err?.error?.message || 'Lỗi hủy cuộc họp. Vui lòng thử lại.');
         }
     };
 
@@ -348,13 +332,10 @@ const EmployeeMeetingDetail = () => {
                 setIsAgendaModalOpen(false);
                 fetchMeeting();
             } else {
-                setMeeting(prev => ({ ...prev, agenda: agendaList }));
-                setSuccessMsg('Đã mô phỏng cập nhật Agenda.');
-                setIsAgendaModalOpen(false);
+                setError(res?.message || 'Không thể lưu Agenda.');
             }
         } catch (err) {
-            setError('Không thể lưu Agenda.');
-            setIsAgendaModalOpen(false);
+            setError(err?.message || err?.error?.message || 'Không thể lưu Agenda. Vui lòng thử lại.');
         }
     };
 
@@ -377,7 +358,10 @@ const EmployeeMeetingDetail = () => {
 
     const isHost = currentUser?.id === (meeting.host_id || meeting.hostId);
     const isOrganizer = currentUser?.id === (meeting.organizer_id || meeting.organizerId);
-    const canManage = isHost || isOrganizer;
+    // Transcript/duyệt biên bản: BE cho phép Host HOẶC Admin (BUSINESS_ADMIN/SYSTEM_ADMIN) — xem GET /auth/me
+    // trả data.roles là mảng { roleCode }, không phải field `role` dạng string.
+    const isAdmin = currentUser?.roles?.some(r => ['BUSINESS_ADMIN', 'SYSTEM_ADMIN'].includes(r.roleCode || r.role_code));
+    const canManage = isHost || isOrganizer || isAdmin;
     const hostParticipant = meeting.participants?.find((participant) =>
         participant.id === (meeting.host_id || meeting.hostId)
         || participant.userId === (meeting.host_id || meeting.hostId)

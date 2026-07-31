@@ -267,9 +267,8 @@ const UserManagement = () => {
             } else {
                 setError(res?.message || 'Không thể thay đổi trạng thái khóa.');
             }
-        } catch {
-            setUsersList(prev => prev.map(u => u.id === user.id ? { ...u, locked: !isUserCurrentlyLocked, accountStatus: isUserCurrentlyLocked ? 'active' : 'locked' } : u));
-            setSuccessMessage(`Đã mô phỏng: ${isUserCurrentlyLocked ? 'Mở khóa' : 'Khóa'} tài khoản ${user.fullName}.`);
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể thay đổi trạng thái khóa. Vui lòng thử lại.');
         }
     };
 
@@ -286,9 +285,8 @@ const UserManagement = () => {
             } else {
                 setError(res?.message || 'Không thể xóa tài khoản.');
             }
-        } catch {
-            setUsersList(prev => prev.filter(u => u.id !== user.id));
-            setSuccessMessage(`Đã mô phỏng xóa tài khoản ${user.fullName}.`);
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
         }
     };
 
@@ -416,42 +414,28 @@ const UserManagement = () => {
         setSuccessMessage(null);
         setValidationErrors([]);
 
-        // Interactive simulation of excel reading/validation
-        setTimeout(async () => {
-            const errors = [];
-            if (importFile.name.includes('invalid') || importFile.size % 2 === 0) {
-                errors.push({ line: 3, message: 'Địa chỉ Email sai định dạng hoặc bị để trống.', value: 'hoangnam.email.com' });
-                errors.push({ line: 5, message: 'Số điện thoại không hợp lệ (Phải đủ 10 số).', value: '091234' });
-                errors.push({ line: 8, message: 'Mã phòng ban (ID) không tồn tại trên hệ thống.', value: '99' });
-            }
-
-            if (errors.length > 0) {
-                setValidationErrors(errors);
-                setError('Tệp Excel chứa một số dòng sai định dạng. Vui lòng kiểm tra danh sách bên dưới.');
-                setImporting(false);
+        try {
+            const fd = new FormData();
+            fd.append('file', importFile);
+            const res = await importUsers(fd);
+            if (res?.success) {
+                setSuccessMessage('Đã tải lên tệp import. Quá trình xử lý đang chạy ngầm.');
+                setIsImportModalOpen(false);
+                fetchUsers();
             } else {
-                try {
-                    const fd = new FormData();
-                    fd.append('file', importFile);
-                    const res = await importUsers(fd);
-                    if (res?.success) {
-                        setSuccessMessage('Đã tải lên tệp import. Quá trình xử lý đang chạy ngầm.');
-                        setIsImportModalOpen(false);
-                        fetchUsers();
-                    } else {
-                        setSuccessMessage(`Đã mô phỏng: Nhập thành công 12 tài khoản từ tệp ${importFile.name}.`);
-                        setIsImportModalOpen(false);
-                        fetchUsers();
-                    }
-                } catch {
-                    setSuccessMessage(`Đã mô phỏng: Nhập thành công 12 tài khoản từ tệp ${importFile.name}.`);
-                    setIsImportModalOpen(false);
-                    fetchUsers();
-                } finally {
-                    setImporting(false);
+                if (res?.error?.details?.rows) {
+                    setValidationErrors(res.error.details.rows);
                 }
+                setError(res?.message || 'Tệp import không hợp lệ. Vui lòng kiểm tra lại định dạng file.');
             }
-        }, 1500);
+        } catch (err) {
+            if (err?.error?.details?.rows) {
+                setValidationErrors(err.error.details.rows);
+            }
+            setError(err?.message || err?.error?.message || 'Lỗi khi tải lên tệp import. Vui lòng thử lại.');
+        } finally {
+            setImporting(false);
+        }
     };
 
     // Helper functions

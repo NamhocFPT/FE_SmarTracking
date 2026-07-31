@@ -39,21 +39,21 @@ export const getTranscript = async (meetingId, params = {}) => {
 };
 
 /**
- * Cập nhật nội dung một segment
- * @param {string} transcriptId 
- * @param {string} segmentId
- * @param {object} payload { text, speakerLabel, speakerUserId, revisionNote }
+ * Sửa 1 hoặc nhiều segment cùng lúc — PATCH /transcripts/:transcriptId/segments
+ * Contract chuẩn theo BE (update-transcript-segments.dto.ts): body dạng mảng `segments[]`.
+ * @param {string} transcriptId
+ * @param {Array<{segmentId: string, text?: string, speakerLabel?: string, speakerUserId?: string, reason?: string}>} segments
+ * @param {string} [revisionNote] - ghi chú chung cho cả lần sửa này (audit)
  */
-export const updateTranscriptSegment = async (transcriptId, segmentId, payload) => {
-    // API theo stt-feature-status-cho-fe.md: PATCH /api/v1/transcripts/:transcriptId/segments
-    // Nhưng nó cần segmentId ở dạng param hoặc payload body.
-    // Giả sử backend nhận segmentId trong body: { segmentId, text, ... }
-    return await patch(`/transcripts/${transcriptId}/segments`, { segmentId, ...payload });
+export const updateTranscriptSegments = async (transcriptId, segments, revisionNote) => {
+    const body = { segments };
+    if (revisionNote) body.revisionNote = revisionNote;
+    return await patch(`/transcripts/${transcriptId}/segments`, body);
 };
 
 /**
  * Ghi đè toàn bộ nội dung text
- * @param {string} transcriptId 
+ * @param {string} transcriptId
  * @param {object} payload { rawText, cleanedText }
  */
 export const updateTranscriptContent = async (transcriptId, payload) => {
@@ -62,9 +62,12 @@ export const updateTranscriptContent = async (transcriptId, payload) => {
 
 /**
  * Chuyển trạng thái duyệt (draft -> reviewed -> approved)
- * @param {string} transcriptId 
+ * @param {string} transcriptId
  * @param {string} status 'reviewed' | 'approved'
+ * @param {string} [note] - ghi chú khi chuyển trạng thái (audit, optional)
  */
-export const updateTranscriptStatus = async (transcriptId, status) => {
-    return await patch(`/transcripts/${transcriptId}/status`, { status });
+export const updateTranscriptStatus = async (transcriptId, status, note) => {
+    const body = { status };
+    if (note) body.note = note;
+    return await patch(`/transcripts/${transcriptId}/status`, body);
 };
