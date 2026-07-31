@@ -1,9 +1,11 @@
+import { AlertCircle, Check, RefreshCw, ScanFace, Shield } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserById, registerFaceProfile } from '../../service/employeeServices';
+import { getUserById } from '../../service/employeeServices';
 import { submitBiometric, updateSelfAvatar } from '../../service/avatarService';
-import { Shield, Check, AlertCircle, RefreshCw } from 'lucide-react';
+
 import { motion } from 'framer-motion';
+import useFaceGuidance from '../../hooks/useFaceGuidance';
 
 /**
  * Face Registration Component for Employee with guided webcam scan
@@ -25,7 +27,8 @@ const EmployeeFaceRegistration = () => {
     // Webcam capture states
     const [cameraStream, setCameraStream] = useState(null);
     const [cameraError, setCameraError] = useState(null);
-    const [webcamStep, setWebcamStep] = useState('aligning'); // 'aligning', 'too_far', 'too_close', 'perfect', 'countdown', 'captured'
+    // 'guiding' (đang phân tích khung hình thật) -> 'countdown' -> 'captured'
+    const [phase, setPhase] = useState('guiding');
     const [countdownVal, setCountdownVal] = useState(3);
     const [capturedFile, setCapturedFile] = useState(null);
     const [capturedPreview, setCapturedPreview] = useState(null);
@@ -33,7 +36,7 @@ const EmployeeFaceRegistration = () => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
-    const timerRef = useRef(null);
+    const countdownTimerRef = useRef(null);
 
     useEffect(() => {
         const localUserStr = localStorage.getItem('user');
@@ -57,19 +60,17 @@ const EmployeeFaceRegistration = () => {
             streamRef.current = null;
         }
         setCameraStream(null);
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
         }
     };
-
-
 
     const startWebcam = async () => {
         setCameraError(null);
         setCapturedPreview(null);
         setCapturedFile(null);
-        setWebcamStep('aligning');
+        setPhase('guiding');
         setError(null);
 
         try {
@@ -85,8 +86,6 @@ const EmployeeFaceRegistration = () => {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
             }
-
-            runWebcamGuideSequence();
         } catch (err) {
             setCameraError('Không thể truy cập camera. Vui lòng cấp quyền sử dụng camera cho trình duyệt.');
         }
@@ -102,6 +101,7 @@ const EmployeeFaceRegistration = () => {
         return () => {
             stopWebcam();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step]);
 
     // Bind stream to video element when stream is ready
@@ -110,41 +110,6 @@ const EmployeeFaceRegistration = () => {
             videoRef.current.srcObject = cameraStream;
         }
     }, [cameraStream]);
-
-    const runWebcamGuideSequence = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setWebcamStep('aligning');
-
-        let duration = 0;
-        timerRef.current = setInterval(() => {
-            duration += 1;
-            if (duration === 3) {
-                setWebcamStep('too_far');
-            } else if (duration === 6) {
-                setWebcamStep('too_close');
-            } else if (duration === 9) {
-                setWebcamStep('perfect');
-            } else if (duration === 11) {
-                setWebcamStep('countdown');
-                startCaptureCountdown();
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
-        }, 1000);
-    };
-
-    const startCaptureCountdown = () => {
-        let count = 3;
-        setCountdownVal(3);
-        const interval = setInterval(() => {
-            count -= 1;
-            setCountdownVal(count);
-            if (count === 0) {
-                clearInterval(interval);
-                capturePhoto();
-            }
-        }, 1000);
-    };
 
     const capturePhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -163,11 +128,55 @@ const EmployeeFaceRegistration = () => {
                 const file = new File([blob], 'face_register.jpg', { type: 'image/jpeg' });
                 setCapturedFile(file);
                 setCapturedPreview(URL.createObjectURL(blob));
-                setWebcamStep('captured');
+                setPhase('captured');
                 stopWebcam();
             }
         }, 'image/jpeg', 0.95);
     };
+
+    const abortCountdown = () => {
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+        }
+        setPhase('guiding');
+    };
+
+    const startCaptureCountdown = () => {
+        if (countdownTimerRef.current) return; // đã đang đếm ngược, tránh chồng
+        setPhase('countdown');
+        let count = 3;
+        setCountdownVal(3);
+        countdownTimerRef.current = setInterval(() => {
+            count -= 1;
+            setCountdownVal(count);
+            if (count === 0) {
+                clearInterval(countdownTimerRef.current);
+                countdownTimerRef.current = null;
+                capturePhoto();
+            }
+        }, 1000);
+    };
+
+    // Phân tích khung hình thật (MediaPipe, chạy client-side) để hướng dẫn căn mặt —
+    // thay cho setInterval hẹn giờ giả lập trước đây. Xem src/hooks/useFaceGuidance.js.
+    // Lưu ý: hook vẫn phải chạy tiếp trong lúc 'countdown' (không chỉ 'guiding') để phát hiện
+    // trường hợp người dùng che camera/rời khỏi khung hình giữa lúc đang đếm ngược 3-2-1.
+    const { guidance, modelError } = useFaceGuidance({
+        videoRef,
+        active: step === 'scanner' && (phase === 'guiding' || phase === 'countdown') && !!cameraStream,
+        onStable: startCaptureCountdown,
+        stableFramesRequired: 8,
+        intervalMs: 150
+    });
+
+    // Huỷ đếm ngược nếu mất điều kiện 'perfect' giữa chừng (che camera, mất mặt, quay đi...)
+    useEffect(() => {
+        if (phase === 'countdown' && guidance.state !== 'perfect') {
+            abortCountdown();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, guidance.state]);
 
     const handleWebcamSubmit = async () => {
         if (!capturedFile) return;
@@ -181,7 +190,7 @@ const EmployeeFaceRegistration = () => {
         try {
             // Step 1: Upload raw image as biometric submission
             const uploadRes = await submitBiometric(capturedFile, true);
-            
+
             if (uploadRes?.success) {
                 // Check if user has display avatar
                 if (!currentUser?.avatarUrl) {
@@ -192,12 +201,10 @@ const EmployeeFaceRegistration = () => {
             } else {
                 setError(uploadRes?.message || uploadRes?.error?.message || 'Gửi dữ liệu khuôn mặt thất bại.');
                 setStep('scanner');
-                startWebcam();
             }
         } catch (err) {
-            setError(err?.error?.message || 'Có lỗi xảy ra trong quá trình truyền tải khuôn mặt.');
+            setError(err?.error?.message || err?.message || 'Có lỗi xảy ra trong quá trình truyền tải khuôn mặt.');
             setStep('scanner');
-            startWebcam();
         }
     };
 
@@ -220,9 +227,51 @@ const EmployeeFaceRegistration = () => {
         setStep('success');
     };
 
+    // Bản đồ trạng thái hướng dẫn thật (từ useFaceGuidance) -> style khung/HUD hiển thị
+    const guidanceState = guidance.state; // loading | no_face | low_light | too_far | too_close | off_center | perfect
+    const directionLabel = { left: 'trái', right: 'phải', up: 'lên', down: 'xuống' };
+
+    const getHudText = () => {
+        if (modelError) return `⚠️ ${modelError}`;
+        switch (guidanceState) {
+            case 'loading': return '⏳ ĐANG TẢI MÔ HÌNH NHẬN DIỆN...';
+            case 'no_face': return '⚠️ KHÔNG PHÁT HIỆN KHUÔN MẶT - VUI LÒNG NHÌN VÀO CAMERA';
+            case 'low_light': return '⚠️ ÁNH SÁNG YẾU - VUI LÒNG DI CHUYỂN ĐẾN NƠI SÁNG HƠN';
+            case 'too_far': return '⚠️ CHƯA ĐỦ GẦN - HÃY DI CHUYỂN LẠI GẦN HƠN';
+            case 'too_close': return '⚠️ QUÁ GẦN - HÃY LÙI XA HƠN MỘT CHÚT';
+            case 'off_center': return `⚠️ DI CHUYỂN SANG ${directionLabel[guidance.direction]?.toUpperCase() || ''}`;
+            case 'perfect': return '✅ CỰ LY ĐẠT CHUẨN! GIỮ YÊN KHUÔN MẶT...';
+            default: return '';
+        }
+    };
+
+    const getOverlayClass = () => {
+        if (phase === 'countdown' || guidanceState === 'perfect') {
+            return 'border-solid border-emerald-500 scale-100 shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-pulse-soft';
+        }
+        if (guidanceState === 'too_far') {
+            return 'border-dashed border-yellow-500 scale-[0.8] shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+        }
+        if (guidanceState === 'too_close') {
+            return 'border-dashed border-yellow-500 scale-[1.25] shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+        }
+        if (guidanceState === 'off_center') {
+            return 'border-dashed border-yellow-500 scale-100 shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+        }
+        if (guidanceState === 'low_light') {
+            return 'border-dashed border-amber-500 scale-95 shadow-[0_0_15px_rgba(245,158,11,0.5)]';
+        }
+        // 'loading' | 'no_face'
+        return 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+    };
+
     return (
         <div className="max-w-2xl mx-auto space-y-6 animate-fade-in-up">
             <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                    <ScanFace className="w-3.5 h-3.5" />
+                    Sinh trắc học
+                </span>
                 <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Đăng ký dữ liệu khuôn mặt FaceID (Nhân viên)</h1>
                 <p className="text-slate-blue text-sm mt-1">
                     Liên kết khuôn mặt của bạn để sử dụng tính năng điểm danh và kiểm soát ra vào phòng họp.
@@ -289,8 +338,8 @@ const EmployeeFaceRegistration = () => {
                             onClick={() => setStep('scanner')}
                             disabled={!pdpaAgreed}
                             className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all ${
-                                pdpaAgreed 
-                                    ? 'bg-action-blue hover:bg-glacier-blue shadow-sm' 
+                                pdpaAgreed
+                                    ? 'bg-action-blue hover:bg-glacier-blue shadow-sm'
                                     : 'bg-steel-gray cursor-not-allowed'
                             }`}
                         >
@@ -305,12 +354,12 @@ const EmployeeFaceRegistration = () => {
                 <div className="bg-white p-8 rounded-2xl border border-platinum-tint shadow-sm-2 flex flex-col space-y-6">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-blue uppercase tracking-wider">
-                            {webcamStep === 'captured' ? 'Xác nhận khuôn mặt' : 'Quét sinh trắc học FaceID'}
+                            {phase === 'captured' ? 'Xác nhận khuôn mặt' : 'Quét sinh trắc học FaceID'}
                         </span>
-                        {webcamStep !== 'captured' && cameraStream && (
-                            <button 
-                                type="button" 
-                                onClick={startWebcam} 
+                        {phase !== 'captured' && cameraStream && (
+                            <button
+                                type="button"
+                                onClick={startWebcam}
                                 className="inline-flex items-center gap-1 text-[10px] font-bold text-action-blue bg-action-blue/10 px-2.5 py-1 rounded-full hover:bg-action-blue/20 transition-all"
                             >
                                 <RefreshCw className="w-3 h-3" /> Thiết lập lại
@@ -326,30 +375,25 @@ const EmployeeFaceRegistration = () => {
                                 <p>{cameraError}</p>
                                 <button type="button" onClick={startWebcam} className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold">Thử lại</button>
                             </div>
-                        ) : webcamStep === 'captured' && capturedPreview ? (
+                        ) : phase === 'captured' && capturedPreview ? (
                             <img src={capturedPreview} alt="Captured Snapshot" className="w-full h-full object-cover" />
                         ) : cameraStream ? (
                             <>
-                                <video 
+                                <video
                                     ref={videoRef}
                                     autoPlay
                                     playsInline
                                     muted
                                     className={`w-full h-full object-cover scale-x-[-1] transition-all duration-300 ${
-                                        webcamStep === 'aligning' ? 'blur-md brightness-50' : ''
+                                        guidanceState === 'loading' ? 'blur-md brightness-50' : ''
                                     }`}
                                 />
 
                                 {/* Interactive Scanner Overlay HUD */}
                                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
-                                    <div className={`w-44 h-60 rounded-[50%] border-4 transition-all duration-500 relative flex items-center justify-center ${
-                                        webcamStep === 'aligning' ? 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]' :
-                                        webcamStep === 'too_far' ? 'border-dashed border-yellow-500 scale-[0.8] shadow-[0_0_15px_rgba(234,179,8,0.5)]' :
-                                        webcamStep === 'too_close' ? 'border-dashed border-yellow-500 scale-[1.25] shadow-[0_0_15px_rgba(234,179,8,0.5)]' :
-                                        'border-solid border-emerald-500 scale-100 shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-pulse-soft'
-                                    }`}>
-                                        
-                                        {(webcamStep === 'perfect' || webcamStep === 'countdown') && (
+                                    <div className={`w-44 h-60 rounded-[50%] border-4 transition-all duration-500 relative flex items-center justify-center ${getOverlayClass()}`}>
+
+                                        {(guidanceState === 'perfect' || phase === 'countdown') && (
                                             <div className="absolute inset-x-0 h-0.5 bg-emerald-400/80 shadow-[0_0_10px_#34d399] animate-scanner" />
                                         )}
 
@@ -359,20 +403,16 @@ const EmployeeFaceRegistration = () => {
                                         <div className="absolute right-0 w-2 h-2 bg-emerald-500 rounded-full translate-x-1" />
                                     </div>
 
-                                    {/* HUD instruction text */}
+                                    {/* HUD instruction text — phản ánh trạng thái thật từ phân tích khung hình */}
                                     <div className="absolute bottom-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-center max-w-[85%] border border-white/10">
                                         <p className="text-[10px] font-bold text-white tracking-wide uppercase">
-                                            {webcamStep === 'aligning' && '⚠️ VUI LÒNG ĐƯA MẶT VÀO VÒNG TRÒN (MỜ BẢN CHỤP)'}
-                                            {webcamStep === 'too_far' && '⚠️ CHƯA ĐỦ GẦN - HÃY DI CHUYỂN LẠI GẦN HƠN'}
-                                            {webcamStep === 'too_close' && '⚠️ QUÁ GẦN - HÃY LÙI XA HƠN MỘT CHÚT'}
-                                            {webcamStep === 'perfect' && '✅ CỰ LY ĐẠT CHUẨN! GIỮ YÊN KHUÔN MẶT...'}
-                                            {webcamStep === 'countdown' && `📸 CHUẨN BỊ CHỤP TRONG ${countdownVal}s`}
+                                            {phase === 'countdown' ? `📸 CHUẨN BỊ CHỤP TRONG ${countdownVal}s` : getHudText()}
                                         </p>
                                     </div>
 
-                                    {webcamStep === 'countdown' && (
+                                    {phase === 'countdown' && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/35">
-                                            <motion.span 
+                                            <motion.span
                                                 key={countdownVal}
                                                 initial={{ scale: 0.5, opacity: 0 }}
                                                 animate={{ scale: 1.2, opacity: 1 }}
@@ -395,7 +435,7 @@ const EmployeeFaceRegistration = () => {
                     <canvas ref={canvasRef} className="hidden" />
 
                     {/* Verification Controls */}
-                    {webcamStep === 'captured' ? (
+                    {phase === 'captured' ? (
                         <div className="space-y-4 max-w-md mx-auto w-full">
                             <label className="flex items-start gap-2.5 cursor-pointer">
                                 <input
@@ -430,9 +470,9 @@ const EmployeeFaceRegistration = () => {
                     ) : (
                         <div className="flex justify-between items-center text-[10.5px] text-slate-blue border border-platinum-tint p-3 rounded-xl bg-cloud-mist/20 max-w-md mx-auto w-full">
                             <span>⚠️ Hãy đảm bảo ánh sáng đủ tốt và không đội mũ bảo hiểm/kính râm.</span>
-                            <button 
-                                type="button" 
-                                onClick={capturePhoto} 
+                            <button
+                                type="button"
+                                onClick={capturePhoto}
                                 disabled={!cameraStream}
                                 className="px-3 py-1 bg-white border border-platinum-tint rounded-lg text-[10px] font-bold text-midnight-indigo hover:bg-cloud-mist disabled:opacity-40"
                             >
@@ -441,7 +481,7 @@ const EmployeeFaceRegistration = () => {
                         </div>
                     )}
 
-                    {webcamStep !== 'captured' && (
+                    {phase !== 'captured' && (
                         <button
                             type="button"
                             onClick={() => { stopWebcam(); setStep('consent'); }}
@@ -473,7 +513,7 @@ const EmployeeFaceRegistration = () => {
                         <Check className="w-8 h-8" />
                     </div>
                     <h4 className="text-base font-bold text-midnight-indigo">Liên kết khuôn mặt thành công!</h4>
-                    
+
                     <p className="text-sm text-slate-blue leading-relaxed max-w-sm mx-auto">
                         Hiện tại bạn chưa thiết lập ảnh đại diện hiển thị trên hệ thống. Bạn có muốn dùng chính ảnh sinh trắc học vừa chụp để làm ảnh đại diện hiển thị của mình không?
                     </p>

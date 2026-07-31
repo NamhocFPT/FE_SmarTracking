@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getBiometricStatus, submitBiometric, updateSelfAvatar } from '../../service/avatarService';
 import { Shield, Camera, Image, ArrowLeft, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import useFaceGuidance from '../../hooks/useFaceGuidance';
 
 const STATUS_LABEL = {
     not_uploaded: { label: 'Chưa nộp ảnh', badge: 'bg-amber-50 text-amber-700 border border-amber-200' },
@@ -28,7 +29,8 @@ const BiometricReminderModal = () => {
     // Webcam capture states
     const [cameraStream, setCameraStream] = useState(null);
     const [cameraError, setCameraError] = useState(null);
-    const [webcamStep, setWebcamStep] = useState('aligning'); // 'aligning', 'too_far', 'too_close', 'perfect', 'countdown', 'captured'
+    // 'guiding' (đang phân tích khung hình thật) -> 'countdown' -> 'captured'
+    const [phase, setPhase] = useState('guiding');
     const [countdownVal, setCountdownVal] = useState(3);
     const [capturedBlob, setCapturedBlob] = useState(null);
     const [capturedFile, setCapturedFile] = useState(null);
@@ -37,7 +39,7 @@ const BiometricReminderModal = () => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const streamRef = useRef(null);
-    const timerRef = useRef(null);
+    const countdownTimerRef = useRef(null);
 
     // Load user and check biometric requirement
     useEffect(() => {
@@ -81,9 +83,9 @@ const BiometricReminderModal = () => {
             streamRef.current = null;
         }
         setCameraStream(null);
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
         }
     };
 
@@ -141,7 +143,7 @@ const BiometricReminderModal = () => {
         setCapturedBlob(null);
         setCapturedPreview(null);
         setCapturedFile(null);
-        setWebcamStep('aligning');
+        setPhase('guiding');
         setError(null);
 
         try {
@@ -157,9 +159,6 @@ const BiometricReminderModal = () => {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
             }
-
-            // Run interactive simulated biometric scanner sequence
-            runWebcamGuideSequence();
         } catch (err) {
             setCameraError('Không thể truy cập camera. Vui lòng cấp quyền sử dụng camera cho trình duyệt.');
         }
@@ -175,6 +174,7 @@ const BiometricReminderModal = () => {
         return () => {
             stopWebcam();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [view, open]);
 
     // Bind stream to video element when stream is ready
@@ -184,40 +184,49 @@ const BiometricReminderModal = () => {
         }
     }, [cameraStream]);
 
-    const runWebcamGuideSequence = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setWebcamStep('aligning');
-
-        let duration = 0;
-        timerRef.current = setInterval(() => {
-            duration += 1;
-            if (duration === 3) {
-                setWebcamStep('too_far');
-            } else if (duration === 6) {
-                setWebcamStep('too_close');
-            } else if (duration === 9) {
-                setWebcamStep('perfect');
-            } else if (duration === 11) {
-                setWebcamStep('countdown');
-                startCaptureCountdown();
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
-        }, 1000);
+    const abortCountdown = () => {
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+        }
+        setPhase('guiding');
     };
 
     const startCaptureCountdown = () => {
+        if (countdownTimerRef.current) return; // đã đang đếm ngược, tránh chồng
+        setPhase('countdown');
         let count = 3;
         setCountdownVal(3);
-        const interval = setInterval(() => {
+        countdownTimerRef.current = setInterval(() => {
             count -= 1;
             setCountdownVal(count);
             if (count === 0) {
-                clearInterval(interval);
+                clearInterval(countdownTimerRef.current);
+                countdownTimerRef.current = null;
                 capturePhoto();
             }
         }, 1000);
     };
+
+    // Phân tích khung hình thật (MediaPipe, chạy client-side) để hướng dẫn căn mặt —
+    // thay cho setInterval hẹn giờ giả lập trước đây. Xem src/hooks/useFaceGuidance.js.
+    // Lưu ý: hook vẫn phải chạy tiếp trong lúc 'countdown' (không chỉ 'guiding') để phát hiện
+    // trường hợp người dùng che camera/rời khỏi khung hình giữa lúc đang đếm ngược 3-2-1.
+    const { guidance, modelError } = useFaceGuidance({
+        videoRef,
+        active: view === 'webcam' && open && (phase === 'guiding' || phase === 'countdown') && !!cameraStream,
+        onStable: startCaptureCountdown,
+        stableFramesRequired: 8,
+        intervalMs: 150
+    });
+
+    // Huỷ đếm ngược nếu mất điều kiện 'perfect' giữa chừng (che camera, mất mặt, quay đi...)
+    useEffect(() => {
+        if (phase === 'countdown' && guidance.state !== 'perfect') {
+            abortCountdown();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, guidance.state]);
 
     const capturePhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -238,7 +247,7 @@ const BiometricReminderModal = () => {
                 setCapturedBlob(blob);
                 setCapturedFile(file);
                 setCapturedPreview(URL.createObjectURL(blob));
-                setWebcamStep('captured');
+                setPhase('captured');
                 stopWebcam();
             }
         }, 'image/jpeg', 0.95);
@@ -301,6 +310,44 @@ const BiometricReminderModal = () => {
     const statusInfo = STATUS_LABEL[status] || STATUS_LABEL.not_uploaded;
 
     const hasAvatar = !!userProfile?.avatarUrl;
+
+    // Bản đồ trạng thái hướng dẫn thật (từ useFaceGuidance) -> style khung/HUD hiển thị
+    const guidanceState = guidance.state; // loading | no_face | low_light | too_far | too_close | off_center | perfect
+    const directionLabel = { left: 'trái', right: 'phải', up: 'lên', down: 'xuống' };
+
+    const getHudText = () => {
+        if (modelError) return `⚠️ ${modelError}`;
+        switch (guidanceState) {
+            case 'loading': return '⏳ ĐANG TẢI MÔ HÌNH NHẬN DIỆN...';
+            case 'no_face': return '⚠️ KHÔNG PHÁT HIỆN KHUÔN MẶT - VUI LÒNG NHÌN VÀO CAMERA';
+            case 'low_light': return '⚠️ ÁNH SÁNG YẾU - VUI LÒNG DI CHUYỂN ĐẾN NƠI SÁNG HƠN';
+            case 'too_far': return '⚠️ CHƯA ĐỦ GẦN - HÃY DI CHUYỂN LẠI GẦN HƠN';
+            case 'too_close': return '⚠️ QUÁ GẦN - HÃY LÙI XA HƠN MỘT CHÚT';
+            case 'off_center': return `⚠️ DI CHUYỂN SANG ${directionLabel[guidance.direction]?.toUpperCase() || ''}`;
+            case 'perfect': return '✅ CỰ LY ĐẠT CHUẨN! GIỮ YÊN KHUÔN MẶT...';
+            default: return '';
+        }
+    };
+
+    const getOverlayClass = () => {
+        if (phase === 'countdown' || guidanceState === 'perfect') {
+            return 'border-solid border-emerald-500 scale-100 shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-pulse-soft';
+        }
+        if (guidanceState === 'too_far') {
+            return 'border-dashed border-yellow-500 scale-[0.8] shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+        }
+        if (guidanceState === 'too_close') {
+            return 'border-dashed border-yellow-500 scale-[1.25] shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+        }
+        if (guidanceState === 'off_center') {
+            return 'border-dashed border-yellow-500 scale-100 shadow-[0_0_15px_rgba(234,179,8,0.5)]';
+        }
+        if (guidanceState === 'low_light') {
+            return 'border-dashed border-amber-500 scale-95 shadow-[0_0_15px_rgba(245,158,11,0.5)]';
+        }
+        // 'loading' | 'no_face'
+        return 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+    };
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xl p-4">
@@ -455,20 +502,20 @@ const BiometricReminderModal = () => {
                         <div className="space-y-4 flex-1 flex flex-col justify-between">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    {webcamStep !== 'captured' && (
-                                        <button 
-                                            type="button" 
-                                            onClick={() => { stopWebcam(); setView('options'); }} 
+                                    {phase !== 'captured' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { stopWebcam(); setView('options'); }}
                                             className="p-1.5 hover:bg-cloud-mist rounded-lg text-slate-blue"
                                         >
                                             <ArrowLeft className="w-4 h-4" />
                                         </button>
                                     )}
                                     <span className="text-xs font-bold text-slate-blue uppercase tracking-wider">
-                                        {webcamStep === 'captured' ? 'Xác nhận ảnh chụp' : 'Giao diện chụp ảnh FaceID'}
+                                        {phase === 'captured' ? 'Xác nhận ảnh chụp' : 'Giao diện chụp ảnh FaceID'}
                                     </span>
                                 </div>
-                                {webcamStep !== 'captured' && cameraStream && (
+                                {phase !== 'captured' && cameraStream && (
                                     <button 
                                         type="button" 
                                         onClick={startWebcam} 
@@ -487,32 +534,27 @@ const BiometricReminderModal = () => {
                                         <p>{cameraError}</p>
                                         <button type="button" onClick={startWebcam} className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold">Thử lại</button>
                                     </div>
-                                ) : webcamStep === 'captured' && capturedPreview ? (
+                                ) : phase === 'captured' && capturedPreview ? (
                                     <img src={capturedPreview} alt="Captured Snapshot" className="w-full h-full object-cover" />
                                 ) : cameraStream ? (
                                     <>
-                                        <video 
+                                        <video
                                             ref={videoRef}
                                             autoPlay
                                             playsInline
                                             muted
                                             className={`w-full h-full object-cover scale-x-[-1] transition-all duration-300 ${
-                                                webcamStep === 'aligning' ? 'blur-md brightness-50' : ''
+                                                guidanceState === 'loading' ? 'blur-md brightness-50' : ''
                                             }`}
                                         />
 
                                         {/* Biometric Scan Overlay Target Guides */}
                                         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
                                             {/* Oval Frame Mask */}
-                                            <div className={`w-32 h-44 sm:w-36 sm:h-48 rounded-[50%] border-4 transition-all duration-500 relative flex items-center justify-center ${
-                                                webcamStep === 'aligning' ? 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]' :
-                                                webcamStep === 'too_far' ? 'border-dashed border-yellow-500 scale-[0.8] shadow-[0_0_15px_rgba(234,179,8,0.5)]' :
-                                                webcamStep === 'too_close' ? 'border-dashed border-yellow-500 scale-[1.25] shadow-[0_0_15px_rgba(234,179,8,0.5)]' :
-                                                'border-solid border-emerald-500 scale-100 shadow-[0_0_20px_rgba(16,185,129,0.7)] animate-pulse-soft'
-                                            }`}>
-                                                
+                                            <div className={`w-32 h-44 sm:w-36 sm:h-48 rounded-[50%] border-4 transition-all duration-500 relative flex items-center justify-center ${getOverlayClass()}`}>
+
                                                 {/* High-tech Horizontal Scanning line */}
-                                                {(webcamStep === 'perfect' || webcamStep === 'countdown') && (
+                                                {(guidanceState === 'perfect' || phase === 'countdown') && (
                                                     <div className="absolute inset-x-0 h-0.5 bg-emerald-400/80 shadow-[0_0_10px_#34d399] animate-scanner" />
                                                 )}
 
@@ -523,19 +565,15 @@ const BiometricReminderModal = () => {
                                                 <div className="absolute right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full translate-x-1.5" />
                                             </div>
 
-                                            {/* Guided HUD Text overlay on top of video */}
+                                            {/* Guided HUD Text overlay on top of video — phản ánh trạng thái thật */}
                                             <div className="absolute bottom-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-center max-w-[85%] border border-white/10">
                                                 <p className="text-[11px] font-bold text-white tracking-wide uppercase">
-                                                    {webcamStep === 'aligning' && '⚠️ VUI LÒNG ĐƯA MẶT VÀO VÒNG TRÒN (MỜ BẢN CHỤP)'}
-                                                    {webcamStep === 'too_far' && '⚠️ CHƯA ĐỦ GẦN - HÃY DI CHUYỂN LẠI GẦN HƠN'}
-                                                    {webcamStep === 'too_close' && '⚠️ QUÁ GẦN - HÃY LÙI XA HƠN MỘT CHÚT'}
-                                                    {webcamStep === 'perfect' && '✅ CỰ LY ĐẠT CHUẨN! GIỮ YÊN KHUÔN MẶT...'}
-                                                    {webcamStep === 'countdown' && `📸 CHUẨN BỊ CHỤP TRONG ${countdownVal}s`}
+                                                    {phase === 'countdown' ? `📸 CHUẨN BỊ CHỤP TRONG ${countdownVal}s` : getHudText()}
                                                 </p>
                                             </div>
 
                                             {/* Countdown overlay indicator */}
-                                            {webcamStep === 'countdown' && (
+                                            {phase === 'countdown' && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/35">
                                                     <motion.span 
                                                         key={countdownVal}
@@ -560,7 +598,7 @@ const BiometricReminderModal = () => {
                             <canvas ref={canvasRef} className="hidden" />
 
                             {/* Controls and Submission */}
-                            {webcamStep === 'captured' ? (
+                            {phase === 'captured' ? (
                                 <div className="space-y-4 pt-1">
                                     <label className="flex items-start gap-2.5 cursor-pointer">
                                         <input
