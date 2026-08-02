@@ -18,33 +18,33 @@ const chunkArray = (arr, size) => {
 };
 
 const navigationItems = [
-    { 
-        label: 'Trang chủ', 
-        to: '/employee', 
+    {
+        label: 'Trang chủ',
+        to: '/employee',
         end: true,
-        icon: Home 
+        icon: Home
     },
     {
         label: 'Cuộc họp',
         isDropdown: true,
         icon: Calendar,
         children: [
-            { 
-                label: 'Lịch cá nhân', 
+            {
+                label: 'Lịch cá nhân',
                 to: '/employee/schedule',
-                icon: Calendar 
+                icon: Calendar
             },
-            { 
-                label: 'Đăng ký họp', 
+            {
+                label: 'Đăng ký họp',
                 to: '/employee/book',
-                icon: PlusCircle 
+                icon: PlusCircle
             },
         ]
     },
-    { 
-        label: 'Tài liệu họp', 
+    {
+        label: 'Tài liệu họp',
         to: '/employee/recordings',
-        icon: FileText 
+        icon: FileText
     }
 ];
 
@@ -130,7 +130,9 @@ const EmployeeLayout = () => {
                             className="flex items-center gap-2 no-underline"
                             aria-label="SmarTracking home"
                         >
-                            <img src={logo} alt="SmarTracking Logo" className="w-12 h-12 object-contain" />
+                            <div className="w-12 h-12 bg-white flex items-center justify-center shrink-0">
+                                <img src={logo} alt="SmarTracking Logo" className="w-full h-full object-contain scale-[1.3]" />
+                            </div>
                             <span className="text-midnight-indigo font-bold text-xl tracking-tight hidden sm:block">
                                 SmarTracking
                             </span>

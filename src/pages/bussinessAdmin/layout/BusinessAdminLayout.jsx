@@ -6,24 +6,24 @@ import BiometricReminderModal from '../../../component/BiometricReminder/Biometr
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
 import NotificationBell from '../../../component/NotificationBell';
-import { 
-    Home, 
-    Calendar, 
-    PlusCircle, 
-    Settings, 
-    Layers, 
-    Video, 
-    Users, 
-    Briefcase, 
-    Shield, 
-    Map, 
-    Key, 
-    MapPin, 
-    Car, 
-    ClipboardList, 
-    AlertTriangle, 
-    BarChart2, 
-    PieChart, 
+import {
+    Home,
+    Calendar,
+    PlusCircle,
+    Settings,
+    Layers,
+    Video,
+    Users,
+    Briefcase,
+    Shield,
+    Map,
+    Key,
+    MapPin,
+    Car,
+    ClipboardList,
+    AlertTriangle,
+    BarChart2,
+    PieChart,
     Clock,
     ChevronDown
 } from 'lucide-react';
@@ -40,11 +40,11 @@ const chunkArray = (arr, size) => {
  * Navigation items cho BusinessAdmin role
  */
 const navigationItems = [
-    { 
-        label: 'Tổng quan', 
-        to: '/business-admin', 
+    {
+        label: 'Tổng quan',
+        to: '/business-admin',
         end: true,
-        icon: Home 
+        icon: Home
     },
 
     {
@@ -179,7 +179,9 @@ const BusinessAdminLayout = () => {
                             className="flex items-center gap-2 no-underline"
                             aria-label="SmarTracking home"
                         >
-                            <img src={logo} alt="SmarTracking Logo" className="w-12 h-12 object-contain" />
+                            <div className="w-12 h-12 bg-white flex items-center justify-center shrink-0">
+                                <img src={logo} alt="SmarTracking Logo" className="w-full h-full object-contain scale-[1.3]" />
+                            </div>
                             <span className="text-midnight-indigo font-bold text-xl tracking-tight hidden sm:block">
                                 SmarTracking
                             </span>

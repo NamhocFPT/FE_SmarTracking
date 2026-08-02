@@ -170,7 +170,9 @@ const ManagerLayout = () => {
                             className="flex items-center gap-2 no-underline"
                             aria-label="SmarTracking home"
                         >
-                            <img src={logo} alt="SmarTracking Logo" className="w-12 h-12 object-contain" />
+                            <div className="w-12 h-12 bg-white flex items-center justify-center shrink-0">
+                                <img src={logo} alt="SmarTracking Logo" className="w-full h-full object-contain scale-[1.3]" />
+                            </div>
                             <span className="text-midnight-indigo font-bold text-xl tracking-tight hidden sm:block">
                                 SmarTracking
                             </span>
