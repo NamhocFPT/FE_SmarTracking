@@ -1,4 +1,4 @@
-import { get, post, patch, buildQuery } from '../utils/request';
+import { get, post, patch, dele, buildQuery } from '../utils/request';
 
 /**
  * Upload audio file cho meeting
@@ -70,4 +70,56 @@ export const updateTranscriptStatus = async (transcriptId, status, note) => {
     const body = { status };
     if (note) body.note = note;
     return await patch(`/transcripts/${transcriptId}/status`, body);
+};
+
+/**
+ * B1: Đóng dấu mốc bắt đầu ghi âm
+ * @param {string} meetingId
+ * @param {string} note (tuỳ chọn)
+ */
+export const startRecordingMarker = async (meetingId, note) => {
+    return await post(`/meetings/${meetingId}/recording/start-marker`, { note });
+};
+
+/**
+ * B2: Gán danh tính trực tiếp trong lúc họp
+ * @param {string} meetingId
+ * @param {object} payload { speakerUserId, externalParticipantId, displayName }
+ */
+export const addSpeakerTag = async (meetingId, payload) => {
+    return await post(`/meetings/${meetingId}/speaker-tags`, payload);
+};
+
+/**
+ * B3 (GET): Xem danh sách các mốc đã gán trong cuộc họp
+ * @param {string} meetingId
+ */
+export const getSpeakerTags = async (meetingId) => {
+    return await get(`/meetings/${meetingId}/speaker-tags`);
+};
+
+/**
+ * B3 (DELETE): Xóa mốc đã gán (hoàn tác)
+ * @param {string} meetingId
+ * @param {string} tagId
+ */
+export const deleteSpeakerTag = async (meetingId, tagId) => {
+    return await dele(`/meetings/${meetingId}/speaker-tags/${tagId}`);
+};
+
+/**
+ * B4: Lấy danh sách nhóm giọng (Speaker Clusters)
+ * @param {string} transcriptId
+ */
+export const getTranscriptSpeakers = async (transcriptId) => {
+    return await get(`/transcripts/${transcriptId}/speakers`);
+};
+
+/**
+ * B5: Gán tên hàng loạt cho các nhóm giọng
+ * @param {string} transcriptId
+ * @param {Array<{speakerLabel: string, speakerUserId?: string, externalParticipantId?: string, displayName: string}>} mappings
+ */
+export const updateSpeakerMappings = async (transcriptId, mappings) => {
+    return await post(`/transcripts/${transcriptId}/speaker-mappings`, { mappings });
 };

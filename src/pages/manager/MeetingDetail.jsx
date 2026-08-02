@@ -12,14 +12,10 @@ import NotificationActionsPanel from '../../component/NotificationActionsPanel';
 import ImportParticipantsModal from '../../component/ImportParticipantsModal';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
 import AddExternalParticipantModal from '../../component/AddExternalParticipantModal';
+import TranscriptViewer from '../../components/transcription/TranscriptViewer';
+import AudioUploader from '../../components/transcription/AudioUploader';
 
-const mockTranscript = [
-    { time: 10, speaker: 'Lê Hoàng Hải', text: 'Chào mọi người, chúng ta bắt đầu họp bàn về thiết kế giao diện FE SmarTracking nhé.' },
-    { time: 25, speaker: 'Nguyễn Thị Minh', text: 'Tôi nghĩ chúng ta nên dùng HSL Tailored Colors để tăng tính thẩm mỹ cao cấp.' },
-    { time: 45, speaker: 'Phan Văn Minh', text: 'Đồng ý, đồng thời cũng cần lưu ý nguyên lý PDPA khi thu thập dữ liệu camera.' },
-    { time: 70, speaker: 'Lê Hoàng Hải', text: 'Chính xác. Mọi bản ghi hình cuộc họp phải được sự đồng ý của tất cả thành viên.' },
-    { time: 95, speaker: 'Phạm Thanh Sơn', text: 'Tôi sẽ cấu hình luồng quay video tự động từ thiết bị IP Camera trong phòng.' }
-];
+
 
 const ManagerMeetingDetail = () => {
     const { id } = useParams();
@@ -62,12 +58,9 @@ const ManagerMeetingDetail = () => {
     const [users, setUsers] = useState([]);
 
     // Recording & Transcript player states
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [transcriptQuery, setTranscriptQuery] = useState('');
-    const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
     const [activeRightTab, setActiveRightTab] = useState('transcript');
     const [activeAttendanceTab, setActiveAttendanceTab] = useState('attendance'); // 'attendance' or 'ivss'
+    const [refreshTranscriptKey, setRefreshTranscriptKey] = useState(0);
 
     // Pagination for long lists
     const [agendaPage, setAgendaPage] = useState(1);
@@ -226,32 +219,6 @@ const ManagerMeetingDetail = () => {
             loadHelpers();
         }
     }, [isEditModalOpen]);
-
-    // Simulated playback updates for transcript
-    useEffect(() => {
-        let interval;
-        if (isPlaying) {
-            interval = setInterval(() => {
-                setCurrentTime(prev => {
-                    const nextTime = prev + 1;
-                    if (nextTime > 120) {
-                        setIsPlaying(false);
-                        return 0;
-                    }
-                    // Find active transcript index
-                    const segmentIndex = mockTranscript.findIndex((t, i) => {
-                        const next = mockTranscript[i + 1];
-                        return nextTime >= t.time && (!next || nextTime < next.time);
-                    });
-                    if (segmentIndex !== -1) {
-                        setActiveSegmentIndex(segmentIndex);
-                    }
-                    return nextTime;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isPlaying]);
 
     // Auto-hide success/error alerts
     useEffect(() => {
@@ -412,11 +379,6 @@ const ManagerMeetingDetail = () => {
     const canJoin = meeting.status === 'scheduled' || meeting.status === 'in_progress';
     const isCompleted = meeting.status === 'completed';
 
-    const filteredTranscript = mockTranscript.filter(item =>
-        item.text.toLowerCase().includes(transcriptQuery.toLowerCase()) ||
-        item.speaker.toLowerCase().includes(transcriptQuery.toLowerCase())
-    );
-
     let isBefore15Min = false;
     let isEnded = false;
     if (meeting?.start_time || meeting?.startTime) {
@@ -443,7 +405,7 @@ const ManagerMeetingDetail = () => {
             <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
                 {/* Header / Actions */}
                 <div className="flex justify-end gap-2 w-full">
-                    {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                    {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && !isEnded && (
                         <>
                             <button
                                 onClick={() => setIsEditModalOpen(true)}
@@ -774,91 +736,21 @@ const ManagerMeetingDetail = () => {
 
                     {activeRightTab === 'transcript' ? (
                         meeting.recordingEnabled && isCompleted ? (
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 space-y-5">
-                                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider border-b border-platinum-tint pb-3 flex items-center gap-2">
-                                    <Video className="w-4.5 h-4.5 text-red-600" />
-                                    Video ghi hình & Bản ghi chữ
-                                </h3>
-
-
-                                {/* Real or Mock Player */}
-                                {videoMedia ? (
-                                    <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner">
-                                        <video src={videoMedia.fileUrl} controls className="w-full h-full" />
-                                    </div>
-                                ) : (
-                                    <div className="relative aspect-video rounded-xl bg-slate-900 overflow-hidden flex items-center justify-center text-white border border-slate-950 shadow-inner group">
-                                        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/80 to-transparent flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <span className="text-[10px] font-semibold bg-red-600/90 text-white px-2 py-0.5 rounded self-start uppercase">Xem lại cuộc họp</span>
-                                            <span className="text-[10.5px] font-mono text-slate-300 self-end">
-                                                {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')} / 2:00
-                                            </span>
-                                        </div>
-
-                                        <button
-                                            onClick={() => setIsPlaying(!isPlaying)}
-                                            className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/35 backdrop-blur-md flex items-center justify-center text-white transition-all shadow-md transform active:scale-95 z-10"
-                                        >
-                                            {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
-                                        </button>
-                                    </div>
+                            <div className="space-y-6">
+                                {/* Audio Uploader */}
+                                {canManage && (
+                                    <AudioUploader
+                                        meetingId={meeting.id}
+                                        onUploadSuccess={() => setRefreshTranscriptKey(prev => prev + 1)}
+                                    />
                                 )}
 
-                                {/* Transcript Area */}
-                                {transcriptMedia ? (
-                                    <div className="pt-2">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-xs font-bold text-midnight-indigo">Bản ghi chữ cuộc họp</span>
-                                            <a href={transcriptMedia.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-action-blue rounded-lg text-xs font-bold hover:bg-blue-100">
-                                                <Download className="w-3.5 h-3.5" />
-                                                Tải bản ghi chữ
-                                            </a>
-                                        </div>
-                                        <div className="text-xs text-slate-blue italic text-center p-4 bg-cloud-mist/30 rounded-xl border border-platinum-tint">
-                                            Tính năng hiển thị trực tiếp bản dịch đang được phát triển. Vui lòng tải xuống file gốc để xem.
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3 pt-2">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-xs font-bold text-midnight-indigo">Bản ghi chữ cuộc họp</span>
-                                            <div className="relative w-36">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Tìm từ khóa..."
-                                                    value={transcriptQuery}
-                                                    onChange={(e) => setTranscriptQuery(e.target.value)}
-                                                    className="w-full pl-7 pr-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] focus:outline-none focus:border-action-blue"
-                                                />
-                                                <Search className="w-3.5 h-3.5 text-slate-blue absolute left-2 top-2" />
-                                            </div>
-                                        </div>
-
-                                        <div className="h-48 overflow-y-auto border border-outline-gray rounded-xl p-3 bg-cloud-mist/30 space-y-3 text-[11px] pr-1.5 scrollbar-thin">
-                                            {filteredTranscript.map((segment, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    onClick={() => setCurrentTime(segment.time)}
-                                                    className={`p-2 rounded-lg border cursor-pointer transition-colors ${idx === activeSegmentIndex && isPlaying
-                                                        ? 'bg-blue-50/80 border-blue-200 shadow-sm'
-                                                        : 'bg-white border-outline-gray/60 hover:bg-cloud-mist'
-                                                        }`}
-                                                >
-                                                    <div className="flex justify-between items-center mb-1 text-[9.5px]">
-                                                        <span className="font-bold text-midnight-indigo">{segment.speaker}</span>
-                                                        <span className="text-slate-blue font-mono font-bold">
-                                                            {Math.floor(segment.time / 60)}:{(segment.time % 60).toString().padStart(2, '0')}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-slate-blue leading-relaxed">{segment.text}</p>
-                                                </div>
-                                            ))}
-                                            {filteredTranscript.length === 0 && (
-                                                <p className="text-center italic text-slate-blue py-6">Không tìm thấy nội dung phù hợp.</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Transcript Viewer */}
+                                <TranscriptViewer
+                                    key={refreshTranscriptKey}
+                                    meetingId={meeting.id}
+                                    isHost={canManage}
+                                />
                             </div>
                         ) : (
                             <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 text-center py-8 text-slate-blue">

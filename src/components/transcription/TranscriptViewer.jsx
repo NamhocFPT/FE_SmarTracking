@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Search, FileText, CheckCircle, AlertTriangle, 
-    RefreshCw, Edit3, Save, X, Loader2
+    RefreshCw, Edit3, Save, X, Loader2, Users
 } from 'lucide-react';
+import SpeakerMappingModal from './SpeakerMappingModal';
 import {
     getTranscriptionJobs,
     getTranscript,
@@ -22,6 +23,9 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     const [editForm, setEditForm] = useState({ text: '', speakerLabel: '', revisionNote: '' });
     const [isSaving, setIsSaving] = useState(false);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
+    
+    // Speaker Mapping Modal state
+    const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     
     const [errorMsg, setErrorMsg] = useState('');
     const [toast, setToast] = useState(null); // { message, type }
@@ -264,13 +268,21 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                     </div>
                     
                     {isHost && transcript?.status === 'draft' && (
-                        <button
-                            onClick={() => handleStatusChange('reviewed')}
-                            disabled={isChangingStatus}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shrink-0 shadow-sm disabled:opacity-50"
-                        >
-                            <CheckCircle className="w-3.5 h-3.5" /> Đánh dấu đã xem
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={() => setIsMappingModalOpen(true)}
+                                className="px-3 py-1.5 bg-white border border-platinum-tint text-action-blue hover:bg-blue-50 rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shadow-sm"
+                            >
+                                <Users className="w-3.5 h-3.5" /> Gán người nói
+                            </button>
+                            <button
+                                onClick={() => handleStatusChange('reviewed')}
+                                disabled={isChangingStatus}
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50"
+                            >
+                                <CheckCircle className="w-3.5 h-3.5" /> Đánh dấu đã xem
+                            </button>
+                        </div>
                     )}
                     {isHost && transcript?.status === 'reviewed' && (
                         <button
@@ -315,7 +327,11 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                                     />
                                 ) : (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-midnight-indigo">{segment.speakerLabel === 'unknown' ? 'Khách chưa rõ' : segment.speakerLabel}</span>
+                                        <span className="text-xs font-bold text-midnight-indigo">
+                                            {segment.speakerLabel === 'unknown' ? 'Chưa xác định' : 
+                                             segment.speakerLabel?.startsWith('Speaker_') ? segment.speakerLabel.replace('Speaker_', 'Người nói ') : 
+                                             segment.speakerLabel}
+                                        </span>
                                         {isLowConfidence && !isEditing && (
                                             <span className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-md font-bold flex items-center gap-1" title="Độ chính xác thấp, cần kiểm tra lại">
                                                 <AlertTriangle className="w-3 h-3" /> Chú ý
@@ -387,6 +403,16 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                     </div>
                 )}
             </div>
+            {/* Speaker Mapping Modal */}
+            <SpeakerMappingModal
+                isOpen={isMappingModalOpen}
+                onClose={() => setIsMappingModalOpen(false)}
+                transcriptId={transcript?.id || transcript?.transcriptId}
+                meetingId={meetingId}
+                onMappingSuccess={() => {
+                    fetchTranscript(); // Refresh to show new names
+                }}
+            />
         </div>
     );
 };

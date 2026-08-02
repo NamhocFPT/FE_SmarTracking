@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Check, ChevronRight, Hand, ListTodo, Mic, MicOff, MonitorUp, PhoneOff, Play, Shield, Smile, Sparkles, StickyNote, Users, Video as VideoIcon, VideoOff, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, ChevronRight, Hand, ListTodo, Mic, MicOff, MonitorUp, PhoneOff, Play, Shield, Smile, Sparkles, StickyNote, Users, Video as VideoIcon, VideoOff, Volume2, VolumeX, Tag, Undo2 } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,7 @@ import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, en
 import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes, startVideoRecording as startManagerVideoRecording, pauseVideoRecording as pauseManagerVideoRecording, resumeVideoRecording as resumeManagerVideoRecording, stopVideoRecording as stopManagerVideoRecording, getRecordingStatus as getManagerRecordingStatus, getMeetingMediaFiles as getManagerMediaFiles } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
+import { startRecordingMarker, addSpeakerTag, getSpeakerTags, deleteSpeakerTag } from '../../service/transcriptionServices';
 
 // CSS styles injected for custom floating reactions and voice sound wave animations
 const customStyles = `
@@ -40,7 +41,7 @@ const defaultMeeting = {
     currentAgendaIndex: 0,
     agendaTimeLeft: 600, 
     participants: [
-        { id: 'mgr-uuid', fullName: 'Nguyễn Văn A', role: 'Host', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: false },
+        { id: 'mgr-uuid', fullName: 'Nguyễn Văn A', role: 'Chủ tọa', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: false },
         { id: 'bot-1', fullName: 'Lê Hoàng Hải', role: 'Thành viên', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: true },
         { id: 'bot-2', fullName: 'Nguyễn Thị Minh', role: 'Thành viên', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: true },
         { id: 'bot-3', fullName: 'Phan Văn Minh', role: 'Thành viên', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: true }
@@ -127,8 +128,8 @@ const RecordingTimer = ({ meetingId, sessionId, initialStatus, onStatusChange })
             <div className={`px-3 py-2 rounded-xl border flex flex-col gap-1 text-xs font-bold ${localStatus === 'recording' ? 'bg-red-50 text-red-600 border-red-200' : localStatus === 'paused' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-action-blue border-blue-100'}`}>
                 <div className="flex items-center">
                     {localStatus === 'recording' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />}
-                    {localStatus === 'recording' ? `REC ${formatDuration(duration)}${formatSize(fileSize)}` : 
-                     localStatus === 'paused' ? `PAUSED ${formatDuration(duration)}${formatSize(fileSize)}` : 
+                    {localStatus === 'recording' ? `GHI HÌNH ${formatDuration(duration)}${formatSize(fileSize)}` : 
+                     localStatus === 'paused' ? `TẠM DỪNG ${formatDuration(duration)}${formatSize(fileSize)}` : 
                      'Đang xử lý...'}
                 </div>
                 {localStatus === 'paused' && (
@@ -148,7 +149,7 @@ const normalizeMeetingDetail = (raw, currentUserId) => {
             id: p.userId || p.user_id || p.id,
             fullName: p.fullName || p.full_name,
             avatarUrl: resolveAvatarUrl(p),
-            role: p.participantRole || p.participant_role === 'host' ? 'Host' : 'Thành viên',
+            role: p.participantRole || p.participant_role === 'host' ? 'Chủ tọa' : 'Thành viên',
             isMuted: false,
             isCameraOff: false,
             isSpeaking: false,
@@ -179,6 +180,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [recordingStartedAt, setRecordingStartedAt] = useState(null);
     const [recordingDuration, setRecordingDuration] = useState(0); // in seconds
     const [mediaFiles, setMediaFiles] = useState([]);
+    
+    // Audio marker state (C1)
+    const [audioMarker, setAudioMarker] = useState(null);
+    const [speakerTags, setSpeakerTags] = useState([]);
     
     // User local settings
     const [isMicOn, setIsMicOn] = useState(true);
@@ -319,7 +324,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         id: initial.hostId,
                         fullName: initial.host,
                         avatarUrl: resolveAvatarUrl(apiHost) || baseMeeting.hostAvatarUrl || baseMeeting.host_avatar_url || '',
-                        role: 'Host',
+                        role: 'Chủ tọa',
                         isMuted: false,
                         isCameraOff: false,
                         isSpeaking: false,
@@ -525,16 +530,16 @@ const InMeetingRoom = ({ isPublic = false }) => {
         const me = meetingState.participants?.find(p => p.id === myParticipantId);
         if (me) {
             if (me.isMuted && !prevMutedRef.current) {
-                showToast('Bạn đã bị Host tắt tiếng (Muted)!', 'error');
+                showToast('Bạn đã bị Chủ tọa tắt tiếng!', 'error');
                 setIsMicOn(false);
             }
             prevMutedRef.current = me.isMuted;
         }
 
         if (meetingState.reactionsLocked && !prevReactionsLockedRef.current) {
-            showToast('Host đã khóa tính năng thả cảm xúc!', 'warning');
+            showToast('Chủ tọa đã khóa tính năng thả cảm xúc!', 'warning');
         } else if (!meetingState.reactionsLocked && prevReactionsLockedRef.current) {
-            showToast('Host đã mở khóa tính năng thả cảm xúc.', 'success');
+            showToast('Chủ tọa đã mở khóa tính năng thả cảm xúc.', 'success');
         }
         prevReactionsLockedRef.current = meetingState.reactionsLocked;
     }, [meetingState, myParticipantId]);
@@ -610,6 +615,21 @@ const InMeetingRoom = ({ isPublic = false }) => {
         return () => clearInterval(countdown);
     }, [meetingState?.status, isHost, id]);
 
+    const fetchSpeakerTags = async () => {
+        try {
+            const res = await getSpeakerTags(id);
+            if (res?.success) {
+                setSpeakerTags(res.data?.items || res.data || []);
+            }
+        } catch (err) {}
+    };
+
+    useEffect(() => {
+        if (meetingState?.status === 'in_progress') {
+            fetchSpeakerTags();
+        }
+    }, [meetingState?.status, id]);
+
     if (loading || !meetingState) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[450px]">
@@ -633,7 +653,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setMeetingState(prev => {
             const list = [...prev.participants];
             const exists = list.find(p => p.id === myParticipantId);
-            const userRole = isPublic ? 'Khách' : (isHost ? 'Host' : 'Thành viên');
+            const userRole = isPublic ? 'Khách' : (isHost ? 'Chủ tọa' : 'Thành viên');
             
             if (exists) {
                 exists.fullName = selectedName;
@@ -785,6 +805,63 @@ const InMeetingRoom = ({ isPublic = false }) => {
         }
     };
 
+    const handleStartAudioMarker = async () => {
+        if (!isHost) return;
+        setActionLoading(true);
+        try {
+            const res = await startRecordingMarker(id, 'Đánh dấu từ Host Controls');
+            if (res?.success) {
+                setAudioMarker({
+                    markerId: res.data?.id || res.data?.markerId || 'marker_1',
+                    startedAt: new Date(res.data?.startedAt || Date.now())
+                });
+                showToast('Đã đóng mốc bắt đầu ghi âm. Vui lòng bật mic ghi âm thực tế.', 'success');
+                fetchSpeakerTags();
+            } else {
+                showToast(res?.error?.message || 'Lỗi khi đóng dấu mốc', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server API ghi âm', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleAddSpeakerTag = async (participant) => {
+        if (!audioMarker) {
+            showToast('Vui lòng bấm Bắt đầu ghi âm trước khi gán người nói', 'warning');
+            return;
+        }
+        try {
+            const payload = {
+                speakerUserId: participant.isBot ? undefined : participant.id,
+                externalParticipantId: participant.isBot ? participant.id : undefined,
+                displayName: participant.fullName
+            };
+            const res = await addSpeakerTag(id, payload);
+            if (res?.success) {
+                showToast(`Đã ghi nhận: ${participant.fullName} đang nói`, 'success');
+                fetchSpeakerTags();
+            } else {
+                showToast(res?.error?.message || 'Lỗi khi gán người nói', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        }
+    };
+
+    const handleUndoSpeakerTag = async (tagId) => {
+        try {
+            const res = await deleteSpeakerTag(id, tagId);
+            if (res?.success !== false) { // Assuming success or empty
+                showToast('Đã hoàn tác gán tên', 'info');
+                fetchSpeakerTags();
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        }
+    };
+
     const handleAddNote = async (e) => {
         e.preventDefault();
         if (!noteInput.trim()) return;
@@ -808,7 +885,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const handleMicToggle = () => {
         const me = meetingState.participants?.find(p => p.id === myParticipantId);
         if (me?.isMuted && isMicOn) {
-            showToast('Không thể bật tiếng. Bạn đã bị Host tắt tiếng!', 'error');
+            showToast('Không thể bật tiếng. Bạn đã bị Chủ tọa tắt tiếng!', 'error');
             return;
         }
 
@@ -864,7 +941,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const sendReaction = (emoji) => {
         if (meetingState.reactionsLocked && !isHost) {
-            showToast('Tính năng thả cảm xúc đang bị Host khóa!', 'error');
+            showToast('Tính năng thả cảm xúc đang bị Chủ tọa khóa!', 'error');
             return;
         }
 
@@ -903,7 +980,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                 return next;
             });
-            showToast(renameModal.isSelf ? 'Đổi tên thành công!' : 'Host đã thay đổi tên của thành viên!', 'success');
+            showToast(renameModal.isSelf ? 'Đổi tên thành công!' : 'Chủ tọa đã thay đổi tên của thành viên!', 'success');
         }
         setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true });
     };
@@ -960,9 +1037,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                 return next;
             });
-            showToast('Đã chuyển phần tiếp theo trong Agenda.', 'success');
+            showToast('Đã chuyển phần tiếp theo trong chương trình.', 'success');
         } else {
-            showToast('Chương trình Agenda đã kết thúc.', 'warning');
+            showToast('Chương trình đã kết thúc.', 'warning');
         }
     };
 
@@ -983,7 +1060,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     return (
-        <div className="min-h-screen bg-cloud-mist text-midnight-indigo flex flex-col relative overflow-hidden">
+        <div className="fixed inset-0 z-[100] bg-cloud-mist text-midnight-indigo flex flex-col overflow-hidden">
             <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
             {/* HEADER BAR */}
@@ -1021,7 +1098,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
                         {/* Preview Screen */}
                         <div className="flex flex-col justify-between space-y-4">
-                            <h2 className="text-base font-bold text-midnight-indigo uppercase tracking-wider">Khung Preview Thiết Bị</h2>
+                            <h2 className="text-base font-bold text-midnight-indigo uppercase tracking-wider">Khung xem trước thiết bị</h2>
                             <div className="relative aspect-video rounded-2xl bg-slate-900 overflow-hidden border border-platinum-tint flex items-center justify-center group shadow-inner">
                                 {isVideoOn ? (
                                     <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
@@ -1045,7 +1122,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     </button>
                                 </div>
                             </div>
-                            <p className="text-[11px] text-slate-blue text-center leading-relaxed">Vui lòng kiểm tra Microphone và Camera trước khi tham gia cuộc họp.</p>
+                            <p className="text-[11px] text-slate-blue text-center leading-relaxed">Vui lòng kiểm tra Micrô và Máy ảnh trước khi tham gia cuộc họp.</p>
                         </div>
 
                         {/* Setup Name and Ready Button */}
@@ -1093,7 +1170,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         <div className="space-y-2">
                             <h2 className="text-xl font-bold text-midnight-indigo uppercase tracking-wider">Chờ chủ tọa bắt đầu...</h2>
                             <p className="text-xs text-slate-blue leading-relaxed">
-                                Bạn đã sẵn sàng trong phòng chờ. Cuộc họp sẽ tự động bắt đầu khi Host (<strong>{meetingState.host}</strong>) nhấn nút bắt đầu cuộc họp.
+                                Bạn đã sẵn sàng trong phòng chờ. Cuộc họp sẽ tự động bắt đầu khi Chủ tọa (<strong>{meetingState.host}</strong>) nhấn nút bắt đầu cuộc họp.
                             </p>
                         </div>
 
@@ -1111,7 +1188,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             <span className="font-semibold text-midnight-indigo">{p.fullName}</span>
                                         </div>
                                         <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold tracking-wider uppercase ${
-                                            p.role === 'Host' ? 'bg-red-50 text-red-600' :
+                                            p.role === 'Chủ tọa' ? 'bg-red-50 text-red-600' :
                                             p.role === 'Khách' ? 'bg-emerald-50 text-emerald-600' :
                                             'bg-blue-50 text-action-blue'
                                         }`}>{p.role}</span>
@@ -1259,7 +1336,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         {/* Tab điều hướng */}
                         <nav className="flex flex-col px-2 py-2 border-b border-platinum-tint">
                             {[
-                                ...(isHost ? [{ id: 'host', label: 'Host Controls', icon: Shield }] : []),
+                                ...(isHost ? [{ id: 'host', label: 'Host Controls', icon: Shield }, { id: 'tagging', label: 'Live Tagging', icon: Tag }] : []),
                                 { id: 'agenda', label: 'Agenda', icon: Calendar },
                                 { id: 'notes', label: 'Notes', icon: StickyNote },
                                 { id: 'attendance', label: 'Attendance', icon: Users },
@@ -1337,6 +1414,38 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     )}
                                 </div>
 
+                                {/* AUDIO RECORDING (MARKER) */}
+                                <div className="bg-white border border-platinum-tint rounded-2xl p-4 space-y-3.5 shadow-sm-1">
+                                    <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest">Audio AI (STT)</h3>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-midnight-indigo flex items-center gap-1.5">
+                                            <Mic className="w-4 h-4" /> Bắt đầu ghi âm (Marker)
+                                        </span>
+                                        <button
+                                            type="button"
+                                            disabled={actionLoading || audioMarker}
+                                            onClick={handleStartAudioMarker}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
+                                                audioMarker ? 'bg-action-blue' : 'bg-pale-gray'
+                                            }`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${audioMarker ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    </div>
+                                    {!audioMarker && (
+                                        <div className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded flex items-start gap-1">
+                                            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                                            <span>Nhắc nhở: Cuộc họp đã bắt đầu nhưng chưa bật ghi âm AI. Hãy bấm nút trên để đánh mốc thời gian t=0.</span>
+                                        </div>
+                                    )}
+                                    {audioMarker && (
+                                        <div className="text-[10px] text-emerald-600 bg-emerald-50 p-2 rounded flex items-start gap-1">
+                                            <Check className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                                            <span>Đang ghi âm — bắt đầu lúc {audioMarker.startedAt.toLocaleTimeString('vi-VN')}</span>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="flex flex-col gap-2">
                                     <button
                                         onClick={handleHostMuteAll}
@@ -1378,6 +1487,63 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     </div>
                                 )}
                             </>
+                        )}
+
+                        {/* TAB: Live Tagging (C2) */}
+                        {activeChatTab === 'tagging' && (
+                            <div className="flex flex-col gap-4">
+                                <div className="bg-action-blue rounded-2xl p-4 text-white space-y-1 shadow-md shadow-action-blue/20">
+                                    <h4 className="text-sm font-extrabold leading-snug">Gán danh tính trực tiếp</h4>
+                                    <p className="text-[11px] opacity-90">Bấm vào tên người đang nói để đánh dấu. Chỉ cần bấm 1 lần cho mỗi người.</p>
+                                </div>
+                                {!audioMarker ? (
+                                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+                                        <AlertTriangle className="w-6 h-6 text-red-500 mx-auto mb-2" />
+                                        <p className="text-xs text-red-600 font-semibold mb-2">Chưa đóng mốc ghi âm (t=0)</p>
+                                        <p className="text-[10px] text-red-500">Vui lòng sang tab Host Controls và bấm "Bắt đầu ghi âm" trước khi gán người nói.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {meetingState.participants?.map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => handleAddSpeakerTag(p)}
+                                                    className="p-3 bg-white border border-platinum-tint hover:bg-blue-50 hover:border-blue-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-all shadow-sm-1"
+                                                >
+                                                    <UserAvatar src={p.avatarUrl} name={p.fullName} size="w-10 h-10" />
+                                                    <span className="text-xs font-bold text-midnight-indigo text-center break-words w-full line-clamp-1">{p.fullName}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {speakerTags.length > 0 && (
+                                            <div className="mt-4 border-t border-platinum-tint pt-4">
+                                                <h4 className="text-xs font-bold text-midnight-indigo uppercase mb-3">Lịch sử gán</h4>
+                                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                    {speakerTags.map((tag, idx) => (
+                                                        <div key={tag.id || idx} className="flex justify-between items-center p-2.5 bg-cloud-mist rounded-lg border border-platinum-tint">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10px] font-mono font-bold text-action-blue bg-blue-50 px-1.5 py-0.5 rounded">
+                                                                    {formatDuration(Math.floor((tag.relativeTimestampMs || 0) / 1000))}
+                                                                </span>
+                                                                <span className="text-xs font-semibold text-midnight-indigo">{tag.displayName}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleUndoSpeakerTag(tag.id)}
+                                                                className="text-red-500 hover:text-red-600 p-1"
+                                                                title="Hoàn tác"
+                                                            >
+                                                                <Undo2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         )}
 
                         {/* TAB: Agenda */}

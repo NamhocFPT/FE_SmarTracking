@@ -423,7 +423,7 @@ const EmployeeMeetingDetail = () => {
             <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
                 {/* Header / Actions */}
                 <div className="flex justify-end gap-2 w-full">
-                    {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                    {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && !isEnded && (
                         <>
                             <button
                                 onClick={() => setIsEditModalOpen(true)}
