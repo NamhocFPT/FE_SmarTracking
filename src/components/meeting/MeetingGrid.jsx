@@ -6,16 +6,18 @@ import UserAvatar from '../../component/UserAvatar';
  * như bản mô phỏng bàn họp cũ. Xem docs/inmeeting-room-redesign-context.md.
  */
 const getGridColsClass = (count) => {
-    if (count <= 1) return 'grid-cols-1';
-    if (count <= 2) return 'grid-cols-2';
-    if (count <= 4) return 'grid-cols-2';
-    if (count <= 6) return 'grid-cols-3';
-    if (count <= 9) return 'grid-cols-3';
-    return 'grid-cols-4';
+    if (count <= 1) return 'grid-cols-1 md:grid-cols-1';
+    if (count <= 2) return 'grid-cols-1 md:grid-cols-2';
+    if (count <= 4) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2';
+    if (count <= 6) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+    if (count <= 9) return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3';
+    if (count <= 12) return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4';
+    if (count <= 16) return 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4';
+    return 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6';
 };
 
 const roleBadgeClass = (role) => {
-    if (role === 'Host') return 'bg-action-blue/90 text-white';
+    if (role === 'Host' || role === 'Chủ tọa') return 'bg-action-blue/90 text-white';
     if (role === 'Khách') return 'bg-emerald-500/90 text-white';
     return 'bg-white/90 text-midnight-indigo';
 };

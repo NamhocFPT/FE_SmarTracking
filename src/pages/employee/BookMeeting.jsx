@@ -996,21 +996,7 @@ const BookMeeting = () => {
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Người chủ trì (Host)</label>
-                                        <select
-                                            value={hostId}
-                                            onChange={(e) => setHostId(e.target.value)}
-                                            className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
-                                        >
-                                            <option value="">Tôi (Mặc định)</option>
-                                            {users.map(u => (
-                                                <option key={u.id} value={u.id}>
-                                                    {u.fullName || u.full_name} ({u.email})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+
 
                                     <div>
                                         <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Mô tả (tuỳ chọn)</label>
@@ -1295,9 +1281,9 @@ const BookMeeting = () => {
 
                                         {/* Agenda Item Document Upload */}
                                         <div className="flex items-center gap-3 w-full">
-                                            <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-platinum-tint hover:border-action-blue bg-cloud-mist/20 hover:bg-blue-50/20 text-slate-blue hover:text-action-blue rounded-xl text-xs font-bold cursor-pointer transition-all flex-1 justify-center select-none">
-                                                <Upload className="w-4 h-4 text-action-blue" />
-                                                <span>{newAgendaFile ? `Đã đính kèm: ${newAgendaFile.name}` : 'Đính kèm tài liệu thảo luận (PDF, Word, Excel, PowerPoint...)'}</span>
+                                            <label className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-platinum-tint hover:border-action-blue bg-cloud-mist/20 hover:bg-blue-50/20 text-slate-blue hover:text-action-blue rounded-xl text-xs font-bold cursor-pointer transition-all flex-1 justify-center select-none min-w-0">
+                                                <Upload className="w-4 h-4 text-action-blue shrink-0" />
+                                                <span className="truncate">{newAgendaFile ? `Đã đính kèm: ${newAgendaFile.name}` : 'Đính kèm tài liệu thảo luận (PDF, Word, Excel, PowerPoint...)'}</span>
                                                 <input
                                                     type="file"
                                                     onChange={(e) => {
@@ -1338,7 +1324,7 @@ const BookMeeting = () => {
                                                             {index + 1}
                                                         </span>
                                                         <div className="space-y-1">
-                                                            <div className="font-semibold text-midnight-indigo">{item.title}</div>
+                                                            <div className="font-semibold text-midnight-indigo break-words break-all">{item.title}</div>
                                                             {item.file && (
                                                                 <div className="flex items-center gap-1.5 text-[10px] text-action-blue font-semibold bg-action-blue/5 px-2 py-0.5 rounded-lg border border-action-blue/10 w-max select-none">
                                                                     <Paperclip className="w-3 h-3 text-action-blue" />

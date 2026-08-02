@@ -9,6 +9,7 @@ import {
 
 import DashboardBanner from '../../component/DashboardBanner';
 import { getEmployeeSummary } from '../../service/campusService';
+import { getMySchedule } from '../../service/employeeServices';
 
 const COLORS = ['#006BFF', '#FFAE00', '#FF3B30'];
 
@@ -29,7 +30,7 @@ const EmployeeHomePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [successToast, setSuccessToast] = useState('');
-
+    const [statusFilter, setStatusFilter] = useState('');
     useEffect(() => {
         if (location.state?.successMessage) {
             setSuccessToast(location.state.successMessage);
@@ -48,7 +49,7 @@ const EmployeeHomePage = () => {
     }, [successToast]);
 
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'analytics'
-    
+
     // Overview states
     const [upcomingMeetings, setUpcomingMeetings] = useState([]);
     const [quickStats, setQuickStats] = useState({
@@ -97,28 +98,81 @@ const EmployeeHomePage = () => {
             meetingsToday: 2
         });
 
-        setUpcomingMeetings([
-            {
-                id: 'meet-1',
-                title: 'Họp kỹ thuật dự án FE SmarTracking',
-                room: 'Phòng Apollo 101',
-                startTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
-                endTime: new Date(Date.now() + 3 * 3600 * 1000).toISOString(),
-                host: 'Lê Hoàng Hải',
-                recordingEnabled: true,
-                consentStatus: 'PENDING'
-            },
-            {
-                id: 'meet-2',
-                title: 'Review Sprint 2 và lập kế hoạch Sprint 3',
-                room: 'Phòng Athena 102',
-                startTime: new Date(Date.now() + 26 * 3600 * 1000).toISOString(),
-                endTime: new Date(Date.now() + 27.5 * 3600 * 1000).toISOString(),
-                host: 'Phan Văn Minh',
-                recordingEnabled: true,
-                consentStatus: 'GRANTED'
+        let isMounted = true;
+        const now = new Date();
+
+        // Tính ngày 7 ngày sau (dùng setDate chuẩn hơn cộng ms)
+        const nextWeek = new Date(now);
+        nextWeek.setDate(now.getDate() + 7);
+
+        // Hàm format thành ISO 8601 Full Timestamp (Local Timezone)
+        const formatFullTimestamp = (d, setEndOfDay = false) => {
+            const targetDate = new Date(d);
+
+            if (setEndOfDay) {
+                targetDate.setHours(23, 59, 59, 0);
+            } else {
+                targetDate.setHours(0, 0, 0, 0);
             }
-        ]);
+
+            const pad = (n) => String(n).padStart(2, '0');
+
+            const year = targetDate.getFullYear();
+            const month = pad(targetDate.getMonth() + 1);
+            const day = pad(targetDate.getDate());
+            const hours = pad(targetDate.getHours());
+            const minutes = pad(targetDate.getMinutes());
+            const seconds = pad(targetDate.getSeconds());
+
+            // Lấy offset múi giờ thiết bị (ví dụ: UTC+7 sẽ ra '+07:00')
+            const tzo = -targetDate.getTimezoneOffset();
+            const diffSign = tzo >= 0 ? '+' : '-';
+            const tzHours = pad(Math.floor(Math.abs(tzo) / 60));
+            const tzMinutes = pad(Math.abs(tzo) % 60);
+            const timezone = `${diffSign}${tzHours}:${tzMinutes}`;
+
+            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${timezone}`;
+        };
+
+        // Gọi hàm getMySchedule
+        getMySchedule({
+            from: formatFullTimestamp(now, false),      // "2026-08-03T00:00:00+07:00"
+            to: formatFullTimestamp(nextWeek, true),     // "2026-08-10T23:59:59+07:00"
+            view: 'month',
+            status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'scheduled']
+        })
+            .then(res => {
+                if (isMounted && res?.success && res.data) {
+                    const dataList = Array.isArray(res.data) ? res.data : (res.data.items || []);
+                    const mapped = dataList.map(m => {
+                        const hostName = m.host?.fullName || m.host?.full_name || m.hostName || m.host_name || 'Người tổ chức';
+                        return {
+                            id: m.id || m._id,
+                            title: m.title || m.meetingTitle || 'Không có tiêu đề',
+                            room: m.room?.roomName || m.room?.name || 'Phòng trực tuyến',
+                            host: hostName,
+                            startTime: m.startTime || m.start_time,
+                            endTime: m.endTime || m.end_time,
+                            recordingEnabled: m.recordingEnabled || m.is_recording_enabled || false,
+                            consentStatus: m.myConsentStatus || m.consentStatus || null,
+                            status: m.status?.toLowerCase() || 'scheduled'
+                        };
+                    });
+
+                    const now = new Date();
+                    const upcoming = mapped
+                        .filter(m => new Date(m.startTime) >= now)
+                        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+                        .slice(0, 5);
+
+                    setUpcomingMeetings(upcoming);
+                }
+            })
+            .catch(err => {
+                console.error("Failed to fetch upcoming meetings", err);
+            });
+
+        return () => { isMounted = false; };
     }, []);
 
     // Load Analytics Data when tab switches to 'analytics'
@@ -193,22 +247,20 @@ const EmployeeHomePage = () => {
                 <div className="flex gap-1 bg-white p-1.5 rounded-xl border border-platinum-tint/80 shadow-sm">
                     <button
                         onClick={() => setActiveTab('overview')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${
-                            activeTab === 'overview'
-                                ? 'bg-action-blue text-white shadow-sm'
-                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
-                        }`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'overview'
+                            ? 'bg-action-blue text-white shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                            }`}
                     >
                         <Calendar className="w-4 h-4" />
                         Lịch họp & Lối tắt
                     </button>
                     <button
                         onClick={() => setActiveTab('analytics')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${
-                            activeTab === 'analytics'
-                                ? 'bg-action-blue text-white shadow-sm'
-                                : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
-                        }`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'analytics'
+                            ? 'bg-action-blue text-white shadow-sm'
+                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
+                            }`}
                     >
                         <BarChart2 className="w-4 h-4" />
                         Thống kê cá nhân
@@ -296,7 +348,7 @@ const EmployeeHomePage = () => {
                                 Lối tắt chức năng nhanh
                             </h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <div 
+                                <div
                                     onClick={() => navigate('/employee/book')}
                                     className="group bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
@@ -312,7 +364,7 @@ const EmployeeHomePage = () => {
                                     </div>
                                 </div>
 
-                                <div 
+                                <div
                                     onClick={() => navigate('/employee/book?quick=true')}
                                     className="group bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
@@ -328,7 +380,10 @@ const EmployeeHomePage = () => {
                                     </div>
                                 </div>
 
-                                <div className="group bg-gradient-to-br from-purple-500 to-purple-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                                <div
+                                    onClick={() => navigate('/employee/schedule')}
+                                    className="group bg-gradient-to-br from-purple-500 to-purple-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                                >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                                             <BookOpen className="w-6 h-6 text-white" />
@@ -341,7 +396,7 @@ const EmployeeHomePage = () => {
                                     </div>
                                 </div>
 
-                                <div 
+                                <div
                                     onClick={() => setActiveTab('analytics')}
                                     className="group bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
@@ -367,74 +422,106 @@ const EmployeeHomePage = () => {
                                         <h2 className="text-base font-bold text-midnight-indigo">Cuộc họp sắp tới</h2>
                                         <p className="text-xs text-slate-blue">Các lịch họp được lên lịch sắp tới của bạn</p>
                                     </div>
-                                    <span className="text-xs font-bold text-action-blue hover:underline cursor-pointer">Xem tất cả</span>
+                                    <span 
+                                        onClick={() => navigate('/employee/schedule')}
+                                        className="text-xs font-bold text-action-blue hover:underline cursor-pointer"
+                                    >
+                                        Xem tất cả
+                                    </span>
                                 </div>
 
                                 <div className="space-y-4">
-                                    {upcomingMeetings.map(meet => (
-                                        <div 
-                                            key={meet.id} 
-                                            onClick={() => navigate(`/employee/meeting/${meet.id}`)}
-                                            className="p-4 rounded-xl border border-platinum-tint/60 hover:bg-cloud-mist/10 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:border-action-blue/30"
-                                        >
-                                            <div className="space-y-1.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-50 text-action-blue">
-                                                        {meet.room}
-                                                    </span>
-                                                    {meet.recordingEnabled && (
-                                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-600 flex items-center gap-1">
-                                                            <Video className="w-3 h-3" /> Ghi hình
+                                    {upcomingMeetings.length > 0 ? (
+                                        upcomingMeetings.map(meet => (
+                                            <div
+                                                key={meet.id}
+                                                onClick={() => navigate(`/employee/meeting/${meet.id}`)}
+                                                className="p-4 rounded-xl border border-platinum-tint/60 hover:bg-cloud-mist/10 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:border-action-blue/30"
+                                            >
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-50 text-action-blue">
+                                                            {meet.room}
                                                         </span>
-                                                    )}
-                                                </div>
-                                                <h4 className="font-bold text-midnight-indigo text-sm sm:text-base">
-                                                    {meet.title}
-                                                </h4>
-                                                <div className="flex items-center gap-4 text-xs text-slate-blue font-medium">
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="w-3.5 h-3.5" />
-                                                        {new Date(meet.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(meet.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ({new Date(meet.startTime).toLocaleDateString('vi-VN')})
-                                                    </span>
-                                                    <span>Chủ trì: <strong>{meet.host}</strong></span>
-                                                </div>
-                                            </div>
-
-                                            {meet.recordingEnabled && (
-                                                <div className="flex items-center gap-2 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-0 border-platinum-tint/40">
-                                                    {meet.consentStatus === 'PENDING' ? (
-                                                        <div className="flex items-center gap-2 w-full justify-between">
-                                                            <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
-                                                                <AlertCircle className="w-3 h-3" /> Cần Consent
+                                                        {meet.status === 'pending_approval' && (
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">
+                                                                Chờ duyệt
                                                             </span>
-                                                            <div className="flex gap-1">
-                                                                <button
-                                                                    onClick={() => handleConsent(meet.id, true)}
-                                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors"
-                                                                >
-                                                                    Đồng ý
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleConsent(meet.id, false)}
-                                                                    className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded transition-colors"
-                                                                >
-                                                                    Từ chối
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ) : meet.consentStatus === 'GRANTED' ? (
-                                                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
-                                                            <CheckCircle className="w-3.5 h-3.5" /> Đã đồng ý ghi hình
+                                                        )}
+                                                        {meet.status === 'draft' && (
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200">
+                                                                Bản nháp
+                                                            </span>
+                                                        )}
+                                                        {meet.status === 'in_progress' && (
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                Đang diễn ra
+                                                            </span>
+                                                        )}
+                                                        {meet.recordingEnabled && (
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-600 flex items-center gap-1">
+                                                                <Video className="w-3 h-3" /> Ghi hình
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="font-bold text-midnight-indigo text-sm sm:text-base">
+                                                        {meet.title}
+                                                    </h4>
+                                                    <div className="flex items-center gap-4 text-xs text-slate-blue font-medium">
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="w-3.5 h-3.5" />
+                                                            {new Date(meet.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(meet.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ({new Date(meet.startTime).toLocaleDateString('vi-VN')})
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded flex items-center gap-1">
-                                                            <AlertCircle className="w-3.5 h-3.5" /> Từ chối ghi hình
-                                                        </span>
-                                                    )}
+                                                        <span>Chủ trì: <strong>{meet.host}</strong></span>
+                                                    </div>
                                                 </div>
-                                            )}
+
+                                                {meet.recordingEnabled && (
+                                                    <div className="flex items-center gap-2 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-0 border-platinum-tint/40">
+                                                        {meet.consentStatus === 'PENDING' ? (
+                                                            <div className="flex items-center gap-2 w-full justify-between">
+                                                                <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
+                                                                    <AlertCircle className="w-3 h-3" /> Cần Consent
+                                                                </span>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        onClick={() => handleConsent(meet.id, true)}
+                                                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors"
+                                                                    >
+                                                                        Đồng ý
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleConsent(meet.id, false)}
+                                                                        className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded transition-colors"
+                                                                    >
+                                                                        Từ chối
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : meet.consentStatus === 'GRANTED' ? (
+                                                            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
+                                                                <CheckCircle className="w-3.5 h-3.5" /> Đã đồng ý ghi hình
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded flex items-center gap-1">
+                                                                <AlertCircle className="w-3.5 h-3.5" /> Từ chối ghi hình
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-12 flex flex-col items-center justify-center text-center bg-cloud-mist/30 rounded-xl border border-dashed border-outline-gray/60">
+                                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                                                <Calendar className="w-8 h-8 text-action-blue/50" />
+                                            </div>
+                                            <h4 className="text-sm font-extrabold text-midnight-indigo mb-1">Không có cuộc họp nào</h4>
+                                            <p className="text-xs text-slate-blue max-w-xs leading-relaxed">
+                                                Tuyệt vời! Bạn không có lịch họp nào sắp tới. Hãy dành thời gian này để tập trung hoàn thành các công việc quan trọng nhé.
+                                            </p>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
 

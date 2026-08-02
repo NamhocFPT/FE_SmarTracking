@@ -42,23 +42,31 @@ const PersonalCalendar = () => {
             const from = `${year}-${month}-01`;
             // Calculate last day of month
             const lastDay = new Date(year, currentDate.getMonth() + 1, 0).getDate();
-            
+
             const fromStr = `${year}-${month}-01T00:00:00+07:00`;
             const toStr = `${year}-${month}-${lastDay}T23:59:59+07:00`;
+
+            let dataList = [];
+            let isSuccess = false;
 
             const res = await getMySchedule({
                 from: fromStr,
                 to: toStr,
-                view: 'month', // Always fetch month view data for the grid
-                status: statusFilter ? [statusFilter, statusFilter] : undefined
+                view: 'month',
+                status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'completed']
             });
 
             if (res?.success) {
-                const mappedMeetings = (res.data?.items || res.data || []).map(mapEventToMeeting);
-                setMeetings(mappedMeetings);
-                setError(null);
+                isSuccess = true;
+                dataList = res.data?.items || res.data || [];
             } else {
                 throw new Error(res?.error?.message || 'Lỗi khi tải lịch trình');
+            }
+
+            if (isSuccess) {
+                const mappedMeetings = dataList.map(mapEventToMeeting);
+                setMeetings(mappedMeetings);
+                setError(null);
             }
         } catch (err) {
             setMeetings([]);
@@ -190,21 +198,19 @@ const PersonalCalendar = () => {
                     <div className="flex items-center bg-white p-1 rounded-xl border border-platinum-tint shadow-sm">
                         <button
                             onClick={() => setViewMode('month')}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                viewMode === 'month'
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'month'
                                     ? 'bg-action-blue text-white shadow-sm'
                                     : 'text-slate-blue hover:text-midnight-indigo'
-                            }`}
+                                }`}
                         >
                             <Grid className="w-3.5 h-3.5" /> Tháng
                         </button>
                         <button
                             onClick={() => setViewMode('week')}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                viewMode === 'week'
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'week'
                                     ? 'bg-action-blue text-white shadow-sm'
                                     : 'text-slate-blue hover:text-midnight-indigo'
-                            }`}
+                                }`}
                         >
                             <List className="w-3.5 h-3.5" /> Tuần
                         </button>
@@ -232,10 +238,11 @@ const PersonalCalendar = () => {
                             className="bg-transparent border-0 text-xs font-bold text-midnight-indigo focus:outline-none cursor-pointer"
                         >
                             <option value="">Tất cả trạng thái</option>
+                            {/* <option value="pending_approval">Chờ duyệt</option> */}
                             <option value="scheduled">Đã lên lịch</option>
-                            <option value="in_progress">Đang diễn ra</option>
+                            {/* <option value="in_progress">Đang diễn ra</option> */}
                             <option value="completed">Đã kết thúc</option>
-                            <option value="cancelled">Đã huỷ</option>
+                            {/* <option value="cancelled">Đã huỷ</option> */}
                         </select>
                     </div>
                 </div>
@@ -251,7 +258,7 @@ const PersonalCalendar = () => {
                                 <AlertTriangle className="w-5 h-5" />
                                 <span className="text-sm font-semibold">{error}</span>
                             </div>
-                            <button 
+                            <button
                                 onClick={fetchSchedule}
                                 className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-bold rounded-lg transition-colors"
                             >
@@ -290,20 +297,18 @@ const PersonalCalendar = () => {
                                         <div
                                             key={idx}
                                             onClick={() => setSelectedDate(dayCell.date)}
-                                            className={`min-h-[72px] p-2 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
-                                                isSelected
+                                            className={`min-h-[72px] p-2 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${isSelected
                                                     ? 'border-action-blue bg-blue-50/20 shadow-inner'
                                                     : 'border-platinum-tint/40 hover:border-platinum-tint'
-                                            } ${!dayCell.isCurrentMonth ? 'opacity-40' : ''}`}
+                                                } ${!dayCell.isCurrentMonth ? 'opacity-40' : ''}`}
                                         >
                                             <div className="flex justify-between items-center">
-                                                <span className={`text-xs font-bold ${
-                                                    isToday
+                                                <span className={`text-xs font-bold ${isToday
                                                         ? 'bg-action-blue text-white w-5 h-5 rounded-full flex items-center justify-center'
                                                         : isSelected
-                                                        ? 'text-action-blue'
-                                                        : 'text-midnight-indigo'
-                                                }`}>
+                                                            ? 'text-action-blue'
+                                                            : 'text-midnight-indigo'
+                                                    }`}>
                                                     {dayCell.date.getDate()}
                                                 </span>
                                             </div>
@@ -313,13 +318,12 @@ const PersonalCalendar = () => {
                                                 {dayMeetings.slice(0, 3).map(m => (
                                                     <span
                                                         key={m.id}
-                                                        className={`w-2 h-2 rounded-full ${
-                                                            m.status === 'cancelled'
+                                                        className={`w-2 h-2 rounded-full ${m.status === 'cancelled'
                                                                 ? 'bg-red-500'
                                                                 : m.status === 'in_progress'
-                                                                ? 'bg-emerald-500'
-                                                                : 'bg-action-blue'
-                                                        }`}
+                                                                    ? 'bg-emerald-500'
+                                                                    : 'bg-action-blue'
+                                                            }`}
                                                         title={m.title}
                                                     />
                                                 ))}
@@ -346,16 +350,14 @@ const PersonalCalendar = () => {
                                             <div
                                                 key={idx}
                                                 onClick={() => setSelectedDate(day)}
-                                                className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer rounded-lg py-1 ${
-                                                    isSelected ? 'bg-blue-50/50 border border-blue-150' : ''
-                                                }`}
+                                                className={`flex flex-col items-center justify-center gap-0.5 cursor-pointer rounded-lg py-1 ${isSelected ? 'bg-blue-50/50 border border-blue-150' : ''
+                                                    }`}
                                             >
                                                 <span className="text-[9px] font-bold text-slate-blue uppercase">
                                                     {day.toLocaleDateString('vi-VN', { weekday: 'short' })}
                                                 </span>
-                                                <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
-                                                    isToday ? 'bg-action-blue text-white' : 'text-midnight-indigo'
-                                                }`}>
+                                                <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${isToday ? 'bg-action-blue text-white' : 'text-midnight-indigo'
+                                                    }`}>
                                                     {day.getDate()}
                                                 </span>
                                             </div>
@@ -391,13 +393,12 @@ const PersonalCalendar = () => {
                                                         >
                                                             {slotMeeting && (
                                                                 <div
-                                                                    className={`rounded-lg p-1.5 text-[10px] font-semibold border leading-tight ${
-                                                                        slotMeeting.status === 'cancelled'
+                                                                    className={`rounded-lg p-1.5 text-[10px] font-semibold border leading-tight ${slotMeeting.status === 'cancelled'
                                                                             ? 'bg-red-50/80 text-red-700 border-red-200'
                                                                             : slotMeeting.status === 'in_progress'
-                                                                            ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200'
-                                                                            : 'bg-blue-50/80 text-action-blue border-blue-200'
-                                                                    }`}
+                                                                                ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200'
+                                                                                : 'bg-blue-50/80 text-action-blue border-blue-200'
+                                                                        }`}
                                                                 >
                                                                     <div className="truncate font-bold">{slotMeeting.title}</div>
                                                                     <div className="flex items-center gap-1 mt-0.5 text-[9px] opacity-80">
@@ -476,7 +477,7 @@ const PersonalCalendar = () => {
                                                     <User className="w-3.5 h-3.5 text-slate-blue" />
                                                     <span className="truncate">Vai trò: {
                                                         meet.myRole === 'host' ? 'Chủ trì' :
-                                                        meet.myRole === 'organizer' ? 'Người tổ chức' : 'Người tham dự'
+                                                            meet.myRole === 'organizer' ? 'Người tổ chức' : 'Người tham dự'
                                                     }</span>
                                                 </div>
                                             </div>
