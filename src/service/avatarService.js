@@ -1,7 +1,7 @@
 import { get, post } from '../utils/request';
 
 /** GET /api/v1/me/avatar-status — AvatarController.getAvatarStatus (avatar.controller.ts:55) */
-export const getBiometricStatus = async () => get('/me/avatar-status');
+export const getBiometricStatus = async () => get('/me/biometric-status');
 
 /**
  * POST /api/v1/me/avatar-submission (multipart/form-data) — AvatarController.submitAvatar (avatar.controller.ts:80)
@@ -12,7 +12,7 @@ export const submitBiometric = async (file, consentAccepted) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('consentAccepted', consentAccepted ? 'true' : 'false');
-    return post('/me/avatar-submission', formData);
+    return post('/me/biometric-submission', formData);
 };
 
 /**

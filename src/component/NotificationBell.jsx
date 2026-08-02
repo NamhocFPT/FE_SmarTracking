@@ -147,20 +147,24 @@ const NotificationBell = ({ basePath }) => {
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-outline-gray rounded-xl shadow-sm-2 z-50">
-                    <div className="px-4 py-3 border-b border-outline-gray bg-cloud-mist flex items-center gap-2">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-outline-gray rounded-xl shadow-sm-2 z-50 flex flex-col overflow-hidden">
+                    <div className="px-4 py-3 border-b border-outline-gray bg-cloud-mist flex items-center gap-2 flex-shrink-0">
                         <BellRing className="w-4 h-4 text-slate-blue" />
                         <p className="text-sm font-bold text-midnight-indigo">Thông báo & Cảnh báo an ninh</p>
                     </div>
 
-                    <div className="py-1">
+                    <div className="py-1 max-h-64 overflow-y-auto flex-1">
                         {loading ? (
                             <p className="px-4 py-6 text-sm text-slate-blue text-center">Đang tải...</p>
                         ) : feedItems.length === 0 ? (
                             <p className="px-4 py-6 text-sm text-slate-blue text-center">Không có thông báo nào.</p>
                         ) : (
                             feedItems.map((item) => (
-                                <div key={item.id} className="flex items-start gap-3 px-4 py-3 hover:bg-cloud-mist/60 border-b border-outline-gray/50 last:border-0">
+                                <div 
+                                    key={item.id} 
+                                    onClick={handleViewAll}
+                                    className="flex items-start gap-3 px-4 py-3 hover:bg-cloud-mist/60 border-b border-outline-gray/50 last:border-0 cursor-pointer"
+                                >
                                     {item.source === 'alert' ? (
                                         <ShieldAlert className={`w-4 h-4 mt-0.5 flex-shrink-0 ${SEVERITY_DOT[item.severity]?.replace('bg-', 'text-') || 'text-slate-400'}`} />
                                     ) : (
@@ -178,7 +182,7 @@ const NotificationBell = ({ basePath }) => {
                     <button
                         type="button"
                         onClick={handleViewAll}
-                        className="w-full px-4 py-2.5 text-center text-sm font-bold text-action-blue hover:bg-cloud-mist border-t border-outline-gray"
+                        className="w-full px-4 py-2.5 text-center text-sm font-bold text-action-blue hover:bg-cloud-mist border-t border-outline-gray flex-shrink-0"
                     >
                         Xem tất cả
                     </button>

@@ -53,15 +53,21 @@ const BiometricReminderModal = () => {
                 setUserProfile(user);
                 const userId = user.id || 'anon';
 
-                const dismissed = sessionStorage.getItem('biometricPopupDismissed_' + userId);
-                if (dismissed === 'true') { setLoading(false); return; }
-
                 const res = await getBiometricStatus();
                 if (cancelled) return;
                 if (res?.success && res.data) {
                     const data = res.data;
                     setBiometricData(data);
-                    if (data.shouldShowBiometricPopup === true) {
+                    
+                    const isForced = data.status === 'not_uploaded';
+                    
+                    const dismissed = sessionStorage.getItem('biometricPopupDismissed_' + userId);
+                    if (!isForced && dismissed === 'true') { setLoading(false); return; }
+
+                    if (data.shouldShowBiometricPopup === true || isForced) {
+                        if (isForced) {
+                            setView('webcam'); // Bỏ qua tuỳ chọn, đi thẳng vào webcam
+                        }
                         setOpen(true);
                     }
                 }
@@ -349,6 +355,8 @@ const BiometricReminderModal = () => {
         return 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
     };
 
+    const isForced = biometricData?.status === 'not_uploaded';
+
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xl p-4">
             <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden border border-platinum-tint flex flex-col max-h-[95vh] animate-fade-in-up">
@@ -366,7 +374,7 @@ const BiometricReminderModal = () => {
                             </span>
                         </div>
                     </div>
-                    {view !== 'confirm_avatar_sync' && (
+                    {view !== 'confirm_avatar_sync' && !isForced && (
                         <button
                             type="button"
                             onClick={handleDismiss}
@@ -502,7 +510,7 @@ const BiometricReminderModal = () => {
                         <div className="space-y-4 flex-1 flex flex-col justify-between">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    {phase !== 'captured' && (
+                                    {phase !== 'captured' && !isForced && (
                                         <button
                                             type="button"
                                             onClick={() => { stopWebcam(); setView('options'); }}
@@ -682,7 +690,7 @@ const BiometricReminderModal = () => {
                 </div>
 
                 {/* Footer disclaimer */}
-                {view === 'options' && (
+                {view === 'options' && !isForced && (
                     <div className="px-6 pb-6 pt-2 border-t border-platinum-tint flex flex-col items-center gap-3">
                         <button
                             type="button"

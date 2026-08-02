@@ -148,6 +148,12 @@ const Profile = () => {
     useEffect(() => { fetchBiometricStatus(); }, [fetchBiometricStatus]);
 
     useEffect(() => {
+        if (profile && profile.hasFaceProfile === false) {
+            setBiometricModalOpen(true);
+        }
+    }, [profile]);
+
+    useEffect(() => {
         if (successMessage) { const t = setTimeout(() => setSuccessMessage(null), 3000); return () => clearTimeout(t); }
     }, [successMessage]);
     useEffect(() => {
@@ -617,21 +623,23 @@ const Profile = () => {
                             >
                                 <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
                                     <h3 className="text-base font-bold text-midnight-indigo">Nộp ảnh sinh trắc học FaceID</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => setBiometricModalOpen(false)}
-                                        className="p-1 rounded-full text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60 transition-colors"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
+                                    {profile?.hasFaceProfile !== false && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setBiometricModalOpen(false)}
+                                            className="p-1 rounded-full text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/60 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    )}
                                 </div>
                                 
                                 <BiometricUploadForm 
                                     compact 
                                     onSuccess={handleBiometricUploadSuccess} 
-                                    onCancel={() => setBiometricModalOpen(false)} 
+                                    onCancel={profile?.hasFaceProfile === false ? undefined : () => setBiometricModalOpen(false)} 
                                 />
                             </motion.div>
                         </motion.div>
