@@ -258,10 +258,12 @@ const ShareMinutesModal = ({ minutesId, open, onClose }) => {
                         ) : (
                             <div className="space-y-2 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                                 {shares.map(s => {
-                                    const u = s.user || {};
-                                    const uName = u.fullName || u.full_name || s.userFullName || s.fullName || s.full_name || 'Nhân sự';
-                                    const uEmail = u.email || s.email || '';
-                                    const uId = u.id || s.userId || s.user_id;
+                                    // BE MinutesShareListItemDto trả field phẳng: id, userId, userFullName, userEmail
+                                    // (không lồng object "user") — không cần đoán qua nhiều tên field.
+                                    const uName = s.userFullName || 'Nhân sự';
+                                    const uEmail = s.userEmail || '';
+                                    const uId = s.userId;
+                                    const u = { id: uId, fullName: uName, email: uEmail };
                                     return (
                                         <div key={s.id || uId} className="flex items-center justify-between p-2.5 bg-slate-50 border border-platinum-tint/65 rounded-xl">
                                             <div className="flex items-center gap-2.5 truncate">

@@ -232,23 +232,19 @@ export const getAuditLogs = async (params = {}) => {
 // ============================================================
 
 /**
- * UC-CFG-01: Lấy danh sách cấu hình hệ thống
- * TODO: Chờ BE mở route (xem §5.2 kế hoạch đồng bộ)
+ * UC-CFG-01: Lấy danh sách cấu hình hệ thống — GET /system-configurations (SystemConfigController)
  * @returns {Promise<object>} { success, data: [...configs] }
  */
 export const getSystemConfigs = async () => {
-    // TODO: BE chưa có controller cho system_configs — chờ §5.2
     return await get('/system-configurations');
 };
 
 /**
- * UC-CFG-01: Cập nhật cấu hình hệ thống
- * TODO: Chờ BE mở route (xem §5.2 kế hoạch đồng bộ)
+ * UC-CFG-01: Cập nhật cấu hình hệ thống — PATCH /system-configurations (SystemConfigController)
  * @param {object} data - { key, value }
  * @returns {Promise<object>} response envelope
  */
 export const updateSystemConfig = async (data) => {
-    // TODO: BE chưa có controller cho system_configs — chờ §5.2
     return await patch('/system-configurations', data);
 };
 
@@ -358,20 +354,16 @@ export const getNotifications = async (params = {}) => {
 };
 
 /**
- * UC-NOTI-02: Đánh dấu thông báo đã đọc
- * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
+ * UC-NOTI-02: Đánh dấu thông báo đã đọc — PATCH /notifications/:id/read
  */
 export const markNotificationRead = async (notificationId) => {
-    // TODO: BE chưa có PATCH /notifications/:id/read — chờ §5.3
     return await patch(`/notifications/${notificationId}/read`);
 };
 
 /**
- * UC-NOTI-03: Đánh dấu tất cả thông báo đã đọc
- * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
+ * UC-NOTI-03: Đánh dấu tất cả thông báo đã đọc — PATCH /notifications/read-all
  */
 export const markAllNotificationsRead = async () => {
-    // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     return await patch('/notifications/read-all');
 };
 

@@ -310,20 +310,16 @@ export const getNotifications = async (params = {}) => {
 };
 
 /**
- * UC-NOTI-02: Đánh dấu thông báo đã đọc
- * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
+ * UC-NOTI-02: Đánh dấu thông báo đã đọc — PATCH /notifications/:id/read
  */
 export const markNotificationRead = async (notificationId) => {
-    // TODO: BE chưa có PATCH /notifications/:id/read — chờ §5.3
     return await patch(`/notifications/${notificationId}/read`);
 };
 
 /**
- * UC-NOTI-03: Đánh dấu tất cả thông báo đã đọc
- * TODO: BE chưa có route — chờ §5.3 kế hoạch đồng bộ
+ * UC-NOTI-03: Đánh dấu tất cả thông báo đã đọc — PATCH /notifications/read-all
  */
 export const markAllNotificationsRead = async () => {
-    // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
     return await patch('/notifications/read-all');
 };
 

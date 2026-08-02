@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -260,23 +260,34 @@ const EmployeeMeetingDetail = () => {
             const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
             const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
 
-            const payload = {
-                title: editTitle,
-                roomId: editRoomId,
-                scheduledStart: startISO,
-                scheduledEnd: endISO,
-                participantIds: editParticipants,
-                recordingEnabled: editRecordingEnabled,
-                agenda: agendaList
-            };
+            // BE tách riêng từng endpoint cho time/room/recording-config/title —
+            // PATCH /meetings/:id (updateMeeting) chỉ nhận title/description, các field khác
+            // sẽ bị ValidationPipe loại bỏ nếu gộp chung vào 1 payload. Gọi tách từng endpoint
+            // giống luồng manager để đảm bảo dữ liệu thực sự được lưu.
+            let successCount = 0;
+            if (startISO !== meeting.startTime || endISO !== meeting.endTime) {
+                const timeRes = await updateMeetingTime(meeting.id, { startTime: startISO, endTime: endISO });
+                if (timeRes?.success) successCount++;
+            }
+            if (editRoomId !== meeting.room?.id) {
+                const roomRes = await updateMeetingRoom(meeting.id, { newRoomId: editRoomId });
+                if (roomRes?.success) successCount++;
+            }
+            if (editRecordingEnabled !== meeting.recordingEnabled) {
+                const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
+                if (recRes?.success) successCount++;
+            }
+            if (editTitle !== meeting.title) {
+                await updateMeeting(meeting.id, { title: editTitle });
+                successCount++;
+            }
 
-            const res = await updateMeeting(meeting.id, payload);
-            if (res?.success) {
+            if (successCount > 0 || (startISO === meeting.startTime && endISO === meeting.endTime && editRoomId === meeting.room?.id && editRecordingEnabled === meeting.recordingEnabled && editTitle === meeting.title)) {
                 setSuccessMsg('Đã cập nhật thông tin cuộc họp thành công.');
                 setIsEditModalOpen(false);
                 fetchMeeting();
             } else {
-                setError(res?.message || 'Không thể cập nhật cuộc họp.');
+                setError('Không thể cập nhật cuộc họp. Vui lòng thử lại.');
             }
         } catch (err) {
             setError(err?.message || err?.error?.message || 'Lỗi cập nhật cuộc họp. Vui lòng thử lại.');
@@ -323,8 +334,17 @@ const EmployeeMeetingDetail = () => {
 
     const handleSaveAgenda = async () => {
         try {
-            const payload = { agenda: agendaList };
-            const res = await updateMeeting(meeting.id, payload);
+            // BE thay agenda qua PUT /meetings/:id/agendas (ReplaceAgendaDto: { items }),
+            // KHÔNG qua PATCH /meetings/:id — field "agenda" không tồn tại trong UpdateMeetingDto
+            // nên trước đây bị ValidationPipe loại bỏ, lưu không có tác dụng.
+            const items = agendaList.map(item => ({
+                ...(item.id ? { id: item.id } : {}),
+                title: item.title,
+                plannedDurationMinutes: item.durationMin ?? item.plannedDurationMinutes ?? item.durationMinutes ?? 15,
+                ...(item.description ? { description: item.description } : {}),
+                ...(item.ownerId ? { ownerId: item.ownerId } : {}),
+            }));
+            const res = await replaceAgendas(meeting.id, items);
             if (res?.success) {
                 setSuccessMsg('Cập nhật chương trình Agenda thành công.');
                 setIsAgendaModalOpen(false);

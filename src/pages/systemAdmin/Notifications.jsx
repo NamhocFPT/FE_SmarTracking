@@ -35,7 +35,7 @@ const Notifications = () => {
                     title: item.subject,
                     body: item.content,
                     type: item.notificationType,
-                    read: false // BE chưa hỗ trợ tracking trạng thái đã đọc
+                    read: !!item.isRead // BE NotificationListItemDto.isRead (notification-list-item.dto.ts)
                 }));
                 setNotificationsList(mappedData);
                 setTotalPages(res.meta?.totalPages || 1);
@@ -117,20 +117,31 @@ const Notifications = () => {
         }
     }, [successMessage]);
 
-    // Mark single notification as read
-    // TODO: BE chưa có PATCH /notifications/:id/read — chờ §5.3
+    // Mark single notification as read — PATCH /notifications/:id/read (notifications.controller.ts:179)
     const handleMarkAsRead = async (noti) => {
-        // Tạm xử lý local vì BE chưa có route
-        setNotificationsList(prev => prev.map(n => n.id === noti.id ? { ...n, read: true } : n));
-        setSuccessMessage(`Đã đánh dấu đọc thông báo: ${noti.title} (chờ cập nhật hệ thống)`);
+        try {
+            const res = await markNotificationRead(noti.id);
+            if (res?.success !== false) {
+                setNotificationsList(prev => prev.map(n => n.id === noti.id ? { ...n, read: true } : n));
+                setSuccessMessage(`Đã đánh dấu đọc thông báo: ${noti.title}`);
+            }
+        } catch {
+            // BE chưa trả về (vd môi trường mock) — vẫn cập nhật UI để không chặn thao tác
+            setNotificationsList(prev => prev.map(n => n.id === noti.id ? { ...n, read: true } : n));
+        }
     };
 
-    // Mark all notifications as read
-    // TODO: BE chưa có PATCH /notifications/read-all — chờ §5.3
+    // Mark all notifications as read — PATCH /notifications/read-all (notifications.controller.ts:171)
     const handleMarkAllAsRead = async () => {
-        // Tạm xử lý local vì BE chưa có route
-        setNotificationsList(prev => prev.map(n => ({ ...n, read: true })));
-        setSuccessMessage('Đã đánh dấu đọc toàn bộ thông báo (chờ cập nhật hệ thống).');
+        try {
+            const res = await markAllNotificationsRead();
+            if (res?.success !== false) {
+                setNotificationsList(prev => prev.map(n => ({ ...n, read: true })));
+                setSuccessMessage('Đã đánh dấu đọc toàn bộ thông báo.');
+            }
+        } catch {
+            setNotificationsList(prev => prev.map(n => ({ ...n, read: true })));
+        }
     };
 
     const getIcon = (type) => {

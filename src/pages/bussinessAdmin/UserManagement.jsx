@@ -378,32 +378,27 @@ const UserManagement = () => {
         }
     };
 
-    // Excel Export download
-    // TODO: BE chưa có GET /users/export — chờ §5.4 kế hoạch đồng bộ
-    // Tạm xuất CSV từ dữ liệu local
+    // Excel Export download — GET /users/export (accounts.user.export), trả file XLSX toàn bộ danh sách
     const handleExportExcel = async () => {
         setError(null);
         setSuccessMessage(null);
         try {
-            // Tạo CSV từ dữ liệu hiện có trên giao diện
-            let csvContent = '\uFEFFID,Họ và Tên,Email,Số điện thoại,Phòng ban,Trạng thái\n';
-            usersList.forEach(user => {
-                const depts = user.departments?.map(d => d.name).join('; ') || 'Chưa gán';
-                const status = user.locked ? 'Bị khóa' : 'Hoạt động';
-                csvContent += `${user.id},"${user.fullName}",${user.email},${user.phone || ''},"${depts}",${status}\n`;
-            });
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'Danh_Sach_Nguoi_Dung.csv');
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            setSuccessMessage('Xuất dữ liệu trang hiện tại ra CSV thành công (chờ cập nhật hệ thống để xuất toàn bộ).');
-        } catch {
-            setError('Lỗi khi xuất dữ liệu.');
+            const res = await exportUsers();
+            if (res?.isBlob && res.data) {
+                const url = window.URL.createObjectURL(res.data);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'Danh_Sach_Nguoi_Dung.xlsx');
+                document.body.appendChild(link);
+                link.click();
+                link.parentNode.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                setSuccessMessage('Xuất toàn bộ danh sách người dùng thành công.');
+                return;
+            }
+            throw new Error('Phản hồi không hợp lệ');
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Lỗi khi xuất dữ liệu.');
         }
     };
 

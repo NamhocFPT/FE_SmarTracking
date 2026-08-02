@@ -46,11 +46,11 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
                 }
             }
 
-            // 3. Fallback to fetch all minutes and find the one for this meeting
-            // We use standard GET /meeting-minutes and filter client-side just in case
-            const minutesListRes = await get('/meeting-minutes');
+            // 3. Fallback: tra biên bản đã có của cuộc họp này qua MinutesQueryDto.meetingId
+            // (BE GET /meeting-minutes hỗ trợ sẵn filter server-side, không cần tải hết rồi lọc client)
+            const minutesListRes = await get(`/meeting-minutes${buildQuery({ meetingId, limit: 1 })}`);
             if (minutesListRes?.success) {
-                const meetingMinute = minutesListRes.data?.find(m => m.meeting?.id === meetingId || m.meetingId === meetingId);
+                const meetingMinute = minutesListRes.data?.[0];
                 if (meetingMinute) {
                     await loadMinutesDetail(meetingMinute.id);
                     return;

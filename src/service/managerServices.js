@@ -220,6 +220,14 @@ export const updateMeetingRecordingConfig = async (id, data) => {
 };
 
 /**
+ * Thay thế toàn bộ agenda — BE dùng PUT /meetings/:id/agendas (ReplaceAgendaDto),
+ * KHÔNG lồng vào PATCH /meetings/:id (updateMeeting chỉ nhận title/description).
+ */
+export const replaceAgendas = async (meetingId, items) => {
+    return await put(`/meetings/${meetingId}/agendas`, { items });
+};
+
+/**
  * UC-SM-03: Hủy cuộc họp
  */
 export const cancelMeeting = async (id, reason = '') => {

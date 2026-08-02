@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/managerServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/managerServices';
 import UserAvatar from '../../component/UserAvatar';
 import MeetingAttendanceBoard from '../../component/MeetingAttendanceBoard';
 import MeetingPresenceIVSS from '../../component/MeetingPresenceIVSS';
@@ -287,8 +287,10 @@ const ManagerMeetingDetail = () => {
                 if (roomRes?.success) successCount++;
             }
             // 3. Update Recording config if changed
+            // BE UpdateRecordingConfigDto chỉ nhận enableVideo/enableAudio (không phải autoRecord/allowRecording —
+            // đó là field của read-shape trong GET /meetings/:id, không phải write-shape của PATCH này).
             if (editRecordingEnabled !== meeting.recordingEnabled) {
-                const recRes = await updateMeetingRecordingConfig(meeting.id, { autoRecord: editRecordingEnabled, allowRecording: editRecordingEnabled });
+                const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
                 if (recRes?.success) successCount++;
             }
 
@@ -350,8 +352,17 @@ const ManagerMeetingDetail = () => {
 
     const handleSaveAgenda = async () => {
         try {
-            const payload = { agenda: agendaList };
-            const res = await updateMeeting(meeting.id, payload);
+            // BE thay agenda qua PUT /meetings/:id/agendas (ReplaceAgendaDto: { items }),
+            // KHÔNG qua PATCH /meetings/:id — field "agenda" không tồn tại trong UpdateMeetingDto
+            // nên trước đây bị ValidationPipe loại bỏ, lưu không có tác dụng.
+            const items = agendaList.map(item => ({
+                ...(item.id ? { id: item.id } : {}),
+                title: item.title,
+                plannedDurationMinutes: item.durationMin ?? item.plannedDurationMinutes ?? item.durationMinutes ?? 15,
+                ...(item.description ? { description: item.description } : {}),
+                ...(item.ownerId ? { ownerId: item.ownerId } : {}),
+            }));
+            const res = await replaceAgendas(meeting.id, items);
             if (res?.success) {
                 setSuccessMsg('Cập nhật chương trình Agenda thành công.');
                 setIsAgendaModalOpen(false);
