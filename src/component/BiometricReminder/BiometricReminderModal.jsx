@@ -58,13 +58,15 @@ const BiometricReminderModal = () => {
                 if (res?.success && res.data) {
                     const data = res.data;
                     setBiometricData(data);
-                    
-                    const isForced = data.status === 'not_uploaded';
-                    
-                    const dismissed = sessionStorage.getItem('biometricPopupDismissed_' + userId);
+
+                    // Sử dụng chính xác cờ biometricRequired do BE trả về trong login-response
+                    // kết hợp với trạng thái lấy từ API getBiometricStatus
+                    const isForced = userProfile?.biometricRequired === true || data.biometricRequired === true || data.avatarReviewStatus === 'not_uploaded';
+
+                    const dismissed = sessionStorage.getItem('avatarPopupDismissed_' + userId);
                     if (!isForced && dismissed === 'true') { setLoading(false); return; }
 
-                    if (data.shouldShowBiometricPopup === true || isForced) {
+                    if (data.shouldShowAvatarPopup === true || isForced) {
                         if (isForced) {
                             setView('webcam'); // Bỏ qua tuỳ chọn, đi thẳng vào webcam
                         }
@@ -100,7 +102,7 @@ const BiometricReminderModal = () => {
     const handleDismiss = () => {
         try {
             if (userProfile) {
-                sessionStorage.setItem('biometricPopupDismissed_' + (userProfile.id || 'anon'), 'true');
+                sessionStorage.setItem('avatarPopupDismissed_' + (userProfile.id || 'anon'), 'true');
             }
         } catch {}
         stopWebcam();
@@ -110,8 +112,9 @@ const BiometricReminderModal = () => {
     const handleUploadSuccess = () => {
         try {
             if (userProfile) {
-                userProfile.biometricReviewStatus = 'pending_review';
-                userProfile.shouldShowBiometricPopup = false;
+                userProfile.avatarReviewStatus = 'pending_review';
+                userProfile.shouldShowAvatarPopup = false;
+                userProfile.biometricRequired = false; // Xoá cờ bắt buộc sau khi đã upload
                 localStorage.setItem('user', JSON.stringify(userProfile));
                 window.dispatchEvent(new Event('storage'));
             }
@@ -312,7 +315,7 @@ const BiometricReminderModal = () => {
 
     if (!open || loading) return null;
 
-    const status = biometricData?.biometricReviewStatus || 'not_uploaded';
+    const status = biometricData?.avatarReviewStatus || 'not_uploaded';
     const statusInfo = STATUS_LABEL[status] || STATUS_LABEL.not_uploaded;
 
     const hasAvatar = !!userProfile?.avatarUrl;
@@ -355,7 +358,7 @@ const BiometricReminderModal = () => {
         return 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
     };
 
-    const isForced = biometricData?.status === 'not_uploaded';
+    const isForced = userProfile?.biometricRequired === true || biometricData?.biometricRequired === true || biometricData?.avatarReviewStatus === 'not_uploaded';
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xl p-4">
