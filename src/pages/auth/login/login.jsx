@@ -145,15 +145,21 @@ const Login = () => {
             // Handle error response matching backend envelope
             let rawMessage = err.error?.message || err.message || "";
             let message = "Đăng nhập thất bại. Vui lòng thử lại.";
+            let lowerMsg = rawMessage.toLowerCase();
 
-            if (rawMessage.toLowerCase().includes("invalid credentials") || rawMessage.toLowerCase().includes("unauthorized")) {
+            if (lowerMsg.includes("invalid credentials") || lowerMsg.includes("unauthorized")) {
                 message = "Sai email hoặc mật khẩu. Vui lòng thử lại.";
-            } else if (rawMessage.toLowerCase().includes("not found")) {
+            } else if (lowerMsg.includes("not found")) {
                 message = "Tài khoản không tồn tại trong hệ thống.";
-            } else if (rawMessage.toLowerCase().includes("inactive") || rawMessage.toLowerCase().includes("blocked")) {
-                message = "Tài khoản đã bị vô hiệu hóa hoặc khoá.";
+            } else if (lowerMsg.includes("inactive") || lowerMsg.includes("blocked")) {
+                message = "Tài khoản đã bị vô hiệu hóa hoặc khoá. Vui lòng liên hệ quản trị viên.";
+            } else if (lowerMsg.includes("too many login attempts") || lowerMsg.includes("too many requests")) {
+                message = "Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.";
             } else if (rawMessage) {
-                message = rawMessage; // Fallback to backend message if it's not a generic english one
+                // Không hiển thị trực tiếp log lỗi tiếng Anh từ BE
+                // Nếu là tiếng Việt thì giữ nguyên, còn không thì dùng lỗi chung
+                const isVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(rawMessage);
+                message = isVietnamese ? rawMessage : "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
             }
 
             setError(message);
