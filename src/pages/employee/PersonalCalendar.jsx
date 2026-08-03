@@ -5,12 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import { getMySchedule } from '../../service/employeeServices';
 
 const STATUS_CONFIG = {
-    draft: { label: 'Bản nháp', bg: 'bg-slate-50 text-slate-600 border-slate-200', icon: Clock },
-    pending_approval: { label: 'Chờ duyệt', bg: 'bg-amber-50 text-amber-600 border-amber-200', icon: Clock },
-    scheduled: { label: 'Đã lên lịch', bg: 'bg-blue-50 text-action-blue border-blue-150', icon: Clock },
-    in_progress: { label: 'Đang diễn ra', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle },
-    completed: { label: 'Đã kết thúc', bg: 'bg-purple-50 text-purple-700 border-purple-200', icon: CheckCircle },
-    cancelled: { label: 'Đã huỷ', bg: 'bg-red-50 text-red-600 border-red-200', icon: XCircle }
+    draft: { label: 'Bản nháp', bg: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400', icon: Clock },
+    pending_approval: { label: 'Chờ duyệt', bg: 'bg-amber-50 text-amber-600 border-amber-200', dot: 'bg-amber-500', icon: Clock },
+    scheduled: { label: 'Đã lên lịch', bg: 'bg-blue-50 text-action-blue border-blue-150', dot: 'bg-blue-500', icon: Clock },
+    in_progress: { label: 'Đang diễn ra', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle },
+    completed: { label: 'Đã kết thúc', bg: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500', icon: CheckCircle },
+    cancelled: { label: 'Đã huỷ', bg: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500', icon: XCircle }
 };
 
 const PersonalCalendar = () => {
@@ -53,7 +53,7 @@ const PersonalCalendar = () => {
                 from: fromStr,
                 to: toStr,
                 view: 'month',
-                status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'completed']
+                status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'completed', 'pending_approval']
             });
 
             if (res?.success) {
@@ -199,8 +199,8 @@ const PersonalCalendar = () => {
                         <button
                             onClick={() => setViewMode('month')}
                             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'month'
-                                    ? 'bg-action-blue text-white shadow-sm'
-                                    : 'text-slate-blue hover:text-midnight-indigo'
+                                ? 'bg-action-blue text-white shadow-sm'
+                                : 'text-slate-blue hover:text-midnight-indigo'
                                 }`}
                         >
                             <Grid className="w-3.5 h-3.5" /> Tháng
@@ -208,8 +208,8 @@ const PersonalCalendar = () => {
                         <button
                             onClick={() => setViewMode('week')}
                             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'week'
-                                    ? 'bg-action-blue text-white shadow-sm'
-                                    : 'text-slate-blue hover:text-midnight-indigo'
+                                ? 'bg-action-blue text-white shadow-sm'
+                                : 'text-slate-blue hover:text-midnight-indigo'
                                 }`}
                         >
                             <List className="w-3.5 h-3.5" /> Tuần
@@ -238,7 +238,7 @@ const PersonalCalendar = () => {
                             className="bg-transparent border-0 text-xs font-bold text-midnight-indigo focus:outline-none cursor-pointer"
                         >
                             <option value="">Tất cả trạng thái</option>
-                            {/* <option value="pending_approval">Chờ duyệt</option> */}
+                            <option value="pending_approval">Chờ duyệt</option>
                             <option value="scheduled">Đã lên lịch</option>
                             {/* <option value="in_progress">Đang diễn ra</option> */}
                             <option value="completed">Đã kết thúc</option>
@@ -298,16 +298,16 @@ const PersonalCalendar = () => {
                                             key={idx}
                                             onClick={() => setSelectedDate(dayCell.date)}
                                             className={`min-h-[72px] p-2 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${isSelected
-                                                    ? 'border-action-blue bg-blue-50/20 shadow-inner'
-                                                    : 'border-platinum-tint/40 hover:border-platinum-tint'
+                                                ? 'border-action-blue bg-blue-50/20 shadow-inner'
+                                                : 'border-platinum-tint/40 hover:border-platinum-tint'
                                                 } ${!dayCell.isCurrentMonth ? 'opacity-40' : ''}`}
                                         >
                                             <div className="flex justify-between items-center">
                                                 <span className={`text-xs font-bold ${isToday
-                                                        ? 'bg-action-blue text-white w-5 h-5 rounded-full flex items-center justify-center'
-                                                        : isSelected
-                                                            ? 'text-action-blue'
-                                                            : 'text-midnight-indigo'
+                                                    ? 'bg-action-blue text-white w-5 h-5 rounded-full flex items-center justify-center'
+                                                    : isSelected
+                                                        ? 'text-action-blue'
+                                                        : 'text-midnight-indigo'
                                                     }`}>
                                                     {dayCell.date.getDate()}
                                                 </span>
@@ -318,12 +318,7 @@ const PersonalCalendar = () => {
                                                 {dayMeetings.slice(0, 3).map(m => (
                                                     <span
                                                         key={m.id}
-                                                        className={`w-2 h-2 rounded-full ${m.status === 'cancelled'
-                                                                ? 'bg-red-500'
-                                                                : m.status === 'in_progress'
-                                                                    ? 'bg-emerald-500'
-                                                                    : 'bg-action-blue'
-                                                            }`}
+                                                        className={`w-2 h-2 rounded-full ${STATUS_CONFIG[m.status]?.dot || 'bg-slate-400'}`}
                                                         title={m.title}
                                                     />
                                                 ))}
@@ -394,10 +389,10 @@ const PersonalCalendar = () => {
                                                             {slotMeeting && (
                                                                 <div
                                                                     className={`rounded-lg p-1.5 text-[10px] font-semibold border leading-tight ${slotMeeting.status === 'cancelled'
-                                                                            ? 'bg-red-50/80 text-red-700 border-red-200'
-                                                                            : slotMeeting.status === 'in_progress'
-                                                                                ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200'
-                                                                                : 'bg-blue-50/80 text-action-blue border-blue-200'
+                                                                        ? 'bg-red-50/80 text-red-700 border-red-200'
+                                                                        : slotMeeting.status === 'in_progress'
+                                                                            ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200'
+                                                                            : 'bg-blue-50/80 text-action-blue border-blue-200'
                                                                         }`}
                                                                 >
                                                                     <div className="truncate font-bold">{slotMeeting.title}</div>
