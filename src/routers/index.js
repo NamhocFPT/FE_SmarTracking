@@ -57,6 +57,7 @@ import EmployeeFaceRegistration from '../pages/employee/FaceRegistration';
 import EmployeeMeetingDetail from '../pages/employee/MeetingDetail';
 import EmployeeRecordings from '../pages/employee/Recordings';
 import InMeetingRoom from '../pages/shared/InMeetingRoom';
+import LegalAndSupport from '../pages/public/LegalAndSupport';
 
 export const router = [
     // ========== Auth Routes (public) ==========
@@ -84,7 +85,6 @@ export const router = [
         path: '/public/in-meeting/:id',
         element: <InMeetingRoom isPublic={true} />
     },
-
     // ========== SystemAdmin Routes (protected) ==========
     {
         path: '/system-admin',
@@ -201,6 +201,10 @@ export const router = [
             {
                 path: 'attendance-analytics',
                 element: <EmployeeOnTimeAnalytics />
+            },
+            {
+                path: 'legal',
+                element: <LegalAndSupport />
             }
         ]
     },
@@ -301,6 +305,10 @@ export const router = [
             {
                 path: 'attendance-analytics',
                 element: <EmployeeOnTimeAnalytics />
+            },
+            {
+                path: 'legal',
+                element: <LegalAndSupport />
             }
         ]
     },
@@ -369,6 +377,10 @@ export const router = [
             {
                 path: 'attendance-analytics',
                 element: <EmployeeOnTimeAnalytics />
+            },
+            {
+                path: 'legal',
+                element: <LegalAndSupport />
             }
         ]
     },
@@ -422,6 +434,10 @@ export const router = [
                 path: 'my-vehicles',
                 element: <MyVehicles />
             },
+            {
+                path: 'legal',
+                element: <LegalAndSupport />
+            }
         ]
     },
 

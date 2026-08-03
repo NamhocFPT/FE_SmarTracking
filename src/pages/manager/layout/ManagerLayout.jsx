@@ -89,9 +89,9 @@ const navigationItems = [
     },
 ];
 const footerLinks = [
-    { label: 'Hỗ trợ', to: '#' },
-    { label: 'Tài liệu', to: '#' },
-    { label: 'Quyền riêng tư', to: '#' },
+    { label: 'Hỗ trợ', to: 'legal?tab=support' },
+    { label: 'Tài liệu', to: 'legal?tab=docs-user' },
+    { label: 'Quyền riêng tư', to: 'legal?tab=privacy' },
 ];
 
 const ManagerLayout = () => {
