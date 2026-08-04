@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, Video, X } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -9,13 +9,23 @@ import UserAvatar from '../../component/UserAvatar';
 import MeetingAttendanceBoard from '../../component/MeetingAttendanceBoard';
 import MeetingPresenceIVSS from '../../component/MeetingPresenceIVSS';
 import NotificationActionsPanel from '../../component/NotificationActionsPanel';
-import ImportParticipantsModal from '../../component/ImportParticipantsModal';
+import AddInternalParticipantModal from '../../component/AddInternalParticipantModal';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
 import AddExternalParticipantModal from '../../component/AddExternalParticipantModal';
+import { removeInternalParticipant, removeExternalParticipant } from '../../service/businessAdminServices';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
 import AudioUploader from '../../components/transcription/AudioUploader';
 
-
+// BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval
+// khiến 2 trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã hủy".
+const STATUS_BADGE = {
+    draft: { label: 'Bản nháp', className: 'bg-slate-100 text-slate-600 border border-slate-200' },
+    pending_approval: { label: 'Chờ duyệt', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
+    scheduled: { label: 'Đã xếp lịch', className: 'bg-blue-50 text-action-blue border border-blue-200' },
+    in_progress: { label: 'Đang họp', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+    completed: { label: 'Đã kết thúc', className: 'bg-purple-50 text-purple-700 border border-purple-200' },
+    cancelled: { label: 'Đã hủy', className: 'bg-red-50 text-red-700 border border-red-200' },
+};
 
 const ManagerMeetingDetail = () => {
     const { id } = useParams();
@@ -29,6 +39,7 @@ const ManagerMeetingDetail = () => {
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
     const [mediaFiles, setMediaFiles] = useState([]);
+    const [activeParticipantTab, setActiveParticipantTab] = useState('internal');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [showAddGuestModal, setShowAddGuestModal] = useState(false);
 
@@ -111,9 +122,11 @@ const ManagerMeetingDetail = () => {
             start_time: meetingObj.startTime || meetingObj.start_time || dto.startTime || dto.start_time,
             endTime: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
             end_time: meetingObj.endTime || meetingObj.end_time || dto.endTime || dto.end_time,
-            recordingEnabled: dto.recordingConfig?.allowRecording || dto.recordingEnabled || dto.recording_enabled || false,
             recording_enabled: dto.recordingConfig?.allowRecording || dto.recordingEnabled || dto.recording_enabled || false,
+            // Participants & Agenda
             participants,
+            externalParticipants: dto.externalParticipants || dto.external_participants || [],
+            external_participants: dto.externalParticipants || dto.external_participants || [],
             agenda,
         };
     };
@@ -413,12 +426,16 @@ const ManagerMeetingDetail = () => {
                             >
                                 <Edit3 className="w-4 h-4" /> Chỉnh sửa cuộc họp
                             </button>
-                            <button
-                                onClick={() => setIsCancelConfirmOpen(true)}
-                                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all"
-                            >
-                                <Trash2 className="w-4 h-4" /> Hủy họp
-                            </button>
+                            {/* BE (meetings.service.ts) chỉ cho hủy meeting đang ở status 'scheduled' —
+                                pending_approval/draft/in_progress sẽ luôn bị BE từ chối 409, nên ẩn nút. */}
+                            {meeting.status === 'scheduled' && (
+                                <button
+                                    onClick={() => setIsCancelConfirmOpen(true)}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Hủy họp
+                                </button>
+                            )}
                         </>
                     )}
                     {meeting.status === 'completed' || isEnded ? (
@@ -474,15 +491,10 @@ const ManagerMeetingDetail = () => {
                         <div className="space-y-4 w-full">
                             <div className="flex flex-wrap items-center gap-3">
                                 <span className={`px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1.5 ${
-                                    meeting.status === 'scheduled' ? 'bg-blue-50 text-action-blue border border-blue-200' :
-                                    meeting.status === 'in_progress' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                    meeting.status === 'completed' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                                    'bg-red-50 text-red-700 border border-red-200'
+                                    (STATUS_BADGE[meeting.status] || STATUS_BADGE.cancelled).className
                                 }`}>
                                     <div className={`w-1.5 h-1.5 rounded-full ${meeting.status === 'in_progress' ? 'bg-emerald-500 animate-pulse' : 'bg-current'}`} />
-                                    {meeting.status === 'scheduled' ? 'Đã xếp lịch' :
-                                     meeting.status === 'in_progress' ? 'Đang họp' :
-                                     meeting.status === 'completed' ? 'Đã kết thúc' : 'Đã hủy'}
+                                    {(STATUS_BADGE[meeting.status] || { label: meeting.status }).label}
                                 </span>
                                 {meeting.recordingEnabled && (
                                     <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-red-50 text-red-600 border border-red-100 flex items-center gap-1.5 shadow-sm">
@@ -571,17 +583,17 @@ const ManagerMeetingDetail = () => {
                     <div className="lg:col-span-2 space-y-6">
                         {/* Agenda */}
                         <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
-                            <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
-                                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                            <div className="flex flex-wrap justify-between items-center gap-3 border-b border-platinum-tint pb-3 mb-4">
+                                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2 shrink-0">
                                     <List className="w-4.5 h-4.5 text-action-blue" />
-                                    Chương trình nghị sự ({meeting.agenda?.length || 0})
+                                    Chương trình làm việc ({meeting.agenda?.length || 0})
                                 </h3>
-                                {isHost && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                                     <button
                                         onClick={() => setIsAgendaModalOpen(true)}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border border-action-blue/20 bg-blue-50 text-action-blue hover:bg-blue-100 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                        className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-action-blue/20 bg-blue-50 text-action-blue hover:bg-blue-100 rounded-md text-[11px] font-bold transition-all shadow-sm shrink-0"
                                     >
-                                        <Edit3 className="w-3.5 h-3.5" /> Quản lý Agenda
+                                        <Edit3 className="w-3.5 h-3.5" /> Quản lý
                                     </button>
                                 )}
                             </div>
@@ -638,79 +650,175 @@ const ManagerMeetingDetail = () => {
                     {/* Right: Participants & Host */}
                     <div className="lg:col-span-1 space-y-4">
                         <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
-                            <div className="flex justify-between items-center border-b border-platinum-tint pb-3 mb-4">
-                                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                            <div className="flex flex-wrap justify-between items-center gap-3 border-b border-platinum-tint pb-3 mb-4">
+                                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2 shrink-0">
                                     <Users className="w-4.5 h-4.5 text-action-blue" />
-                                    Người tham dự ({meeting.participants?.length || 0})
+                                    Người tham dự
                                 </h3>
                                 {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
-                                    <button
-                                        onClick={() => setShowAddGuestModal(true)}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all shadow-sm"
-                                    >
-                                        + Mời khách ngoài
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                        <button
+                                            onClick={() => setIsImportModalOpen(true)}
+                                            className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md text-[11px] font-bold transition-all shadow-sm"
+                                        >
+                                            <UserPlus className="w-3.5 h-3.5" /> Nội bộ
+                                        </button>
+                                        <button
+                                            onClick={() => setShowAddGuestModal(true)}
+                                            className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md text-[11px] font-bold transition-all shadow-sm"
+                                        >
+                                            <UserPlus className="w-3.5 h-3.5" /> Khách
+                                        </button>
+                                    </div>
                                 )}
                             </div>
+                            <div className="flex bg-cloud-mist/50 p-1 rounded-xl mb-4">
+                                <button
+                                    onClick={() => setActiveParticipantTab('internal')}
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeParticipantTab === 'internal' ? 'bg-white text-action-blue shadow-sm' : 'text-slate-blue hover:text-midnight-indigo'}`}
+                                >
+                                    Nội bộ ({meeting.participants?.length || 0})
+                                </button>
+                                <button
+                                    onClick={() => setActiveParticipantTab('external')}
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeParticipantTab === 'external' ? 'bg-white text-action-blue shadow-sm' : 'text-slate-blue hover:text-midnight-indigo'}`}
+                                >
+                                    Khách ngoài ({meeting.externalParticipants?.length || meeting.external_participants?.length || 0})
+                                </button>
+                            </div>
+                            
                             <div className="flex flex-col h-full">
-                                <div className="grid grid-cols-1 gap-4 flex-1">
-                                    {participantsPage === 1 && (
-                                        <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
-                                            <UserAvatar
-                                                user={hostUser}
-                                                name={hostName}
-                                                className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
-                                            />
-                                            <div className="truncate">
-                                                <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Người chủ trì</span>
-                                                <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
+                                {activeParticipantTab === 'internal' && (
+                                    <div className="grid grid-cols-1 gap-4 flex-1">
+                                        {participantsPage === 1 && (
+                                            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
+                                                <UserAvatar
+                                                    user={hostUser}
+                                                    name={hostName}
+                                                    className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
+                                                />
+                                                <div className="truncate">
+                                                    <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Người chủ trì</span>
+                                                    <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                    
-                                    {(() => {
-                                        const filtered = meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName) || [];
-                                        const paginated = filtered.slice((participantsPage - 1) * ITEMS_PER_PAGE, participantsPage * ITEMS_PER_PAGE);
+                                        )}
                                         
-                                        return (
-                                            <>
-                                                {paginated.map(p => (
-                                                    <div key={p.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center gap-3">
-                                                        <UserAvatar
-                                                            user={p}
-                                                            className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
-                                                        />
-                                                        <div className="truncate">
-                                                            <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Người tham dự</span>
-                                                            <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
+                                        {(() => {
+                                            const filtered = meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName) || [];
+                                            const paginated = filtered.slice((participantsPage - 1) * ITEMS_PER_PAGE, participantsPage * ITEMS_PER_PAGE);
+                                            
+                                            return (
+                                                <>
+                                                    {paginated.map(p => (
+                                                        <div key={p.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center justify-between gap-3 group hover:bg-white transition-colors">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <UserAvatar
+                                                                    user={p}
+                                                                    className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
+                                                                />
+                                                                <div className="truncate">
+                                                                    <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Người tham dự</span>
+                                                                    <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
+                                                                </div>
+                                                            </div>
+                                                            {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!window.confirm(`Bạn có chắc chắn muốn xóa ${p.fullName || p.full_name}?`)) return;
+                                                                        try {
+                                                                            const res = await removeInternalParticipant(meeting.id, p.id);
+                                                                            if (res?.success) {
+                                                                                setMeeting({ ...meeting, participants: meeting.participants.filter(pt => pt.id !== p.id) });
+                                                                                setSuccessMsg('Đã xóa người tham dự.');
+                                                                                setTimeout(() => setSuccessMsg(null), 3000);
+                                                                            } else {
+                                                                                alert(res?.message || 'Xóa thất bại');
+                                                                            }
+                                                                        } catch (err) {
+                                                                            alert('Lỗi hệ thống khi xóa');
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                                                    title="Xóa người tham dự"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
+                                                    ))}
+                                                    {filtered.length > ITEMS_PER_PAGE && (
+                                                        <div className="flex justify-between items-center mt-2 pt-3 border-t border-platinum-tint">
+                                                            <button 
+                                                                disabled={participantsPage === 1} 
+                                                                onClick={() => setParticipantsPage(p => p - 1)} 
+                                                                className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
+                                                            >
+                                                                Trước
+                                                            </button>
+                                                            <span className="text-[10px] font-bold text-slate-blue">
+                                                                Trang {participantsPage} / {Math.ceil(filtered.length / ITEMS_PER_PAGE)}
+                                                            </span>
+                                                            <button 
+                                                                disabled={participantsPage === Math.ceil(filtered.length / ITEMS_PER_PAGE)} 
+                                                                onClick={() => setParticipantsPage(p => p + 1)} 
+                                                                className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
+                                                            >
+                                                                Sau
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+
+                                {activeParticipantTab === 'external' && (
+                                    <div className="grid grid-cols-1 gap-4 flex-1">
+                                        {(meeting.externalParticipants || meeting.external_participants || []).map(p => (
+                                            <div key={p.id} className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 flex items-center justify-between gap-3 group hover:bg-white transition-colors">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-10 h-10 rounded-full shrink-0 font-bold text-sm bg-amber-100 text-amber-700 flex items-center justify-center">
+                                                        {(p.name || p.fullName || p.full_name || p.email || 'G').charAt(0).toUpperCase()}
                                                     </div>
-                                                ))}
-                                                {filtered.length > ITEMS_PER_PAGE && (
-                                                    <div className="flex justify-between items-center mt-2 pt-3 border-t border-platinum-tint">
-                                                        <button 
-                                                            disabled={participantsPage === 1} 
-                                                            onClick={() => setParticipantsPage(p => p - 1)} 
-                                                            className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
-                                                        >
-                                                            Trước
-                                                        </button>
-                                                        <span className="text-[10px] font-bold text-slate-blue">
-                                                            Trang {participantsPage} / {Math.ceil(filtered.length / ITEMS_PER_PAGE)}
-                                                        </span>
-                                                        <button 
-                                                            disabled={participantsPage === Math.ceil(filtered.length / ITEMS_PER_PAGE)} 
-                                                            onClick={() => setParticipantsPage(p => p + 1)} 
-                                                            className="px-3 py-1 text-xs font-bold text-slate-blue bg-cloud-mist hover:bg-slate-200 rounded-lg disabled:opacity-50 transition-all"
-                                                        >
-                                                            Sau
-                                                        </button>
+                                                    <div className="truncate">
+                                                        <span className="block text-xs font-bold text-amber-600 uppercase tracking-wider text-[9px]">Khách ngoài</span>
+                                                        <span className="text-xs font-bold text-midnight-indigo block truncate">{p.name || p.fullName || p.full_name}</span>
+                                                        <span className="text-[10px] text-slate-blue block truncate">{p.email}</span>
                                                     </div>
+                                                </div>
+                                                {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!window.confirm(`Bạn có chắc chắn muốn xóa khách ${p.name || p.fullName || p.full_name}?`)) return;
+                                                            try {
+                                                                const res = await removeExternalParticipant(meeting.id, p.id);
+                                                                if (res?.success) {
+                                                                    const currentExternal = meeting.externalParticipants || meeting.external_participants || [];
+                                                                    setMeeting({ ...meeting, externalParticipants: currentExternal.filter(pt => pt.id !== p.id), external_participants: currentExternal.filter(pt => pt.id !== p.id) });
+                                                                    setSuccessMsg('Đã xóa khách ngoài.');
+                                                                    setTimeout(() => setSuccessMsg(null), 3000);
+                                                                } else {
+                                                                    alert(res?.message || 'Xóa thất bại');
+                                                                }
+                                                            } catch (err) {
+                                                                alert('Lỗi hệ thống khi xóa khách');
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                                        title="Xóa khách"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 )}
-                                            </>
-                                        );
-                                    })()}
-                                </div>
+                                            </div>
+                                        ))}
+                                        {(meeting.externalParticipants?.length === 0 && meeting.external_participants?.length === 0) && (
+                                            <p className="text-xs text-slate-blue italic text-center py-4">Chưa có khách ngoài nào.</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -839,8 +947,8 @@ const ManagerMeetingDetail = () => {
                                 onClick={() => setIsImportModalOpen(true)}
                                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all"
                             >
-                                <Upload className="w-3.5 h-3.5" />
-                                Nhập từ Excel
+                                <UserPlus className="w-3.5 h-3.5" />
+                                Thêm nội bộ
                             </button>
                         </div>
                     </div>
@@ -1126,11 +1234,12 @@ const ManagerMeetingDetail = () => {
 
             {/* M8 — Modal Import Người tham dự */}
             {meeting && (
-                <ImportParticipantsModal
+                <AddInternalParticipantModal
                     meetingId={meeting.id}
                     open={isImportModalOpen}
                     onClose={() => setIsImportModalOpen(false)}
-                    onSuccess={(msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(null), 4000); }}
+                    users={users}
+                    onSuccess={(msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(null), 4000); fetchMeeting(); }}
                 />
             )}
             {/* Add External Participant Modal */}

@@ -14,13 +14,14 @@ export const getAvailableRooms = async (params = {}) => {
 };
 
 /**
- * @deprecated Backend chưa có endpoint list phòng (GET /rooms). Dùng cho các trang ngoài
- * phạm vi luồng booking (MeetingDetail.jsx); KHÔNG dùng trong BookMeeting.jsx (xem getAvailableRooms).
+ * Lấy danh sách phòng họp (BE không có /rooms/available — dùng /rooms/search thật).
+ * Dùng cho các trang ngoài phạm vi luồng booking (MeetingDetail.jsx); KHÔNG dùng trong
+ * BookMeeting.jsx để check trùng lịch theo khung giờ (xem getAvailableRooms).
  * @param {object} params - { page, limit }
  */
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/rooms/available${query}`);
+    return await get(`/rooms/search${query}`);
 };
 
 /**
@@ -149,7 +150,8 @@ export const updateMeetingRecordingConfig = async (id, data) => {
  * UC-SM-03: Hủy cuộc họp
  */
 export const cancelMeeting = async (id, reason = '') => {
-    return await post(`/meetings/${id}/cancel`, { reason });
+    // BE DTO (cancel-meeting.dto.ts) dùng field cancellationReason, không phải reason
+    return await post(`/meetings/${id}/cancel`, { cancellationReason: reason });
 };
 
 /**

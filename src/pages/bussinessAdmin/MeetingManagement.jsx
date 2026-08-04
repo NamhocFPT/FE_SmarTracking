@@ -10,6 +10,17 @@ import {
     getRooms
 } from '../../service/businessAdminServices';
 
+// BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval/
+// in_progress khiến các trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã huỷ".
+const STATUS_BADGE = {
+    draft: { label: 'Bản nháp', className: 'bg-slate-100 text-slate-600' },
+    pending_approval: { label: 'Chờ duyệt', className: 'bg-amber-50 text-amber-700' },
+    scheduled: { label: 'Đã lên lịch', className: 'bg-blue-50 text-blue-700' },
+    in_progress: { label: 'Đang họp', className: 'bg-emerald-50 text-emerald-700' },
+    completed: { label: 'Hoàn thành', className: 'bg-green-50 text-green-700' },
+    cancelled: { label: 'Đã huỷ', className: 'bg-red-50 text-red-700' },
+};
+
 
 const MeetingManagement = () => {
     const [meetingsList, setMeetingsList] = useState([]);
@@ -293,13 +304,9 @@ const MeetingManagement = () => {
                                             </td>
                                             <td className="py-4 px-6 text-sm">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                                    m.status === 'scheduled' ? 'bg-blue-50 text-blue-700' :
-                                                    m.status === 'completed' ? 'bg-green-50 text-green-700' :
-                                                    'bg-red-50 text-red-700'
+                                                    (STATUS_BADGE[m.status] || STATUS_BADGE.cancelled).className
                                                 }`}>
-                                                    {m.status === 'scheduled' ? 'Đã lên lịch' :
-                                                     m.status === 'completed' ? 'Hoàn thành' :
-                                                     'Đã huỷ'}
+                                                    {(STATUS_BADGE[m.status] || { label: m.status }).label}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-right space-x-2">

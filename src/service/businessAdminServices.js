@@ -170,6 +170,7 @@ export const getBackgroundJobStatus = async (jobId) => {
 
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
+    // BE không có route /rooms/available — endpoint thật là /rooms/search
     return await get(`/rooms/search${query}`);
 };
 
@@ -254,7 +255,8 @@ export const updateMeetingRecordingConfig = async (id, data) => {
 };
 
 export const cancelMeeting = async (meetingId, reason = 'Huỷ bởi quản trị viên') => {
-    return await post(`/meetings/${meetingId}/cancel`, { reason });
+    // BE DTO (cancel-meeting.dto.ts) dùng field cancellationReason, không phải reason
+    return await post(`/meetings/${meetingId}/cancel`, { cancellationReason: reason });
 };
 
 // ============================================================
@@ -383,10 +385,10 @@ export const removeExternalParticipant = async (meetingId, externalParticipantId
     return await dele(`/meetings/${meetingId}/participants/external/${externalParticipantId}`, data);
 };
 
-// B-M8.7 — Xóa người tham gia nội bộ (CHỜ BE-06 — prefix meetings/ đang thiếu)
-// export const removeInternalParticipant = async (meetingId, participantUserId, data = {}) => {
-//     return await dele(`/meetings/${meetingId}/participants/${participantUserId}`, data);
-// };
+// B-M8.7 — Xóa người tham gia nội bộ
+export const removeInternalParticipant = async (meetingId, participantUserId, data = {}) => {
+    return await dele(`/meetings/${meetingId}/participants/${participantUserId}`, data);
+};
 
 // ============================================================
 // B-M6: BIÊN BẢN NÂNG CAO (Minutes)

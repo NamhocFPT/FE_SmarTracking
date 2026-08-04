@@ -231,7 +231,8 @@ export const replaceAgendas = async (meetingId, items) => {
  * UC-SM-03: Hủy cuộc họp
  */
 export const cancelMeeting = async (id, reason = '') => {
-    return await post(`/meetings/${id}/cancel`, { reason });
+    // BE DTO (cancel-meeting.dto.ts) dùng field cancellationReason, không phải reason
+    return await post(`/meetings/${id}/cancel`, { cancellationReason: reason });
 };
 
 /**
@@ -251,11 +252,11 @@ export const startMeeting = async (id) => {
 };
 
 /**
- * Get available meeting rooms
+ * Lấy danh sách phòng họp (BE không có /rooms/available — dùng /rooms/search thật)
  */
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
-    return await get(`/rooms/available${query}`);
+    return await get(`/rooms/search${query}`);
 };
 
 /**

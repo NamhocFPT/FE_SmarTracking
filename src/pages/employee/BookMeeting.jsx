@@ -379,7 +379,8 @@ const BookMeeting = () => {
                         if (isInternalChecked && isExternalChecked) {
                             error = error || `Dòng ${rowNumber}: Không thể đánh dấu cả "Trong công ty" và "Ngoài công ty" cùng lúc`;
                         } else if (!isInternalChecked && !isExternalChecked) {
-                            type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                            const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                            type = found ? 'internal' : 'external';
                         } else {
                             type = isInternalChecked ? 'internal' : 'external';
                         }
@@ -388,10 +389,19 @@ const BookMeeting = () => {
                         if (typeVal.includes('trong') || typeVal.includes('internal') || typeVal.includes('nội bộ') || typeVal === 'in') {
                             type = 'internal';
                         } else if (!typeVal) {
-                            type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                            const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                            type = found ? 'internal' : 'external';
                         }
                     } else {
-                        type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                        const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                        type = found ? 'internal' : 'external';
+                    }
+
+                    if (type === 'internal') {
+                        const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                        if (!found) {
+                            error = error || `Dòng ${rowNumber}: Không tìm thấy nhân viên trong hệ thống`;
+                        }
                     }
 
                     return { email, type, error, rowNumber };
@@ -423,7 +433,15 @@ const BookMeeting = () => {
 
             let type = manualType;
             if (type === 'auto') {
-                type = email.toLowerCase().endsWith('@smrmpts.com') ? 'internal' : 'external';
+                const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                type = found ? 'internal' : 'external';
+            }
+
+            if (type === 'internal') {
+                const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                if (!found) {
+                    error = error || `Dòng ${rowNumber}: Không tìm thấy nhân viên trong hệ thống`;
+                }
             }
 
             return { email, type, error, rowNumber };
@@ -454,16 +472,9 @@ const BookMeeting = () => {
                     }
                     internalMatchedCount++;
                 } else {
-                    if (!newExternal.some(e => e.email.toLowerCase() === item.email.toLowerCase())) {
-                        newExternal.push({
-                            id: `ext-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                            email: item.email,
-                            fullName: item.email.split('@')[0],
-                            isExternal: true,
-                            isCompanyUnmatched: true
-                        });
-                    }
-                    externalAddedCount++;
+                    // This case should not happen because we already validated and set error if not found.
+                    // But just in case, we do not add to external to prevent fake internal users.
+                    console.warn(`Internal user ${item.email} not found in users list.`);
                 }
             } else {
                 if (!newExternal.some(e => e.email.toLowerCase() === item.email.toLowerCase())) {
