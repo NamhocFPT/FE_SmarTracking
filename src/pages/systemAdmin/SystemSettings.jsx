@@ -237,10 +237,12 @@ const SystemSettings = () => {
                 setError('ID Kênh Camera không được để trống.');
                 return;
             }
-            if (newRoomMap[id]) {
+            if (newRoomMap[id] !== undefined) {
                 setError(`ID Kênh Camera bị trùng lặp: ${id}`);
                 return;
             }
+            // Only add keys with non-empty values. 
+            // Missing keys will be implicitly deleted since the BE fully replaces the JSON object.
             if (row.roomId) newRoomMap[id] = row.roomId;
             if (row.direction) newDirMap[id] = row.direction;
             if (row.presenceZone) newPZoneMap[id] = row.presenceZone;
@@ -277,9 +279,10 @@ const SystemSettings = () => {
             // Check if value actually changed
             if (JSON.stringify(currentVal) === JSON.stringify(dbVal)) return false;
 
-            // Only patch if it has data (skip empty maps and empty thresholds)
+            // Allow sending changed objects even if they appear "empty" 
+            // (e.g. they only contain nulls to delete keys)
             if (typeof currentVal === 'object' && currentVal !== null) {
-                return Object.keys(currentVal).length > 0;
+                return true;
             } else {
                 return currentVal !== '' && currentVal !== null && currentVal !== undefined;
             }
@@ -306,11 +309,10 @@ const SystemSettings = () => {
 
             await Promise.all([...updatePromises, ...updateChannelPromises]);
             
-            // Re-fetch or sync state
+            // Re-fetch or sync state to ensure we have the absolute latest from DB
+            await fetchConfigs();
             setSuccessMessage('Cập nhật chính sách và tham số cấu hình hệ thống thành công.');
-            setDbConfigs({ ...configs });
-            setChannelMaps(currentChannelMaps);
-            setDbChannelMaps(currentChannelMaps);
+
         } catch (err) {
             setError(err?.message || err?.error?.message || 'Không thể cập nhật cấu hình hệ thống. Vui lòng thử lại.');
         } finally {
