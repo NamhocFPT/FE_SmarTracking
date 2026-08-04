@@ -144,14 +144,14 @@ const DeviceManagement = () => {
     const openEditModal = (device) => {
         setSelectedDevice(device);
         setFormData({
-            deviceCode: device.deviceCode || '',
-            deviceName: device.deviceName || '',
-            deviceType: device.deviceType || 'camera',
+            deviceCode: device.device_code || '',
+            deviceName: device.device_name || '',
+            deviceType: device.device_type || 'camera',
             roomId: device.room_id || '',
-            ipAddress: device.ipAddress || '',
-            macAddress: device.macAddress || '',
-            streamUrl: device.streamUrl || '',
-            agentVersion: device.agentVersion || 'v1.0.0'
+            ipAddress: device.ip_address || '',
+            macAddress: device.mac_address || '',
+            streamUrl: device.stream_url || '',
+            agentVersion: device.agent_version || 'v1.0.0'
         });
         setIsEditModalOpen(true);
     };
@@ -240,7 +240,7 @@ const DeviceManagement = () => {
     const handleDeleteDevice = (device) => {
         setConfirmModal({
             title: 'Xác nhận gỡ đăng ký thiết bị',
-            message: `Bạn có chắc chắn muốn gỡ bỏ hoàn toàn thiết bị ${device.deviceCode}? Hành động này không thể hoàn tác.`,
+            message: `Bạn có chắc chắn muốn gỡ bỏ hoàn toàn thiết bị ${device.device_code}? Hành động này không thể hoàn tác.`,
             type: 'danger',
             onConfirm: async () => {
                 setError(null);
@@ -260,7 +260,7 @@ const DeviceManagement = () => {
         const isOnline = device.status === 'online';
         setConfirmModal({
             title: isOnline ? 'Ngừng kích hoạt thiết bị' : 'Kích hoạt lại thiết bị',
-            message: `Bạn có muốn ${isOnline ? 'ngừng kích hoạt (disable)' : 'kích hoạt lại (enable)'} thiết bị ${device.deviceCode}?`,
+            message: `Bạn có muốn ${isOnline ? 'ngừng kích hoạt (disable)' : 'kích hoạt lại (enable)'} thiết bị ${device.device_code}?`,
             type: isOnline ? 'warning' : 'info',
             onConfirm: async () => {
                 setError(null);
@@ -292,7 +292,7 @@ const DeviceManagement = () => {
         try {
             const res = await checkDeviceAvailability(device.id);
             if (res?.success && res.data) {
-                setSuccessMessage(`Thiết bị ${device.deviceName} phản hồi: ${res.data.isReachable ? 'Có thể kết nối (Reachable)' : 'Không thể kết nối (Unreachable)'}.`);
+                setSuccessMessage(`Thiết bị ${device.device_name} phản hồi: ${res.data.isReachable ? 'Có thể kết nối (Reachable)' : 'Không thể kết nối (Unreachable)'}.`);
                 fetchData(); // refresh status
             } else {
                 throw new Error(res?.error?.message || res?.message || 'Không thể kiểm tra kết nối thiết bị.');
@@ -305,7 +305,7 @@ const DeviceManagement = () => {
     const handleRotateToken = (device) => {
         setConfirmModal({
             title: 'Rotate Token Face Server',
-            message: `Bạn có chắc chắn muốn Rotate Token cho Face Server ${device.deviceName}? Các thiết bị cũ sẽ mất kết nối nếu không cập nhật token mới.`,
+            message: `Bạn có chắc chắn muốn Rotate Token cho Face Server ${device.device_name}? Các thiết bị cũ sẽ mất kết nối nếu không cập nhật token mới.`,
             type: 'warning',
             onConfirm: async () => {
                 setError(null);
@@ -316,7 +316,7 @@ const DeviceManagement = () => {
                         // FE-5: Hiển thị token trong modal "chỉ hiện 1 lần"
                         setTokenModalData({
                             token: res.data?.token || res.data?.accessToken || 'Token đã được tạo',
-                            deviceName: device.deviceName
+                            deviceName: device.device_name
                         });
                         setTokenCopied(false);
                     } else {
@@ -334,7 +334,7 @@ const DeviceManagement = () => {
     const handleRevokeToken = (device) => {
         setConfirmModal({
             title: 'Thu hồi Token Face Server',
-            message: `Bạn có chắc chắn muốn thu hồi (revoke) token hiện tại của ${device.deviceName}? Thiết bị sẽ mất kết nối ngay lập tức.`,
+            message: `Bạn có chắc chắn muốn thu hồi (revoke) token hiện tại của ${device.device_name}? Thiết bị sẽ mất kết nối ngay lập tức.`,
             type: 'danger',
             onConfirm: async () => {
                 setError(null);
@@ -342,7 +342,7 @@ const DeviceManagement = () => {
                 try {
                     const res = await revokeFaceServerToken(device.id);
                     if (res?.success) {
-                        setSuccessMessage(`Đã thu hồi token của ${device.deviceName} thành công.`);
+                        setSuccessMessage(`Đã thu hồi token của ${device.device_name} thành công.`);
                         fetchData();
                     } else {
                         throw new Error(res?.error?.message || res?.message || 'Không thể thu hồi token.');
@@ -428,10 +428,10 @@ const DeviceManagement = () => {
     // Filtered list
     const filteredDevices = devicesList.filter(device => {
         const matchSearch = search.trim() === '' || 
-            device.deviceCode.toLowerCase().includes(search.toLowerCase()) ||
-            device.deviceName.toLowerCase().includes(search.toLowerCase()) ||
-            device.ipAddress.includes(search);
-        const matchType = selectedType === '' || device.deviceType === selectedType;
+            device.device_code.toLowerCase().includes(search.toLowerCase()) ||
+            device.device_name.toLowerCase().includes(search.toLowerCase()) ||
+            device.ip_address.includes(search);
+        const matchType = selectedType === '' || device.device_type === selectedType;
         const matchStatus = selectedStatus === '' || device.status === selectedStatus;
         const matchRoom = selectedRoomId === '' || device.room_id === selectedRoomId;
         return matchSearch && matchType && matchStatus && matchRoom;
@@ -601,15 +601,15 @@ const DeviceManagement = () => {
                                             return (
                                                 <tr key={device.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
                                                     <td className="py-4 px-6">
-                                                        <h4 className="text-sm font-bold text-midnight-indigo leading-tight">{device.deviceName}</h4>
-                                                        <p className="text-[10px] text-steel-gray mt-1 font-mono">{device.deviceCode}</p>
+                                                        <h4 className="text-sm font-bold text-midnight-indigo leading-tight">{device.device_name}</h4>
+                                                        <p className="text-[10px] text-steel-gray mt-1 font-mono">{device.device_code}</p>
                                                     </td>
                                                     <td className="py-4 px-6 text-sm text-slate-blue font-medium">
-                                                        {TYPE_MAP[device.deviceType] || device.deviceType}
+                                                        {TYPE_MAP[device.device_type] || device.device_type}
                                                     </td>
                                                     <td className="py-4 px-6">
-                                                        <div className="text-xs text-midnight-indigo font-mono">IP: {device.ipAddress}</div>
-                                                        <div className="text-[10px] text-slate-blue mt-0.5 font-mono">MAC: {device.macAddress}</div>
+                                                        <div className="text-xs text-midnight-indigo font-mono">IP: {device.ip_address}</div>
+                                                        <div className="text-[10px] text-slate-blue mt-0.5 font-mono">MAC: {device.mac_address}</div>
                                                     </td>
                                                     <td className="py-4 px-6">
                                                         {assignedRoom ? (
@@ -668,7 +668,7 @@ const DeviceManagement = () => {
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                                             </svg>
                                                         </button>
-                                                        {device.deviceType === 'face_server' && (
+                                                        {device.device_type === 'face_server' && (
                                                             <>
                                                             <button
                                                                 onClick={() => handleRotateToken(device)}
@@ -690,9 +690,9 @@ const DeviceManagement = () => {
                                                             </button>
                                                             </>
                                                         )}
-                                                        {device.deviceType === 'camera' && (
+                                                        {device.device_type === 'camera' && (
                                                             <button
-                                                                onClick={() => { setRtspDeviceId(device.id); setRtspUrl(device.streamUrl || ''); setIsRtspModalOpen(true); }}
+                                                                onClick={() => { setRtspDeviceId(device.id); setRtspUrl(device.stream_url || ''); setIsRtspModalOpen(true); }}
                                                                 title="Cấu hình RTSP"
                                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-purple-600 hover:bg-purple-50 transition-colors"
                                                             >
@@ -1371,3 +1371,4 @@ const DeviceManagement = () => {
 };
 
 export default DeviceManagement;
+
