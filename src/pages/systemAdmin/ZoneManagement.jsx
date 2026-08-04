@@ -24,8 +24,7 @@ const ZoneManagement = () => {
 
     // Modal states
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+        const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [zoneToDelete, setZoneToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -38,10 +37,7 @@ const ZoneManagement = () => {
         description: ''
     });
 
-    const [assignForm, setAssignForm] = useState({
-        deviceId: ''
-    });
-
+    
     const fetchZones = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -152,35 +148,7 @@ const ZoneManagement = () => {
         }
     };
 
-    const handleAssignSubmit = async (e) => {
-        e.preventDefault();
-        if (!selectedZone || !assignForm.deviceId) return;
-        
-        try {
-            const res = await assignDeviceToZone(selectedZone.id, { device_ids: [assignForm.deviceId] });
-            if (res?.success) {
-                setSuccessMessage('Gán thiết bị thành công!');
-                setIsAssignModalOpen(false);
-                
-                // Vì API GET /zones/:id không trả về devices, ta phải tự update state ở client
-                const assignedDevice = availableDevices.find(d => d.id === assignForm.deviceId);
-                if (assignedDevice) {
-                    setSelectedZone(prev => ({
-                        ...prev,
-                        devices: [...(prev.devices || []), assignedDevice]
-                    }));
-                }
-                
-                setAssignForm({ deviceId: '' });
-                // Không gọi lại handleSelectZone vì sẽ làm mất mảng devices do BE không trả về
-                fetchAvailableDevices();
-            } else {
-                setError(res?.message || 'Gán thiết bị thất bại.');
-            }
-        } catch (err) {
-            setError(err?.message || 'Lỗi kết nối khi gán thiết bị.');
-        }
-    };
+    
 
     const handleRemoveDevice = async (deviceId) => {
         if (!selectedZone) return;
@@ -315,13 +283,6 @@ const ZoneManagement = () => {
                                     <p className="text-xs text-slate-blue mt-1">Quản lý các camera được gán vào khu vực này</p>
                                 </div>
                                 <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setIsAssignModalOpen(true)}
-                                        className="inline-flex items-center px-4 py-2 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm"
-                                    >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Thêm camera
-                                    </button>
                                 </div>
                             </div>
                             
@@ -357,7 +318,6 @@ const ZoneManagement = () => {
                                                 <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-blue">
                                                     <Video className="w-10 h-10 mb-3 text-slate-300" />
                                                     <p className="text-sm font-medium">Khu vực này chưa có camera nào</p>
-                                                    <button onClick={() => setIsAssignModalOpen(true)} className="mt-3 text-sm font-semibold text-action-blue hover:underline">Thêm camera ngay</button>
                                                 </div>
                                             ) : (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,33 +436,7 @@ const ZoneManagement = () => {
                 document.body
             )}
 
-            {/* ASSIGN MODAL */}
-            {isAssignModalOpen && selectedZone && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full flex flex-col overflow-hidden">
-                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-blue-50">
-                            <h3 className="font-bold text-action-blue">Thêm thiết bị vào khu vực</h3>
-                            <button onClick={() => setIsAssignModalOpen(false)} className="text-action-blue hover:text-midnight-indigo">✕</button>
-                        </div>
-                        <form onSubmit={handleAssignSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn thiết bị giám sát</label>
-                                <select required value={assignForm.deviceId} onChange={e => setAssignForm({deviceId: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white">
-                                    <option value="" disabled>-- Chọn thiết bị --</option>
-                                    {availableDevices.map(dev => (
-                                        <option key={dev.id} value={dev.id}>{dev.device_name} ({dev.device_code})</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setIsAssignModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
-                                <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue">Gán thiết bị</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>,
-                document.body
-            )}
+            }
         </div>
     );
 };
