@@ -51,6 +51,7 @@ const SystemSettings = () => {
     const [dbChannelMaps, setDbChannelMaps] = useState({});
     const [localChannels, setLocalChannels] = useState([]);
     const [rooms, setRooms] = useState([]);
+    const [channelPage, setChannelPage] = useState(1); // phân trang danh sách ánh xạ kênh camera (client-side)
 
     // Tracking which keys were modified compared to database
     const [dbConfigs, setDbConfigs] = useState({});
@@ -63,7 +64,7 @@ const SystemSettings = () => {
             const [res, channelRes, roomRes] = await Promise.all([
                 getSystemConfigs(),
                 getChannelMaps().catch(() => ({ success: true, data: [] })),
-                getRooms({ limit: 100 }).catch(() => ({ success: true, data: [] }))
+                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] }))
             ]);
 
             if (res?.success && Array.isArray(res.data)) {
@@ -135,7 +136,11 @@ const SystemSettings = () => {
             }
 
             if (roomRes?.success) {
-                const roomData = Array.isArray(roomRes.data?.data) ? roomRes.data.data : (Array.isArray(roomRes.data) ? roomRes.data : []);
+                let roomData = [];
+                if (Array.isArray(roomRes.data?.items)) roomData = roomRes.data.items;
+                else if (Array.isArray(roomRes.data?.rooms)) roomData = roomRes.data.rooms;
+                else if (Array.isArray(roomRes.data?.data)) roomData = roomRes.data.data;
+                else if (Array.isArray(roomRes.data)) roomData = roomRes.data;
                 setRooms(roomData);
             }
         } catch (err) {
@@ -265,9 +270,20 @@ const SystemSettings = () => {
 
         // Find keys that changed compared to initial database values
         const changedKeys = Object.keys(configs).filter(key => configs[key] !== dbConfigs[key]);
-        const changedChannelKeys = Object.keys(currentChannelMaps).filter(key => 
-            JSON.stringify(currentChannelMaps[key]) !== JSON.stringify(dbChannelMaps[key])
-        );
+        const changedChannelKeys = Object.keys(currentChannelMaps).filter(key => {
+            const currentVal = currentChannelMaps[key];
+            const dbVal = dbChannelMaps[key];
+            
+            // Check if value actually changed
+            if (JSON.stringify(currentVal) === JSON.stringify(dbVal)) return false;
+
+            // Only patch if it has data (skip empty maps and empty thresholds)
+            if (typeof currentVal === 'object' && currentVal !== null) {
+                return Object.keys(currentVal).length > 0;
+            } else {
+                return currentVal !== '' && currentVal !== null && currentVal !== undefined;
+            }
+        });
 
         if (changedKeys.length === 0 && changedChannelKeys.length === 0) {
             setSuccessMessage('Không có thay đổi nào cần lưu.');
@@ -281,11 +297,11 @@ const SystemSettings = () => {
                 const valueString = String(configs[key]);
                 return updateSystemConfig({ key, value: valueString });
             });
+            // Endpoint /system-configurations/channel-maps lưu thẳng vào cột config_json (JSONB) —
+            // BE cần nhận value đúng kiểu gốc (object cho 4 map, number cho 3 ngưỡng), KHÔNG stringify.
+            // Stringify object ở đây sẽ khiến BE báo "Value ... phải là object dạng {...}".
             const updateChannelPromises = changedChannelKeys.map(key => {
-                let value = currentChannelMaps[key];
-                if (typeof value === 'object') value = JSON.stringify(value);
-                else value = String(value);
-                return updateChannelMap({ key, value });
+                return updateChannelMap({ key, value: currentChannelMaps[key] });
             });
 
             await Promise.all([...updatePromises, ...updateChannelPromises]);
@@ -349,7 +365,17 @@ const SystemSettings = () => {
             zone: zMap[id] || ''
         }));
         setLocalChannels(rows);
+        setChannelPage(1);
     };
+
+    // Phân trang danh sách kênh camera (client-side — dữ liệu đã có sẵn từ channel maps, không gọi lại API)
+    const CHANNELS_PER_PAGE = 8;
+    const totalChannelPages = Math.max(1, Math.ceil(localChannels.length / CHANNELS_PER_PAGE));
+    const safeChannelPage = Math.min(channelPage, totalChannelPages);
+    const paginatedChannels = localChannels.slice(
+        (safeChannelPage - 1) * CHANNELS_PER_PAGE,
+        safeChannelPage * CHANNELS_PER_PAGE
+    );
 
     if (loading) {
         return (
@@ -784,131 +810,167 @@ const SystemSettings = () => {
                                 </div>
                             </div>
 
-                            {/* Map Table */}
+                            {/* Map List (Compact Table + Phân trang — tránh giao diện kéo dài, không dùng scroll dọc) */}
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h3 className="font-bold text-midnight-indigo">Ánh xạ Kênh Camera</h3>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setLocalChannels([...localChannels, { id: '', roomId: '', direction: '', presenceZone: '', zone: '' }])}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const newChannels = [...localChannels, { id: '', roomId: '', direction: '', presenceZone: '', zone: '' }];
+                                            setLocalChannels(newChannels);
+                                            setChannelPage(Math.ceil(newChannels.length / CHANNELS_PER_PAGE)); // nhảy tới trang chứa kênh vừa thêm
+                                        }}
                                         className="px-3 py-1.5 bg-action-blue text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
                                     >
                                         <Plus className="w-4 h-4" /> Thêm kênh
                                     </button>
                                 </div>
-                                
-                                <div className="overflow-x-auto border border-platinum-tint rounded-xl">
-                                    <table className="w-full text-left text-sm text-midnight-indigo">
-                                        <thead className="bg-cloud-mist/50 border-b border-platinum-tint text-xs uppercase text-slate-blue font-bold">
-                                            <tr>
-                                                <th className="px-4 py-3 min-w-[100px]">ID Kênh</th>
-                                                <th className="px-4 py-3 min-w-[150px]">Phòng</th>
-                                                <th className="px-4 py-3 min-w-[150px]">Hướng di chuyển</th>
-                                                <th className="px-4 py-3 min-w-[150px]">Phân vùng Hiện diện</th>
-                                                <th className="px-4 py-3 min-w-[150px]">Phân vùng chung</th>
-                                                <th className="px-4 py-3 w-[80px] text-center">Thao tác</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {localChannels.map((row, index) => (
-                                                <tr key={index} className="border-b border-platinum-tint last:border-0 hover:bg-slate-50">
-                                                    <td className="px-4 py-2">
-                                                        <input 
-                                                            type="text" 
-                                                            value={row.id} 
-                                                            onChange={(e) => {
-                                                                const newChannels = [...localChannels];
-                                                                newChannels[index].id = e.target.value;
-                                                                setLocalChannels(newChannels);
-                                                            }}
-                                                            placeholder="VD: 1, 2"
-                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <select 
-                                                            value={row.roomId} 
-                                                            onChange={(e) => {
-                                                                const newChannels = [...localChannels];
-                                                                newChannels[index].roomId = e.target.value;
-                                                                setLocalChannels(newChannels);
-                                                            }}
-                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
-                                                        >
-                                                            <option value="">-- Chọn phòng --</option>
-                                                            {rooms.map(room => (
-                                                                <option key={room.id} value={room.id}>{room.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <select 
-                                                            value={row.direction} 
-                                                            onChange={(e) => {
-                                                                const newChannels = [...localChannels];
-                                                                newChannels[index].direction = e.target.value;
-                                                                setLocalChannels(newChannels);
-                                                            }}
-                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
-                                                        >
-                                                            <option value="">-- Chọn hướng --</option>
-                                                            <option value="enter">Vào (Enter)</option>
-                                                            <option value="leave">Ra (Leave)</option>
-                                                            <option value="seen">Hiện diện (Seen)</option>
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <input 
-                                                            type="text" 
-                                                            value={row.presenceZone} 
-                                                            onChange={(e) => {
-                                                                const newChannels = [...localChannels];
-                                                                newChannels[index].presenceZone = e.target.value;
-                                                                setLocalChannels(newChannels);
-                                                            }}
-                                                            placeholder="UUID phân vùng"
-                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <input 
-                                                            type="text" 
-                                                            value={row.zone} 
-                                                            onChange={(e) => {
-                                                                const newChannels = [...localChannels];
-                                                                newChannels[index].zone = e.target.value;
-                                                                setLocalChannels(newChannels);
-                                                            }}
-                                                            placeholder="UUID phân vùng"
-                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        <button 
-                                                            type="button" 
-                                                            onClick={() => {
-                                                                const newChannels = [...localChannels];
-                                                                newChannels.splice(index, 1);
-                                                                setLocalChannels(newChannels);
-                                                            }}
-                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Xóa"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {localChannels.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-blue text-sm">
-                                                        Chưa có cấu hình ánh xạ kênh nào. Bấm "Thêm kênh" để bắt đầu.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+
+                                {localChannels.length === 0 ? (
+                                    <div className="p-8 text-center border border-platinum-tint border-dashed rounded-xl text-slate-blue text-sm">
+                                        Chưa có cấu hình ánh xạ kênh nào. Bấm "Thêm kênh" để bắt đầu.
+                                    </div>
+                                ) : (
+                                    <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm min-w-[760px]">
+                                                <thead className="bg-cloud-mist/50 border-b border-platinum-tint">
+                                                    <tr>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-24">ID Kênh</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Phòng</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-44">Hướng di chuyển</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Phân vùng hiện diện</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Phân vùng chung</th>
+                                                        <th className="px-3 py-2.5 w-10"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-platinum-tint">
+                                                    {paginatedChannels.map((row, pageIdx) => {
+                                                        const index = (safeChannelPage - 1) * CHANNELS_PER_PAGE + pageIdx;
+                                                        return (
+                                                            <tr key={index} className="hover:bg-cloud-mist/30 transition-colors">
+                                                                <td className="px-3 py-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={row.id}
+                                                                        onChange={(e) => {
+                                                                            const newChannels = [...localChannels];
+                                                                            newChannels[index].id = e.target.value;
+                                                                            setLocalChannels(newChannels);
+                                                                        }}
+                                                                        placeholder="VD: 1"
+                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs focus:border-action-blue"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    <select
+                                                                        value={row.roomId}
+                                                                        onChange={(e) => {
+                                                                            const newChannels = [...localChannels];
+                                                                            newChannels[index].roomId = e.target.value;
+                                                                            setLocalChannels(newChannels);
+                                                                        }}
+                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs focus:border-action-blue"
+                                                                    >
+                                                                        <option value="">-- Chọn phòng --</option>
+                                                                        {rooms.map((room, idx) => (
+                                                                            <option key={room.id || room.roomId || idx} value={room.id || room.roomId}>{room.roomName || room.room_name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    <select
+                                                                        value={row.direction}
+                                                                        onChange={(e) => {
+                                                                            const newChannels = [...localChannels];
+                                                                            newChannels[index].direction = e.target.value;
+                                                                            setLocalChannels(newChannels);
+                                                                        }}
+                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs focus:border-action-blue"
+                                                                    >
+                                                                        <option value="">-- Chọn hướng --</option>
+                                                                        <option value="enter">Vào (Enter)</option>
+                                                                        <option value="leave">Ra (Leave)</option>
+                                                                        <option value="seen">Hiện diện (Seen)</option>
+                                                                    </select>
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={row.presenceZone}
+                                                                        onChange={(e) => {
+                                                                            const newChannels = [...localChannels];
+                                                                            newChannels[index].presenceZone = e.target.value;
+                                                                            setLocalChannels(newChannels);
+                                                                        }}
+                                                                        placeholder="UUID phân vùng"
+                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs font-mono focus:border-action-blue"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={row.zone}
+                                                                        onChange={(e) => {
+                                                                            const newChannels = [...localChannels];
+                                                                            newChannels[index].zone = e.target.value;
+                                                                            setLocalChannels(newChannels);
+                                                                        }}
+                                                                        placeholder="UUID phân vùng"
+                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs font-mono focus:border-action-blue"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-3 py-2 text-right">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const newChannels = [...localChannels];
+                                                                            newChannels.splice(index, 1);
+                                                                            setLocalChannels(newChannels);
+                                                                            const newTotalPages = Math.max(1, Math.ceil(newChannels.length / CHANNELS_PER_PAGE));
+                                                                            if (safeChannelPage > newTotalPages) setChannelPage(newTotalPages);
+                                                                        }}
+                                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                        title="Xóa kênh"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {totalChannelPages > 1 && (
+                                            <div className="px-4 py-3 bg-cloud-mist/30 border-t border-platinum-tint flex items-center justify-between">
+                                                <span className="text-xs font-medium text-slate-blue">
+                                                    Trang {safeChannelPage} / {totalChannelPages} (Tổng {localChannels.length} kênh)
+                                                </span>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setChannelPage(Math.max(1, safeChannelPage - 1))}
+                                                        disabled={safeChannelPage === 1}
+                                                        className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
+                                                    >
+                                                        Trước
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setChannelPage(Math.min(totalChannelPages, safeChannelPage + 1))}
+                                                        disabled={safeChannelPage === totalChannelPages}
+                                                        className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
+                                                    >
+                                                        Sau
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
