@@ -12,6 +12,16 @@ export const uploadAudio = async (meetingId, file) => {
 };
 
 /**
+ * REC-006: Gửi các mốc gán tên đã thu thập tại trạm
+ * @param {string} meetingId 
+ * @param {string} sessionId 
+ * @param {Array} marks 
+ */
+export const uploadStationSpeakerMarks = async (meetingId, sessionId, marks) => {
+    return await post(`/meetings/${meetingId}/recording-sessions/${sessionId}/speaker-marks`, { marks });
+};
+
+/**
  * Tạo job transcription
  * @param {string} meetingId 
  * @param {object} payload { recordingSessionId, language, speakerMappingMode, initialPrompt, forceRerun }

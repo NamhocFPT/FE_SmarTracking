@@ -136,6 +136,15 @@ const MeetingApprovals = () => {
         setCurrentPage(1);
     };
 
+    // BE PermissionsGuard trả error.code === 'FORBIDDEN' khi thiếu quyền
+    // (meeting_request.approve/reject) — tách riêng để không nhầm với lỗi hệ thống thật.
+    const getActionErrorMessage = (err, fallback) => {
+        if (err?.error?.code === 'FORBIDDEN') {
+            return 'Bạn chưa có quyền thực hiện thao tác này. Vui lòng liên hệ quản trị viên hệ thống để được cấp quyền.';
+        }
+        return err?.error?.message || err?.message || fallback;
+    };
+
     // Actions
     const handleApprove = async () => {
         if (!selectedRequest) return;
@@ -154,7 +163,7 @@ const MeetingApprovals = () => {
                 throw new Error(res?.error?.message || res?.message || 'Thao tác phê duyệt thất bại.');
             }
         } catch (err) {
-            setError(err?.error?.message || err?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
+            setError(getActionErrorMessage(err, 'Thao tác phê duyệt thất bại, vui lòng thử lại.'));
         } finally {
             setSubmittingAction(false);
         }
@@ -181,7 +190,7 @@ const MeetingApprovals = () => {
                 throw new Error(res?.error?.message || res?.message || 'Thao tác từ chối thất bại.');
             }
         } catch (err) {
-            setError(err?.error?.message || err?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
+            setError(getActionErrorMessage(err, 'Thao tác từ chối thất bại, vui lòng thử lại.'));
         } finally {
             setSubmittingAction(false);
         }

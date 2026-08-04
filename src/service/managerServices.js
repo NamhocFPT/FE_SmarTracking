@@ -275,6 +275,14 @@ export const getMeetingMediaFiles = async (meetingId, params = {}) => {
     return await get(`/meetings/${meetingId}/media-files${query}`);
 };
 
+export const getMediaFile = async (fileId) => {
+    return await get(`/media-files/${fileId}`);
+};
+
+export const getMediaFilePlayback = async (fileId) => {
+    return await get(`/media-files/${fileId}/playback`);
+};
+
 export const updateMediaVisibility = async (fileId, data) => {
     return await patch(`/media-files/${fileId}/visibility`, data);
 };

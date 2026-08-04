@@ -8,6 +8,7 @@ import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, en
 import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes, startVideoRecording as startManagerVideoRecording, pauseVideoRecording as pauseManagerVideoRecording, resumeVideoRecording as resumeManagerVideoRecording, stopVideoRecording as stopManagerVideoRecording, getRecordingStatus as getManagerRecordingStatus, getMeetingMediaFiles as getManagerMediaFiles } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
+import StationRecorder from '../../components/transcription/StationRecorder';
 import { startRecordingMarker, addSpeakerTag, getSpeakerTags, deleteSpeakerTag } from '../../service/transcriptionServices';
 
 // CSS styles injected for custom floating reactions and voice sound wave animations
@@ -1361,6 +1362,20 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         {/* TAB: Host Controls */}
                         {activeChatTab === 'host' && isHost && (
                             <>
+                                {meetingState?.room?.hasMicrophone && (
+                                    <div className="mb-4">
+                                        <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest mb-3">Ghi âm & Gán người nói (Trạm cố định)</h3>
+                                        <StationRecorder 
+                                            meetingId={id} 
+                                            participants={meetingState.participants || []} 
+                                            onUploadSuccess={(sessionId) => {
+                                                showToast('Đã tải lên tệp ghi âm thành công', 'success');
+                                                setRecordingSessionId(sessionId);
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="bg-white border border-platinum-tint rounded-2xl p-4 space-y-3.5 shadow-sm-1">
                                     <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest">Active Permissions</h3>
 

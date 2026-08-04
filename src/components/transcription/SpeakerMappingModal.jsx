@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, AlertCircle, CheckCircle, Headphones } from 'lucide-react';
 import { getTranscriptSpeakers, updateSpeakerMappings } from '../../service/transcriptionServices';
-import { getMeetingById as getMeetingEmployee } from '../../service/employeeServices';
-import { getMeetingById as getMeetingManager } from '../../service/managerServices';
+import { getMeetingById as getMeetingEmployee, getMeetingMediaFiles as getMediaEmp, getMediaFile as getFileEmp } from '../../service/employeeServices';
+import { getMeetingById as getMeetingManager, getMeetingMediaFiles as getMediaMgr, getMediaFile as getFileMgr } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 
 const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappingSuccess }) => {
@@ -14,6 +14,8 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
     const [mappings, setMappings] = useState({}); // { speakerLabel: participantId }
     const [errorMsg, setErrorMsg] = useState('');
     const [resultData, setResultData] = useState(null); // To show merged/conflicts after save
+    const [audioUrl, setAudioUrl] = useState(null);
+    const audioRef = useRef(null);
 
     useEffect(() => {
         if (!isOpen || !transcriptId) return;
@@ -45,6 +47,30 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                 if (meetingData?.participants) {
                     setParticipants(meetingData.participants);
                 }
+
+                // Fetch media files to get audio downloadUrl
+                let fetchedAudioUrl = null;
+                try {
+                    let mediaRes = await getMediaEmp(meetingId);
+                    if (!mediaRes?.success) throw new Error();
+                    const audioFile = mediaRes.data?.find(f => f.fileType === 'AUDIO' || f.file_type === 'AUDIO');
+                    if (audioFile) {
+                        const fileRes = await getFileEmp(audioFile.id);
+                        if (fileRes?.success) fetchedAudioUrl = fileRes.data?.downloadUrl;
+                    }
+                } catch (e) {
+                    try {
+                        let mediaRes = await getMediaMgr(meetingId);
+                        if (mediaRes?.success) {
+                            const audioFile = mediaRes.data?.find(f => f.fileType === 'AUDIO' || f.file_type === 'AUDIO');
+                            if (audioFile) {
+                                const fileRes = await getFileMgr(audioFile.id);
+                                if (fileRes?.success) fetchedAudioUrl = fileRes.data?.downloadUrl;
+                            }
+                        }
+                    } catch (err) {}
+                }
+                setAudioUrl(fetchedAudioUrl);
 
                 // Init empty mappings
                 setMappings({});
@@ -90,7 +116,7 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                 if (onMappingSuccess) onMappingSuccess();
                 // We keep modal open to show merged/conflicts, user must click close
             } else {
-                if (res?.error?.code === 409) {
+                if ((res?.error?.code === 400 && res?.error?.details?.code === 'SPEAKER_MAPPING_CONFLICT') || res?.error?.code === 409) {
                     setErrorMsg('Có xung đột với mốc gán thủ công (conflict). Vui lòng thử lại.');
                 } else {
                     setErrorMsg(res?.error?.message || 'Lỗi khi lưu.');
@@ -188,7 +214,9 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                                                     <div className="w-12 h-12 bg-cloud-mist rounded-full flex items-center justify-center mb-2">
                                                         <Headphones className="w-5 h-5 text-slate-blue" />
                                                     </div>
-                                                    <span className="text-xs font-extrabold text-midnight-indigo text-center">Người nói {index + 1}</span>
+                                                    <span className="text-xs font-extrabold text-midnight-indigo text-center">
+                                                        {spk.speakerLabel === 'unknown' ? 'Chưa xác định' : spk.speakerLabel.replace('Speaker_', 'Người nói ')}
+                                                    </span>
                                                 </div>
                                                 
                                                 <div className="flex-1 flex flex-col justify-center border-l border-platinum-tint pl-4">
@@ -207,10 +235,13 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
 
                                                 <div className="w-56 shrink-0 flex flex-col justify-center gap-3 pl-4 border-l border-platinum-tint">
                                                     <button 
-                                                        className="w-full py-1.5 bg-white border border-platinum-tint text-action-blue hover:bg-blue-50 rounded-lg text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5"
+                                                        className="w-full py-1.5 bg-white border border-platinum-tint text-action-blue hover:bg-blue-50 rounded-lg text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                                        disabled={!audioUrl}
                                                         onClick={() => {
-                                                            // Mock playback - Ideally we use A8 playback API here
-                                                            alert(`Phát thử audio từ t=${spk.sampleStartMs}ms`);
+                                                            if (audioRef.current && audioUrl) {
+                                                                audioRef.current.currentTime = (spk.sampleStartMs || 0) / 1000;
+                                                                audioRef.current.play();
+                                                            }
                                                         }}
                                                     >
                                                         <Play className="w-3.5 h-3.5" /> Nghe thử đoạn mẫu
@@ -258,6 +289,10 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                                 )}
                             </button>
                         </div>
+                    )}
+                    
+                    {audioUrl && (
+                        <audio ref={audioRef} src={audioUrl} className="hidden" />
                     )}
                 </motion.div>
             </motion.div>
