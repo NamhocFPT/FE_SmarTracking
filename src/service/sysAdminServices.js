@@ -345,11 +345,12 @@ export const updateSelfProfile = async (userId, data) => {
 
 /**
  * Lấy danh sách phòng họp
- * @param {object} params - { page, limit }
+ * @param {object} params - { page, limit, capacityMin, capacityMax, areaName, onlyAvailable }
  * @returns {Promise<object>} response envelope
  */
 export const getRooms = async (params = {}) => {
     const query = buildQuery(params);
+    // BE không có route /rooms/available — endpoint thật là /rooms/search (xem rooms.controller.ts)
     return await get(`/rooms/search${query}`);
 };
 
@@ -566,6 +567,12 @@ export const updateEarlyVacancyConfig = async (data) => {
 };
 
 // UC-IVSS-02 — Nhật ký ra/vào phòng họp
-export const getRoomAccessLog = async (roomId, date) => {
-    return await get(`/ivss/rooms/${roomId}/access-log${date ? `?date=${date}` : ''}`);
+// BE hỗ trợ phân trang + search server-side (xem BE_Plan_RoomAccessLog.md mục 1):
+// page, limit, date, search (lọc theo tên người dùng).
+export const getRoomAccessLog = async (roomId, date, params = {}) => {
+    const query = buildQuery({ date, ...params });
+    if (!roomId || roomId === 'all') {
+        return await get(`/ivss/access-log${query}`);
+    }
+    return await get(`/ivss/rooms/${roomId}/access-log${query}`);
 };
