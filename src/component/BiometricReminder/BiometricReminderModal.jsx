@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { getBiometricStatus, submitBiometric, updateSelfAvatar } from '../../service/avatarService';
-import { Shield, Camera, Image, ArrowLeft, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Shield, Camera, Image, ArrowLeft, Check, AlertCircle, RefreshCw, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useFaceGuidance from '../../hooks/useFaceGuidance';
+import BiometricUploadForm from './BiometricUploadForm';
 
 const STATUS_LABEL = {
     not_uploaded: { label: 'Chưa nộp ảnh', badge: 'bg-amber-50 text-amber-700 border border-amber-200' },
@@ -61,7 +62,8 @@ const BiometricReminderModal = () => {
 
                     // Sử dụng chính xác cờ biometricRequired do BE trả về trong login-response
                     // kết hợp với trạng thái lấy từ API getBiometricStatus
-                    const isForced = userProfile?.biometricRequired === true || data.biometricRequired === true || data.avatarReviewStatus === 'not_uploaded';
+                    const needsUpload = data.avatarReviewStatus === 'not_uploaded' || data.avatarReviewStatus === 'rejected';
+                    const isForced = (userProfile?.biometricRequired === true || data.biometricRequired === true || needsUpload) && needsUpload;
 
                     const dismissed = sessionStorage.getItem('avatarPopupDismissed_' + userId);
                     if (!isForced && dismissed === 'true') { setLoading(false); return; }
@@ -358,7 +360,8 @@ const BiometricReminderModal = () => {
         return 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
     };
 
-    const isForced = userProfile?.biometricRequired === true || biometricData?.biometricRequired === true || biometricData?.avatarReviewStatus === 'not_uploaded';
+    const needsUpload = biometricData?.avatarReviewStatus === 'not_uploaded' || biometricData?.avatarReviewStatus === 'rejected';
+    const isForced = (userProfile?.biometricRequired === true || biometricData?.biometricRequired === true || needsUpload) && needsUpload;
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xl p-4">
@@ -407,7 +410,7 @@ const BiometricReminderModal = () => {
                                 Để tham gia chấm công tự động bằng hệ thống Camera AI, bạn cần cung cấp một ảnh sinh trắc học rõ nét khuôn mặt và được ban quản trị phê duyệt.
                             </p>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                                 {/* Option A: Use Avatar */}
                                 <div 
                                     onClick={() => hasAvatar && setView('confirm_avatar')}
@@ -427,7 +430,7 @@ const BiometricReminderModal = () => {
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-midnight-indigo text-xs">Sử dụng Ảnh đại diện</h4>
-                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Lấy trực tiếp ảnh đại diện hiện tại để gửi phê duyệt FaceID</p>
+                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Dùng ảnh hiện tại làm FaceID</p>
                                         </div>
                                     </div>
                                     {!hasAvatar && (
@@ -445,11 +448,28 @@ const BiometricReminderModal = () => {
                                             <Camera className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-midnight-indigo text-xs">Chụp ảnh bằng Webcam</h4>
-                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Chụp ảnh trực tiếp có hướng dẫn AI giúp tối ưu độ nét nhận diện</p>
+                                            <h4 className="font-bold text-midnight-indigo text-xs">Chụp qua Webcam</h4>
+                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Chụp ảnh trực tiếp với AI</p>
                                         </div>
                                     </div>
-                                    <span className="text-[8px] text-action-blue font-bold bg-action-blue/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Hỗ trợ hướng dẫn</span>
+                                    <span className="text-[8px] text-action-blue font-bold bg-action-blue/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Hỗ trợ AI</span>
+                                </div>
+
+                                {/* Option C: Upload Image */}
+                                <div 
+                                    onClick={() => setView('upload')}
+                                    className="p-4 rounded-2xl border-2 border-platinum-tint hover:border-emerald-500 hover:bg-emerald-50 transition-all flex flex-col items-center justify-between text-center cursor-pointer select-none group h-40"
+                                >
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform duration-300">
+                                            <Upload className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-midnight-indigo text-xs">Tải từ thiết bị</h4>
+                                            <p className="text-[9.5px] text-slate-blue mt-0.5 leading-normal">Chọn ảnh có sẵn từ máy của bạn</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[8px] text-emerald-600 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Tệp ảnh</span>
                                 </div>
                             </div>
                         </div>
@@ -687,6 +707,24 @@ const BiometricReminderModal = () => {
                                     Không, để sau
                                 </button>
                             </div>
+                        </div>
+                    )}
+
+                    {/* PHASE 5: Upload Image from device */}
+                    {view === 'upload' && (
+                        <div className="space-y-4 py-2 flex-1">
+                            <div className="flex items-center gap-3 mb-6">
+                                <button type="button" onClick={() => setView('options')} className="p-1.5 hover:bg-cloud-mist rounded-lg text-slate-blue">
+                                    <ArrowLeft className="w-4 h-4" />
+                                </button>
+                                <span className="text-xs font-bold text-slate-blue uppercase tracking-wider">Tải ảnh từ thiết bị</span>
+                            </div>
+                            <BiometricUploadForm 
+                                onSuccess={() => {
+                                    handleUploadSuccess();
+                                }}
+                                onCancel={() => setView('options')}
+                            />
                         </div>
                     )}
 
