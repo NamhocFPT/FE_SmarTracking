@@ -18,6 +18,12 @@ const ANPRManagement = () => {
     // ============================================
     const [historyList, setHistoryList] = useState([]);
     const [filterMatchState, setFilterMatchState] = useState('ALL');
+    const [historyPage, setHistoryPage] = useState(1);
+    const itemsPerPage = 10;
+
+    useEffect(() => {
+        setHistoryPage(1);
+    }, [filterMatchState]);
 
     const fetchHistory = async () => {
         setLoading(true);
@@ -72,6 +78,7 @@ const ANPRManagement = () => {
     // TAB 3: BIỂN LẠ
     // ============================================
     const [unknownList, setUnknownList] = useState([]);
+    const [unknownPage, setUnknownPage] = useState(1);
 
     const fetchUnknown = async () => {
         setLoading(true);
@@ -178,7 +185,7 @@ const ANPRManagement = () => {
                                 ) : historyList.length === 0 ? (
                                     <tr><td colSpan="5" className="py-8 text-center text-slate-blue">Không có dữ liệu trong khoảng thời gian này.</td></tr>
                                 ) : (
-                                    historyList.map((item, idx) => (
+                                    historyList.slice((historyPage - 1) * itemsPerPage, historyPage * itemsPerPage).map((item, idx) => (
                                         <tr key={idx} className="hover:bg-cloud-mist/30">
                                             <td className="py-3 px-4 text-sm font-semibold text-midnight-indigo">
                                                 {new Date(item.eventTime).toLocaleString('vi-VN')}
@@ -203,6 +210,44 @@ const ANPRManagement = () => {
                             </tbody>
                         </table>
                     </div>
+                    
+                    {/* Pagination History */}
+                    {!loading && Math.ceil(historyList.length / itemsPerPage) > 1 && (
+                        <div className="flex justify-between items-center pt-4">
+                            <span className="text-[11px] text-slate-blue">
+                                Hiển thị {(historyPage - 1) * itemsPerPage + 1} - {Math.min(historyPage * itemsPerPage, historyList.length)} trong tổng số {historyList.length} lượt quét
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setHistoryPage(prev => Math.max(1, prev - 1))}
+                                    disabled={historyPage === 1}
+                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                >
+                                    Trước
+                                </button>
+                                {[...Array(Math.ceil(historyList.length / itemsPerPage))].map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setHistoryPage(i + 1)}
+                                        className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${
+                                            historyPage === i + 1 
+                                                ? 'bg-action-blue text-white border-action-blue' 
+                                                : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
+                                        }`}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setHistoryPage(prev => Math.min(Math.ceil(historyList.length / itemsPerPage), prev + 1))}
+                                    disabled={historyPage === Math.ceil(historyList.length / itemsPerPage)}
+                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                >
+                                    Sau
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -222,7 +267,7 @@ const ANPRManagement = () => {
                                 Không có cảnh báo biển lạ nào hiện tại.
                             </div>
                         ) : (
-                            unknownList.map((item, idx) => (
+                            unknownList.slice((unknownPage - 1) * itemsPerPage, unknownPage * itemsPerPage).map((item, idx) => (
                                 <div key={idx} className="p-4 rounded-xl border border-orange-200 bg-orange-50 flex items-start gap-4 shadow-sm">
                                     <div className="w-12 h-12 rounded-full bg-white border border-orange-200 flex items-center justify-center flex-shrink-0 text-xl shadow-sm">
                                         ⚠️
@@ -237,6 +282,44 @@ const ANPRManagement = () => {
                             ))
                         )}
                     </div>
+
+                    {/* Pagination Unknown */}
+                    {!loading && Math.ceil(unknownList.length / itemsPerPage) > 1 && (
+                        <div className="flex justify-between items-center pt-4 mt-2 border-t border-platinum-tint/50">
+                            <span className="text-[11px] text-slate-blue">
+                                Hiển thị {(unknownPage - 1) * itemsPerPage + 1} - {Math.min(unknownPage * itemsPerPage, unknownList.length)} trong tổng số {unknownList.length} biển lạ
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setUnknownPage(prev => Math.max(1, prev - 1))}
+                                    disabled={unknownPage === 1}
+                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                >
+                                    Trước
+                                </button>
+                                {[...Array(Math.ceil(unknownList.length / itemsPerPage))].map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setUnknownPage(i + 1)}
+                                        className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${
+                                            unknownPage === i + 1 
+                                                ? 'bg-action-blue text-white border-action-blue' 
+                                                : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
+                                        }`}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setUnknownPage(prev => Math.min(Math.ceil(unknownList.length / itemsPerPage), prev + 1))}
+                                    disabled={unknownPage === Math.ceil(unknownList.length / itemsPerPage)}
+                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
+                                >
+                                    Sau
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
