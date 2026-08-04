@@ -248,6 +248,14 @@ export const updateSystemConfig = async (data) => {
     return await patch('/system-configurations', data);
 };
 
+export const getChannelMaps = async () => {
+    return await get('/system-configurations/channel-maps');
+};
+
+export const updateChannelMap = async (data) => {
+    return await patch('/system-configurations/channel-maps', data);
+};
+
 // ============================================================
 // DEPARTMENT APIs (UC-ACC-08 - hỗ trợ cho User Management)
 // ============================================================

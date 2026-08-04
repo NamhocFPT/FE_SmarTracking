@@ -1,7 +1,7 @@
-import { Settings } from 'lucide-react';
+import { Settings, Camera, Plus, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
-import { getSystemConfigs, updateSystemConfig } from '../../service/sysAdminServices';
+import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms } from '../../service/sysAdminServices';
 
 /**
  * SystemSettings Component
@@ -13,7 +13,7 @@ import { getSystemConfigs, updateSystemConfig } from '../../service/sysAdminServ
  */
 const SystemSettings = () => {
     // Tab State
-    const [activeTab, setActiveTab] = useState('workspace'); // workspace | recording | system
+    const [activeTab, setActiveTab] = useState('workspace'); // workspace | recording | system | camera
 
     // API & UI States
     const [loading, setLoading] = useState(true);
@@ -38,6 +38,20 @@ const SystemSettings = () => {
         overrun_grace_minutes: 10
     });
 
+    // Channel Maps State
+    const [channelMaps, setChannelMaps] = useState({
+        'ivss.channel_room_map': {},
+        'ivss.channel_direction_map': {},
+        'ivss.channel_presence_zone_map': {},
+        'ivss.channel_zone_map': {},
+        'ivss.presence.gap_threshold_seconds': 30,
+        'campus.journey.gap_threshold_seconds': 60,
+        'attendance.late_grace_minutes': 15
+    });
+    const [dbChannelMaps, setDbChannelMaps] = useState({});
+    const [localChannels, setLocalChannels] = useState([]);
+    const [rooms, setRooms] = useState([]);
+
     // Tracking which keys were modified compared to database
     const [dbConfigs, setDbConfigs] = useState({});
 
@@ -46,7 +60,12 @@ const SystemSettings = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await getSystemConfigs();
+            const [res, channelRes, roomRes] = await Promise.all([
+                getSystemConfigs(),
+                getChannelMaps().catch(() => ({ success: true, data: [] })),
+                getRooms({ limit: 100 }).catch(() => ({ success: true, data: [] }))
+            ]);
+
             if (res?.success && Array.isArray(res.data)) {
                 // Map array of { id, key, value, ... } to state object
                 const mappedConfigs = {};
@@ -66,6 +85,58 @@ const SystemSettings = () => {
                 setDbConfigs(merged);
             } else {
                 throw new Error('Không thể tải cấu hình từ hệ thống.');
+            }
+
+            // Handle channel maps
+            if (channelRes?.success && Array.isArray(channelRes.data)) {
+                const mappedChannels = {};
+                channelRes.data.forEach(item => {
+                    let parsedValue = item.value;
+                    try {
+                        if (typeof parsedValue === 'string' && parsedValue.trim().startsWith('{')) {
+                            parsedValue = JSON.parse(parsedValue);
+                        }
+                    } catch(e) {}
+                    // Ensure numbers are numbers for thresholds
+                    if (['ivss.presence.gap_threshold_seconds', 'campus.journey.gap_threshold_seconds', 'attendance.late_grace_minutes'].includes(item.key)) {
+                        parsedValue = Number(parsedValue) || 0;
+                    }
+                    mappedChannels[item.key] = parsedValue;
+                });
+                
+                const mergedChannels = {
+                    'ivss.channel_room_map': {},
+                    'ivss.channel_direction_map': {},
+                    'ivss.channel_presence_zone_map': {},
+                    'ivss.channel_zone_map': {},
+                    'ivss.presence.gap_threshold_seconds': 30,
+                    'campus.journey.gap_threshold_seconds': 60,
+                    'attendance.late_grace_minutes': 15,
+                    ...mappedChannels 
+                };
+                setChannelMaps(mergedChannels);
+                setDbChannelMaps(mergedChannels);
+
+                // Build localChannels
+                const roomMap = mergedChannels['ivss.channel_room_map'] || {};
+                const dirMap = mergedChannels['ivss.channel_direction_map'] || {};
+                const pZoneMap = mergedChannels['ivss.channel_presence_zone_map'] || {};
+                const zMap = mergedChannels['ivss.channel_zone_map'] || {};
+
+                const allKeys = new Set([...Object.keys(roomMap), ...Object.keys(dirMap), ...Object.keys(pZoneMap), ...Object.keys(zMap)]);
+                const rows = Array.from(allKeys).map(id => ({
+                    id,
+                    roomId: roomMap[id] || '',
+                    direction: dirMap[id] || '',
+                    presenceZone: pZoneMap[id] || '',
+                    zone: zMap[id] || ''
+                }));
+                setLocalChannels(rows);
+            }
+
+            if (roomRes?.success) {
+                const roomData = Array.isArray(roomRes.data?.data) ? roomRes.data.data : (Array.isArray(roomRes.data) ? roomRes.data : []);
+                setRooms(roomData);
             }
         } catch (err) {
             // Mock default config database simulation for local development / fallback
@@ -149,10 +220,39 @@ const SystemSettings = () => {
         setError(null);
         setSuccessMessage(null);
 
+        // Build new maps from localChannels
+        const newRoomMap = {};
+        const newDirMap = {};
+        const newPZoneMap = {};
+        const newZoneMap = {};
+
+        for (const row of localChannels) {
+            const id = String(row.id).trim();
+            if (!id) {
+                setError('ID Kênh Camera không được để trống.');
+                return;
+            }
+            if (newRoomMap[id]) {
+                setError(`ID Kênh Camera bị trùng lặp: ${id}`);
+                return;
+            }
+            if (row.roomId) newRoomMap[id] = row.roomId;
+            if (row.direction) newDirMap[id] = row.direction;
+            if (row.presenceZone) newPZoneMap[id] = row.presenceZone;
+            if (row.zone) newZoneMap[id] = row.zone;
+        }
+
+        const currentChannelMaps = {
+            ...channelMaps,
+            'ivss.channel_room_map': newRoomMap,
+            'ivss.channel_direction_map': newDirMap,
+            'ivss.channel_presence_zone_map': newPZoneMap,
+            'ivss.channel_zone_map': newZoneMap
+        };
+
         if (!validateConfigs(configs)) return;
 
         // Check for aggressive threshold warning (UC-RUM-15 E1)
-        // If early departure threshold is less than 3 minutes, trigger warning modal first
         if (configs.is_early_release_enabled && Number(configs.early_departure_threshold_minutes) < 3) {
             if (!showSoftWarning) {
                 setShowSoftWarning(true);
@@ -165,8 +265,11 @@ const SystemSettings = () => {
 
         // Find keys that changed compared to initial database values
         const changedKeys = Object.keys(configs).filter(key => configs[key] !== dbConfigs[key]);
+        const changedChannelKeys = Object.keys(currentChannelMaps).filter(key => 
+            JSON.stringify(currentChannelMaps[key]) !== JSON.stringify(dbChannelMaps[key])
+        );
 
-        if (changedKeys.length === 0) {
+        if (changedKeys.length === 0 && changedChannelKeys.length === 0) {
             setSuccessMessage('Không có thay đổi nào cần lưu.');
             setSaving(false);
             return;
@@ -178,12 +281,20 @@ const SystemSettings = () => {
                 const valueString = String(configs[key]);
                 return updateSystemConfig({ key, value: valueString });
             });
+            const updateChannelPromises = changedChannelKeys.map(key => {
+                let value = currentChannelMaps[key];
+                if (typeof value === 'object') value = JSON.stringify(value);
+                else value = String(value);
+                return updateChannelMap({ key, value });
+            });
 
-            await Promise.all(updatePromises);
+            await Promise.all([...updatePromises, ...updateChannelPromises]);
             
             // Re-fetch or sync state
             setSuccessMessage('Cập nhật chính sách và tham số cấu hình hệ thống thành công.');
             setDbConfigs({ ...configs });
+            setChannelMaps(currentChannelMaps);
+            setDbChannelMaps(currentChannelMaps);
         } catch (err) {
             setError(err?.message || err?.error?.message || 'Không thể cập nhật cấu hình hệ thống. Vui lòng thử lại.');
         } finally {
@@ -221,6 +332,23 @@ const SystemSettings = () => {
     const handleReset = () => {
         setError(null);
         setConfigs({ ...dbConfigs });
+        setChannelMaps({ ...dbChannelMaps });
+        
+        // Build localChannels
+        const roomMap = dbChannelMaps['ivss.channel_room_map'] || {};
+        const dirMap = dbChannelMaps['ivss.channel_direction_map'] || {};
+        const pZoneMap = dbChannelMaps['ivss.channel_presence_zone_map'] || {};
+        const zMap = dbChannelMaps['ivss.channel_zone_map'] || {};
+
+        const allKeys = new Set([...Object.keys(roomMap), ...Object.keys(dirMap), ...Object.keys(pZoneMap), ...Object.keys(zMap)]);
+        const rows = Array.from(allKeys).map(id => ({
+            id,
+            roomId: roomMap[id] || '',
+            direction: dirMap[id] || '',
+            presenceZone: pZoneMap[id] || '',
+            zone: zMap[id] || ''
+        }));
+        setLocalChannels(rows);
     };
 
     if (loading) {
@@ -287,10 +415,10 @@ const SystemSettings = () => {
             )}
 
             {/* Navigation Tabs */}
-            <div className="border-b border-platinum-tint flex gap-2">
+            <div className="border-b border-platinum-tint flex gap-2 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('workspace')}
-                    className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                    className={`whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
                         activeTab === 'workspace'
                             ? 'border-action-blue text-action-blue'
                             : 'border-transparent text-slate-blue hover:text-midnight-indigo'
@@ -300,7 +428,7 @@ const SystemSettings = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('recording')}
-                    className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                    className={`whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
                         activeTab === 'recording'
                             ? 'border-action-blue text-action-blue'
                             : 'border-transparent text-slate-blue hover:text-midnight-indigo'
@@ -310,7 +438,7 @@ const SystemSettings = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('system')}
-                    className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                    className={`whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
                         activeTab === 'system'
                             ? 'border-action-blue text-action-blue'
                             : 'border-transparent text-slate-blue hover:text-midnight-indigo'
@@ -318,10 +446,20 @@ const SystemSettings = () => {
                 >
                     Tham số hệ thống
                 </button>
+                <button
+                    onClick={() => setActiveTab('camera')}
+                    className={`whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                        activeTab === 'camera'
+                            ? 'border-action-blue text-action-blue'
+                            : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                    }`}
+                >
+                    Cấu hình Camera & Cảm biến
+                </button>
             </div>
 
             {/* Tab Contents */}
-            <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
+            <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2 overflow-hidden">
                 <form onSubmit={handleSubmit} className="space-y-8">
                     
                     {/* TAB 1: WORKSPACE RULES */}
@@ -601,6 +739,179 @@ const SystemSettings = () => {
                         </div>
                     )}
 
+                    {/* TAB 4: CAMERA & SENSORS */}
+                    {activeTab === 'camera' && (
+                        <div className="space-y-8">
+                            <div className="border-b border-platinum-tint/60 pb-3">
+                                <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
+                                    <Camera className="w-5 h-5 text-action-blue" />
+                                    Cấu hình Camera & Cảm biến (IVSS)
+                                </h2>
+                                <p className="text-xs text-slate-blue mt-1">Ánh xạ kênh camera vào phòng họp và thiết lập ngưỡng thời gian vắng mặt.</p>
+                            </div>
+
+                            {/* Thresholds */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase">Ngưỡng Hiện Diện (s)</label>
+                                    <span className="text-xs text-steel-gray mt-0.5 block">Thời gian tối đa ngắt quãng để vẫn tính là đang hiện diện (giây).</span>
+                                    <input
+                                        type="number" min="0"
+                                        value={channelMaps['ivss.presence.gap_threshold_seconds']}
+                                        onChange={(e) => setChannelMaps({...channelMaps, 'ivss.presence.gap_threshold_seconds': Number(e.target.value)})}
+                                        className="mt-3 w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:border-action-blue"
+                                    />
+                                </div>
+                                <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase">Ngưỡng Hành Trình (s)</label>
+                                    <span className="text-xs text-steel-gray mt-0.5 block">Thời gian tối đa giữa các lần xuất hiện để nối hành trình (giây).</span>
+                                    <input
+                                        type="number" min="0"
+                                        value={channelMaps['campus.journey.gap_threshold_seconds']}
+                                        onChange={(e) => setChannelMaps({...channelMaps, 'campus.journey.gap_threshold_seconds': Number(e.target.value)})}
+                                        className="mt-3 w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:border-action-blue"
+                                    />
+                                </div>
+                                <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase">Ân hạn Đi Muộn (phút)</label>
+                                    <span className="text-xs text-steel-gray mt-0.5 block">Thời gian cho phép đi muộn không bị đánh dấu vi phạm (phút).</span>
+                                    <input
+                                        type="number" min="0"
+                                        value={channelMaps['attendance.late_grace_minutes']}
+                                        onChange={(e) => setChannelMaps({...channelMaps, 'attendance.late_grace_minutes': Number(e.target.value)})}
+                                        className="mt-3 w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:border-action-blue"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Map Table */}
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-bold text-midnight-indigo">Ánh xạ Kênh Camera</h3>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setLocalChannels([...localChannels, { id: '', roomId: '', direction: '', presenceZone: '', zone: '' }])}
+                                        className="px-3 py-1.5 bg-action-blue text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" /> Thêm kênh
+                                    </button>
+                                </div>
+                                
+                                <div className="overflow-x-auto border border-platinum-tint rounded-xl">
+                                    <table className="w-full text-left text-sm text-midnight-indigo">
+                                        <thead className="bg-cloud-mist/50 border-b border-platinum-tint text-xs uppercase text-slate-blue font-bold">
+                                            <tr>
+                                                <th className="px-4 py-3 min-w-[100px]">ID Kênh</th>
+                                                <th className="px-4 py-3 min-w-[150px]">Phòng</th>
+                                                <th className="px-4 py-3 min-w-[150px]">Hướng di chuyển</th>
+                                                <th className="px-4 py-3 min-w-[150px]">Phân vùng Hiện diện</th>
+                                                <th className="px-4 py-3 min-w-[150px]">Phân vùng chung</th>
+                                                <th className="px-4 py-3 w-[80px] text-center">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {localChannels.map((row, index) => (
+                                                <tr key={index} className="border-b border-platinum-tint last:border-0 hover:bg-slate-50">
+                                                    <td className="px-4 py-2">
+                                                        <input 
+                                                            type="text" 
+                                                            value={row.id} 
+                                                            onChange={(e) => {
+                                                                const newChannels = [...localChannels];
+                                                                newChannels[index].id = e.target.value;
+                                                                setLocalChannels(newChannels);
+                                                            }}
+                                                            placeholder="VD: 1, 2"
+                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <select 
+                                                            value={row.roomId} 
+                                                            onChange={(e) => {
+                                                                const newChannels = [...localChannels];
+                                                                newChannels[index].roomId = e.target.value;
+                                                                setLocalChannels(newChannels);
+                                                            }}
+                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
+                                                        >
+                                                            <option value="">-- Chọn phòng --</option>
+                                                            {rooms.map(room => (
+                                                                <option key={room.id} value={room.id}>{room.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <select 
+                                                            value={row.direction} 
+                                                            onChange={(e) => {
+                                                                const newChannels = [...localChannels];
+                                                                newChannels[index].direction = e.target.value;
+                                                                setLocalChannels(newChannels);
+                                                            }}
+                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
+                                                        >
+                                                            <option value="">-- Chọn hướng --</option>
+                                                            <option value="enter">Vào (Enter)</option>
+                                                            <option value="leave">Ra (Leave)</option>
+                                                            <option value="seen">Hiện diện (Seen)</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <input 
+                                                            type="text" 
+                                                            value={row.presenceZone} 
+                                                            onChange={(e) => {
+                                                                const newChannels = [...localChannels];
+                                                                newChannels[index].presenceZone = e.target.value;
+                                                                setLocalChannels(newChannels);
+                                                            }}
+                                                            placeholder="UUID phân vùng"
+                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <input 
+                                                            type="text" 
+                                                            value={row.zone} 
+                                                            onChange={(e) => {
+                                                                const newChannels = [...localChannels];
+                                                                newChannels[index].zone = e.target.value;
+                                                                setLocalChannels(newChannels);
+                                                            }}
+                                                            placeholder="UUID phân vùng"
+                                                            className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg focus:border-action-blue text-sm"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2 text-center">
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => {
+                                                                const newChannels = [...localChannels];
+                                                                newChannels.splice(index, 1);
+                                                                setLocalChannels(newChannels);
+                                                            }}
+                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Xóa"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {localChannels.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-blue text-sm">
+                                                        Chưa có cấu hình ánh xạ kênh nào. Bấm "Thêm kênh" để bắt đầu.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </form>
             </div>
 
