@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, BellRing, CheckCircle, Edit3, Eye, Filter, Mail, Plus, Power, PowerOff, RefreshCw, ShieldAlert, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Bell, BellRing, CheckCircle, Clock, Edit3, Eye, Filter, Mail, Plus, Power, PowerOff, RefreshCw, ShieldAlert, Trash2, Users, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -131,8 +131,8 @@ const AlertRules = () => {
             threshold: rule.threshold || '',
             channels: parsedChannels,
             enabled: rule.enabled !== undefined ? rule.enabled : true,
-            allow_from: rule.restricted_hours_json?.allow_from || '',
-            allow_to: rule.restricted_hours_json?.allow_to || ''
+            allow_from: rule.restricted_hours_json?.allowFrom || rule.restricted_hours_json?.allow_from || '',
+            allow_to: rule.restricted_hours_json?.allowTo || rule.restricted_hours_json?.allow_to || ''
         });
         setFormErrors({});
         setModal({ open: true, type: 'edit', data: rule });
@@ -415,14 +415,28 @@ const AlertRules = () => {
                                             {rule.zone_id ? (zones.find(z => z.id === rule.zone_id)?.zone_name || 'N/A') : <span className="text-slate-blue italic">Toàn hệ thống</span>}
                                         </td>
                                         <td className="p-4 text-sm">
-                                            {rule.alert_type === 'crowd' && rule.threshold && <div className="mb-1"><span className="text-slate-blue">Ngưỡng:</span> <span className="font-bold text-midnight-indigo">{rule.threshold} người</span></div>}
-                                            {rule.restricted_hours_json ? (
-                                                <div className="text-xs bg-slate-100 px-2 py-1 rounded inline-block">
-                                                    Từ {rule.restricted_hours_json.allow_from} đến {rule.restricted_hours_json.allow_to}
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-slate-400 italic">24/7</span>
-                                            )}
+                                            <div className="flex flex-col gap-1.5">
+                                                {rule.alert_type === 'crowd' && rule.threshold && (
+                                                    <div className="flex items-center gap-1.5 text-midnight-indigo">
+                                                        <Users className="w-3.5 h-3.5 text-slate-blue" />
+                                                        <span className="text-slate-blue text-[11px]">Ngưỡng:</span> 
+                                                        <span className="font-bold text-[11px]">{rule.threshold} người</span>
+                                                    </div>
+                                                )}
+                                                {rule.restricted_hours_json ? (
+                                                    <div className="flex items-center gap-1.5 bg-blue-50/50 px-2.5 py-1 rounded-md border border-blue-100/50 w-fit">
+                                                        <Clock className="w-3.5 h-3.5 text-action-blue" />
+                                                        <span className="text-[11px] font-bold text-action-blue tracking-wide">
+                                                            {rule.restricted_hours_json.allowFrom || rule.restricted_hours_json.allow_from} - {rule.restricted_hours_json.allowTo || rule.restricted_hours_json.allow_to}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1.5 text-slate-500">
+                                                        <Clock className="w-3.5 h-3.5 opacity-60" />
+                                                        <span className="text-[11px] font-medium italic">Hoạt động 24/7</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4">
                                             <div className="flex gap-1 flex-wrap">

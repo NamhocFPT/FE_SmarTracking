@@ -45,7 +45,15 @@ const VehicleControlList = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await getVehicleControlList(currentFilters);
+            // Remove empty strings from filters to prevent validation errors on backend
+            const cleanFilters = Object.entries(currentFilters).reduce((acc, [key, value]) => {
+                if (value !== '') {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {});
+            
+            const res = await getVehicleControlList(cleanFilters);
             if (res?.success) {
                 setVehicles(res.data || []);
                 setMeta(res.meta);
@@ -361,7 +369,7 @@ const VehicleControlList = () => {
                 </div>
 
                 {/* Pagination */}
-                {meta && meta.totalPages > 1 && (
+                {meta && meta.total > 0 && (
                     <div className="px-6 py-4 bg-cloud-mist/30 border-t border-platinum-tint flex items-center justify-between">
                         <span className="text-xs font-medium text-slate-blue">
                             Hiển thị trang {meta.page} / {meta.totalPages} (Tổng {meta.total} bản ghi)

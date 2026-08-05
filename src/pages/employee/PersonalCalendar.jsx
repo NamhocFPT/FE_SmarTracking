@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { getMySchedule } from '../../service/employeeServices';
+import { isForbiddenError } from '../../utils/permissionUtils';
 
 const STATUS_CONFIG = {
     draft: { label: 'Bản nháp', bg: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400', icon: Clock },
@@ -70,12 +71,19 @@ const PersonalCalendar = () => {
             }
         } catch (err) {
             setMeetings([]);
+            // A permission-denial (e.g. role lost `schedule.read.self` mid-session while this
+            // screen was already open) should land the user on the real 403 page, not an inline
+            // retry banner — the route guard only checks at navigation time.
+            if (isForbiddenError(err)) {
+                navigate('/403', { replace: true });
+                return;
+            }
             const errorMsg = err?.error?.message || err?.message || 'Lỗi kết nối máy chủ';
             setError(errorMsg);
         } finally {
             setLoading(false);
         }
-    }, [currentDate, statusFilter]);
+    }, [currentDate, statusFilter, navigate]);
 
     useEffect(() => {
         fetchSchedule();

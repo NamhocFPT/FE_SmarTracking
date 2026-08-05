@@ -1,9 +1,11 @@
 import { AlertTriangle, ArrowUpDown, Building, Calendar, CheckCircle2, Clock, DoorOpen, Filter, RotateCw, Search, ShieldAlert, ShieldQuestion, Users } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 import {
     getRooms,
-    getRoomAccessLog
+    getRoomAccessLog,
+    getRoomBookings
 } from '../../service/sysAdminServices';
 
 const LOGS_PER_PAGE = 10;
@@ -75,6 +77,21 @@ const RoomAccessLogs = () => {
     const [rooms, setRooms] = useState([]);
     const [selectedRoomId, setSelectedRoomId] = useState('');
     const [selectedDate, setSelectedDate] = useState(getTodayVNString());
+    const [meetings, setMeetings] = useState([]);
+    const [selectedMeetingId, setSelectedMeetingId] = useState('');
+    const [isMeetingDropdownOpen, setIsMeetingDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsMeetingDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Page state
     const [roomsLoading, setRoomsLoading] = useState(true);
@@ -101,7 +118,7 @@ const RoomAccessLogs = () => {
     // Reset về trang 1 mỗi khi đổi phòng/ngày/từ khóa tìm kiếm
     useEffect(() => {
         setCurrentPage(1);
-    }, [selectedRoomId, selectedDate, debouncedSearch]);
+    }, [selectedRoomId, selectedDate, selectedMeetingId, debouncedSearch]);
 
     // Load available rooms
     const fetchRoomsList = useCallback(async () => {
@@ -132,6 +149,40 @@ const RoomAccessLogs = () => {
         fetchRoomsList();
     }, [fetchRoomsList]);
 
+    // Fetch meetings for the selected room and date
+    const fetchMeetings = useCallback(async () => {
+        if (!selectedRoomId || !selectedDate) {
+            setMeetings([]);
+            setSelectedMeetingId('');
+            return;
+        }
+        try {
+            // Using from and to based on selectedDate
+            const from = new Date(`${selectedDate}T00:00:00`).toISOString();
+            const to = new Date(`${selectedDate}T23:59:59`).toISOString();
+            const res = await getRoomBookings({
+                roomId: selectedRoomId,
+                from,
+                to,
+                limit: 100,
+                sortOrder: 'asc'
+            });
+            if (res?.success && res.data) {
+                setMeetings(res.data);
+            } else {
+                setMeetings([]);
+            }
+        } catch (err) {
+            setMeetings([]);
+        }
+        // Always reset selected meeting when room or date changes
+        setSelectedMeetingId('');
+    }, [selectedRoomId, selectedDate]);
+
+    useEffect(() => {
+        fetchMeetings();
+    }, [fetchMeetings]);
+
     // Fetch access logs — server-side pagination + search
     const fetchLogs = useCallback(async () => {
         setLogsLoading(true);
@@ -140,7 +191,8 @@ const RoomAccessLogs = () => {
             const res = await getRoomAccessLog(selectedRoomId, selectedDate, {
                 page: currentPage,
                 limit: LOGS_PER_PAGE,
-                search: debouncedSearch || undefined
+                search: debouncedSearch || undefined,
+                meetingId: selectedMeetingId || undefined
             });
             if (res?.success && res.data) {
                 setLogsData(res.data);
@@ -158,7 +210,7 @@ const RoomAccessLogs = () => {
         } finally {
             setLogsLoading(false);
         }
-    }, [selectedRoomId, selectedDate, currentPage, debouncedSearch]);
+    }, [selectedRoomId, selectedDate, currentPage, debouncedSearch, selectedMeetingId]);
 
     useEffect(() => {
         fetchLogs();
@@ -249,6 +301,86 @@ const RoomAccessLogs = () => {
                     </div>
                 </div>
 
+                <div className="w-full md:w-1/4 space-y-2">
+                    <label className="text-[10px] font-bold text-slate-blue uppercase tracking-wider block">Chọn ca họp</label>
+                    <div className="relative" ref={dropdownRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsMeetingDropdownOpen(!isMeetingDropdownOpen)}
+                            disabled={!selectedRoomId || meetings.length === 0}
+                            className={`w-full pl-9 pr-8 py-2 border rounded-xl text-xs text-left focus:outline-none transition-all flex items-center justify-between ${!selectedRoomId || meetings.length === 0
+                                    ? 'bg-slate-50 border-platinum-tint text-slate-400 cursor-not-allowed'
+                                    : isMeetingDropdownOpen
+                                        ? 'bg-white border-action-blue ring-2 ring-action-blue/20 text-midnight-indigo shadow-sm'
+                                        : 'bg-white hover:bg-cloud-mist/30 border-platinum-tint text-midnight-indigo'
+                                }`}
+                        >
+                            <span className="font-semibold truncate">
+                                {selectedMeetingId === '' ? 'Toàn bộ ngày' : (() => {
+                                    const m = meetings.find(x => x.id === selectedMeetingId);
+                                    if (!m) return 'Toàn bộ ngày';
+                                    const s = formatVietnameseDateTime(m.reservedStartTime || m.reserved_start_time).split(' ')[0].slice(0, 5);
+                                    const e = formatVietnameseDateTime(m.reservedEndTime || m.reserved_end_time).split(' ')[0].slice(0, 5);
+                                    return `${s} - ${e} | ${m.title || 'Không có tiêu đề'}`;
+                                })()}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-slate-blue absolute right-3 top-2.5 transition-transform duration-200 ${isMeetingDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        <Clock className={`w-4 h-4 absolute left-3 top-2.5 pointer-events-none transition-colors ${!selectedRoomId || meetings.length === 0 ? 'text-slate-400' : 'text-action-blue'
+                            }`} />
+
+                        {/* Dropdown Menu */}
+                        {isMeetingDropdownOpen && (
+                            <div className="absolute z-50 w-full mt-1.5 bg-white border border-platinum-tint rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="max-h-64 overflow-y-auto py-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedMeetingId('');
+                                            setIsMeetingDropdownOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2.5 text-xs font-semibold hover:bg-blue-50/50 transition-colors flex items-center gap-2 ${selectedMeetingId === '' ? 'bg-blue-50 text-action-blue' : 'text-midnight-indigo'
+                                            }`}
+                                    >
+                                        <div className={`w-1.5 h-1.5 rounded-full ${selectedMeetingId === '' ? 'bg-action-blue' : 'bg-transparent'}`}></div>
+                                        Toàn bộ ngày
+                                    </button>
+
+                                    {meetings.map((meeting) => {
+                                        const startTime = formatVietnameseDateTime(meeting.reservedStartTime || meeting.reserved_start_time).split(' ')[0].slice(0, 5);
+                                        const endTime = formatVietnameseDateTime(meeting.reservedEndTime || meeting.reserved_end_time).split(' ')[0].slice(0, 5);
+                                        const title = meeting.title || 'Ca họp không tên';
+                                        const isSelected = selectedMeetingId === meeting.id;
+
+                                        return (
+                                            <button
+                                                key={meeting.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedMeetingId(meeting.id);
+                                                    setIsMeetingDropdownOpen(false);
+                                                }}
+                                                className={`w-full text-left px-3 py-2.5 hover:bg-blue-50/50 transition-colors flex items-start gap-2 border-t border-slate-50 first:border-0 ${isSelected ? 'bg-blue-50/80' : ''
+                                                    }`}
+                                            >
+                                                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isSelected ? 'bg-action-blue' : 'bg-slate-300'}`}></div>
+                                                <div className="flex flex-col gap-0.5 min-w-0">
+                                                    <span className={`text-[11px] font-bold ${isSelected ? 'text-action-blue' : 'text-slate-700'}`}>
+                                                        {startTime} - {endTime}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-500 font-medium truncate">
+                                                        {title}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 <div className="w-full md:w-auto">
                     <button
                         onClick={fetchLogs}
@@ -256,7 +388,6 @@ const RoomAccessLogs = () => {
                         className="w-full inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-action-blue hover:bg-action-blue/95 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 disabled:bg-slate-200 disabled:text-slate-400"
                     >
                         <RotateCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
-                        Làm mới dữ liệu
                     </button>
                 </div>
             </div>
@@ -313,53 +444,45 @@ const RoomAccessLogs = () => {
                     </div>
 
                     {/* Chưa khớp — người quen nhưng sai bối cảnh (vd vào nhầm phòng/giờ) */}
-                    <div className={`bg-white rounded-2xl border p-5 flex items-center justify-between transition-all shadow-sm ${
-                        unmatchedCount > 0 ? 'border-amber-300 bg-amber-50/10' : 'border-platinum-tint'
-                    }`}>
+                    <div className={`bg-white rounded-2xl border p-5 flex items-center justify-between transition-all shadow-sm ${unmatchedCount > 0 ? 'border-amber-300 bg-amber-50/10' : 'border-platinum-tint'
+                        }`}>
                         <div className="space-y-1">
                             <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Chưa khớp bối cảnh</span>
-                            <div className={`text-2xl font-bold flex items-baseline gap-1.5 ${
-                                unmatchedCount > 0 ? 'text-amber-600' : 'text-midnight-indigo'
-                            }`}>
+                            <div className={`text-2xl font-bold flex items-baseline gap-1.5 ${unmatchedCount > 0 ? 'text-amber-600' : 'text-midnight-indigo'
+                                }`}>
                                 {unmatchedCount}
                                 <span className="text-xs font-medium text-slate-blue">lần</span>
                             </div>
-                            <p className={`text-[10.5px] font-semibold flex items-center gap-0.5 ${
-                                unmatchedCount > 0 ? 'text-amber-600' : 'text-slate-500'
-                            }`}>
+                            <p className={`text-[10.5px] font-semibold flex items-center gap-0.5 ${unmatchedCount > 0 ? 'text-amber-600' : 'text-slate-500'
+                                }`}>
                                 <ShieldQuestion className="w-3 h-3" />
                                 Người quen nhưng sai phòng/giờ
                             </p>
                         </div>
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                            unmatchedCount > 0 ? 'bg-amber-100 text-amber-600' : 'bg-cloud-mist text-slate-400'
-                        }`}>
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${unmatchedCount > 0 ? 'bg-amber-100 text-amber-600' : 'bg-cloud-mist text-slate-400'
+                            }`}>
                             <ShieldQuestion className="w-6 h-6" />
                         </div>
                     </div>
 
                     {/* Người lạ thật sự — không có userId */}
-                    <div className={`bg-white rounded-2xl border p-5 flex items-center justify-between transition-all shadow-sm ${
-                        strangerCount > 0 ? 'border-red-300 bg-red-50/10' : 'border-platinum-tint'
-                    }`}>
+                    <div className={`bg-white rounded-2xl border p-5 flex items-center justify-between transition-all shadow-sm ${strangerCount > 0 ? 'border-red-300 bg-red-50/10' : 'border-platinum-tint'
+                        }`}>
                         <div className="space-y-1">
                             <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Người lạ</span>
-                            <div className={`text-2xl font-bold flex items-baseline gap-1.5 ${
-                                strangerCount > 0 ? 'text-red-600' : 'text-midnight-indigo'
-                            }`}>
+                            <div className={`text-2xl font-bold flex items-baseline gap-1.5 ${strangerCount > 0 ? 'text-red-600' : 'text-midnight-indigo'
+                                }`}>
                                 {strangerCount}
                                 <span className="text-xs font-medium text-slate-blue">lần</span>
                             </div>
-                            <p className={`text-[10.5px] font-semibold flex items-center gap-0.5 ${
-                                strangerCount > 0 ? 'text-red-600 animate-pulse' : 'text-slate-500'
-                            }`}>
+                            <p className={`text-[10.5px] font-semibold flex items-center gap-0.5 ${strangerCount > 0 ? 'text-red-600 animate-pulse' : 'text-slate-500'
+                                }`}>
                                 <AlertTriangle className="w-3 h-3" />
                                 {strangerCount > 0 ? 'Cảnh báo: không xác định được danh tính!' : 'Không có bất thường an ninh'}
                             </p>
                         </div>
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                            strangerCount > 0 ? 'bg-red-100 text-red-600' : 'bg-cloud-mist text-slate-400'
-                        }`}>
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${strangerCount > 0 ? 'bg-red-100 text-red-600' : 'bg-cloud-mist text-slate-400'
+                            }`}>
                             <AlertTriangle className="w-6 h-6" />
                         </div>
                     </div>
@@ -445,117 +568,113 @@ const RoomAccessLogs = () => {
                     ) : (
                         <div className="border border-outline-gray rounded-xl overflow-hidden">
                             <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                                <thead>
-                                    <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold">
-                                        <th className="p-3.5">Thời điểm (Giờ VN)</th>
-                                        <th className="p-3.5">Người</th>
-                                        {showRoomColumn && <th className="p-3.5">Phòng họp</th>}
-                                        <th className="p-3.5">Hướng</th>
-                                        <th className="p-3.5">Trạng thái đối soát</th>
-                                        <th className="p-3.5">Độ tin cậy</th>
-                                        <th className="p-3.5">Gắn cuộc họp</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sortedEvents.map((ev) => {
-                                        const identityStatus = getIdentityStatus(ev);
-                                        const isStranger = identityStatus === 'stranger';
-                                        const isUnmatched = identityStatus === 'unmatched';
-                                        const isEnter = ev.direction === 'enter';
-                                        const isLeave = ev.direction === 'leave';
+                                <table className="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold">
+                                            <th className="p-3.5">Thời điểm (Giờ VN)</th>
+                                            <th className="p-3.5">Người</th>
+                                            {showRoomColumn && <th className="p-3.5">Phòng họp</th>}
+                                            <th className="p-3.5">Hướng</th>
+                                            <th className="p-3.5">Trạng thái đối soát</th>
+                                            <th className="p-3.5">Độ tin cậy</th>
+                                            <th className="p-3.5">Gắn cuộc họp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sortedEvents.map((ev) => {
+                                            const identityStatus = getIdentityStatus(ev);
+                                            const isStranger = identityStatus === 'stranger';
+                                            const isUnmatched = identityStatus === 'unmatched';
+                                            const isEnter = ev.direction === 'enter';
+                                            const isLeave = ev.direction === 'leave';
 
-                                        const formattedName = ev.fullName || 'Không nhận diện được';
+                                            const formattedName = ev.fullName || 'Không nhận diện được';
 
-                                        return (
-                                            <tr
-                                                key={ev.id}
-                                                className={`border-b border-outline-gray hover:bg-cloud-mist/30 transition-colors ${
-                                                    isStranger
-                                                        ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500'
-                                                        : isUnmatched
-                                                            ? 'bg-amber-50/60 hover:bg-amber-100/60 border-l-4 border-l-amber-400'
-                                                            : ''
-                                                }`}
-                                            >
-                                                {/* Event Time */}
-                                                <td className="p-3.5 font-semibold text-midnight-indigo whitespace-nowrap">
-                                                    {formatVietnameseDateTime(ev.eventTime || ev.timestamp)}
-                                                </td>
-
-                                                {/* Person info */}
-                                                <td className="p-3.5">
-                                                    <div className="flex flex-col">
-                                                        <span className={`font-bold ${
-                                                            isStranger ? 'text-red-700' : isUnmatched ? 'text-amber-700' : 'text-midnight-indigo'
-                                                        }`}>
-                                                            {formattedName}
-                                                        </span>
-                                                        {ev.userId && (
-                                                            <span className="text-[10px] text-slate-blue font-mono">
-                                                                ID: {ev.userId}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                {/* Room (chỉ hiện khi đang xem "Tất cả phòng họp") */}
-                                                {showRoomColumn && (
-                                                    <td className="p-3.5 font-semibold text-slate-700">
-                                                        {ev.roomName || '—'}
-                                                    </td>
-                                                )}
-
-                                                {/* Direction */}
-                                                <td className="p-3.5">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                        isEnter
-                                                            ? 'bg-emerald-50 text-emerald-700'
-                                                            : isLeave
-                                                                ? 'bg-amber-50 text-amber-700'
-                                                                : 'bg-slate-100 text-slate-700'
-                                                    }`}>
-                                                        {isEnter ? 'Vào' : isLeave ? 'Ra' : 'Thấy'}
-                                                    </span>
-                                                </td>
-
-                                                {/* Identity status (isStranger/isUnmatched) */}
-                                                <td className="p-3.5">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                                        isStranger
-                                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            return (
+                                                <tr
+                                                    key={ev.id}
+                                                    className={`border-b border-outline-gray hover:bg-cloud-mist/30 transition-colors ${isStranger
+                                                            ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500'
                                                             : isUnmatched
-                                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                                : 'bg-green-50 text-green-700 border-green-200'
-                                                    }`}>
-                                                        {isStranger ? '🚨 Người lạ' : isUnmatched ? '⚠ Chưa khớp' : '✓ Khớp'}
-                                                    </span>
-                                                </td>
+                                                                ? 'bg-amber-50/60 hover:bg-amber-100/60 border-l-4 border-l-amber-400'
+                                                                : ''
+                                                        }`}
+                                                >
+                                                    {/* Event Time */}
+                                                    <td className="p-3.5 font-semibold text-midnight-indigo whitespace-nowrap">
+                                                        {formatVietnameseDateTime(ev.eventTime || ev.timestamp)}
+                                                    </td>
 
-                                                {/* Similarity confidence */}
-                                                <td className="p-3.5 font-mono font-bold text-slate-500">
-                                                    {ev.similarity !== null && ev.similarity !== undefined
-                                                        ? `${(ev.similarity * 100).toFixed(0)}%`
-                                                        : ev.reliability !== null && ev.reliability !== undefined
-                                                            ? `${(ev.reliability * 100).toFixed(0)}%`
-                                                            : '—'}
-                                                </td>
+                                                    {/* Person info */}
+                                                    <td className="p-3.5">
+                                                        <div className="flex flex-col">
+                                                            <span className={`font-bold ${isStranger ? 'text-red-700' : isUnmatched ? 'text-amber-700' : 'text-midnight-indigo'
+                                                                }`}>
+                                                                {formattedName}
+                                                            </span>
+                                                            {ev.userId && (
+                                                                <span className="text-[10px] text-slate-blue font-mono">
+                                                                    ID: {ev.userId}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
 
-                                                {/* Meeting Code */}
-                                                <td className="p-3.5 font-mono text-slate-600 font-semibold">
-                                                    {ev.meetingId ? (
-                                                        <span className="text-action-blue cursor-pointer hover:underline" title="ID cuộc họp">
-                                                            {ev.meetingId.substring(0, 8)}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400">—</span>
+                                                    {/* Room (chỉ hiện khi đang xem "Tất cả phòng họp") */}
+                                                    {showRoomColumn && (
+                                                        <td className="p-3.5 font-semibold text-slate-700">
+                                                            {ev.roomName || '—'}
+                                                        </td>
                                                     )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+
+                                                    {/* Direction */}
+                                                    <td className="p-3.5">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${isEnter
+                                                                ? 'bg-emerald-50 text-emerald-700'
+                                                                : isLeave
+                                                                    ? 'bg-amber-50 text-amber-700'
+                                                                    : 'bg-slate-100 text-slate-700'
+                                                            }`}>
+                                                            {isEnter ? 'Vào' : isLeave ? 'Ra' : 'Thấy'}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Identity status (isStranger/isUnmatched) */}
+                                                    <td className="p-3.5">
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${isStranger
+                                                                ? 'bg-red-50 text-red-700 border-red-200'
+                                                                : isUnmatched
+                                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                    : 'bg-green-50 text-green-700 border-green-200'
+                                                            }`}>
+                                                            {isStranger ? '🚨 Người lạ' : isUnmatched ? '⚠ Chưa khớp' : '✓ Khớp'}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Similarity confidence */}
+                                                    <td className="p-3.5 font-mono font-bold text-slate-500">
+                                                        {ev.similarity !== null && ev.similarity !== undefined
+                                                            ? `${(ev.similarity * 100).toFixed(0)}%`
+                                                            : ev.reliability !== null && ev.reliability !== undefined
+                                                                ? `${(ev.reliability * 100).toFixed(0)}%`
+                                                                : '—'}
+                                                    </td>
+
+                                                    {/* Meeting Code */}
+                                                    <td className="p-3.5 font-mono text-slate-600 font-semibold">
+                                                        {ev.meetingId ? (
+                                                            <span className="text-action-blue cursor-pointer hover:underline" title="ID cuộc họp">
+                                                                {ev.meetingId.substring(0, 8)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400">—</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
@@ -582,11 +701,10 @@ const RoomAccessLogs = () => {
                                             <button
                                                 key={p}
                                                 onClick={() => setCurrentPage(p)}
-                                                className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${
-                                                    currentPage === p
+                                                className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${currentPage === p
                                                         ? 'bg-action-blue text-white border-action-blue'
                                                         : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
-                                                }`}
+                                                    }`}
                                             >
                                                 {p}
                                             </button>

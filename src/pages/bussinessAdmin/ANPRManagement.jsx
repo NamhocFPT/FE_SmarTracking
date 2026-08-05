@@ -17,6 +17,7 @@ const ANPRManagement = () => {
     // TAB 1: LỊCH SỬ QUÉT BIỂN
     // ============================================
     const [historyList, setHistoryList] = useState([]);
+    const [historyTotal, setHistoryTotal] = useState(0);
     const [filterMatchState, setFilterMatchState] = useState('ALL');
     const [historyPage, setHistoryPage] = useState(1);
     const itemsPerPage = 10;
@@ -28,10 +29,21 @@ const ANPRManagement = () => {
     const fetchHistory = async () => {
         setLoading(true);
         try {
-            const params = filterMatchState !== 'ALL' ? { matchState: filterMatchState } : {};
+            const params = {
+                page: historyPage,
+                limit: itemsPerPage
+            };
+            if (filterMatchState !== 'ALL') {
+                params.matchState = filterMatchState;
+            }
             const res = await getAdminVehicleHistory(params);
-            if (res?.success) setHistoryList(res.data);
-            else setHistoryList([]);
+            if (res?.success) {
+                setHistoryList(res.data);
+                setHistoryTotal(res.meta?.total || 0);
+            } else {
+                setHistoryList([]);
+                setHistoryTotal(0);
+            }
         } catch (err) {
             console.error('Error fetching history:', err);
         }
@@ -78,14 +90,20 @@ const ANPRManagement = () => {
     // TAB 3: BIỂN LẠ
     // ============================================
     const [unknownList, setUnknownList] = useState([]);
+    const [unknownTotal, setUnknownTotal] = useState(0);
     const [unknownPage, setUnknownPage] = useState(1);
 
     const fetchUnknown = async () => {
         setLoading(true);
         try {
-            const res = await getUnknownVehicles();
-            if (res?.success) setUnknownList(res.data);
-            else setUnknownList([]);
+            const res = await getUnknownVehicles({ page: unknownPage, limit: itemsPerPage });
+            if (res?.success) {
+                setUnknownList(res.data);
+                setUnknownTotal(res.meta?.total || 0);
+            } else {
+                setUnknownList([]);
+                setUnknownTotal(0);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -97,9 +115,17 @@ const ANPRManagement = () => {
     // ============================================
     useEffect(() => {
         if (activeTab === 'history') fetchHistory();
-        if (activeTab === 'register') fetchUsers();
+    }, [activeTab, filterMatchState, historyPage]);
+
+    useEffect(() => {
         if (activeTab === 'unknown') fetchUnknown();
-        
+    }, [activeTab, unknownPage]);
+
+    useEffect(() => {
+        if (activeTab === 'register') fetchUsers();
+    }, [activeTab]);
+
+    useEffect(() => {
         // Auto-refresh logic for Dashboard (history/unknown)
         let interval;
         if (activeTab === 'history' || activeTab === 'unknown') {
@@ -109,7 +135,7 @@ const ANPRManagement = () => {
             }, 10000); // 10 seconds auto-refresh
         }
         return () => clearInterval(interval);
-    }, [activeTab, filterMatchState]);
+    }, [activeTab, filterMatchState, historyPage, unknownPage]);
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-fade-in-up pb-10">
@@ -185,8 +211,8 @@ const ANPRManagement = () => {
                                 ) : historyList.length === 0 ? (
                                     <tr><td colSpan="5" className="py-8 text-center text-slate-blue">Không có dữ liệu trong khoảng thời gian này.</td></tr>
                                 ) : (
-                                    historyList.slice((historyPage - 1) * itemsPerPage, historyPage * itemsPerPage).map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-cloud-mist/30">
+                                    historyList.map((item, idx) => (
+                                        <tr key={item.id || idx} className="hover:bg-cloud-mist/30">
                                             <td className="py-3 px-4 text-sm font-semibold text-midnight-indigo">
                                                 {new Date(item.eventTime).toLocaleString('vi-VN')}
                                             </td>
@@ -212,10 +238,10 @@ const ANPRManagement = () => {
                     </div>
                     
                     {/* Pagination History */}
-                    {!loading && Math.ceil(historyList.length / itemsPerPage) > 1 && (
+                    {!loading && Math.ceil(historyTotal / itemsPerPage) > 1 && (
                         <div className="flex justify-between items-center pt-4">
                             <span className="text-[11px] text-slate-blue">
-                                Hiển thị {(historyPage - 1) * itemsPerPage + 1} - {Math.min(historyPage * itemsPerPage, historyList.length)} trong tổng số {historyList.length} lượt quét
+                                Hiển thị {(historyPage - 1) * itemsPerPage + 1} - {Math.min(historyPage * itemsPerPage, historyTotal)} trong tổng số {historyTotal} lượt quét
                             </span>
                             <div className="flex items-center gap-1.5">
                                 <button
@@ -225,7 +251,7 @@ const ANPRManagement = () => {
                                 >
                                     Trước
                                 </button>
-                                {[...Array(Math.ceil(historyList.length / itemsPerPage))].map((_, i) => (
+                                {[...Array(Math.ceil(historyTotal / itemsPerPage))].map((_, i) => (
                                     <button
                                         key={i}
                                         onClick={() => setHistoryPage(i + 1)}
@@ -239,8 +265,8 @@ const ANPRManagement = () => {
                                     </button>
                                 ))}
                                 <button
-                                    onClick={() => setHistoryPage(prev => Math.min(Math.ceil(historyList.length / itemsPerPage), prev + 1))}
-                                    disabled={historyPage === Math.ceil(historyList.length / itemsPerPage)}
+                                    onClick={() => setHistoryPage(prev => Math.min(Math.ceil(historyTotal / itemsPerPage), prev + 1))}
+                                    disabled={historyPage === Math.ceil(historyTotal / itemsPerPage)}
                                     className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
                                 >
                                     Sau
@@ -267,8 +293,8 @@ const ANPRManagement = () => {
                                 Không có cảnh báo biển lạ nào hiện tại.
                             </div>
                         ) : (
-                            unknownList.slice((unknownPage - 1) * itemsPerPage, unknownPage * itemsPerPage).map((item, idx) => (
-                                <div key={idx} className="p-4 rounded-xl border border-orange-200 bg-orange-50 flex items-start gap-4 shadow-sm">
+                            unknownList.map((item, idx) => (
+                                <div key={item.id || idx} className="p-4 rounded-xl border border-orange-200 bg-orange-50 flex items-start gap-4 shadow-sm">
                                     <div className="w-12 h-12 rounded-full bg-white border border-orange-200 flex items-center justify-center flex-shrink-0 text-xl shadow-sm">
                                         ⚠️
                                     </div>
@@ -284,10 +310,10 @@ const ANPRManagement = () => {
                     </div>
 
                     {/* Pagination Unknown */}
-                    {!loading && Math.ceil(unknownList.length / itemsPerPage) > 1 && (
+                    {!loading && Math.ceil(unknownTotal / itemsPerPage) > 1 && (
                         <div className="flex justify-between items-center pt-4 mt-2 border-t border-platinum-tint/50">
                             <span className="text-[11px] text-slate-blue">
-                                Hiển thị {(unknownPage - 1) * itemsPerPage + 1} - {Math.min(unknownPage * itemsPerPage, unknownList.length)} trong tổng số {unknownList.length} biển lạ
+                                Hiển thị {(unknownPage - 1) * itemsPerPage + 1} - {Math.min(unknownPage * itemsPerPage, unknownTotal)} trong tổng số {unknownTotal} biển lạ
                             </span>
                             <div className="flex items-center gap-1.5">
                                 <button
@@ -297,7 +323,7 @@ const ANPRManagement = () => {
                                 >
                                     Trước
                                 </button>
-                                {[...Array(Math.ceil(unknownList.length / itemsPerPage))].map((_, i) => (
+                                {[...Array(Math.ceil(unknownTotal / itemsPerPage))].map((_, i) => (
                                     <button
                                         key={i}
                                         onClick={() => setUnknownPage(i + 1)}
@@ -311,8 +337,8 @@ const ANPRManagement = () => {
                                     </button>
                                 ))}
                                 <button
-                                    onClick={() => setUnknownPage(prev => Math.min(Math.ceil(unknownList.length / itemsPerPage), prev + 1))}
-                                    disabled={unknownPage === Math.ceil(unknownList.length / itemsPerPage)}
+                                    onClick={() => setUnknownPage(prev => Math.min(Math.ceil(unknownTotal / itemsPerPage), prev + 1))}
+                                    disabled={unknownPage === Math.ceil(unknownTotal / itemsPerPage)}
                                     className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
                                 >
                                     Sau

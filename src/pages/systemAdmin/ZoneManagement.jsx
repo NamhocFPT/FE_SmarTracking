@@ -2,9 +2,9 @@ import { AlertTriangle, Camera, CheckCircle, Edit2, Map, MapPin, Monitor, Plus, 
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import { 
-    getZones, getZoneById, createZone, updateZone, 
-    deleteZone, assignDeviceToZone, removeDeviceFromZone 
+import {
+    getZones, getZoneById, createZone, updateZone,
+    deleteZone, assignDeviceToZone, removeDeviceFromZone
 } from '../../service/zoneServices';
 import { getDevices } from '../../service/sysAdminServices';
 
@@ -14,7 +14,7 @@ const ZoneManagement = () => {
     const [zones, setZones] = useState([]);
     const [selectedZone, setSelectedZone] = useState(null);
     const [availableDevices, setAvailableDevices] = useState([]);
-    
+
     // UI states
     const [loading, setLoading] = useState(true);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -24,7 +24,7 @@ const ZoneManagement = () => {
 
     // Modal states
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-        const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [zoneToDelete, setZoneToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -37,7 +37,7 @@ const ZoneManagement = () => {
         description: ''
     });
 
-    
+
     const fetchZones = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -148,7 +148,7 @@ const ZoneManagement = () => {
         }
     };
 
-    
+
 
     const handleRemoveDevice = async (deviceId) => {
         if (!selectedZone) return;
@@ -156,13 +156,13 @@ const ZoneManagement = () => {
             const res = await removeDeviceFromZone(selectedZone.id, deviceId);
             if (res?.success) {
                 setSuccessMessage('Đã gỡ thiết bị khỏi khu vực.');
-                
+
                 // Update state ở client thay vì fetch lại API do API ko trả về devices
                 setSelectedZone(prev => ({
                     ...prev,
                     devices: (prev.devices || []).filter(d => d.id !== deviceId)
                 }));
-                
+
                 fetchAvailableDevices();
             } else {
                 setError(res?.message || 'Lỗi khi gỡ thiết bị.');
@@ -216,16 +216,16 @@ const ZoneManagement = () => {
                     <div className="p-4 border-b border-platinum-tint bg-cloud-mist/30">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-blue" />
-                            <input 
-                                type="text" 
-                                placeholder="Tìm kiếm khu vực..." 
+                            <input
+                                type="text"
+                                placeholder="Tìm kiếm khu vực..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-9 pr-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                             />
                         </div>
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
@@ -239,14 +239,13 @@ const ZoneManagement = () => {
                             </div>
                         ) : (
                             filteredZones.map((zone) => (
-                                <div 
+                                <div
                                     key={zone.id}
                                     onClick={() => handleSelectZone(zone)}
-                                    className={`p-3 rounded-xl border transition-all cursor-pointer group ${
-                                        selectedZone?.id === zone.id 
-                                        ? 'border-action-blue bg-blue-50/50 shadow-sm' 
-                                        : 'border-platinum-tint bg-white hover:border-action-blue/50 hover:bg-cloud-mist/20'
-                                    }`}
+                                    className={`p-3 rounded-xl border transition-all cursor-pointer group ${selectedZone?.id === zone.id
+                                            ? 'border-action-blue bg-blue-50/50 shadow-sm'
+                                            : 'border-platinum-tint bg-white hover:border-action-blue/50 hover:bg-cloud-mist/20'
+                                        }`}
                                 >
                                     <div className="flex justify-between items-start mb-1">
                                         <h3 className="font-bold text-sm text-midnight-indigo">{zone.zone_name}</h3>
@@ -285,7 +284,7 @@ const ZoneManagement = () => {
                                 <div className="flex gap-3">
                                 </div>
                             </div>
-                            
+
                             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                                 {detailLoading ? (
                                     <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
@@ -313,7 +312,7 @@ const ZoneManagement = () => {
 
                                         <div>
                                             <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider mb-3">Thiết bị giám sát ({selectedZone.devices?.length || 0})</h3>
-                                            
+
                                             {(!selectedZone.devices || selectedZone.devices.length === 0) ? (
                                                 <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-blue">
                                                     <Video className="w-10 h-10 mb-3 text-slate-300" />
@@ -335,7 +334,7 @@ const ZoneManagement = () => {
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleRemoveDevice(device.id)}
                                                                 className="text-slate-blue hover:text-red-500 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
                                                                 title="Gỡ thiết bị"
@@ -372,15 +371,15 @@ const ZoneManagement = () => {
                         <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã khu vực <span className="text-red-500">*</span></label>
-                                <input required type="text" value={createForm.zone_code} onChange={e => setCreateForm({...createForm, zone_code: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: ROOM-101" />
+                                <input required type="text" value={createForm.zone_code} onChange={e => setCreateForm({ ...createForm, zone_code: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: ROOM-101" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên khu vực <span className="text-red-500">*</span></label>
-                                <input required type="text" value={createForm.zone_name} onChange={e => setCreateForm({...createForm, zone_name: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Phòng họp 1" />
+                                <input required type="text" value={createForm.zone_name} onChange={e => setCreateForm({ ...createForm, zone_name: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Phòng họp 1" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại khu vực <span className="text-red-500">*</span></label>
-                                <select required value={createForm.zone_type} onChange={e => setCreateForm({...createForm, zone_type: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm">
+                                <select required value={createForm.zone_type} onChange={e => setCreateForm({ ...createForm, zone_type: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm">
                                     <option value="room">Phòng họp (room)</option>
                                     <option value="gate">Cổng ra vào (gate)</option>
                                     <option value="corridor">Hành lang (corridor)</option>
@@ -391,16 +390,16 @@ const ZoneManagement = () => {
                             <div className="flex gap-4">
                                 <div className="flex-1">
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tòa nhà</label>
-                                    <input type="text" value={createForm.building} onChange={e => setCreateForm({...createForm, building: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Toà nhà A" />
+                                    <input type="text" value={createForm.building} onChange={e => setCreateForm({ ...createForm, building: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Toà nhà A" />
                                 </div>
                                 <div className="flex-1">
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tầng</label>
-                                    <input type="text" value={createForm.floor} onChange={e => setCreateForm({...createForm, floor: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1" />
+                                    <input type="text" value={createForm.floor} onChange={e => setCreateForm({ ...createForm, floor: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mô tả</label>
-                                <textarea rows="3" value={createForm.description} onChange={e => setCreateForm({...createForm, description: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Mô tả chức năng khu vực..." />
+                                <textarea rows="3" value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Mô tả chức năng khu vực..." />
                             </div>
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
                                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
@@ -435,8 +434,6 @@ const ZoneManagement = () => {
                 </div>,
                 document.body
             )}
-
-            }
         </div>
     );
 };
