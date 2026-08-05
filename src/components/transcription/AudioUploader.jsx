@@ -138,7 +138,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
                             Kéo thả file âm thanh vào đây
                         </p>
                         <p className="text-xs text-slate-blue mb-4">
-                            Hỗ trợ .mp3, .wav, .m4a (Tối đa 50MB)
+                            Hỗ trợ .mp3, .wav, .m4a (Tối đa 500MB)
                         </p>
                         <button
                             onClick={() => fileInputRef.current?.click()}

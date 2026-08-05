@@ -1,4 +1,4 @@
-import { get, post, patch, dele, buildQuery } from '../utils/request';
+import { get, post, patch, buildQuery } from '../utils/request';
 
 /**
  * Upload audio file cho meeting
@@ -92,37 +92,11 @@ export const startRecordingMarker = async (meetingId, note) => {
 };
 
 /**
- * B2: Gán danh tính trực tiếp trong lúc họp
- * @param {string} meetingId
- * @param {object} payload { speakerUserId, externalParticipantId, displayName }
- */
-export const addSpeakerTag = async (meetingId, payload) => {
-    return await post(`/meetings/${meetingId}/speaker-tags`, payload);
-};
-
-/**
- * B3 (GET): Xem danh sách các mốc đã gán trong cuộc họp
- * @param {string} meetingId
- */
-export const getSpeakerTags = async (meetingId) => {
-    return await get(`/meetings/${meetingId}/speaker-tags`);
-};
-
-/**
- * B3 (DELETE): Xóa mốc đã gán (hoàn tác)
- * @param {string} meetingId
- * @param {string} tagId
- */
-export const deleteSpeakerTag = async (meetingId, tagId) => {
-    return await dele(`/meetings/${meetingId}/speaker-tags/${tagId}`);
-};
-
-/**
  * B4: Lấy danh sách nhóm giọng (Speaker Clusters)
  * @param {string} transcriptId
  */
 export const getTranscriptSpeakers = async (transcriptId) => {
-    return await get(`/transcripts/${transcriptId}/speakers`);
+    return await get(`/transcripts/${transcriptId}/speaker-clusters`);
 };
 
 /**

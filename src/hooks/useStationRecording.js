@@ -145,7 +145,7 @@ export const useStationRecording = (meetingId) => {
                     await clearDB(dbRef.current);
                     resolve({ success: true, sessionId, marksCount: marksRef.current.length });
                 } catch (err) {
-                    setError('Lỗi khi xử lý video: ' + err.message);
+                    setError('Lỗi khi xử lý bản ghi âm: ' + err.message);
                     resolve({ success: false, error: err.message });
                 } finally {
                     setIsProcessing(false);
@@ -161,8 +161,9 @@ export const useStationRecording = (meetingId) => {
         if (!isRecording || !startTime) return;
         const offsetSeconds = Math.max(0, (Date.now() - startTime) / 1000);
         
-        // Xác định loại ID dựa trên dữ liệu participant (có thể khác nhau tuỳ role)
-        const isExternal = participant.is_external || participant.isExternal || participant.role === 'GUEST';
+        // Chỉ dựa vào cờ tường minh isExternal — không suy đoán qua role (role hiện là chuỗi
+        // tiếng Việt 'Chủ tọa'/'Thành viên'/'Khách mời', không phải mã định danh ổn định).
+        const isExternal = participant.isExternal === true || participant.is_external === true;
         const pId = participant.userId || participant.user_id || participant.id;
         
         marksRef.current.push({

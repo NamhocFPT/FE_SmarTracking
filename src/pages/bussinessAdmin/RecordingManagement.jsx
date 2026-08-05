@@ -140,6 +140,18 @@ const RecordingManagement = () => {
         }
     };
 
+    // Preview Handler — GET /media-files/:fileId trả downloadUrl (link ký sẵn), danh sách
+    // media-files không có sẵn field này nên phải gọi riêng, giống cách SpeakerMappingModal.jsx làm.
+    const handlePreviewVideo = async (rec) => {
+        setPreviewVideo({ ...rec, videoUrl: null, previewLoading: true });
+        try {
+            const res = await getMediaFile(rec.id);
+            setPreviewVideo({ ...rec, videoUrl: res?.success ? res.data?.downloadUrl : null, previewLoading: false });
+        } catch {
+            setPreviewVideo({ ...rec, videoUrl: null, previewLoading: false });
+        }
+    };
+
     // Download Handler — dùng media-files API
     const handleDownload = async (rec) => {
         try {
@@ -386,7 +398,7 @@ const RecordingManagement = () => {
                                                 {rec.status !== 'failed' && rec.status !== 'FAILED' && (
                                                     <>
                                                         <button
-                                                            onClick={() => setPreviewVideo(rec)}
+                                                            onClick={() => handlePreviewVideo(rec)}
                                                             className="p-1.5 hover:text-action-blue hover:bg-blue-50 text-slate-blue rounded-lg transition-colors"
                                                             title="Phát lại video"
                                                         >
@@ -487,11 +499,13 @@ const RecordingManagement = () => {
                         </div>
                         {/* Video Element */}
                         <div className="bg-black aspect-video flex items-center justify-center relative">
-                            {previewVideo.videoUrl ? (
-                                <video 
-                                    src={previewVideo.videoUrl} 
-                                    controls 
-                                    autoPlay 
+                            {previewVideo.previewLoading ? (
+                                <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : previewVideo.videoUrl ? (
+                                <video
+                                    src={previewVideo.videoUrl}
+                                    controls
+                                    autoPlay
                                     className="w-full h-full object-contain"
                                 />
                             ) : (
