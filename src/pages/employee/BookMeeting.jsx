@@ -1,12 +1,12 @@
-import { AlertTriangle, ArrowLeft, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { AlertTriangle, ArrowLeft, Building, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, ChevronDown, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X, Edit2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, getUsers, getUserById, getUserPublicProfile } from '../../service/employeeServices';
-import { getDepartments } from '../../service/businessAdminServices';
+import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, uploadAgendaAttachment, getUsers, getUserById, getUserPublicProfile } from '../../service/employeeServices';
+import { getDepartments, getDepartmentMembers } from '../../service/businessAdminServices';
 import * as XLSX from 'xlsx';
 
 const getInitialTimes = () => {
@@ -70,7 +70,16 @@ const BookMeeting = () => {
 
     // Data lists
     const [departments, setDepartments] = useState([]);
-    const [users, setUsers] = useState([]);
+    const [usersById, setUsersById] = useState({});
+    const users = useMemo(() => Object.values(usersById), [usersById]);
+    const mergeUsers = (list) => {
+        if (!Array.isArray(list) || list.length === 0) return;
+        setUsersById(prev => {
+            const next = { ...prev };
+            list.forEach(u => { if (u && u.id) next[u.id] = u; });
+            return next;
+        });
+    };
     const [loadingData, setLoadingData] = useState(true);
 
     // Search and availability states
@@ -85,14 +94,24 @@ const BookMeeting = () => {
     const [conflictInfo, setConflictInfo] = useState(null);
     const [alternativeRooms, setAlternativeRooms] = useState([]);
 
-    // Import modal states
+    // Participant search states (server-side, debounced)
     const [searchEmail, setSearchEmail] = useState('');
     const [searchFocused, setSearchFocused] = useState(false);
+    const [defaultSuggestions, setDefaultSuggestions] = useState([]);
+    const [searchResults, setSearchResults] = useState([]);
+    const [searchingUsers, setSearchingUsers] = useState(false);
+    const searchRequestRef = useRef(0);
+
+    // Bulk add by department states
+    const [addingDepartment, setAddingDepartment] = useState(false);
+
+    // Import modal states
     const [showImportModal, setShowImportModal] = useState(false);
     const [importMethod, setImportMethod] = useState('manual'); // 'manual' or 'excel'
     const [manualEmails, setManualEmails] = useState('');
     const [manualType, setManualType] = useState('auto'); // 'auto', 'internal', 'external'
     const [importPreview, setImportPreview] = useState([]);
+    const [importProcessing, setImportProcessing] = useState(false);
 
     // User detail modal states
     const [selectedDetailUserId, setSelectedDetailUserId] = useState(null);
@@ -131,10 +150,12 @@ const BookMeeting = () => {
     }, [showImportModal]);
 
     useEffect(() => {
+        let parsedUser = null;
         try {
             const userStr = localStorage.getItem('user');
             if (userStr) {
-                setCurrentUser(JSON.parse(userStr));
+                parsedUser = JSON.parse(userStr);
+                setCurrentUser(parsedUser);
             }
         } catch (err) {
             console.error('Failed to load user info', err);
@@ -142,25 +163,10 @@ const BookMeeting = () => {
 
         const fetchData = async () => {
             try {
-                const [usersRes, deptsRes] = await Promise.all([
-                    getUsers({ limit: 1000 }),
-                    getDepartments().catch(err => {
-                        console.error('Failed to load departments', err);
-                        return { success: false };
-                    })
-                ]);
-
-                if (usersRes?.success) {
-                    setUsers(usersRes.data || []);
-                } else {
-                    // Fallback mock users for local mapping if needed
-                    setUsers([
-                        { id: 'user-1', fullName: 'Lê Hoàng Hải', email: 'hai.lh@smrmpts.com' },
-                        { id: 'user-2', fullName: 'Nguyễn Thị Minh', email: 'minh.nt@smrmpts.com' },
-                        { id: 'user-3', fullName: 'Phan Văn Minh', email: 'minh.pv@smrmpts.com' },
-                        { id: 'user-4', fullName: 'Phạm Thanh Sơn', email: 'son.pt@smrmpts.com' }
-                    ]);
-                }
+                const deptsRes = await getDepartments().catch(err => {
+                    console.error('Failed to load departments', err);
+                    return { success: false };
+                });
 
                 if (deptsRes?.success) {
                     setDepartments(deptsRes.data || []);
@@ -172,6 +178,32 @@ const BookMeeting = () => {
                         { id: 'dept-4', department_code: 'RND', department_name: 'Phòng Nghiên cứu & Phát triển' }
                     ]);
                 }
+
+                // Gợi ý mặc định khi ô tìm kiếm còn trống: ưu tiên nạp cả phòng ban
+                // của người đặt lịch (GET /departments/:id/members), fallback lấy
+                // một batch nhỏ toàn công ty nếu user chưa thuộc phòng ban nào.
+                // Không còn tải trước 1000 user như trước (tốn băng thông, không scale).
+                const deptId = parsedUser?.departmentId || parsedUser?.department_id;
+                let suggestions = [];
+                if (deptId) {
+                    try {
+                        const membersRes = await getDepartmentMembers(deptId);
+                        if (membersRes?.success) suggestions = membersRes.data || [];
+                    } catch (err) {
+                        console.error('Failed to load default department members', err);
+                    }
+                }
+                if (suggestions.length === 0) {
+                    try {
+                        const usersRes = await getUsers({ limit: 30 });
+                        if (usersRes?.success) suggestions = usersRes.data || [];
+                    } catch (err) {
+                        console.error('Failed to load default users', err);
+                    }
+                }
+                mergeUsers(suggestions);
+                setDefaultSuggestions(suggestions);
+                setSearchResults(suggestions);
             } catch (err) {
                 console.error('Error fetching initial data', err);
                 setErrorMsg('Không thể tải danh sách phòng ban hoặc nhân sự.');
@@ -182,6 +214,43 @@ const BookMeeting = () => {
 
         fetchData();
     }, []);
+
+    // Tìm kiếm người tham dự phía server (debounce 300ms), có bảo vệ chống
+    // race-condition khi gõ nhanh (chỉ áp dụng kết quả của request mới nhất).
+    useEffect(() => {
+        const query = searchEmail.trim();
+        if (!query) {
+            setSearchResults(defaultSuggestions);
+            setSearchingUsers(false);
+            return;
+        }
+
+        const requestId = ++searchRequestRef.current;
+        setSearchingUsers(true);
+        const timer = setTimeout(async () => {
+            try {
+                const res = await getUsers({ search: query, limit: 20 });
+                if (requestId !== searchRequestRef.current) return; // Kết quả cũ, bỏ qua
+                if (res?.success) {
+                    const list = res.data || [];
+                    mergeUsers(list);
+                    setSearchResults(list);
+                } else {
+                    setSearchResults([]);
+                }
+            } catch (err) {
+                if (requestId === searchRequestRef.current) {
+                    console.error('Failed to search users', err);
+                    setSearchResults([]);
+                }
+            } finally {
+                if (requestId === searchRequestRef.current) setSearchingUsers(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchEmail, defaultSuggestions]);
 
     const selectedRoom = availableRooms.find(r => r.id === selectedRoomId);
 
@@ -278,7 +347,7 @@ const BookMeeting = () => {
             {
                 title: newAgendaTitle,
                 durationMin: duration,
-                file: newAgendaFile ? { name: newAgendaFile.name, size: newAgendaFile.size } : null
+                file: newAgendaFile ? newAgendaFile : null
             }
         ]);
         setNewAgendaTitle('');
@@ -287,6 +356,14 @@ const BookMeeting = () => {
 
     const handleRemoveAgenda = (index) => {
         setAgendaList(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleEditAgenda = (index) => {
+        const item = agendaList[index];
+        setNewAgendaTitle(item.title);
+        setNewAgendaDuration(item.durationMin.toString());
+        setNewAgendaFile(item.file);
+        handleRemoveAgenda(index);
     };
 
     const toggleParticipant = (userId) => {
@@ -300,35 +377,139 @@ const BookMeeting = () => {
         return uDept ? uDept.department_code || uDept.department_name : '';
     };
 
-    const getFilteredUsers = () => {
-        const deptId = currentUser?.departmentId || currentUser?.department_id;
-        if (!searchEmail.trim()) {
-            if (!deptId) return users.filter(u => u.id !== currentUser?.id);
-            return users.filter(u => (u.departmentId === deptId || u.department_id === deptId) && u.id !== currentUser?.id);
+    // Gợi ý hiển thị trong dropdown tìm kiếm: kết quả search server (hoặc gợi ý
+    // mặc định khi ô trống), loại trừ chính mình.
+    const visibleSuggestions = searchResults.filter(u => u.id !== currentUser?.id);
+
+    const visibleDepartments = useMemo(() => {
+        if (!searchEmail.trim()) return [];
+        const q = searchEmail.trim().toLowerCase();
+
+        // Remove prefix "phòng" or "phong" to match the core department name
+        const qWithoutPhong = q.replace(/^phòng\s+|^phong\s+/i, '').trim();
+
+        // If user explicitly types just "phòng" or "phong", show all departments
+        if (q === 'phòng' || q === 'phong') {
+            return departments;
         }
-        return users.filter(u =>
-            u.email && u.email.toLowerCase().includes(searchEmail.toLowerCase().trim()) && u.id !== currentUser?.id
-        );
+
+        return departments.filter(d => {
+            const name = (d.departmentName || d.department_name || '').toLowerCase();
+            const code = (d.departmentCode || d.department_code || '').toLowerCase();
+            return name.includes(q) || code.includes(q) || (qWithoutPhong && name.includes(qWithoutPhong));
+        });
+    }, [searchEmail, departments]);
+
+    const handleAddDepartment = async (deptId) => {
+        if (!deptId) return;
+        setAddingDepartment(true);
+        setErrorMsg('');
+        try {
+            const res = await getDepartmentMembers(deptId);
+            if (res?.success) {
+                const members = res.data || [];
+                mergeUsers(members);
+
+                const dept = departments.find(d => d.id === deptId);
+                const deptName = dept?.departmentName || dept?.department_name || 'đã chọn';
+
+                const newIds = [...selectedParticipantIds];
+                let addedCount = 0;
+                members.forEach(m => {
+                    if (m.id !== currentUser?.id && !newIds.includes(m.id)) {
+                        newIds.push(m.id);
+                        addedCount++;
+                    }
+                });
+                const skippedCount = members.length - addedCount;
+                setSelectedParticipantIds(newIds);
+
+                setSuccessMessage(
+                    addedCount === 0
+                        ? `Toàn bộ nhân viên phòng "${deptName}" đã có trong danh sách.`
+                        : skippedCount > 0
+                            ? `Đã thêm ${addedCount} nhân viên phòng "${deptName}" (bỏ qua ${skippedCount} người đã có trong danh sách).`
+                            : `Đã thêm ${addedCount} nhân viên phòng "${deptName}".`
+                );
+                setTimeout(() => setSuccessMessage(''), 5000);
+            } else {
+                setErrorMsg(res?.message || 'Không thể tải danh sách nhân viên phòng ban.');
+            }
+        } catch (err) {
+            console.error('Failed to load department members', err);
+            setErrorMsg(err?.error?.message || 'Không thể tải danh sách nhân viên phòng ban.');
+        } finally {
+            setAddingDepartment(false);
+        }
     };
 
     // --- Import guest actions ---
+    // Bộ cột khớp với template chuẩn của BE (IMPORT_PARTICIPANTS_HEADERS trong
+    // participant-import.service.ts) để người dùng chỉ cần học 1 định dạng file
+    // duy nhất trong toàn hệ thống (BookMeeting và MeetingDetail dùng chung layout).
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // Tra cứu nhân viên nội bộ theo email/mã nhân viên: ưu tiên tìm trong dữ liệu
+    // đã có sẵn (usersById), nếu chưa có thì gọi GET /users?search= (server search
+    // theo tên/email) — không còn phụ thuộc vào việc tải sẵn toàn bộ danh sách nhân viên.
+    const resolveInternalUser = async (email, employeeCode) => {
+        const emailKey = (email || '').trim().toLowerCase();
+        const codeKey = (employeeCode || '').trim();
+
+        let found = users.find(u =>
+            (emailKey && (u.email || '').toLowerCase() === emailKey)
+            || (codeKey && (u.employeeCode || u.employee_code) === codeKey)
+        );
+        if (found) return found;
+
+        const query = email || employeeCode;
+        if (!query) return null;
+
+        try {
+            const res = await getUsers({ search: query, limit: 5 });
+            if (res?.success) {
+                const list = res.data || [];
+                mergeUsers(list);
+                found = list.find(u =>
+                    (emailKey && (u.email || '').toLowerCase() === emailKey)
+                    || (codeKey && (u.employeeCode || u.employee_code) === codeKey)
+                );
+            }
+        } catch (err) {
+            console.error('Failed to resolve internal user', email || employeeCode, err);
+        }
+        return found || null;
+    };
+
     const downloadSampleExcel = () => {
         const data = [
-            { "Email": "hai.lh@smrmpts.com", "Trong công ty": "✓", "Ngoài công ty": "✗" },
-            { "Email": "guest_external@gmail.com", "Trong công ty": "✗", "Ngoài công ty": "✓" },
-            { "Email": "minh.pv@smrmpts.com", "Trong công ty": "✓", "Ngoài công ty": "✗" }
+            { 'Email': 'nhanvien@smrmpts.com', 'Mã nhân viên': '', 'Họ và tên': '', 'Tổ chức/Công ty': '', 'Số điện thoại': '' },
+            { 'Email': '', 'Mã nhân viên': 'EMP0123', 'Họ và tên': '', 'Tổ chức/Công ty': '', 'Số điện thoại': '' },
+            { 'Email': 'khach@doitac.com', 'Mã nhân viên': '', 'Họ và tên': 'Nguyễn Văn B', 'Tổ chức/Công ty': 'Công ty ABC', 'Số điện thoại': '0900000000' }
         ];
-        const ws = XLSX.utils.json_to_sheet(data);
+        const headers = ['Email', 'Mã nhân viên', 'Họ và tên', 'Tổ chức/Công ty', 'Số điện thoại'];
+        const ws = XLSX.utils.json_to_sheet(data, { header: headers });
 
         ws['!cols'] = [
-            { wch: 32 },
-            { wch: 16 },
-            { wch: 16 }
+            { wch: 28 }, { wch: 16 }, { wch: 24 }, { wch: 24 }, { wch: 16 }
         ];
 
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Danh sách khách mời");
-        XLSX.writeFile(wb, "SmarTracking_Template_Import.xlsx");
+        XLSX.utils.book_append_sheet(wb, ws, 'DanhSach');
+
+        const guideRows = [
+            ['Cột', 'Mô tả'],
+            ['Email', 'Nhân viên: định danh chính (ưu tiên). Khách ngoài: email liên hệ (bắt buộc)'],
+            ['Mã nhân viên', 'Nhân viên: tùy chọn (dùng khi không có email)'],
+            ['Họ và tên', 'Khách ngoài: bắt buộc'],
+            ['Tổ chức/Công ty', 'Khách ngoài: tùy chọn'],
+            ['Số điện thoại', 'Khách ngoài: tùy chọn'],
+        ];
+        const guideWs = XLSX.utils.aoa_to_sheet(guideRows);
+        guideWs['!cols'] = [{ wch: 20 }, { wch: 72 }];
+        XLSX.utils.book_append_sheet(wb, guideWs, 'HuongDan');
+
+        XLSX.writeFile(wb, 'SmarTracking_Template_Them_Danh_Sach.xlsx');
     };
 
     const handleExcelImport = (e) => {
@@ -336,7 +517,7 @@ const BookMeeting = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
             try {
                 const bstr = evt.target.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
@@ -344,110 +525,122 @@ const BookMeeting = () => {
                 const ws = wb.Sheets[wsname];
                 const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                const isCheckMark = (val) => {
-                    const v = String(val).trim().toLowerCase();
-                    return v === '✓' || v === '✔' || v === 'x' || v === 'yes' || v === '1' || v === 'true' || v === '☑';
-                };
+                const getCell = (row, key) => (key ? String(row[key] ?? '').trim() : '');
 
-                const parsed = rows.map((row, index) => {
-                    const rowNumber = index + 2;
-                    const keys = Object.keys(row);
-                    const emailKey = keys.find(k => k.toLowerCase().includes('email') || k.toLowerCase().includes('thư điện tử'));
-                    const internalKey = keys.find(k => k.toLowerCase().includes('trong') && k.toLowerCase().includes('công ty'));
-                    const externalKey = keys.find(k => k.toLowerCase().includes('ngoài') && k.toLowerCase().includes('công ty'));
-                    const legacyTypeKey = keys.find(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('loại') || k.toLowerCase().includes('loai'));
+                const rawRows = rows
+                    .map((row, index) => {
+                        const keys = Object.keys(row);
+                        const findKey = (name) => keys.find(k => k.toLowerCase().trim() === name.toLowerCase());
+                        return {
+                            rowNumber: index + 2,
+                            email: getCell(row, findKey('Email')),
+                            employeeCode: getCell(row, findKey('Mã nhân viên')),
+                            fullName: getCell(row, findKey('Họ và tên')),
+                            organizationName: getCell(row, findKey('Tổ chức/Công ty')) || getCell(row, findKey('Phòng ban/Tổ chức')),
+                            phoneNumber: getCell(row, findKey('Số điện thoại')),
+                        };
+                    })
+                    .filter(r => r.email || r.employeeCode || r.fullName || r.organizationName || r.phoneNumber);
 
-                    const email = emailKey ? String(row[emailKey]).trim() : '';
+                if (rawRows.length === 0) {
+                    alert('Tệp không có dữ liệu hoặc sai cấu trúc cột. Vui lòng tải lại file mẫu.');
+                    return;
+                }
 
+                setImportProcessing(true);
+                const parsed = await Promise.all(rawRows.map(async (r) => {
                     let error = '';
-                    if (!email) {
-                        error = `Dòng ${rowNumber}: Cột Email bị trống`;
-                    } else if (!email.includes('@')) {
-                        error = `Dòng ${rowNumber}: Email "${email}" thiếu ký tự '@'`;
-                    } else if (!emailRegex.test(email)) {
-                        error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
+                    if (!r.email && !r.employeeCode) {
+                        error = `Dòng ${r.rowNumber}: Cần có Email hoặc Mã nhân viên`;
+                    } else if (r.email && !EMAIL_REGEX.test(r.email)) {
+                        error = `Dòng ${r.rowNumber}: Email "${r.email}" sai định dạng`;
                     }
 
+                    let resolvedUserId = null;
                     let type = 'external';
-                    if (internalKey !== undefined || externalKey !== undefined) {
-                        const internalVal = internalKey ? row[internalKey] : '';
-                        const externalVal = externalKey ? row[externalKey] : '';
-                        const isInternalChecked = isCheckMark(internalVal);
-                        const isExternalChecked = isCheckMark(externalVal);
 
-                        if (isInternalChecked && isExternalChecked) {
-                            error = error || `Dòng ${rowNumber}: Không thể đánh dấu cả "Trong công ty" và "Ngoài công ty" cùng lúc`;
-                        } else if (!isInternalChecked && !isExternalChecked) {
-                            const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-                            type = found ? 'internal' : 'external';
-                        } else {
-                            type = isInternalChecked ? 'internal' : 'external';
-                        }
-                    } else if (legacyTypeKey) {
-                        const typeVal = String(row[legacyTypeKey]).toLowerCase().trim();
-                        if (typeVal.includes('trong') || typeVal.includes('internal') || typeVal.includes('nội bộ') || typeVal === 'in') {
+                    if (!error) {
+                        const found = await resolveInternalUser(r.email, r.employeeCode);
+                        if (found) {
+                            resolvedUserId = found.id;
                             type = 'internal';
-                        } else if (!typeVal) {
-                            const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-                            type = found ? 'internal' : 'external';
-                        }
-                    } else {
-                        const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-                        type = found ? 'internal' : 'external';
-                    }
-
-                    if (type === 'internal') {
-                        const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-                        if (!found) {
-                            error = error || `Dòng ${rowNumber}: Không tìm thấy nhân viên trong hệ thống`;
+                        } else {
+                            if (!r.fullName) {
+                                error = `Dòng ${r.rowNumber}: Khách ngoài hệ thống cần nhập Họ và tên`;
+                            }
                         }
                     }
 
-                    return { email, type, error, rowNumber };
+                    return { ...r, type, error, resolvedUserId };
+                }));
+
+                // Phát hiện trùng trong cùng file
+                const seenInternal = new Set();
+                const seenExternal = new Set();
+                parsed.forEach(item => {
+                    if (item.error) return;
+                    if (item.type === 'internal' && item.resolvedUserId) {
+                        if (seenInternal.has(item.resolvedUserId)) {
+                            item.error = `Dòng ${item.rowNumber}: Trùng với một dòng khác trong file`;
+                        } else {
+                            seenInternal.add(item.resolvedUserId);
+                        }
+                    } else if (item.type === 'external' && item.email) {
+                        if (seenExternal.has(item.email)) {
+                            item.error = `Dòng ${item.rowNumber}: Trùng email với một dòng khác trong file`;
+                        } else {
+                            seenExternal.add(item.email);
+                        }
+                    }
                 });
 
                 setImportPreview(parsed);
             } catch (err) {
                 console.error('Failed to parse excel file', err);
                 alert('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
+            } finally {
+                setImportProcessing(false);
             }
         };
         reader.readAsBinaryString(file);
     };
 
-    const handleManualImport = () => {
+    const handleManualImport = async () => {
         if (!manualEmails.trim()) return;
         const emailList = manualEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e !== '');
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        const parsed = emailList.map((email, index) => {
-            const rowNumber = index + 1;
-            let error = '';
+        setImportProcessing(true);
+        try {
+            const parsed = await Promise.all(emailList.map(async (email, index) => {
+                const rowNumber = index + 1;
+                let error = '';
 
-            if (!email.includes('@')) {
-                error = `Dòng ${rowNumber}: Email "${email}" thiếu ký tự '@'`;
-            } else if (!emailRegex.test(email)) {
-                error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
-            }
-
-            let type = manualType;
-            if (type === 'auto') {
-                const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-                type = found ? 'internal' : 'external';
-            }
-
-            if (type === 'internal') {
-                const found = users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-                if (!found) {
-                    error = error || `Dòng ${rowNumber}: Không tìm thấy nhân viên trong hệ thống`;
+                if (!email.includes('@')) {
+                    error = `Dòng ${rowNumber}: Email "${email}" thiếu ký tự '@'`;
+                } else if (!EMAIL_REGEX.test(email)) {
+                    error = `Dòng ${rowNumber}: Email "${email}" sai định dạng`;
                 }
-            }
 
-            return { email, type, error, rowNumber };
-        });
+                let type = 'auto';
+                let resolvedUserId = null;
 
-        setImportPreview(parsed);
+                if (!error) {
+                    const found = await resolveInternalUser(email, '');
+                    if (found) {
+                        resolvedUserId = found.id;
+                        type = 'internal';
+                    } else {
+                        type = 'external';
+                    }
+                }
+
+                return { rowNumber, email, employeeCode: '', fullName: '', organizationName: '', phoneNumber: '', type, error, resolvedUserId };
+            }));
+
+            setImportPreview(parsed);
+        } finally {
+            setImportProcessing(false);
+        }
     };
 
     const handleConfirmImport = () => {
@@ -465,23 +658,22 @@ const BookMeeting = () => {
 
         importPreview.forEach(item => {
             if (item.type === 'internal') {
-                const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
-                if (foundUser) {
-                    if (!newSelectedIds.includes(foundUser.id)) {
-                        newSelectedIds.push(foundUser.id);
+                if (item.resolvedUserId) {
+                    if (!newSelectedIds.includes(item.resolvedUserId)) {
+                        newSelectedIds.push(item.resolvedUserId);
                     }
                     internalMatchedCount++;
                 } else {
                     // This case should not happen because we already validated and set error if not found.
-                    // But just in case, we do not add to external to prevent fake internal users.
-                    console.warn(`Internal user ${item.email} not found in users list.`);
+                    console.warn(`Internal row ${item.email || item.employeeCode} missing resolvedUserId.`);
                 }
             } else {
-                if (!newExternal.some(e => e.email.toLowerCase() === item.email.toLowerCase())) {
+                if (!newExternal.some(ex => ex.email.toLowerCase() === item.email.toLowerCase())) {
                     newExternal.push({
                         id: `ext-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                         email: item.email,
-                        fullName: item.email.split('@')[0],
+                        fullName: item.fullName || item.email.split('@')[0],
+                        ...(item.organizationName ? { organization: item.organizationName } : {}),
                         isExternal: true
                     });
                 }
@@ -594,10 +786,27 @@ const BookMeeting = () => {
 
             if (meetingId && agendaList.length > 0) {
                 try {
-                    await replaceAgendas(meetingId, agendaList.map(item => ({
+                    const payloadAgendas = agendaList.map(item => ({
                         title: item.title,
                         plannedDurationMinutes: Number(item.durationMin)
-                    })));
+                    }));
+                    const agendaRes = await replaceAgendas(meetingId, payloadAgendas);
+
+                    if (agendaRes?.success && agendaRes.data?.items) {
+                        const savedItems = agendaRes.data.items;
+                        for (let i = 0; i < agendaList.length; i++) {
+                            if (agendaList[i].file && savedItems[i]) {
+                                const formData = new FormData();
+                                formData.append('file', agendaList[i].file);
+                                try {
+                                    await uploadAgendaAttachment(meetingId, savedItems[i].id, formData);
+                                } catch (uploadErr) {
+                                    console.error('Failed to upload attachment', uploadErr);
+                                    subWarnings.push(`file đính kèm cho "${agendaList[i].title}"`);
+                                }
+                            }
+                        }
+                    }
                 } catch (subErr) {
                     console.error('Failed to save agenda', subErr);
                     subWarnings.push('chương trình họp (agenda)');
@@ -1046,23 +1255,24 @@ const BookMeeting = () => {
                                     )}
 
                                     {/* Search & Import Section */}
-                                    <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                                        {/* Search Input - Left side */}
                                         <div className="relative flex-1">
-                                            <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-blue/60" />
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-blue/60" />
                                             <input
                                                 type="text"
                                                 value={searchEmail}
                                                 onChange={(e) => setSearchEmail(e.target.value)}
                                                 onFocus={() => setSearchFocused(true)}
                                                 onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-                                                placeholder="Tìm kiếm nhân viên theo email..."
-                                                className="w-full pl-10 pr-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
+                                                placeholder="Tìm kiếm theo tên, email hoặc tên phòng ban..."
+                                                className="w-full pl-9 pr-8 py-1.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white shadow-sm"
                                             />
                                             {searchEmail && (
                                                 <button
                                                     type="button"
                                                     onClick={() => setSearchEmail('')}
-                                                    className="absolute right-3 top-3.5 text-slate-blue/50 hover:text-slate-blue"
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-blue/50 hover:text-slate-blue"
                                                 >
                                                     <X className="w-4 h-4" />
                                                 </button>
@@ -1070,24 +1280,64 @@ const BookMeeting = () => {
 
                                             {/* Floating Autocomplete Dropdown suggestions list */}
                                             {searchFocused && (
-                                                <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-platinum-tint rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-cloud-mist">
-                                                    {getFilteredUsers().filter(u => !selectedParticipantIds.includes(u.id)).length > 0 ? (
-                                                        getFilteredUsers()
-                                                            .filter(u => !selectedParticipantIds.includes(u.id))
-                                                            .map(user => {
+                                                <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-platinum-tint rounded-xl shadow-lg max-h-72 overflow-y-auto divide-y divide-cloud-mist">
+                                                    {searchingUsers ? (
+                                                        <div className="p-4 flex items-center justify-center gap-2 text-xs text-slate-blue">
+                                                            <div className="w-3.5 h-3.5 border-2 border-action-blue border-t-transparent rounded-full animate-spin" />
+                                                            Đang tìm kiếm...
+                                                        </div>
+                                                    ) : (visibleSuggestions.length > 0 || visibleDepartments.length > 0) ? (
+                                                        <>
+                                                            {/* Departments */}
+                                                            {visibleDepartments.map(dept => (
+                                                                <div
+                                                                    key={`dept-${dept.id}`}
+                                                                    onMouseDown={() => {
+                                                                        handleAddDepartment(dept.id);
+                                                                        setSearchEmail('');
+                                                                    }}
+                                                                    className="p-3 hover:bg-royal-amethyst/5 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between text-midnight-indigo transition-colors gap-3 bg-slate-50 border-b border-platinum-tint/50"
+                                                                >
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-9 h-9 rounded-lg bg-royal-amethyst/10 flex items-center justify-center shrink-0 border border-royal-amethyst/20">
+                                                                            <Building className="w-4 h-4 text-royal-amethyst" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-royal-amethyst">
+                                                                                Phòng: {dept.departmentName || dept.department_name}
+                                                                            </p>
+                                                                            <p className="text-[11px] font-medium text-slate-blue opacity-80 mt-0.5">Thêm toàn bộ nhân viên phòng này vào danh sách</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="px-3 py-2 rounded-lg bg-royal-amethyst hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors w-full sm:w-auto mt-2 sm:mt-0">
+                                                                        <Users className="w-3.5 h-3.5" /> Thêm tất cả
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+
+                                                            {/* Users */}
+                                                            {visibleSuggestions.map(user => {
                                                                 const deptCode = getUserDeptCode(user);
+                                                                const isSelected = selectedParticipantIds.includes(user.id);
                                                                 return (
                                                                     <div
                                                                         key={user.id}
-                                                                        onMouseDown={() => {
+                                                                        onMouseDown={(e) => {
+                                                                            // Prevent blurring the input so they can toggle multiple without closing
+                                                                            e.preventDefault();
                                                                             toggleParticipant(user.id);
-                                                                            setSearchEmail('');
+                                                                            if (!isSelected) {
+                                                                                setSearchEmail('');
+                                                                            }
                                                                         }}
-                                                                        className="p-2.5 hover:bg-action-blue/[0.03] cursor-pointer flex items-center justify-between text-slate-blue transition-colors gap-3 min-w-0"
+                                                                        className={`p-3 cursor-pointer flex items-center justify-between transition-colors gap-3 min-w-0 group ${isSelected
+                                                                            ? 'bg-action-blue/[0.04] hover:bg-rose-50/50 border-l-2 border-action-blue'
+                                                                            : 'hover:bg-action-blue/[0.03] border-l-2 border-transparent'
+                                                                            }`}
                                                                     >
-                                                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                                                             {/* Mini Avatar in dropdown */}
-                                                                            <div className="w-8 h-8 rounded-full overflow-hidden border border-platinum-tint flex-shrink-0 bg-gradient-to-tr from-action-blue to-cyan-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                                                            <div className="w-9 h-9 rounded-full overflow-hidden border border-platinum-tint flex-shrink-0 bg-gradient-to-tr from-action-blue to-cyan-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                                                                                 {user.avatarUrl ? (
                                                                                     <img src={user.avatarUrl} alt={user.fullName || user.full_name} className="w-full h-full object-cover" />
                                                                                 ) : (
@@ -1096,40 +1346,51 @@ const BookMeeting = () => {
                                                                             </div>
                                                                             <div className="space-y-0.5 min-w-0 flex-1">
                                                                                 <div className="flex items-center gap-1.5 min-w-0">
-                                                                                    <p className="text-sm font-semibold text-midnight-indigo truncate" title={user.fullName || user.full_name}>
+                                                                                    <p className={`text-sm font-semibold truncate ${isSelected ? 'text-midnight-indigo' : 'text-midnight-indigo'}`} title={user.fullName || user.full_name}>
                                                                                         {user.fullName || user.full_name}
                                                                                     </p>
                                                                                     {deptCode && (
                                                                                         <span
-                                                                                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue shrink-0 max-w-[85px] truncate"
+                                                                                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 max-w-[85px] truncate ${isSelected ? 'bg-action-blue/20 text-action-blue' : 'bg-action-blue/10 text-action-blue'
+                                                                                                }`}
                                                                                             title={deptCode}
                                                                                         >
                                                                                             {deptCode}
                                                                                         </span>
                                                                                     )}
                                                                                 </div>
-                                                                                <p className="text-[11px] opacity-75 truncate" title={user.email}>{user.email}</p>
+                                                                                <p className="text-xs text-slate-blue opacity-75 truncate" title={user.email}>{user.email}</p>
                                                                             </div>
                                                                         </div>
-                                                                        <Plus className="w-4 h-4 text-action-blue opacity-60 hover:opacity-100 shrink-0" />
+                                                                        {isSelected ? (
+                                                                            <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all duration-200 shrink-0 group-hover:bg-rose-600 group-hover:border-rose-600 shadow-sm" title="Bỏ chọn">
+                                                                                <Check className="w-3 h-3 block group-hover:hidden" />
+                                                                                <X className="w-3 h-3 hidden group-hover:block" />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <Plus className="w-4 h-4 text-action-blue opacity-60 group-hover:opacity-100 shrink-0" title="Thêm vào danh sách" />
+                                                                        )}
                                                                     </div>
                                                                 );
-                                                            })
+                                                            })}
+                                                        </>
                                                     ) : (
                                                         <div className="p-4 text-center text-xs text-slate-blue italic">
-                                                            {searchEmail ? 'Không tìm thấy nhân viên phù hợp.' : 'Không còn gợi ý nhân viên nào.'}
+                                                            {searchEmail ? 'Không tìm thấy nhân viên hay phòng ban phù hợp.' : 'Nhập tên nhân viên hoặc phòng ban để tìm kiếm...'}
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Actions - Right side */}
                                         <button
                                             type="button"
                                             onClick={() => setShowImportModal(true)}
-                                            className="px-4 py-2.5 bg-cloud-mist hover:bg-platinum-tint/50 text-slate-blue hover:text-midnight-indigo border border-platinum-tint rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shrink-0"
+                                            className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shrink-0 shadow-sm"
                                         >
-                                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                                            Import danh sách
+                                            <FileSpreadsheet className="w-3 h-3" />
+                                            <span>Thêm danh sách</span>
                                         </button>
                                     </div>
 
@@ -1347,6 +1608,14 @@ const BookMeeting = () => {
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-xs font-medium text-slate-blue bg-cloud-mist px-2.5 py-0.5 rounded-full">{item.durationMin} phút</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleEditAgenda(index)}
+                                                            className="p-1 text-slate-blue hover:text-action-blue rounded transition-colors"
+                                                            title="Sửa chương trình"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => handleRemoveAgenda(index)}
@@ -1569,7 +1838,7 @@ const BookMeeting = () => {
                                 <div className="flex items-center justify-between p-5 border-b border-cloud-mist bg-cloud-mist/20">
                                     <div className="flex items-center gap-2">
                                         <FileSpreadsheet className="w-5 h-5 text-action-blue" />
-                                        <h3 className="font-bold text-base text-midnight-indigo">Import danh sách khách mời</h3>
+                                        <h3 className="font-bold text-base text-midnight-indigo"> Thêm danh sách</h3>
                                     </div>
                                     <button
                                         type="button"
@@ -1631,52 +1900,20 @@ const BookMeeting = () => {
                                                 />
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-4">
-                                                <span className="text-xs font-semibold text-slate-blue">Phân loại email nhập vào:</span>
-                                                <div className="flex items-center gap-4">
-                                                    <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
-                                                        <input
-                                                            type="radio"
-                                                            name="manualType"
-                                                            value="auto"
-                                                            checked={manualType === 'auto'}
-                                                            onChange={() => setManualType('auto')}
-                                                            className="text-action-blue focus:ring-action-blue"
-                                                        />
-                                                        Tự động nhận diện
-                                                    </label>
-                                                    <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
-                                                        <input
-                                                            type="radio"
-                                                            name="manualType"
-                                                            value="internal"
-                                                            checked={manualType === 'internal'}
-                                                            onChange={() => setManualType('internal')}
-                                                            className="text-action-blue focus:ring-action-blue"
-                                                        />
-                                                        Trong công ty (Nội bộ)
-                                                    </label>
-                                                    <label className="flex items-center gap-1.5 text-xs text-slate-blue cursor-pointer select-none">
-                                                        <input
-                                                            type="radio"
-                                                            name="manualType"
-                                                            value="external"
-                                                            checked={manualType === 'external'}
-                                                            onChange={() => setManualType('external')}
-                                                            className="text-action-blue focus:ring-action-blue"
-                                                        />
-                                                        Ngoài công ty (Khách ngoài)
-                                                    </label>
-                                                </div>
+                                            <div className="flex flex-wrap items-center gap-4 hidden">
+                                                {/* Hidden since system automatically checks now */}
                                             </div>
 
                                             <div className="flex justify-end">
                                                 <button
                                                     type="button"
                                                     onClick={handleManualImport}
-                                                    disabled={!manualEmails.trim()}
-                                                    className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all"
+                                                    disabled={!manualEmails.trim() || importProcessing}
+                                                    className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
                                                 >
+                                                    {importProcessing && (
+                                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                    )}
                                                     Xem trước danh sách
                                                 </button>
                                             </div>
@@ -1705,10 +1942,17 @@ const BookMeeting = () => {
                                                     type="file"
                                                     accept=".xlsx, .xls"
                                                     onChange={handleExcelImport}
-                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                    disabled={importProcessing}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full disabled:cursor-not-allowed"
                                                 />
-                                                <Upload className="w-8 h-8 text-slate-blue/60 group-hover:text-action-blue transition-colors mb-2" />
-                                                <p className="text-xs font-bold text-midnight-indigo">Click để chọn hoặc kéo thả file Excel vào đây</p>
+                                                {importProcessing ? (
+                                                    <div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin mb-2" />
+                                                ) : (
+                                                    <Upload className="w-8 h-8 text-slate-blue/60 group-hover:text-action-blue transition-colors mb-2" />
+                                                )}
+                                                <p className="text-xs font-bold text-midnight-indigo">
+                                                    {importProcessing ? 'Đang đối chiếu dữ liệu với hệ thống...' : 'Click để chọn hoặc kéo thả file Excel vào đây'}
+                                                </p>
                                                 <p className="text-[10px] text-slate-blue mt-1">Hỗ trợ file định dạng .xlsx, .xls</p>
                                             </div>
 
@@ -1717,35 +1961,43 @@ const BookMeeting = () => {
                                                     <Info className="w-3.5 h-3.5 text-action-blue" /> Hướng dẫn định dạng cột Excel:
                                                 </h4>
                                                 <p className="text-[11px] text-slate-blue leading-relaxed">
-                                                    Hệ thống sẽ quét file Excel và đọc các cột:
+                                                    File dùng đúng bộ cột chuẩn của hệ thống (giống định dạng khi thêm thành viên ở trang chi tiết cuộc họp):
                                                 </p>
                                                 <ul className="list-disc pl-4 text-[11px] text-slate-blue space-y-0.5">
-                                                    <li>Cột <strong>Email</strong>: Chứa địa chỉ email của người tham gia.</li>
-                                                    <li>Cột <strong>Trong công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là nhân viên nội bộ, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
-                                                    <li>Cột <strong>Ngoài công ty</strong>: Đánh dấu <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">✓</code> nếu là khách ngoài, <code className="px-1 py-0.2 bg-white border rounded font-semibold text-rose-500">✗</code> nếu không.</li>
-                                                    <li className="text-[10px] italic text-slate-blue/70">Nếu cả 2 cột đều bỏ trống, hệ thống sẽ tự nhận diện theo đuôi email.</li>
+                                                    <li>Cột <strong>type</strong>: <code className="px-1 py-0.2 bg-white border rounded font-semibold text-blue-600">internal</code> (nhân viên nội bộ) hoặc <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">external</code> (khách ngoài) — bắt buộc.</li>
+                                                    <li>Cột <strong>email</strong>: định danh chính cho nhân viên nội bộ (ưu tiên); bắt buộc với khách ngoài.</li>
+                                                    <li>Cột <strong>employee_code</strong>: mã nhân viên — dùng thay email khi tra cứu nhân viên nội bộ.</li>
+                                                    <li>Cột <strong>full_name</strong>: bắt buộc với khách ngoài.</li>
+                                                    <li>Cột <strong>organization_name</strong>: tổ chức của khách ngoài (tùy chọn).</li>
+                                                    <li className="text-[10px] italic text-slate-blue/70">Cột phone_number chỉ để tham khảo, chưa được lưu ở bước tạo cuộc họp.</li>
                                                 </ul>
 
                                                 {/* Mini preview table */}
-                                                <div className="mt-2 border border-blue-100 rounded-lg overflow-hidden">
-                                                    <table className="w-full text-[10.5px] text-center">
+                                                <div className="mt-2 border border-blue-100 rounded-lg overflow-hidden overflow-x-auto">
+                                                    <table className="w-full text-[10.5px] text-left">
                                                         <thead>
                                                             <tr className="bg-blue-50/60 text-slate-blue font-bold">
-                                                                <th className="py-1.5 px-2 text-left">Email</th>
-                                                                <th className="py-1.5 px-2">Trong công ty</th>
-                                                                <th className="py-1.5 px-2">Ngoài công ty</th>
+                                                                <th className="py-1.5 px-2">type</th>
+                                                                <th className="py-1.5 px-2">email</th>
+                                                                <th className="py-1.5 px-2">employee_code</th>
+                                                                <th className="py-1.5 px-2">full_name</th>
+                                                                <th className="py-1.5 px-2">organization_name</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="text-slate-blue/80">
                                                             <tr className="border-t border-blue-50">
-                                                                <td className="py-1 px-2 text-left">nhanvien@smrmpts.com</td>
-                                                                <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
-                                                                <td className="py-1 px-2 text-rose-400">✗</td>
+                                                                <td className="py-1 px-2 text-blue-600 font-bold">internal</td>
+                                                                <td className="py-1 px-2">nhanvien@smrmpts.com</td>
+                                                                <td className="py-1 px-2">—</td>
+                                                                <td className="py-1 px-2">—</td>
+                                                                <td className="py-1 px-2">—</td>
                                                             </tr>
                                                             <tr className="border-t border-blue-50">
-                                                                <td className="py-1 px-2 text-left">khachngoai@gmail.com</td>
-                                                                <td className="py-1 px-2 text-rose-400">✗</td>
-                                                                <td className="py-1 px-2 text-emerald-600 font-bold">✓</td>
+                                                                <td className="py-1 px-2 text-emerald-600 font-bold">external</td>
+                                                                <td className="py-1 px-2">khachngoai@gmail.com</td>
+                                                                <td className="py-1 px-2">—</td>
+                                                                <td className="py-1 px-2">Nguyễn Văn A</td>
+                                                                <td className="py-1 px-2">Công ty ABC</td>
                                                             </tr>
                                                         </tbody>
                                                     </table>
@@ -1771,51 +2023,48 @@ const BookMeeting = () => {
                                                 <table className="w-full text-left text-xs border-collapse">
                                                     <thead>
                                                         <tr className="bg-cloud-mist/50 border-b border-platinum-tint font-bold text-slate-blue">
-                                                            <th className="p-3">Email</th>
-                                                            <th className="p-3 text-center">Trong công ty</th>
-                                                            <th className="p-3 text-center">Ngoài công ty</th>
+                                                            <th className="p-3">Định danh</th>
+                                                            <th className="p-3 text-center">Loại</th>
                                                             <th className="p-3 text-right">Trạng thái đối khớp / Lỗi</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {importPreview.map((item, idx) => {
                                                             const isInternal = item.type === 'internal';
-                                                            const foundUser = users.find(u => u.email && u.email.toLowerCase() === item.email.toLowerCase());
+                                                            const resolvedUser = isInternal && item.resolvedUserId
+                                                                ? usersById[item.resolvedUserId]
+                                                                : null;
+                                                            const identifier = item.email || item.employeeCode || item.fullName || '(Để trống)';
 
                                                             let matchStatus = 'Khách ngoài công ty';
                                                             let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
 
                                                             if (isInternal) {
-                                                                if (foundUser) {
-                                                                    matchStatus = `Nhân viên: ${foundUser.fullName || foundUser.full_name}`;
+                                                                if (resolvedUser) {
+                                                                    matchStatus = `Nhân viên: ${resolvedUser.fullName || resolvedUser.full_name}`;
                                                                     badgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
                                                                 } else {
-                                                                    matchStatus = 'Không thấy NV (Coi là khách)';
+                                                                    matchStatus = 'Không tìm thấy nhân viên';
                                                                     badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
                                                                 }
                                                             }
 
                                                             if (item.error) {
-                                                                matchStatus = 'Lỗi định dạng';
+                                                                matchStatus = 'Lỗi';
                                                                 badgeClass = 'bg-red-50 text-red-700 border-red-100';
                                                             }
 
                                                             return (
                                                                 <tr key={idx} className={`border-b border-platinum-tint/50 hover:bg-cloud-mist/20 transition-colors ${item.error ? 'bg-rose-50/20' : ''}`}>
                                                                     <td className="p-3 font-medium text-midnight-indigo">
-                                                                        <span className={item.error ? 'text-rose-600 font-semibold' : ''}>{item.email || '(Để trống)'}</span>
+                                                                        <span className={item.error ? 'text-rose-600 font-semibold' : ''}>{identifier}</span>
                                                                         {item.error && (
                                                                             <span className="block text-[10px] text-rose-500 font-bold mt-0.5">{item.error}</span>
                                                                         )}
                                                                     </td>
                                                                     <td className="p-3 text-center">
-                                                                        <span className={`text-sm font-bold ${isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
-                                                                            {isInternal ? '✓' : '✗'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="p-3 text-center">
-                                                                        <span className={`text-sm font-bold ${!isInternal ? 'text-emerald-600' : 'text-rose-400'}`}>
-                                                                            {!isInternal ? '✓' : '✗'}
+                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isInternal ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                                            {isInternal ? 'Nội bộ' : 'Ngoài'}
                                                                         </span>
                                                                     </td>
                                                                     <td className="p-3 text-right">
@@ -1849,7 +2098,7 @@ const BookMeeting = () => {
                                     <button
                                         type="button"
                                         onClick={handleConfirmImport}
-                                        disabled={importPreview.length === 0 || importPreview.some(p => p.error !== '')}
+                                        disabled={importPreview.length === 0 || importProcessing || importPreview.some(p => p.error !== '')}
                                         className="px-4 py-2 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                                     >
                                         Xác nhận thêm ({importPreview.length})

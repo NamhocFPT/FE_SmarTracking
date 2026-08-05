@@ -1,4 +1,4 @@
-import { get, post, patch, put, buildQuery } from '../utils/request';
+import { get, post, patch, put, dele, buildQuery } from '../utils/request';
 
 // ============================================================
 // EMPLOYEE APIs (UC-SM-01 ~ UC-SM-03)
@@ -57,6 +57,20 @@ export const addRecordingConfig = async (meetingId, data) => {
  */
 export const replaceAgendas = async (meetingId, items) => {
     return await put(`/meetings/${meetingId}/agendas`, { items });
+};
+
+export const updateAgendaItem = async (meetingId, agendaId, data) => {
+    return await patch(`/meetings/${meetingId}/agendas/${agendaId}`, data);
+};
+
+export const uploadAgendaAttachment = async (meetingId, agendaId, formData) => {
+    return await post(`/meetings/${meetingId}/agendas/${agendaId}/attachments`, formData, {
+        headers: {} // Let browser set multipart/form-data with boundary
+    });
+};
+
+export const deleteAgendaAttachment = async (meetingId, agendaId, fileId) => {
+    return await dele(`/meetings/${meetingId}/agendas/${agendaId}/attachments/${fileId}`);
 };
 
 /**

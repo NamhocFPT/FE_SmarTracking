@@ -403,3 +403,13 @@ export const getRecordingConfig = async (meetingId) => {
 export const updateRecordingConfig = async (meetingId, data) => {
     return await patch(`/meetings/${meetingId}/recording-config`, data);
 };
+
+export const uploadAgendaAttachment = async (meetingId, agendaId, formData) => {
+    return await post(`/meetings/${meetingId}/agendas/${agendaId}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+};
+
+export const deleteAgendaAttachment = async (meetingId, agendaId, fileId) => {
+    return await dele(`/meetings/${meetingId}/agendas/${agendaId}/attachments/${fileId}`);
+};
