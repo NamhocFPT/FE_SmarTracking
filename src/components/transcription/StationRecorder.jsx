@@ -46,7 +46,7 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
     };
 
     return (
-        <div className="flex flex-col sm:flex-row items-center gap-4 bg-white border border-platinum-tint p-4 rounded-2xl shadow-sm">
+        <div className="flex flex-col gap-4 bg-white border border-platinum-tint p-4 rounded-2xl shadow-sm w-full overflow-hidden">
             {/* Control Button */}
             <div>
                 {!isRecording ? (
@@ -87,7 +87,7 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
 
             {/* Speaker Marker Section */}
             {isRecording && (
-                <div className="flex-1 flex items-center justify-end gap-3 border-l border-platinum-tint pl-4 ml-2">
+                <div className="flex flex-col gap-2 border-t sm:border-t-0 sm:border-l border-platinum-tint pt-4 sm:pt-0 sm:pl-4">
                     {showToast && (
                         <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md animate-fade-in-up">
                             <Check className="w-3.5 h-3.5" />

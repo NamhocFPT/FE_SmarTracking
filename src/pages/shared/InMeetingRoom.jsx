@@ -1169,21 +1169,34 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
                         {/* Lưới người tham gia — số cột tự tính theo số người, không còn "ghế" cố định */}
                         <div className="flex-1 min-h-[420px] flex items-start">
-                            <MeetingGrid
-                                participants={meetingState.participants || []}
-                                myParticipantId={myParticipantId}
-                                isHost={isHost}
-                                isVideoOn={isVideoOn}
-                                onHostMuteToggle={handleHostMuteToggle}
-                                onRename={(pId, currentName, isSelf) => {
-                                    if (isSelf) handleRenameSelf();
-                                    else handleHostRename(pId, currentName);
-                                }}
-                                reactionsByParticipantId={floatingReactions.reduce((acc, fr) => {
-                                    acc[fr.participantId] = fr.emoji;
-                                    return acc;
-                                }, {})}
-                            />
+                            {(() => {
+                                const presentUserIds = new Set(
+                                    attendance
+                                        .filter(a => ['present', 'maybe_present', 'late', 'checked_in'].includes(a.presenceStatus || a.attendanceStatus || ''))
+                                        .map(a => a.userId || a.user_id || a.id)
+                                );
+                                const activeParticipants = (meetingState.participants || []).filter(
+                                    p => presentUserIds.has(p.id) || p.id === myParticipantId || p.role === 'Chủ tọa' || p.isBot
+                                );
+
+                                return (
+                                    <MeetingGrid
+                                        participants={activeParticipants}
+                                        myParticipantId={myParticipantId}
+                                        isHost={isHost}
+                                        isVideoOn={isVideoOn}
+                                        onHostMuteToggle={handleHostMuteToggle}
+                                        onRename={(pId, currentName, isSelf) => {
+                                            if (isSelf) handleRenameSelf();
+                                            else handleHostRename(pId, currentName);
+                                        }}
+                                        reactionsByParticipantId={floatingReactions.reduce((acc, fr) => {
+                                            acc[fr.participantId] = fr.emoji;
+                                            return acc;
+                                        }, {})}
+                                    />
+                                );
+                            })()}
                         </div>
 
                         {/* THANH ĐIỀU KHIỂN DƯỚI CÙNG */}
@@ -1259,7 +1272,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 onClick={handleLeaveRoom}
                                 className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-full text-xs font-bold transition-colors flex items-center gap-2 shadow-md shadow-red-600/20"
                             >
-                                <PhoneOff className="w-4 h-4" /> Leave
+                                <PhoneOff className="w-4 h-4" /> Rời khỏi
                             </button>
                         </div>
 
@@ -1268,17 +1281,17 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     {/* ROOM PANEL — sidebar phải, dạng tab */}
                     <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-platinum-tint bg-white flex flex-col overflow-y-auto">
                         <div className="px-6 pt-6 pb-4 border-b border-platinum-tint">
-                            <h2 className="text-sm font-extrabold text-midnight-indigo">Room Panel</h2>
-                            <p className="text-[11px] text-slate-blue">Manage session</p>
+                            <h2 className="text-sm font-extrabold text-midnight-indigo">Bảng điều khiển</h2>
+                            <p className="text-[11px] text-slate-blue">Quản lý phiên họp</p>
                         </div>
 
                         {/* Tab điều hướng */}
                         <nav className="flex flex-col px-2 py-2 border-b border-platinum-tint">
                             {[
-                                ...(isHost ? [{ id: 'host', label: 'Host Controls', icon: Shield }] : []),
-                                { id: 'agenda', label: 'Agenda', icon: Calendar },
-                                { id: 'notes', label: 'Notes', icon: StickyNote },
-                                { id: 'attendance', label: 'Attendance', icon: Users },
+                                ...(isHost ? [{ id: 'host', label: 'Quản lý phòng', icon: Shield }] : []),
+                                { id: 'agenda', label: 'Lịch trình', icon: Calendar },
+                                { id: 'notes', label: 'Ghi chú', icon: StickyNote },
+                                { id: 'attendance', label: 'Người tham gia', icon: Users },
                             ].map(tab => (
                                 <button
                                     key={tab.id}
@@ -1318,12 +1331,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 )}
 
                                 <div className="bg-white border border-platinum-tint rounded-2xl p-4 space-y-3.5 shadow-sm-1">
-                                    <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest">Active Permissions</h3>
+                                    <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest">Quyền tương tác</h3>
 
                                     {/* Screen Share — BE hiện chưa có endpoint hỗ trợ, để disabled thay vì giả lập chạy được */}
                                     <div className="flex items-center justify-between opacity-60" title="BE chưa hỗ trợ chia sẻ màn hình">
                                         <span className="text-xs font-semibold text-midnight-indigo flex items-center gap-1.5">
-                                            <MonitorUp className="w-4 h-4" /> Screen Share
+                                            <MonitorUp className="w-4 h-4" /> Chia sẻ màn hình
                                         </span>
                                         <span className="relative inline-flex h-5 w-9 items-center rounded-full bg-pale-gray cursor-not-allowed">
                                             <span className="inline-block h-4 w-4 translate-x-0.5 rounded-full bg-white shadow" />
@@ -1333,7 +1346,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     {/* Record Session — gắn thật vào recording-config / recording-session BE */}
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-semibold text-midnight-indigo flex items-center gap-1.5">
-                                            <VideoIcon className="w-4 h-4" /> Record Session
+                                            <VideoIcon className="w-4 h-4" /> Ghi hình cuộc họp
                                         </span>
                                         <button
                                             type="button"
@@ -1393,12 +1406,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 {/* Next agenda item */}
                                 {meetingState.agenda?.[meetingState.currentAgendaIndex + 1] && (
                                     <div className="bg-action-blue rounded-2xl p-4 text-white space-y-1 shadow-md shadow-action-blue/20">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Next agenda item</span>
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Mục lịch trình tiếp theo</span>
                                         <h4 className="text-sm font-extrabold leading-snug">
                                             {meetingState.agenda[meetingState.currentAgendaIndex + 1].title}
                                         </h4>
                                         <p className="text-[11px] opacity-90">
-                                            Starts in {Math.max(1, Math.ceil(meetingState.agendaTimeLeft / 60))} mins
+                                            Bắt đầu trong {Math.max(1, Math.ceil(meetingState.agendaTimeLeft / 60))} phút
                                         </p>
                                         {meetingState.currentAgendaIndex + 1 < meetingState.agenda.length && (
                                             <button
