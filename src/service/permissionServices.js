@@ -60,3 +60,7 @@ export const getRolePermissions = async (roleId) => {
 export const assignRolePermissions = async (roleId, permissionIds) => {
     return await post(`/roles/${roleId}/permissions`, { permissionIds });
 };
+
+export const revokeRolePermission = async (roleId, permissionId) => {
+    return await dele(`/roles/${roleId}/permissions/${permissionId}`);
+};

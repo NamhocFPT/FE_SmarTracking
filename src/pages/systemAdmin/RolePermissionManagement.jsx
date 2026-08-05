@@ -2,10 +2,12 @@ import { AlertTriangle, CheckCircle, Key, Plus, RefreshCw, Save, Search, Shield,
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import { 
-    getRoles, getPermissions, getRolePermissions, 
-    assignRolePermissions, createRole, updateRole, deleteRole
+import {
+    getRoles, getPermissions, getRolePermissions,
+    assignRolePermissions, revokeRolePermission, createRole, updateRole, deleteRole
 } from '../../service/permissionServices';
+import { PERMISSION_MODULE_STATUS } from '../../config/permissionModuleStatus';
+import { PERMISSION_DEPENDENCIES } from '../../config/permissionDependencies';
 
 
 const MODULE_TRANSLATIONS = {
@@ -44,6 +46,7 @@ const RolePermissionManagement = () => {
     const [permissions, setPermissions] = useState([]);
     const [selectedRole, setSelectedRole] = useState(null);
     const [rolePermissions, setRolePermissions] = useState([]); // IDs of permissions for the selected role
+    const [originalRolePermissions, setOriginalRolePermissions] = useState([]); // IDs as loaded from server, used to diff on save
     
     // UI states
     const [loading, setLoading] = useState(true);
@@ -111,6 +114,7 @@ const RolePermissionManagement = () => {
                 // BE might return full permission objects or just IDs. Assuming full objects.
                 const assignedIds = (res.data || []).map(p => p.permissionId || p.id);
                 setRolePermissions(assignedIds);
+                setOriginalRolePermissions(assignedIds);
             }
         } catch (err) {
             setError('Không thể tải danh sách quyền của vai trò này.');
@@ -119,30 +123,89 @@ const RolePermissionManagement = () => {
         }
     };
 
-    // Handle toggling a permission checkbox
+    // Handle toggling a permission checkbox.
+    // Enforces a one-way dependency: ticking a "write" permission auto-ticks its required "read"
+    // permission (if declared in PERMISSION_DEPENDENCIES); unticking a "read" permission is blocked
+    // while a still-ticked "write" permission depends on it. Read-only grants remain unaffected.
     const handleTogglePermission = (permissionId) => {
-        setRolePermissions(prev => 
-            prev.includes(permissionId)
-                ? prev.filter(id => id !== permissionId)
-                : [...prev, permissionId]
-        );
+        const target = permissions.find(p => p.id === permissionId);
+        const isCurrentlyChecked = rolePermissions.includes(permissionId);
+
+        if (!isCurrentlyChecked) {
+            const deps = (target && PERMISSION_DEPENDENCIES[target.permissionCode]) || [];
+            const depIds = deps
+                .map(code => permissions.find(p => p.permissionCode === code)?.id)
+                .filter(id => id && !rolePermissions.includes(id));
+            if (depIds.length > 0) {
+                setError(null);
+                setSuccessMessage(`Đã tự động thêm ${depIds.length} quyền xem cần thiết cho "${target.permissionName}".`);
+            }
+            setRolePermissions(prev => [...prev, permissionId, ...depIds]);
+            return;
+        }
+
+        const blockedBy = target && rolePermissions
+            .filter(id => id !== permissionId)
+            .map(id => permissions.find(p => p.id === id))
+            .find(p => p && PERMISSION_DEPENDENCIES[p.permissionCode]?.includes(target.permissionCode));
+        if (blockedBy) {
+            setSuccessMessage(null);
+            setError(`Không thể gỡ "${target.permissionName}" vì "${blockedBy.permissionName}" đang được chọn và cần quyền này. Hãy gỡ "${blockedBy.permissionName}" trước.`);
+            return;
+        }
+
+        setRolePermissions(prev => prev.filter(id => id !== permissionId));
     };
 
-    // Save assigned permissions
+    // Save assigned permissions: diff against the originally loaded set so
+    // unchecked permissions are actually revoked (POST only ever adds, never removes).
     const handleSavePermissions = async () => {
         if (!selectedRole) return;
         setSaving(true);
         setError(null);
         setSuccessMessage(null);
         try {
-            const res = await assignRolePermissions(selectedRole.id, rolePermissions);
-            if (res?.success) {
-                setSuccessMessage(`Đã cập nhật quyền cho vai trò ${selectedRole.roleName}.`);
+            const toAdd = rolePermissions.filter(id => !originalRolePermissions.includes(id));
+            const toRemove = originalRolePermissions.filter(id => !rolePermissions.includes(id));
+
+            if (toAdd.length === 0 && toRemove.length === 0) {
+                setSuccessMessage('Không có thay đổi nào để lưu.');
+                return;
+            }
+
+            if (toAdd.length > 0) {
+                await assignRolePermissions(selectedRole.id, rolePermissions);
+            }
+
+            // BE only supports revoking one permission per request.
+            // allSettled so one blocked revoke (e.g. CANNOT_REVOKE_SYSTEM_PERMISSION)
+            // doesn't hide the outcome of the others.
+            const revokeResults = await Promise.allSettled(
+                toRemove.map(id => revokeRolePermission(selectedRole.id, id))
+            );
+            const failedRevokes = revokeResults
+                .map((r, i) => ({ r, id: toRemove[i] }))
+                .filter(({ r }) => r.status === 'rejected');
+
+            // Re-sync from server so the UI always reflects real DB state,
+            // especially permissions whose revoke was blocked and must show checked again.
+            const refreshed = await getRolePermissions(selectedRole.id);
+            if (refreshed?.success) {
+                const assignedIds = (refreshed.data || []).map(p => p.permissionId || p.id);
+                setRolePermissions(assignedIds);
+                setOriginalRolePermissions(assignedIds);
+            }
+
+            if (failedRevokes.length > 0) {
+                const messages = failedRevokes
+                    .map(({ r }) => r.reason?.error?.message || r.reason?.message || 'Lỗi không xác định')
+                    .join('; ');
+                setError(`Đã lưu một phần. Không thể gỡ ${failedRevokes.length} quyền: ${messages}`);
             } else {
-                setError(res?.message || 'Không thể lưu phân quyền.');
+                setSuccessMessage(`Đã cập nhật quyền cho vai trò ${selectedRole.roleName}.`);
             }
         } catch (err) {
-            setError(err?.message || 'Lỗi khi lưu phân quyền.');
+            setError(err?.error?.message || err?.message || 'Lỗi khi lưu phân quyền.');
         } finally {
             setSaving(false);
         }
@@ -188,6 +251,7 @@ const RolePermissionManagement = () => {
                 if (selectedRole?.id === roleToDelete.id) {
                     setSelectedRole(null);
                     setRolePermissions([]);
+                    setOriginalRolePermissions([]);
                 }
                 fetchData();
             } else {
@@ -360,22 +424,33 @@ const RolePermissionManagement = () => {
                                                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {groupedPermissions[module]
                                                         .filter(p => !searchTerm || p.permissionName.toLowerCase().includes(searchTerm.toLowerCase()) || p.permissionCode.toLowerCase().includes(searchTerm.toLowerCase()))
-                                                        .map(p => (
+                                                        .map(p => {
+                                                        const moduleStatus = PERMISSION_MODULE_STATUS[p.moduleCode];
+                                                        return (
                                                         <label key={p.id} className="flex items-start space-x-3 cursor-pointer group">
                                                             <div className="flex-shrink-0 pt-0.5">
-                                                                <input 
-                                                                    type="checkbox" 
+                                                                <input
+                                                                    type="checkbox"
                                                                     className="w-4 h-4 text-action-blue border-platinum-tint rounded rounded focus:ring-action-blue"
                                                                     checked={rolePermissions.includes(p.id)}
                                                                     onChange={() => handleTogglePermission(p.id)}
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-semibold text-midnight-indigo group-hover:text-action-blue transition-colors">{p.permissionName}</p>
+                                                                <p className="text-sm font-semibold text-midnight-indigo group-hover:text-action-blue transition-colors flex items-center gap-1.5">
+                                                                    {p.permissionName}
+                                                                    {moduleStatus && (
+                                                                        <AlertTriangle
+                                                                            className="w-3.5 h-3.5 text-amber-500 flex-shrink-0"
+                                                                            title={moduleStatus.note}
+                                                                        />
+                                                                    )}
+                                                                </p>
                                                                 <p className="text-xs text-slate-blue font-mono mt-0.5">{p.permissionCode}</p>
                                                             </div>
                                                         </label>
-                                                    ))}
+                                                        );
+                                                        })}
                                                 </div>
                                             </div>
                                         ))}
