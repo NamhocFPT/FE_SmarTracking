@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, CheckSquare, Clock, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CheckSquare, Clock, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert, Image as ImageIcon } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -8,6 +8,7 @@ import {
     resolveSecurityAlert, bulkAcknowledgeSecurityAlerts 
 } from '../../service/securityAlertService';
 import { getZones } from '../../service/zoneServices';
+import EventSnapshotModal from '../../component/EventSnapshotModal';
 
 const SecurityAlerts = () => {
     const [alerts, setAlerts] = useState([]);
@@ -33,6 +34,9 @@ const SecurityAlerts = () => {
     // Modals
     const [resolveModal, setResolveModal] = useState({ open: false, alert: null });
     const [resolutionNote, setResolutionNote] = useState('');
+
+    const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
 
     const fetchZones = async () => {
         try {
@@ -366,7 +370,7 @@ const SecurityAlerts = () => {
                                         <td className="p-4">
                                             {getStatusBadge(alert.status)}
                                         </td>
-                                        <td className="p-4 text-right">
+                                        <td className="p-4 text-right flex items-start justify-end gap-2">
                                             {alert.status === 'new' && (
                                                 <button 
                                                     onClick={() => handleAcknowledge(alert.id)}
@@ -399,6 +403,18 @@ const SecurityAlerts = () => {
                                                         Note: {alert.resolution_note}
                                                     </p>
                                                 </div>
+                                            )}
+                                            {alert.source_event_id && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setSnapshotEventId(alert.source_event_id);
+                                                        setIsSnapshotOpen(true);
+                                                    }}
+                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-cloud-mist hover:bg-slate-200 text-slate-600 transition-colors"
+                                                    title="Xem ảnh hiện trường"
+                                                >
+                                                    <ImageIcon className="w-4 h-4" />
+                                                </button>
                                             )}
                                         </td>
                                     </tr>
@@ -475,6 +491,12 @@ const SecurityAlerts = () => {
                 </div>,
                 document.body
             )}
+
+            <EventSnapshotModal 
+                isOpen={isSnapshotOpen}
+                onClose={() => setIsSnapshotOpen(false)}
+                eventId={snapshotEventId}
+            />
         </div>
     );
 };

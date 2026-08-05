@@ -1,4 +1,4 @@
-import { request, get, post, patch, dele, buildQuery } from '../utils/request';
+import { request, get, post, patch, dele, buildQuery, API_BASE_URL } from '../utils/request';
 
 // ============================================================
 // DASHBOARD / ANALYTICS APIs (UC-RPT-01, UC-RPT-02, UC-RPT-03, UC-RPT-04)
@@ -575,4 +575,26 @@ export const getRoomAccessLog = async (roomId, date, params = {}) => {
         return await get(`/ivss/access-log${query}`);
     }
     return await get(`/ivss/rooms/${roomId}/access-log${query}`);
+};
+
+export const getEventSnapshot = async (eventId) => {
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`${API_BASE_URL}/ivss/device-events/${eventId}/snapshot`, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        if (response.status === 404) {
+            return { success: true, notFound: true };
+        }
+        if (!response.ok) {
+            return { success: false, message: 'Lỗi tải ảnh' };
+        }
+        const blob = await response.blob();
+        return { success: true, isBlob: true, data: blob };
+    } catch (error) {
+        return { success: false, message: 'Lỗi kết nối' };
+    }
 };

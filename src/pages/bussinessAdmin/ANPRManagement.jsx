@@ -1,4 +1,4 @@
-import { Car } from 'lucide-react';
+import { Car, Image as ImageIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { 
@@ -8,10 +8,15 @@ import {
     getMyVehicles 
 } from '../../service/anprService';
 import { getUsers } from '../../service/employeeServices'; // Để lấy danh sách nhân viên
+import EventSnapshotModal from '../../component/EventSnapshotModal';
 
 const ANPRManagement = () => {
     const [activeTab, setActiveTab] = useState('history'); // 'history', 'register', 'unknown'
     const [loading, setLoading] = useState(false);
+
+    // Snapshot Modal
+    const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
 
     // ============================================
     // TAB 1: LỊCH SỬ QUÉT BIỂN
@@ -203,6 +208,7 @@ const ANPRManagement = () => {
                                     <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Biển số nhận diện</th>
                                     <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Trạng thái (Khớp)</th>
                                     <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Chủ xe</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-right">Xem ảnh</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-platinum-tint">
@@ -229,6 +235,18 @@ const ANPRManagement = () => {
                                             </td>
                                             <td className="py-3 px-4 text-sm font-semibold text-action-blue">
                                                 {item.userId ? `User #${item.userId}` : '-'}
+                                            </td>
+                                            <td className="py-3 px-4 text-right">
+                                                <button
+                                                    onClick={() => {
+                                                        setSnapshotEventId(item.id);
+                                                        setIsSnapshotOpen(true);
+                                                    }}
+                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-action-blue/10 text-action-blue transition-colors"
+                                                    title="Xem ảnh camera"
+                                                >
+                                                    <ImageIcon className="w-4 h-4" />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))
@@ -303,6 +321,16 @@ const ANPRManagement = () => {
                                         <p className="text-xs font-semibold text-slate-blue mt-2">Phát hiện lúc:</p>
                                         <p className="text-sm font-bold text-midnight-indigo">{new Date(item.eventTime).toLocaleString('vi-VN')}</p>
                                         <p className="text-xs text-slate-blue mt-1">Camera: {item.channelId || 'Unknown'}</p>
+                                        <button
+                                            onClick={() => {
+                                                setSnapshotEventId(item.id);
+                                                setIsSnapshotOpen(true);
+                                            }}
+                                            className="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs font-bold transition-colors"
+                                        >
+                                            <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
+                                            Xem ảnh camera
+                                        </button>
                                     </div>
                                 </div>
                             ))
@@ -423,6 +451,12 @@ const ANPRManagement = () => {
                     </form>
                 </div>
             )}
+
+            <EventSnapshotModal 
+                isOpen={isSnapshotOpen}
+                onClose={() => setIsSnapshotOpen(false)}
+                eventId={snapshotEventId}
+            />
         </div>
     );
 };

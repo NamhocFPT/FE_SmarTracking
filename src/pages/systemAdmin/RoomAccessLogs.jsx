@@ -1,6 +1,7 @@
-import { AlertTriangle, ArrowUpDown, Building, Calendar, CheckCircle2, Clock, DoorOpen, Filter, RotateCw, Search, ShieldAlert, ShieldQuestion, Users } from 'lucide-react';
+import { AlertTriangle, ArrowUpDown, Building, Calendar, CheckCircle2, Clock, DoorOpen, Filter, RotateCw, Search, ShieldAlert, ShieldQuestion, Users, Image as ImageIcon, Eye } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
+import EventSnapshotModal from '../../component/EventSnapshotModal';
 
 import {
     getRooms,
@@ -108,6 +109,10 @@ const RoomAccessLogs = () => {
 
     // Pagination — server-side (BE trả data.events theo đúng 1 trang + data.pagination)
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Snapshot Modal State
+    const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
 
     // Debounce ô tìm kiếm 400ms trước khi gửi lên BE
     useEffect(() => {
@@ -576,6 +581,7 @@ const RoomAccessLogs = () => {
                                             {showRoomColumn && <th className="p-3.5">Phòng họp</th>}
                                             <th className="p-3.5">Hướng</th>
                                             <th className="p-3.5">Trạng thái đối soát</th>
+                                            <th className="p-3.5 text-center">Xem ảnh</th>
                                             <th className="p-3.5">Độ tin cậy</th>
                                             <th className="p-3.5">Gắn cuộc họp</th>
                                         </tr>
@@ -651,6 +657,20 @@ const RoomAccessLogs = () => {
                                                         </span>
                                                     </td>
 
+                                                    {/* View Snapshot button */}
+                                                    <td className="p-3.5 text-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSnapshotEventId(ev.id);
+                                                                setIsSnapshotOpen(true);
+                                                            }}
+                                                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-action-blue/10 text-action-blue transition-colors group relative"
+                                                            title="Xem ảnh camera"
+                                                        >
+                                                            <ImageIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+
                                                     {/* Similarity confidence */}
                                                     <td className="p-3.5 font-mono font-bold text-slate-500">
                                                         {ev.similarity !== null && ev.similarity !== undefined
@@ -723,6 +743,12 @@ const RoomAccessLogs = () => {
                     )}
                 </div>
             </div>
+
+            <EventSnapshotModal 
+                isOpen={isSnapshotOpen}
+                onClose={() => setIsSnapshotOpen(false)}
+                eventId={snapshotEventId}
+            />
         </div>
     );
 };

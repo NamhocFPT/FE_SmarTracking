@@ -154,6 +154,16 @@ export const updateDepartment = async (id, data) => {
     return await patch(`/departments/${id}`, data);
 };
 
+/**
+ * Danh sách nhân viên trực thuộc trực tiếp 1 phòng ban (không đệ quy phòng ban con).
+ * BE: GET /departments/:id/members — dùng để nạp nhanh cả phòng ban vào danh sách
+ * người tham dự khi đặt lịch họp.
+ * @param {string} departmentId
+ */
+export const getDepartmentMembers = async (departmentId) => {
+    return await get(`/departments/${departmentId}/members`);
+};
+
 
 
 export const getRoles = async () => {
