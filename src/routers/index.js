@@ -184,7 +184,11 @@ export const router = [
             },
             {
                 path: 'schedule',
-                element: <PersonalCalendar />
+                element: (
+                    <ProtectedRoute requiredPermission="schedule.read.self">
+                        <PersonalCalendar />
+                    </ProtectedRoute>
+                )
             },
             {
                 path: 'meeting/:id',
@@ -288,7 +292,11 @@ export const router = [
             },
             {
                 path: 'schedule',
-                element: <PersonalCalendar />
+                element: (
+                    <ProtectedRoute requiredPermission="schedule.read.self">
+                        <PersonalCalendar />
+                    </ProtectedRoute>
+                )
             },
             {
                 path: 'meeting/:id',
@@ -332,7 +340,11 @@ export const router = [
             },
             {
                 path: 'schedule',
-                element: <PersonalCalendar />
+                element: (
+                    <ProtectedRoute requiredPermission="schedule.read.self">
+                        <PersonalCalendar />
+                    </ProtectedRoute>
+                )
             },
             {
                 path: 'profile',
@@ -404,7 +416,11 @@ export const router = [
             },
             {
                 path: 'schedule',
-                element: <PersonalCalendar />
+                element: (
+                    <ProtectedRoute requiredPermission="schedule.read.self">
+                        <PersonalCalendar />
+                    </ProtectedRoute>
+                )
             },
             {
                 path: 'profile',

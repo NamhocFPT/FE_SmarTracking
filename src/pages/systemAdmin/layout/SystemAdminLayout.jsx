@@ -1,12 +1,13 @@
 import { AlertTriangle, BarChart2, Box, Calendar, Camera, Car, ChevronDown, ClipboardList, Clock, Cpu, DoorOpen, FileText, HardDrive, Home, Key, LogIn, Map, MapPin, PieChart, PlusCircle, Settings, ShieldAlert, Sliders, User, Users } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { logout } from '../../../service/authService';
+import { logout, getCurrentUser } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
 import BiometricReminderModal from '../../../component/BiometricReminder/BiometricReminderModal';
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
 import NotificationBell from '../../../component/NotificationBell';
+import { buildDynamicNavigation, filterStaticNavigation } from '../../../utils/buildDynamicNavigation';
 
 
 const chunkArray = (arr, size) => {
@@ -26,7 +27,7 @@ const chunkArray = (arr, size) => {
  * - Nhật ký hệ thống → Audit Logs (UC-CFG-02)
  * - Cài đặt → System Config (UC-CFG-01, UC-NS-06)
  */
-const navigationItems = [
+const STATIC_NAVIGATION_ITEMS = [
     {
         label: 'Bảng điều khiển',
         to: '/system-admin',
@@ -139,6 +140,7 @@ const navigationItems = [
                 label: 'Lịch của tôi',
                 to: '/system-admin/schedule',
                 icon: User,
+                requiredPermission: 'schedule.read.self',
             },
             {
                 label: 'Đăng ký cuộc họp',
@@ -187,6 +189,8 @@ const SystemAdminLayout = () => {
     const navRef = useRef(null);
     const navigate = useNavigate();
 
+    const navigationItems = [...filterStaticNavigation(STATIC_NAVIGATION_ITEMS), ...buildDynamicNavigation('system-admin')];
+
     // Load user info from localStorage
     useEffect(() => {
         try {
@@ -197,6 +201,20 @@ const SystemAdminLayout = () => {
         } catch {
             // silent - user data may not exist
         }
+
+        // Refresh effective permissions from server so newly granted/revoked
+        // permissions reflect in the navbar without requiring re-login.
+        getCurrentUser().then(res => {
+            if (Array.isArray(res?.data?.permissions)) {
+                const userStr = localStorage.getItem('user');
+                const user = userStr ? JSON.parse(userStr) : {};
+                const updatedUser = { ...user, permissions: res.data.permissions };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                setCurrentUser(updatedUser);
+            }
+        }).catch(() => {
+            // silent - keep existing cached permissions if refresh fails
+        });
     }, []);
 
     // Close profile menu on outside click

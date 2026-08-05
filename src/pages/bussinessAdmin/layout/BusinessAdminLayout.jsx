@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { logout } from '../../../service/authService';
+import { logout, getCurrentUser } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
 import BiometricReminderModal from '../../../component/BiometricReminder/BiometricReminderModal';
 import UserAvatar from '../../../component/UserAvatar';
 import ChangePasswordModal from '../../../component/ChangePasswordModal';
 import NotificationBell from '../../../component/NotificationBell';
+import { buildDynamicNavigation, filterStaticNavigation } from '../../../utils/buildDynamicNavigation';
 import {
     Home,
     Calendar,
@@ -39,7 +40,7 @@ const chunkArray = (arr, size) => {
 /**
  * Navigation items cho BusinessAdmin role
  */
-const navigationItems = [
+const STATIC_NAVIGATION_ITEMS = [
     {
         label: 'Tổng quan',
         to: '/business-admin',
@@ -52,7 +53,7 @@ const navigationItems = [
         isDropdown: true,
         icon: Calendar,
         children: [
-            { label: 'Lịch cá nhân', to: '/business-admin/schedule', icon: Calendar },
+            { label: 'Lịch cá nhân', to: '/business-admin/schedule', icon: Calendar, requiredPermission: 'schedule.read.self' },
             { label: 'Đăng ký họp', to: '/business-admin/book', icon: PlusCircle },
             { label: 'Quản lý cuộc họp', to: '/business-admin/meetings', icon: Settings },
         ],
@@ -111,6 +112,8 @@ const BusinessAdminLayout = () => {
     const navRef = useRef(null);
     const navigate = useNavigate();
 
+    const navigationItems = [...filterStaticNavigation(STATIC_NAVIGATION_ITEMS), ...buildDynamicNavigation('business-admin')];
+
     // Load user info from localStorage
     useEffect(() => {
         try {
@@ -121,6 +124,20 @@ const BusinessAdminLayout = () => {
         } catch {
             // silent - user data may not exist
         }
+
+        // Refresh effective permissions from server so newly granted/revoked
+        // permissions reflect in the navbar without requiring re-login.
+        getCurrentUser().then(res => {
+            if (Array.isArray(res?.data?.permissions)) {
+                const userStr = localStorage.getItem('user');
+                const user = userStr ? JSON.parse(userStr) : {};
+                const updatedUser = { ...user, permissions: res.data.permissions };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                setCurrentUser(updatedUser);
+            }
+        }).catch(() => {
+            // silent - keep existing cached permissions if refresh fails
+        });
     }, []);
 
     // Close profile menu on outside click
