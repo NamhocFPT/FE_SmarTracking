@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.smartracking.io.vn/api/v1';
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.smartracking.io.vn/api/v1';
 
 const decodeUnicodeEscapes = (obj) => {
     if (obj === null || obj === undefined) return obj;
@@ -210,7 +210,8 @@ const handleResponse = async (response) => {
         contentType.includes('spreadsheetml') ||
         contentType.includes('excel') ||
         contentType.includes('pdf') ||
-        contentType.includes('octet-stream')
+        contentType.includes('octet-stream') ||
+        contentType.includes('image')
     ) {
         try {
             const blob = await response.blob();
@@ -267,6 +268,7 @@ const handleResponse = async (response) => {
                 code: code,
                 requestId: requestId
             },
+            status: response.status,
             requestId: requestId
         };
     }

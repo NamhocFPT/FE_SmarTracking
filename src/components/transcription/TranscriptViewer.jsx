@@ -71,8 +71,12 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                 setStatus('empty');
             }
         } catch (err) {
-            setErrorMsg(err.message || 'Không thể tải chi tiết transcript.');
-            setStatus('error');
+            if (err.status === 404 || err.error?.code === 'NOT_FOUND' || (err.error?.message && err.error.message.includes('Không tìm thấy'))) {
+                setStatus('empty');
+            } else {
+                setErrorMsg(err.error?.message || err.message || 'Không thể tải chi tiết transcript.');
+                setStatus('error');
+            }
         }
     }, [meetingId]);
 
