@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -37,6 +37,9 @@ const EmployeeMeetingDetail = () => {
     const [successMsg, setSuccessMsg] = useState(null);
     const [mediaFiles, setMediaFiles] = useState([]);
     const [activeParticipantTab, setActiveParticipantTab] = useState('internal');
+    const [internalPage, setInternalPage] = useState(1);
+    const [externalPage, setExternalPage] = useState(1);
+    const ITEMS_PER_PAGE = 2;
 
     // Editing modal states
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -55,11 +58,11 @@ const EmployeeMeetingDetail = () => {
     const [editRecordingEnabled, setEditRecordingEnabled] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
 
-    // Agenda edit state
     const [agendaList, setAgendaList] = useState([]);
     const [newAgendaTitle, setNewAgendaTitle] = useState('');
     const [newAgendaDuration, setNewAgendaDuration] = useState('15');
     const [newAgendaFile, setNewAgendaFile] = useState(null);
+    const [agendaEditIndex, setAgendaEditIndex] = useState(null);
 
     // Data lists for editing
     const [rooms, setRooms] = useState([]);
@@ -332,21 +335,77 @@ const EmployeeMeetingDetail = () => {
         const dur = Number(newAgendaDuration);
         if (isNaN(dur) || dur <= 0) return;
 
-        setAgendaList(prev => [
-            ...prev,
-            {
-                title: newAgendaTitle,
-                durationMin: dur,
-                orderIndex: prev.length,
-                file: newAgendaFile ? { name: newAgendaFile.name, size: newAgendaFile.size } : null
-            }
-        ]);
+        if (agendaEditIndex !== null) {
+            setAgendaList(prev => {
+                const newList = [...prev];
+                newList[agendaEditIndex] = {
+                    ...newList[agendaEditIndex],
+                    title: newAgendaTitle,
+                    durationMin: dur,
+                    file: newAgendaFile ? newAgendaFile : newList[agendaEditIndex].file
+                };
+                return newList;
+            });
+            setAgendaEditIndex(null);
+        } else {
+            setAgendaList(prev => [
+                ...prev,
+                {
+                    title: newAgendaTitle,
+                    durationMin: dur,
+                    orderIndex: prev.length,
+                    file: newAgendaFile ? newAgendaFile : null,
+                    attachments: []
+                }
+            ]);
+        }
         setNewAgendaTitle('');
         setNewAgendaFile(null);
     };
 
     const handleRemoveAgendaItem = (idx) => {
         setAgendaList(prev => prev.filter((_, i) => i !== idx).map((item, idy) => ({ ...item, orderIndex: idy })));
+    };
+
+    const handleEditAgendaItem = (idx) => {
+        const item = agendaList[idx];
+        setNewAgendaTitle(item.title);
+        setNewAgendaDuration(item.durationMin.toString());
+        setNewAgendaFile(item.file);
+        setAgendaEditIndex(idx);
+    };
+
+    const handleDeleteAttachment = async (agendaId, fileId) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa file đính kèm này?')) return;
+        try {
+            const res = await deleteAgendaAttachment(meeting.id, agendaId, fileId);
+            if (res?.success) {
+                setAgendaList(prev => prev.map(a => {
+                    if (a.id === agendaId && a.attachments) {
+                        return { ...a, attachments: a.attachments.filter(att => att.id !== fileId) };
+                    }
+                    return a;
+                }));
+                fetchMeeting();
+            } else {
+                alert('Không thể xóa file.');
+            }
+        } catch (e) {
+            alert('Lỗi khi xóa file.');
+        }
+    };
+
+    const handleDownloadFile = async (fileId) => {
+        try {
+            const res = await getMediaFile(fileId);
+            if (res?.success && res.data?.downloadUrl) {
+                window.open(res.data.downloadUrl, '_blank');
+            } else {
+                alert('Không thể lấy link tải file.');
+            }
+        } catch (e) {
+            alert('Lỗi khi lấy link tải file.');
+        }
     };
 
     const handleSaveAgenda = async () => {
@@ -363,6 +422,22 @@ const EmployeeMeetingDetail = () => {
             }));
             const res = await replaceAgendas(meeting.id, items);
             if (res?.success) {
+                if (res.data?.items) {
+                    const savedItems = res.data.items;
+                    for (let i = 0; i < agendaList.length; i++) {
+                        const localItem = agendaList[i];
+                        const savedItem = savedItems[i];
+                        if (localItem.file && localItem.file instanceof File && savedItem) {
+                            const formData = new FormData();
+                            formData.append('file', localItem.file);
+                            try {
+                                await uploadAgendaAttachment(meeting.id, savedItem.id, formData);
+                            } catch (e) {
+                                console.error('Failed to upload attachment', e);
+                            }
+                        }
+                    }
+                }
                 setSuccessMsg('Cập nhật chương trình Agenda thành công.');
                 setIsAgendaModalOpen(false);
                 fetchMeeting();
@@ -460,14 +535,7 @@ const EmployeeMeetingDetail = () => {
                             )}
                         </>
                     )}
-                    {meeting.status === 'completed' || isEnded ? (
-                        <button
-                            disabled
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
-                        >
-                            Cuộc họp đã kết thúc
-                        </button>
-                    ) : meeting.status === 'cancelled' ? (
+                    {meeting.status === 'completed' ? null : meeting.status === 'cancelled' ? (
                         <button
                             disabled
                             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all bg-red-50 text-red-400 cursor-not-allowed border border-red-200"
@@ -508,13 +576,12 @@ const EmployeeMeetingDetail = () => {
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
                         <Users className="w-48 h-48 text-midnight-indigo" />
                     </div>
-                    
+
                     <div className="flex flex-col md:flex-row justify-between items-start gap-6 pb-6 border-b border-platinum-tint/60 relative z-10">
                         <div className="space-y-4 w-full">
                             <div className="flex flex-wrap items-center gap-3">
-                                <span className={`px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1.5 ${
-                                    (STATUS_BADGE[meeting.status] || STATUS_BADGE.cancelled).className
-                                }`}>
+                                <span className={`px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1.5 ${(STATUS_BADGE[meeting.status] || STATUS_BADGE.cancelled).className
+                                    }`}>
                                     <div className={`w-1.5 h-1.5 rounded-full ${meeting.status === 'in_progress' ? 'bg-emerald-500 animate-pulse' : 'bg-current'}`} />
                                     {(STATUS_BADGE[meeting.status] || { label: meeting.status }).label}
                                 </span>
@@ -630,10 +697,23 @@ const EmployeeMeetingDetail = () => {
                                                 <div className="flex justify-between items-center">
                                                     <h4 className="font-semibold text-midnight-indigo text-xs sm:text-sm flex items-center gap-2">
                                                         {item.title}
-                                                        {item.file && <FileText className="w-4 h-4 text-action-blue shrink-0" title={item.file.name} />}
                                                     </h4>
                                                     <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded font-bold">{item.durationMin} phút</span>
                                                 </div>
+                                                {item.attachments && item.attachments.length > 0 && (
+                                                    <div className="mt-2 flex flex-col gap-1.5">
+                                                        {item.attachments.map((file, fIdx) => (
+                                                            <button
+                                                                key={fIdx}
+                                                                onClick={() => handleDownloadFile(file.id)}
+                                                                className="flex items-center gap-1.5 text-[11px] text-action-blue hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg w-max transition-colors text-left"
+                                                            >
+                                                                <FileText className="w-3.5 h-3.5 shrink-0" />
+                                                                <span className="truncate max-w-[200px]">{file.fileName}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -672,119 +752,187 @@ const EmployeeMeetingDetail = () => {
                             </div>
                             <div className="flex bg-cloud-mist/50 p-1 rounded-xl mb-4">
                                 <button
-                                    onClick={() => setActiveParticipantTab('internal')}
+                                    onClick={() => { setActiveParticipantTab('internal'); setInternalPage(1); }}
                                     className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeParticipantTab === 'internal' ? 'bg-white text-action-blue shadow-sm' : 'text-slate-blue hover:text-midnight-indigo'}`}
                                 >
                                     Nội bộ ({meeting.participants?.length || 0})
                                 </button>
                                 <button
-                                    onClick={() => setActiveParticipantTab('external')}
+                                    onClick={() => { setActiveParticipantTab('external'); setExternalPage(1); }}
                                     className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeParticipantTab === 'external' ? 'bg-white text-action-blue shadow-sm' : 'text-slate-blue hover:text-midnight-indigo'}`}
                                 >
                                     Khách ngoài ({meeting.externalParticipants?.length || meeting.external_participants?.length || 0})
                                 </button>
                             </div>
-                            
-                            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto scrollbar-thin pr-2">
-                                {activeParticipantTab === 'internal' && (
-                                    <>
-                                        <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
-                                            <UserAvatar
-                                                user={hostUser}
-                                                name={hostName}
-                                                className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
-                                            />
-                                            <div className="truncate">
-                                                <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Người chủ trì</span>
-                                                <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
-                                            </div>
-                                        </div>
 
-                                        {meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName).map(p => (
-                                            <div key={p.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center justify-between gap-3 group hover:bg-white transition-colors">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <UserAvatar
-                                                        user={p}
-                                                        className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
-                                                    />
-                                                    <div className="truncate">
-                                                        <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Người tham dự</span>
-                                                        <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
-                                                    </div>
-                                                </div>
-                                                {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                            <div className="flex flex-col gap-4">
+                                {activeParticipantTab === 'internal' && (() => {
+                                    const allInternal = [
+                                        // Host first
+                                        { isHost: true, ...hostUser },
+                                        // Then participants
+                                        ...(meeting.participants?.filter(p => p !== hostParticipant && (p.fullName || p.full_name) !== hostName) || [])
+                                    ];
+                                    const totalPages = Math.ceil(allInternal.length / ITEMS_PER_PAGE) || 1;
+                                    const paginated = allInternal.slice((internalPage - 1) * ITEMS_PER_PAGE, internalPage * ITEMS_PER_PAGE);
+
+                                    return (
+                                        <>
+                                            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto scrollbar-thin pr-2">
+                                                {paginated.map((p, idx) => {
+                                                    if (p.isHost) {
+                                                        return (
+                                                            <div key="host" className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-3">
+                                                                <UserAvatar
+                                                                    user={hostUser}
+                                                                    name={hostName}
+                                                                    className="w-10 h-10 rounded-full shrink-0 font-bold text-sm ring-2 ring-white"
+                                                                />
+                                                                <div className="truncate">
+                                                                    <span className="block text-xs font-bold text-action-blue uppercase tracking-wider text-[9px]">Người chủ trì</span>
+                                                                    <span className="text-xs font-bold text-midnight-indigo block truncate">{hostName}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <div key={p.id || idx} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center justify-between gap-3 group hover:bg-white transition-colors">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <UserAvatar
+                                                                    user={p}
+                                                                    className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
+                                                                />
+                                                                <div className="truncate">
+                                                                    <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider text-[9px]">Người tham dự</span>
+                                                                    <span className="text-xs font-bold text-midnight-indigo block truncate">{p.fullName || p.full_name}</span>
+                                                                </div>
+                                                            </div>
+                                                            {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!window.confirm(`Bạn có chắc chắn muốn xóa ${p.fullName || p.full_name}?`)) return;
+                                                                        try {
+                                                                            const res = await removeInternalParticipant(meeting.id, p.id);
+                                                                            if (res?.success) {
+                                                                                setMeeting({ ...meeting, participants: meeting.participants.filter(pt => pt.id !== p.id) });
+                                                                                setSuccessMsg('Đã xóa người tham dự.');
+                                                                                setTimeout(() => setSuccessMsg(null), 3000);
+                                                                            } else {
+                                                                                alert(res?.message || 'Xóa thất bại');
+                                                                            }
+                                                                        } catch (err) {
+                                                                            alert('Lỗi hệ thống khi xóa');
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                                                    title="Xóa người tham dự"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            {totalPages > 1 && (
+                                                <div className="flex justify-center items-center gap-2 mt-2">
                                                     <button
-                                                        onClick={async () => {
-                                                            if (!window.confirm(`Bạn có chắc chắn muốn xóa ${p.fullName || p.full_name}?`)) return;
-                                                            try {
-                                                                const res = await removeInternalParticipant(meeting.id, p.id);
-                                                                if (res?.success) {
-                                                                    setMeeting({ ...meeting, participants: meeting.participants.filter(pt => pt.id !== p.id) });
-                                                                    setSuccessMsg('Đã xóa người tham dự.');
-                                                                    setTimeout(() => setSuccessMsg(null), 3000);
-                                                                } else {
-                                                                    alert(res?.message || 'Xóa thất bại');
-                                                                }
-                                                            } catch (err) {
-                                                                alert('Lỗi hệ thống khi xóa');
-                                                            }
-                                                        }}
-                                                        className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                                                        title="Xóa người tham dự"
+                                                        onClick={() => setInternalPage(p => Math.max(1, p - 1))}
+                                                        disabled={internalPage === 1}
+                                                        className="px-2.5 py-1 bg-cloud-mist hover:bg-pale-gray rounded-lg text-xs font-bold disabled:opacity-50"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        Trước
                                                     </button>
+                                                    <span className="text-xs font-semibold text-slate-blue">
+                                                        {internalPage} / {totalPages}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setInternalPage(p => Math.min(totalPages, p + 1))}
+                                                        disabled={internalPage === totalPages}
+                                                        className="px-2.5 py-1 bg-cloud-mist hover:bg-pale-gray rounded-lg text-xs font-bold disabled:opacity-50"
+                                                    >
+                                                        Sau
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+
+                                {activeParticipantTab === 'external' && (() => {
+                                    const allExternal = meeting.externalParticipants || meeting.external_participants || [];
+                                    const totalPages = Math.ceil(allExternal.length / ITEMS_PER_PAGE) || 1;
+                                    const paginated = allExternal.slice((externalPage - 1) * ITEMS_PER_PAGE, externalPage * ITEMS_PER_PAGE);
+
+                                    return (
+                                        <>
+                                            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto scrollbar-thin pr-2">
+                                                {paginated.map(p => (
+                                                    <div key={p.id} className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 flex items-center justify-between gap-3 group hover:bg-white transition-colors">
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className="w-10 h-10 rounded-full shrink-0 font-bold text-sm bg-amber-100 text-amber-700 flex items-center justify-center">
+                                                                {(p.name || p.fullName || p.full_name || p.email || 'G').charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="truncate">
+                                                                <span className="block text-xs font-bold text-amber-600 uppercase tracking-wider text-[9px]">Khách ngoài</span>
+                                                                <span className="text-xs font-bold text-midnight-indigo block truncate">{p.name || p.fullName || p.full_name}</span>
+                                                                <span className="text-[10px] text-slate-blue block truncate">{p.email}</span>
+                                                            </div>
+                                                        </div>
+                                                        {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!window.confirm(`Bạn có chắc chắn muốn xóa khách ${p.name || p.fullName || p.full_name}?`)) return;
+                                                                    try {
+                                                                        const res = await removeExternalParticipant(meeting.id, p.id);
+                                                                        if (res?.success) {
+                                                                            const currentExternal = meeting.externalParticipants || meeting.external_participants || [];
+                                                                            setMeeting({ ...meeting, externalParticipants: currentExternal.filter(pt => pt.id !== p.id), external_participants: currentExternal.filter(pt => pt.id !== p.id) });
+                                                                            setSuccessMsg('Đã xóa khách ngoài.');
+                                                                            setTimeout(() => setSuccessMsg(null), 3000);
+                                                                        } else {
+                                                                            alert(res?.message || 'Xóa thất bại');
+                                                                        }
+                                                                    } catch (err) {
+                                                                        alert('Lỗi hệ thống khi xóa khách');
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                                                title="Xóa khách"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {allExternal.length === 0 && (
+                                                    <p className="text-xs text-slate-blue italic text-center py-4">Chưa có khách ngoài nào.</p>
                                                 )}
                                             </div>
-                                        ))}
-                                    </>
-                                )}
-
-                                {activeParticipantTab === 'external' && (
-                                    <>
-                                        {(meeting.externalParticipants || meeting.external_participants || []).map(p => (
-                                            <div key={p.id} className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 flex items-center justify-between gap-3 group hover:bg-white transition-colors">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-10 h-10 rounded-full shrink-0 font-bold text-sm bg-amber-100 text-amber-700 flex items-center justify-center">
-                                                        {(p.name || p.fullName || p.full_name || p.email || 'G').charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div className="truncate">
-                                                        <span className="block text-xs font-bold text-amber-600 uppercase tracking-wider text-[9px]">Khách ngoài</span>
-                                                        <span className="text-xs font-bold text-midnight-indigo block truncate">{p.name || p.fullName || p.full_name}</span>
-                                                        <span className="text-[10px] text-slate-blue block truncate">{p.email}</span>
-                                                    </div>
-                                                </div>
-                                                {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                            {totalPages > 1 && (
+                                                <div className="flex justify-center items-center gap-2 mt-2">
                                                     <button
-                                                        onClick={async () => {
-                                                            if (!window.confirm(`Bạn có chắc chắn muốn xóa khách ${p.name || p.fullName || p.full_name}?`)) return;
-                                                            try {
-                                                                const res = await removeExternalParticipant(meeting.id, p.id);
-                                                                if (res?.success) {
-                                                                    const currentExternal = meeting.externalParticipants || meeting.external_participants || [];
-                                                                    setMeeting({ ...meeting, externalParticipants: currentExternal.filter(pt => pt.id !== p.id), external_participants: currentExternal.filter(pt => pt.id !== p.id) });
-                                                                    setSuccessMsg('Đã xóa khách ngoài.');
-                                                                    setTimeout(() => setSuccessMsg(null), 3000);
-                                                                } else {
-                                                                    alert(res?.message || 'Xóa thất bại');
-                                                                }
-                                                            } catch (err) {
-                                                                alert('Lỗi hệ thống khi xóa khách');
-                                                            }
-                                                        }}
-                                                        className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                                                        title="Xóa khách"
+                                                        onClick={() => setExternalPage(p => Math.max(1, p - 1))}
+                                                        disabled={externalPage === 1}
+                                                        className="px-2.5 py-1 bg-cloud-mist hover:bg-pale-gray rounded-lg text-xs font-bold disabled:opacity-50"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        Trước
                                                     </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                        {(meeting.externalParticipants?.length === 0 && meeting.external_participants?.length === 0) && (
-                                            <p className="text-xs text-slate-blue italic text-center py-4">Chưa có khách ngoài nào.</p>
-                                        )}
-                                    </>
-                                )}
+                                                    <span className="text-xs font-semibold text-slate-blue">
+                                                        {externalPage} / {totalPages}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setExternalPage(p => Math.min(totalPages, p + 1))}
+                                                        disabled={externalPage === totalPages}
+                                                        className="px-2.5 py-1 bg-cloud-mist hover:bg-pale-gray rounded-lg text-xs font-bold disabled:opacity-50"
+                                                    >
+                                                        Sau
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -1017,8 +1165,21 @@ const EmployeeMeetingDetail = () => {
                                             onClick={handleAddAgendaItem}
                                             className="px-3.5 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold shrink-0"
                                         >
-                                            Thêm
+                                            {agendaEditIndex !== null ? 'Lưu' : 'Thêm'}
                                         </button>
+                                        {agendaEditIndex !== null && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAgendaEditIndex(null);
+                                                    setNewAgendaTitle('');
+                                                    setNewAgendaFile(null);
+                                                }}
+                                                className="px-3.5 py-2 bg-cloud-mist hover:bg-platinum-tint text-slate-blue rounded-xl text-xs font-bold shrink-0"
+                                            >
+                                                Hủy
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-3 w-full">
                                         <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-platinum-tint hover:border-action-blue bg-cloud-mist/20 hover:bg-blue-50/20 text-slate-blue hover:text-action-blue rounded-xl text-xs font-bold cursor-pointer transition-all flex-1 justify-center select-none">
@@ -1037,19 +1198,45 @@ const EmployeeMeetingDetail = () => {
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {agendaList.map((item, idx) => (
                                         <div key={idx} className="flex justify-between items-center p-3 bg-cloud-mist rounded-xl border border-outline-gray">
-                                            <div className="text-left">
-                                                <span className="text-xs font-bold text-midnight-indigo flex items-center gap-2 mb-1">
+                                            <div className="text-left overflow-hidden">
+                                                <span className="text-xs font-bold text-midnight-indigo flex items-center gap-2 mb-1 truncate">
                                                     {item.title}
-                                                    {item.file && <FileText className="w-3.5 h-3.5 text-action-blue shrink-0" title={item.file.name} />}
                                                 </span>
-                                                <span className="text-[10px] text-slate-blue font-medium">{item.durationMin} phút</span>
+                                                <span className="text-[10px] text-slate-blue font-medium block">{item.durationMin} phút</span>
+                                                {item.attachments && item.attachments.length > 0 && (
+                                                    <div className="mt-1 flex flex-col gap-1">
+                                                        {item.attachments.map(att => (
+                                                            <div key={att.id} className="flex items-center justify-between text-[10px] text-action-blue bg-blue-50 px-2 py-0.5 rounded w-full max-w-xs">
+                                                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                                                    <FileText className="w-3 h-3 shrink-0" />
+                                                                    <span className="truncate max-w-[180px]">{att.fileName}</span>
+                                                                </div>
+                                                                <button onClick={() => handleDeleteAttachment(item.id, att.id)} className="text-red-500 hover:text-red-700 ml-2"><X className="w-3 h-3" /></button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {item.file && item.file instanceof File && (
+                                                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-max">
+                                                        <FileText className="w-3 h-3 shrink-0" />
+                                                        <span className="truncate max-w-[200px]">Mới: {item.file.name}</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <button
-                                                onClick={() => handleRemoveAgendaItem(idx)}
-                                                className="text-red-500 hover:text-red-700 p-1.5"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleEditAgendaItem(idx)}
+                                                    className="text-blue-500 hover:text-blue-700 p-1.5"
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRemoveAgendaItem(idx)}
+                                                    className="text-red-500 hover:text-red-700 p-1.5"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -1143,10 +1330,10 @@ const EmployeeMeetingDetail = () => {
                     open={isImportModalOpen}
                     onClose={() => setIsImportModalOpen(false)}
                     users={users}
-                    onSuccess={(msg) => { 
-                        setSuccessMsg(msg); 
-                        setTimeout(() => setSuccessMsg(null), 4000); 
-                        fetchMeeting(); 
+                    onSuccess={(msg) => {
+                        setSuccessMsg(msg);
+                        setTimeout(() => setSuccessMsg(null), 4000);
+                        fetchMeeting();
                     }}
                 />
             )}
