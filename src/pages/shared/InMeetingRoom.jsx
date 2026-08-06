@@ -1,9 +1,10 @@
-import { AlertTriangle, Calendar, Check, ChevronRight, Hand, ListTodo, Mic, MicOff, MonitorUp, PhoneOff, Play, Shield, Smile, Sparkles, StickyNote, Users, Video as VideoIcon, VideoOff, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, ChevronRight, Hand, ListTodo, Mic, MicOff, MonitorUp, PhoneOff, Play, Shield, Smile, Sparkles, StickyNote, Users, Video as VideoIcon, VideoOff, Volume2, VolumeX, FileText, ExternalLink } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { getSocket, subscribeToMeeting } from '../../utils/socket';
+import { request } from '../../utils/request';
 import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, endMeeting as endEmployee, getPresentAttendees as getEmployeeAttendees, getMeetingAttendance as getEmployeeAttendance, createMeetingNote as createEmployeeNote, listMeetingNotes as listEmployeeNotes, startVideoRecording as startEmployeeVideoRecording, pauseVideoRecording as pauseEmployeeVideoRecording, resumeVideoRecording as resumeEmployeeVideoRecording, stopVideoRecording as stopEmployeeVideoRecording, getRecordingStatus as getEmployeeRecordingStatus, getMeetingMediaFiles as getEmployeeMediaFiles } from '../../service/employeeServices';
 import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes, startVideoRecording as startManagerVideoRecording, pauseVideoRecording as pauseManagerVideoRecording, resumeVideoRecording as resumeManagerVideoRecording, stopVideoRecording as stopManagerVideoRecording, getRecordingStatus as getManagerRecordingStatus, getMeetingMediaFiles as getManagerMediaFiles } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
@@ -171,6 +172,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [confirmLeaveModal, setConfirmLeaveModal] = useState(false);
     const [notes, setNotes] = useState([]);
     const [noteInput, setNoteInput] = useState('');
+    const [presentedFile, setPresentedFile] = useState(null);
     const [attendance, setAttendance] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
     
@@ -282,8 +284,14 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 savedState.title = baseMeeting.title || savedState.title;
                 savedState.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || savedState.roomName;
                 savedState.room = baseMeeting.room || savedState.room || null;
-                if (baseMeeting.agenda && baseMeeting.agenda.length > 0) {
-                    savedState.agenda = baseMeeting.agenda;
+                if (baseMeeting.agendas && baseMeeting.agendas.length > 0) {
+                    savedState.agenda = baseMeeting.agendas.map((a, idx) => ({
+                        id: a.id,
+                        title: a.title,
+                        durationMin: a.plannedDurationMinutes,
+                        orderIndex: a.agendaOrder ?? idx,
+                        attachments: a.attachments || [],
+                    }));
                 }
                 savedState.participants = savedState.participants?.map((savedParticipant) => {
                     const apiParticipant = baseMeeting.participants?.find((participant) => {
@@ -303,8 +311,14 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 initial.title = baseMeeting.title || initial.title;
                 initial.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || initial.roomName;
                 initial.room = baseMeeting.room || null;
-                if (baseMeeting.agenda && baseMeeting.agenda.length > 0) {
-                    initial.agenda = baseMeeting.agenda;
+                if (baseMeeting.agendas && baseMeeting.agendas.length > 0) {
+                    initial.agenda = baseMeeting.agendas.map((a, idx) => ({
+                        id: a.id,
+                        title: a.title,
+                        durationMin: a.plannedDurationMinutes,
+                        orderIndex: a.agendaOrder ?? idx,
+                        attachments: a.attachments || [],
+                    }));
                 }
                 initial.hostId = baseMeeting.host_id || baseMeeting.hostId || initial.hostId;
                 initial.status = baseMeeting.status || initial.status;
@@ -428,6 +442,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 });
                 s.on('meeting.session.ended', () => {
                     setMeetingState(prev => ({ ...prev, status: 'completed' }));
+                });
+                s.on('agenda:presented', (payload) => {
+                    setPresentedFile(payload);
+                });
+                s.on('agenda:present_stopped', () => {
+                    setPresentedFile(null);
                 });
                 return cleanup;
             }
@@ -1167,6 +1187,50 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     {/* Lưới video (2/3 width) */}
                     <div className="flex-1 flex flex-col bg-white p-6 relative select-none">
 
+                        {/* Banner Trình chiếu tài liệu */}
+                        {presentedFile && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mb-4 bg-blue-50 border border-action-blue/30 p-3 rounded-xl flex items-center justify-between shadow-sm"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-action-blue flex items-center justify-center text-white shadow-inner shrink-0">
+                                        <MonitorUp className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-bold text-action-blue uppercase tracking-wider">Đang trình chiếu</div>
+                                        <div className="text-sm font-extrabold text-midnight-indigo truncate max-w-[300px]">{presentedFile.fileName || 'Tài liệu'}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {isHost && (
+                                        <button 
+                                            onClick={() => getSocket().emit('agenda:present_stop', { meetingId: id })}
+                                            className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-[10px] font-extrabold uppercase transition-colors"
+                                        >
+                                            Dừng chiếu
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                const res = await request(`/media-files/${presentedFile.fileId}`, { method: 'GET' });
+                                                const url = res.data?.data?.downloadUrl || res.data?.downloadUrl || (res.data?.success && res.data?.data?.url);
+                                                if (url) window.open(url, '_blank');
+                                                else showToast('Không tìm thấy link tải tài liệu', 'error');
+                                            } catch (e) {
+                                                showToast('Lỗi khi mở tài liệu', 'error');
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 bg-action-blue text-white hover:bg-glacier-blue rounded-lg text-xs font-bold transition-colors shadow flex items-center gap-1.5"
+                                    >
+                                        Mở tài liệu <ExternalLink className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+
                         {/* Lưới người tham gia — số cột tự tính theo số người, không còn "ghế" cố định */}
                         <div className="flex-1 min-h-[420px] flex items-start">
                             {(() => {
@@ -1437,6 +1501,42 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                 <h4 className="font-extrabold text-midnight-indigo text-sm mt-0.5 leading-snug">
                                                     {meetingState.agenda[meetingState.currentAgendaIndex]?.title}
                                                 </h4>
+                                                {meetingState.agenda[meetingState.currentAgendaIndex]?.attachments?.length > 0 && (
+                                                    <div className="mt-2 space-y-1.5">
+                                                        {meetingState.agenda[meetingState.currentAgendaIndex].attachments.map(att => (
+                                                            <div key={att.id} className="flex items-center justify-between bg-white border border-blue-100 p-2 rounded-lg">
+                                                                <div className="flex items-center gap-1.5 truncate">
+                                                                    <FileText className="w-3.5 h-3.5 text-slate-blue shrink-0" />
+                                                                    <span className="text-[11px] font-semibold text-midnight-indigo truncate">{att.fileName}</span>
+                                                                </div>
+                                                                {isHost && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            if (presentedFile?.fileId === att.id) {
+                                                                                getSocket().emit('agenda:present_stop', { meetingId: id });
+                                                                            } else {
+                                                                                getSocket().emit('agenda:present', {
+                                                                                    meetingId: id,
+                                                                                    agendaId: meetingState.agenda[meetingState.currentAgendaIndex].id,
+                                                                                    fileId: att.id,
+                                                                                    fileName: att.fileName,
+                                                                                    presentedBy: myParticipantId
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        className={`shrink-0 ml-2 px-2 py-1 rounded text-[9px] font-extrabold uppercase transition-colors ${
+                                                                            presentedFile?.fileId === att.id 
+                                                                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                                                            : 'bg-action-blue text-white hover:bg-glacier-blue'
+                                                                        }`}
+                                                                    >
+                                                                        {presentedFile?.fileId === att.id ? 'Dừng chiếu' : 'Chiếu'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex justify-between items-center bg-white px-2.5 py-1.5 rounded-lg border border-blue-100">
                                                 <span className="text-[10px] text-slate-blue font-bold">Thời gian còn lại:</span>
@@ -1481,9 +1581,17 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         <span className="text-[10px] font-bold text-slate-blue uppercase tracking-widest block">Nội dung kế tiếp</span>
                                         <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                                             {meetingState.agenda.slice(meetingState.currentAgendaIndex + 1).map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center p-2.5 bg-cloud-mist rounded-lg border border-platinum-tint text-[11px] font-semibold text-midnight-indigo">
-                                                    <span className="truncate max-w-[140px]">{item.title}</span>
-                                                    <span className="text-[10px] text-action-blue font-bold bg-blue-50 px-2 py-0.5 rounded">{item.durationMin || item.plannedDurationMinutes} phút</span>
+                                                <div key={idx} className="flex flex-col gap-1 p-2.5 bg-cloud-mist rounded-lg border border-platinum-tint">
+                                                    <div className="flex justify-between items-center text-[11px] font-semibold text-midnight-indigo">
+                                                        <span className="truncate max-w-[140px]">{item.title}</span>
+                                                        <span className="text-[10px] text-action-blue font-bold bg-blue-50 px-2 py-0.5 rounded shrink-0">{item.durationMin || item.plannedDurationMinutes} phút</span>
+                                                    </div>
+                                                    {item.attachments?.length > 0 && (
+                                                        <div className="flex items-center gap-1 mt-0.5 opacity-70">
+                                                            <FileText className="w-3 h-3 text-slate-blue" />
+                                                            <span className="text-[9px] text-slate-blue font-medium">{item.attachments.length} tài liệu</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                             {meetingState.currentAgendaIndex + 1 >= meetingState.agenda.length && (
