@@ -2,12 +2,14 @@ import { AlertTriangle, ArrowUpDown, Building, Calendar, CheckCircle2, Clock, Do
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 import EventSnapshotModal from '../../component/EventSnapshotModal';
+import ThumbnailImage from '../../component/ThumbnailImage';
 
 import {
     getRooms,
     getRoomAccessLog,
     getRoomBookings
 } from '../../service/sysAdminServices';
+import { getUsers } from '../../service/employeeServices';
 
 const LOGS_PER_PAGE = 10;
 
@@ -114,6 +116,9 @@ const RoomAccessLogs = () => {
     const [snapshotEventId, setSnapshotEventId] = useState(null);
     const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
 
+    // Users lookup state for avatars
+    const [usersMap, setUsersMap] = useState({});
+
     // Debounce ô tìm kiếm 400ms trước khi gửi lên BE
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
@@ -152,6 +157,23 @@ const RoomAccessLogs = () => {
 
     useEffect(() => {
         fetchRoomsList();
+        
+        // Fetch all users to create a lookup map for avatars
+        const fetchUsersMap = async () => {
+            try {
+                const res = await getUsers({ limit: 1000 });
+                if (res?.success && res.data) {
+                    const map = {};
+                    res.data.forEach(u => {
+                        map[u.id] = u;
+                    });
+                    setUsersMap(map);
+                }
+            } catch (err) {
+                console.error("Failed to fetch users map:", err);
+            }
+        };
+        fetchUsersMap();
     }, [fetchRoomsList]);
 
     // Fetch meetings for the selected room and date
@@ -322,11 +344,12 @@ const RoomAccessLogs = () => {
                         >
                             <span className="font-semibold truncate">
                                 {selectedMeetingId === '' ? 'Toàn bộ ngày' : (() => {
-                                    const m = meetings.find(x => x.id === selectedMeetingId);
+                                    const m = meetings.find(x => (x.meetingId || x.meeting_id || x.id) === selectedMeetingId);
                                     if (!m) return 'Toàn bộ ngày';
                                     const s = formatVietnameseDateTime(m.reservedStartTime || m.reserved_start_time).split(' ')[0].slice(0, 5);
                                     const e = formatVietnameseDateTime(m.reservedEndTime || m.reserved_end_time).split(' ')[0].slice(0, 5);
-                                    return `${s} - ${e} | ${m.title || 'Không có tiêu đề'}`;
+                                    const title = m.meeting?.title || m.title || 'Ca họp không tên';
+                                    return `${s} - ${e} | ${title}`;
                                 })()}
                             </span>
                             <ChevronDown className={`w-4 h-4 text-slate-blue absolute right-3 top-2.5 transition-transform duration-200 ${isMeetingDropdownOpen ? 'rotate-180' : ''}`} />
@@ -354,15 +377,18 @@ const RoomAccessLogs = () => {
                                     {meetings.map((meeting) => {
                                         const startTime = formatVietnameseDateTime(meeting.reservedStartTime || meeting.reserved_start_time).split(' ')[0].slice(0, 5);
                                         const endTime = formatVietnameseDateTime(meeting.reservedEndTime || meeting.reserved_end_time).split(' ')[0].slice(0, 5);
-                                        const title = meeting.title || 'Ca họp không tên';
-                                        const isSelected = selectedMeetingId === meeting.id;
+                                        const title = meeting.meeting?.title || meeting.title || 'Ca họp không tên';
+                                        
+                                        // Sử dụng meetingId thay vì id của booking
+                                        const targetMeetingId = meeting.meetingId || meeting.meeting_id || meeting.id;
+                                        const isSelected = selectedMeetingId === targetMeetingId;
 
                                         return (
                                             <button
                                                 key={meeting.id}
                                                 type="button"
                                                 onClick={() => {
-                                                    setSelectedMeetingId(meeting.id);
+                                                    setSelectedMeetingId(targetMeetingId);
                                                     setIsMeetingDropdownOpen(false);
                                                 }}
                                                 className={`w-full text-left px-3 py-2.5 hover:bg-blue-50/50 transition-colors flex items-start gap-2 border-t border-slate-50 first:border-0 ${isSelected ? 'bg-blue-50/80' : ''
@@ -613,16 +639,29 @@ const RoomAccessLogs = () => {
 
                                                     {/* Person info */}
                                                     <td className="p-3.5">
-                                                        <div className="flex flex-col">
-                                                            <span className={`font-bold ${isStranger ? 'text-red-700' : isUnmatched ? 'text-amber-700' : 'text-midnight-indigo'
-                                                                }`}>
-                                                                {formattedName}
-                                                            </span>
-                                                            {ev.userId && (
-                                                                <span className="text-[10px] text-slate-blue font-mono">
-                                                                    ID: {ev.userId}
-                                                                </span>
+                                                        <div className="flex items-center gap-3">
+                                                            {ev.userId && usersMap[ev.userId]?.avatarUrl ? (
+                                                                <img 
+                                                                    src={usersMap[ev.userId].avatarUrl} 
+                                                                    alt={formattedName} 
+                                                                    className="w-8 h-8 rounded-full object-cover shadow-sm border border-slate-200 flex-shrink-0" 
+                                                                />
+                                                            ) : (
+                                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-300">
+                                                                    <Users className="w-4 h-4 text-slate-500" />
+                                                                </div>
                                                             )}
+                                                            <div className="flex flex-col">
+                                                                <span className={`font-bold ${isStranger ? 'text-red-700' : isUnmatched ? 'text-amber-700' : 'text-midnight-indigo'
+                                                                    }`}>
+                                                                    {formattedName}
+                                                                </span>
+                                                                {ev.userId && (
+                                                                    <span className="text-[10px] text-slate-blue font-mono">
+                                                                        ID: {ev.userId}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </td>
 
@@ -659,16 +698,13 @@ const RoomAccessLogs = () => {
 
                                                     {/* View Snapshot button */}
                                                     <td className="p-3.5 text-center">
-                                                        <button
+                                                        <ThumbnailImage 
+                                                            eventId={ev.id}
                                                             onClick={() => {
                                                                 setSnapshotEventId(ev.id);
                                                                 setIsSnapshotOpen(true);
                                                             }}
-                                                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-action-blue/10 text-action-blue transition-colors group relative"
-                                                            title="Xem ảnh camera"
-                                                        >
-                                                            <ImageIcon className="w-4 h-4" />
-                                                        </button>
+                                                        />
                                                     </td>
 
                                                     {/* Similarity confidence */}
