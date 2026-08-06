@@ -254,7 +254,7 @@ const AddInternalParticipantModal = ({ meetingId, open, onClose, onSuccess, user
                                     <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                                     <div>
                                         <p className="text-sm font-bold text-blue-800">Bước 1: Tải file mẫu</p>
-                                        <p className="text-xs text-blue-600 mt-0.5">File mẫu có các cột: loại, email, mã nhân viên, họ tên, tổ chức, số điện thoại.</p>
+                                        <p className="text-xs text-blue-600 mt-0.5">File mẫu có các cột: STT, Loại, Email, Mã nhân viên, Họ và tên, Tổ chức, Số điện thoại.</p>
                                     </div>
                                 </div>
                                 <button
