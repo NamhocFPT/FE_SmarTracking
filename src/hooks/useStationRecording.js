@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { uploadAudio, uploadStationSpeakerMarks } from '../service/transcriptionServices';
+import { uploadAudio, uploadStationSpeakerMarks, createTranscriptionJob } from '../service/transcriptionServices';
 
 // Helpers cho IndexedDB để chống mất dữ liệu khi browser crash
 const DB_NAME = 'SmarTrackingRecordingDB';
@@ -47,7 +47,18 @@ const clearDB = async (db) => {
     });
 };
 
-export const useStationRecording = (meetingId) => {
+// Chuẩn hoá tên cuộc họp thành slug an toàn cho tên file (bỏ dấu tiếng Việt, khoảng trắng → _)
+const slugifyMeetingTitle = (title) => {
+    if (!title) return 'meeting';
+    return title
+        .normalize('NFD').replace(/[̀-ͯ]/g, '') // bỏ dấu tiếng Việt
+        .replace(/đ/gi, 'd')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 60) || 'meeting';
+};
+
+export const useStationRecording = (meetingId, meetingTitle) => {
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState('');
@@ -123,7 +134,8 @@ export const useStationRecording = (meetingId) => {
                     // Gom chunk từ IndexedDB
                     const chunks = await getAllChunksFromDB(dbRef.current);
                     const finalBlob = new Blob(chunks, { type: 'audio/webm' });
-                    const file = new File([finalBlob], 'station_recording.webm', { type: 'audio/webm' });
+                    const fileName = `audio_${slugifyMeetingTitle(meetingTitle)}.webm`;
+                    const file = new File([finalBlob], fileName, { type: 'audio/webm' });
 
                     // Upload file
                     const uploadRes = await uploadAudio(meetingId, file);
@@ -141,6 +153,21 @@ export const useStationRecording = (meetingId) => {
                         }
                     }
 
+                    // Tạo job STT ngay cho đúng recordingSessionId vừa upload — thiếu bước này thì
+                    // transcript không bao giờ được tạo cho đường ghi âm trạm cố định (BUG-15).
+                    if (sessionId) {
+                        try {
+                            await createTranscriptionJob(meetingId, {
+                                recordingSessionId: sessionId,
+                                language: 'vi-VN',
+                                speakerMappingMode: 'diarization_only'
+                            });
+                        } catch (jobErr) {
+                            console.error('Lỗi khi tạo job STT:', jobErr);
+                            // Audio + marks đã lưu; job có thể tạo lại sau nên không chặn luồng
+                        }
+                    }
+
                     // Dọn dẹp DB
                     await clearDB(dbRef.current);
                     resolve({ success: true, sessionId, marksCount: marksRef.current.length });
@@ -155,7 +182,7 @@ export const useStationRecording = (meetingId) => {
             // Bắt buộc đẩy chunk cuối cùng trước khi stop
             mediaRecorderRef.current.stop();
         });
-    }, [meetingId]);
+    }, [meetingId, meetingTitle]);
 
     const addSpeakerMark = useCallback((participant) => {
         if (!isRecording || !startTime) return;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Mic, Square, Loader2, UserPlus, X, Check } from 'lucide-react';
 import { useStationRecording } from '../../hooks/useStationRecording';
 
-const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
+const StationRecorder = ({ meetingId, meetingTitle, participants, onUploadSuccess }) => {
     const [showParticipantSelect, setShowParticipantSelect] = useState(false);
     const [selectedParticipant, setSelectedParticipant] = useState('');
     const [showToast, setShowToast] = useState(false);
@@ -16,7 +16,7 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
         startRecording,
         stopAndUpload,
         addSpeakerMark
-    } = useStationRecording(meetingId);
+    } = useStationRecording(meetingId, meetingTitle);
 
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
@@ -59,8 +59,8 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
                         Bắt đầu ghi âm
                     </button>
                 ) : (
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl border border-red-200">
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl border border-red-200 w-full">
                             <span className="relative flex h-3 w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
@@ -69,7 +69,7 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
                         </div>
                         <button
                             onClick={handleStop}
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl font-bold transition-colors"
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl font-bold transition-colors w-full"
                         >
                             <Square className="w-4 h-4" fill="currentColor" />
                             Dừng ghi

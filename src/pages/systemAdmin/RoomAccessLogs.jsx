@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 import EventSnapshotModal from '../../component/EventSnapshotModal';
 import ThumbnailImage from '../../component/ThumbnailImage';
+import UserAvatar from '../../component/UserAvatar';
 
 import {
     getRooms,
@@ -640,17 +641,11 @@ const RoomAccessLogs = () => {
                                                     {/* Person info */}
                                                     <td className="p-3.5">
                                                         <div className="flex items-center gap-3">
-                                                            {ev.userId && usersMap[ev.userId]?.avatarUrl ? (
-                                                                <img 
-                                                                    src={usersMap[ev.userId].avatarUrl} 
-                                                                    alt={formattedName} 
-                                                                    className="w-8 h-8 rounded-full object-cover shadow-sm border border-slate-200 flex-shrink-0" 
-                                                                />
-                                                            ) : (
-                                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-300">
-                                                                    <Users className="w-4 h-4 text-slate-500" />
-                                                                </div>
-                                                            )}
+                                                            <UserAvatar 
+                                                                user={ev.userId ? usersMap[ev.userId] : null}
+                                                                name={formattedName}
+                                                                className="w-8 h-8 rounded-full shadow-sm border border-slate-200 flex-shrink-0 text-[10px] font-bold"
+                                                            />
                                                             <div className="flex flex-col">
                                                                 <span className={`font-bold ${isStranger ? 'text-red-700' : isUnmatched ? 'text-amber-700' : 'text-midnight-indigo'
                                                                     }`}>

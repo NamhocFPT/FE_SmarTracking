@@ -38,6 +38,28 @@ const UserManagement = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
 
+    // Global users map for avatars and phone numbers not returned by manage API
+    const [usersMap, setUsersMap] = useState({});
+
+    // Fetch master user list for avatars and phone numbers
+    useEffect(() => {
+        const fetchUsersMap = async () => {
+            try {
+                const res = await getUsers({ limit: 1000 });
+                if (res?.success && res.data) {
+                    const map = {};
+                    res.data.forEach(u => {
+                        map[u.id] = u;
+                    });
+                    setUsersMap(map);
+                }
+            } catch (err) {
+                console.error("Failed to fetch users map:", err);
+            }
+        };
+        fetchUsersMap();
+    }, []);
+
     // Filter & Search states
     const [search, setSearch] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
@@ -91,15 +113,17 @@ const UserManagement = () => {
             if (deptRes?.success) setDepartments(deptRes.data || []);
             if (rolesRes?.success) setRoles(rolesRes.data || []);
         } catch {
+            // Field theo đúng shape thật của DepartmentResponseDto/RoleResponseDto
+            // (departmentName, roleCode, roleName) để khớp với phần render bên dưới.
             setDepartments([
-                { id: 1, name: 'Phòng Kỹ Thuật' },
-                { id: 2, name: 'Phòng Hành Chính' },
-                { id: 3, name: 'Ban Giám Đốc' },
+                { id: 'dept-1', departmentName: 'Phòng Kỹ Thuật' },
+                { id: 'dept-2', departmentName: 'Phòng Hành Chính' },
+                { id: 'dept-3', departmentName: 'Ban Giám Đốc' },
             ]);
             setRoles([
-                { id: 1, name: 'System Admin', code: 'SYSTEM_ADMIN' },
-                { id: 2, name: 'Business Admin', code: 'BUSINESS_ADMIN' },
-                { id: 3, name: 'Employee', code: 'EMPLOYEE' }
+                { id: 'role-1', roleName: 'System Admin', roleCode: 'SYSTEM_ADMIN' },
+                { id: 'role-2', roleName: 'Business Admin', roleCode: 'BUSINESS_ADMIN' },
+                { id: 'role-3', roleName: 'Employee', roleCode: 'EMPLOYEE' }
             ]);
         }
     }, []);
@@ -189,7 +213,7 @@ const UserManagement = () => {
     // Handle Create (UC-06)
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
-        
+
         // Client-side Validation
         const errors = {};
         if (!formData.fullName.trim()) errors.fullName = "Vui lòng nhập họ và tên";
@@ -209,7 +233,7 @@ const UserManagement = () => {
         setFormErrors({});
         setError(null);
         setSuccessMessage(null);
-        
+
         try {
             const res = await createUser({
                 email: formData.email,
@@ -427,7 +451,7 @@ const UserManagement = () => {
         try {
             const fd = new FormData();
             fd.append('file', importFile);
-            
+
             const isCommit = importStep === 2;
             if (isCommit) {
                 fd.append('commit', 'true');
@@ -439,16 +463,16 @@ const UserManagement = () => {
             if (importPhotos.length > 0) {
                 fd.append('biometricConsentConfirmed', 'true');
             }
-            
+
             const res = await importUsers(fd);
             if (res?.success && res.data) {
                 const report = res.data;
                 const results = report.results || [];
                 const failedRows = results.filter(r => r.status === 'failed' || r.status === 'invalid');
-                
+
                 setValidationErrors(failedRows);
                 setImportResults(results);
-                
+
                 if (!isCommit) {
                     // Step 1: Preview completed
                     if (failedRows.length > 0) {
@@ -463,7 +487,7 @@ const UserManagement = () => {
                         `Đã tạo ${report.successCount ?? 0}/${report.totalRows ?? 0} tài khoản thành công.`
                         + (failedRows.length > 0 ? ` Bỏ qua ${failedRows.length} dòng bị lỗi.` : '')
                     );
-                    
+
                     if (failedRows.length === 0 && importPhotos.length === 0) {
                         setIsImportModalOpen(false);
                     } else {
@@ -491,12 +515,27 @@ const UserManagement = () => {
 
     const openEditModal = (user) => {
         setSelectedUser(user);
+        // ManageUserItemDto.departmentId là UUID string trực tiếp trên user (không
+        // phải mảng user.departments); ManageUserItemDto.roles là string[] roleCode
+        // (còn UserDetailResponseDto.roles — khi mở từ modal Chi tiết — là object[]
+        // {id, roleCode, roleName}) — phải suy ra id thật của role qua danh sách
+        // roles đã nạp (khớp theo roleCode) để checkbox tick đúng trạng thái hiện tại.
+        const deptId = user.departmentId || user.departments?.[0]?.id || user.department?.id || '';
+        const roleIds = (user.roles || [])
+            .map(r => {
+                if (typeof r === 'string') {
+                    return roles.find(role => role.roleCode === r)?.id;
+                }
+                return r.id || roles.find(role => role.roleCode === r.roleCode)?.id;
+            })
+            .filter(Boolean);
+
         setFormData({
             email: user.email,
             fullName: user.fullName,
             phone: user.phoneNumber || user.phone || '',
-            departmentId: user.departments?.[0]?.id || '',
-            roleIds: user.roles?.map(r => r.id) || []
+            departmentId: deptId,
+            roleIds
         });
         setIsEditModalOpen(true);
     };
@@ -519,12 +558,14 @@ const UserManagement = () => {
     };
 
     const handleRoleCheckboxChange = (roleId) => {
-        const id = Number(roleId);
+        // roleId là UUID string (RoleResponseDto.id) — trước đây Number(roleId) biến
+        // UUID thành NaN, khiến checkbox không bao giờ khớp và payload gửi lên BE
+        // (CreateUserDto/UpdateUserRolesDto yêu cầu roleIds là UUID) luôn bị 400.
         setFormData(prev => {
-            const exists = prev.roleIds.includes(id);
+            const exists = prev.roleIds.includes(roleId);
             const newRoles = exists
-                ? prev.roleIds.filter(r => r !== id)
-                : [...prev.roleIds, id];
+                ? prev.roleIds.filter(r => r !== roleId)
+                : [...prev.roleIds, roleId];
             return { ...prev, roleIds: newRoles };
         });
     };
@@ -618,7 +659,7 @@ const UserManagement = () => {
                     >
                         <option value="">Tất cả vai trò</option>
                         {roles.map(r => (
-                            <option key={r.id} value={r.id}>{r.name}</option>
+                            <option key={r.id} value={r.id}>{r.roleName}</option>
                         ))}
                     </select>
 
@@ -630,7 +671,7 @@ const UserManagement = () => {
                     >
                         <option value="">Tất cả phòng ban</option>
                         {departments.map(d => (
-                            <option key={d.id} value={d.id}>{d.name}</option>
+                            <option key={d.id} value={d.id}>{d.departmentName}</option>
                         ))}
                     </select>
 
@@ -658,15 +699,15 @@ const UserManagement = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr className="border-b border-platinum-tint bg-cloud-mist/50">
-                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Hồ sơ</th>
-                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Số điện thoại</th>
-                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Phòng ban</th>
-                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Vai trò (Role)</th>
-                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Trạng thái</th>
-                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase text-right">Hành động</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Hồ sơ</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Số điện thoại</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Phòng ban</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Vai trò (Role)</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Trạng thái</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase text-right whitespace-nowrap">Hành động</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -677,137 +718,137 @@ const UserManagement = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    usersList.map((user) => (
-                                        <tr key={user.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
-                                            <td className="py-4 px-6">
-                                                <div className="flex items-center gap-3">
-                                                    <UserAvatar
-                                                        user={user.avatarUrl
-                                                            || user.avatar_url
-                                                            || user.user?.avatarUrl
-                                                            || user.user?.avatar_url
-                                                            || user.profile?.avatarUrl
-                                                            || user.profile?.avatar_url
-                                                            || user}
-                                                        className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
-                                                    />
-                                                    <div>
-                                                        <h4
-                                                            onClick={() => handleViewDetail(user)}
-                                                            className="text-sm font-bold text-midnight-indigo leading-tight cursor-pointer hover:underline hover:text-action-blue"
-                                                        >
-                                                            {user.fullName}
-                                                        </h4>
-                                                        <p className="text-xs text-slate-blue leading-normal">{user.email}</p>
+                                    usersList.map((baseUser) => {
+                                        const detailedUser = usersMap[baseUser.id] || {};
+                                        const user = { ...baseUser, ...detailedUser };
+                                        return (
+                                            <tr key={user.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
+                                                <td className="py-4 px-6 whitespace-nowrap">
+                                                    <div className="flex items-center gap-3">
+                                                        <UserAvatar
+                                                            user={user}
+                                                            className="w-10 h-10 rounded-full shrink-0 font-bold text-sm"
+                                                        />
+
+                                                        <div>
+                                                            <h4
+                                                                onClick={() => handleViewDetail(user)}
+                                                                className="text-sm font-bold text-midnight-indigo leading-tight cursor-pointer hover:underline hover:text-action-blue"
+                                                            >
+                                                                {user.fullName}
+                                                            </h4>
+                                                            <p className="text-xs text-slate-blue leading-normal">{user.email}</p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6 text-sm text-slate-blue">
-                                                {user.phoneNumber || user.phone || 'Chưa cung cấp'}
-                                            </td>
-                                            <td className="py-4 px-6 text-sm text-midnight-indigo font-medium">
-                                                {(() => {
-                                                    const deptId = user.departmentId || (user.departments && user.departments[0]?.id) || (user.department?.id);
-                                                    const dept = departments.find(d => d.id === deptId || d.uuid === deptId);
-                                                    return dept ? dept.name || dept.roomName || dept.departmentName : 'Chưa phân bổ';
-                                                })()}
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {user.roles?.map((r, idx) => {
-                                                        const roleCode = typeof r === 'string' ? r : r.code || r.name;
-                                                        const roleObj = roles.find(role => role.code === roleCode || role.name === roleCode || role.id === roleCode);
-                                                        const roleName = roleObj ? roleObj.name : roleCode;
-                                                        return (
-                                                            <span key={idx} className="inline-flex text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
-                                                                {roleName}
-                                                            </span>
-                                                        );
-                                                    }) || <span className="text-xs text-steel-gray">Chưa phân quyền</span>}
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                                    (user.accountStatus === 'locked' || user.locked) ? 'bg-red-50 text-red-700' :
-                                                    user.accountStatus === 'inactive' ? 'bg-slate-100 text-slate-600' :
-                                                    user.accountStatus === 'pending_reset' ? 'bg-amber-50 text-amber-700' :
-                                                    'bg-green-50 text-green-700'
-                                                }`}>
-                                                    {(user.accountStatus === 'locked' || user.locked) ? 'Bị khóa' :
-                                                     user.accountStatus === 'inactive' ? 'Tạm dừng' :
-                                                     user.accountStatus === 'pending_reset' ? 'Chờ đổi mk' :
-                                                     'Hoạt động'}
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-6 text-right space-x-2">
-                                                <button
-                                                    onClick={() => handleViewDetail(user)}
-                                                    title="Xem chi tiết hồ sơ"
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleViewLogs(user)}
-                                                    title="Xem nhật ký lịch sử"
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => navigate(`/business-admin/user-journey?userId=${user.id || user.uuid}`)}
-                                                    title="Xem hành trình di chuyển"
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => openEditModal(user)}
-                                                    title="Chỉnh sửa thông tin"
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleLockToggle(user)}
-                                                    title={user.locked ? "Mở khóa tài khoản" : "Khóa tài khoản"}
-                                                    className={`inline-flex p-1.5 rounded-lg transition-colors ${user.locked
-                                                        ? 'text-green-600 hover:bg-green-50 hover:text-green-700'
-                                                        : 'text-red-500 hover:bg-red-50 hover:text-red-600'
-                                                        }`}
-                                                >
-                                                    {user.locked ? (
+                                                </td>
+                                                <td className="py-4 px-6 text-sm text-slate-blue whitespace-nowrap">
+                                                    {user.phoneNumber || user.phone || 'Chưa cung cấp'}
+                                                </td>
+                                                <td className="py-4 px-6 text-sm text-midnight-indigo font-medium whitespace-nowrap">
+                                                    {(() => {
+                                                        const deptId = user.departmentId || (user.departments && user.departments[0]?.id) || (user.department?.id);
+                                                        const dept = departments.find(d => d.id === deptId || d.uuid === deptId);
+                                                        return dept ? dept.name || dept.roomName || dept.departmentName : 'Chưa phân bổ';
+                                                    })()}
+                                                </td>
+                                                <td className="py-4 px-6 whitespace-nowrap">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {user.roles?.map((r, idx) => {
+                                                            // user.roles có thể là string[] roleCode (ManageUserItemDto, danh sách)
+                                                            // hoặc object[] {id, roleCode, roleName} (UserDetailResponseDto, chi tiết).
+                                                            const roleCode = typeof r === 'string' ? r : (r.roleCode || r.code);
+                                                            const roleObj = roles.find(role => role.roleCode === roleCode || role.id === roleCode);
+                                                            const roleName = (typeof r === 'object' && r.roleName) || roleObj?.roleName || roleCode;
+                                                            return (
+                                                                <span key={idx} className="inline-flex text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
+                                                                    {roleName}
+                                                                </span>
+                                                            );
+                                                        }) || <span className="text-xs text-steel-gray">Chưa phân quyền</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-6 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${(user.accountStatus === 'locked' || user.locked) ? 'bg-red-50 text-red-700' :
+                                                        user.accountStatus === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                                                            user.accountStatus === 'pending_reset' ? 'bg-amber-50 text-amber-700' :
+                                                                'bg-green-50 text-green-700'
+                                                        }`}>
+                                                        {(user.accountStatus === 'locked' || user.locked) ? 'Bị khóa' :
+                                                            user.accountStatus === 'inactive' ? 'Tạm dừng' :
+                                                                user.accountStatus === 'pending_reset' ? 'Chờ đổi mk' :
+                                                                    'Hoạt động'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
+                                                    <button
+                                                        onClick={() => handleViewDetail(user)}
+                                                        title="Xem chi tiết hồ sơ"
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                    >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                         </svg>
-                                                    ) : (
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleViewLogs(user)}
+                                                        title="Xem nhật ký lịch sử"
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors"
+                                                    >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteUser(user)}
-                                                    title="Xóa vĩnh viễn"
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate(`/business-admin/user-journey?userId=${user.id || user.uuid}`)}
+                                                        title="Xem hành trình di chuyển"
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openEditModal(user)}
+                                                        title="Chỉnh sửa thông tin"
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleLockToggle(user)}
+                                                        title={user.locked ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+                                                        className={`inline-flex p-1.5 rounded-lg transition-colors ${user.locked
+                                                            ? 'text-green-600 hover:bg-green-50 hover:text-green-700'
+                                                            : 'text-red-500 hover:bg-red-50 hover:text-red-600'
+                                                            }`}
+                                                    >
+                                                        {user.locked ? (
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                            </svg>
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteUser(user)}
+                                                        title="Xóa vĩnh viễn"
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -861,7 +902,7 @@ const UserManagement = () => {
                                 <input
                                     type="text"
                                     value={formData.fullName}
-                                    onChange={(e) => { setFormData({ ...formData, fullName: e.target.value }); setFormErrors({...formErrors, fullName: ''}); }}
+                                    onChange={(e) => { setFormData({ ...formData, fullName: e.target.value }); setFormErrors({ ...formErrors, fullName: '' }); }}
                                     placeholder="Ví dụ: Nguyễn Văn A"
                                     className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.fullName ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 />
@@ -872,7 +913,7 @@ const UserManagement = () => {
                                 <input
                                     type="email"
                                     value={formData.email}
-                                    onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFormErrors({...formErrors, email: ''}); }}
+                                    onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFormErrors({ ...formErrors, email: '' }); }}
                                     placeholder="email@smrmpts.com"
                                     className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.email ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 />
@@ -892,12 +933,12 @@ const UserManagement = () => {
                                 <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.departmentId ? 'text-red-500' : 'text-slate-blue'}`}>Phòng ban</label>
                                 <select
                                     value={formData.departmentId}
-                                    onChange={(e) => { setFormData({ ...formData, departmentId: e.target.value }); setFormErrors({...formErrors, departmentId: ''}); }}
+                                    onChange={(e) => { setFormData({ ...formData, departmentId: e.target.value }); setFormErrors({ ...formErrors, departmentId: '' }); }}
                                     className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none bg-white ${formErrors.departmentId ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 >
                                     <option value="">Chọn phòng ban...</option>
                                     {departments.map(d => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                        <option key={d.id} value={d.id}>{d.departmentName}</option>
                                     ))}
                                 </select>
                                 {formErrors.departmentId && <p className="text-red-500 text-xs mt-1">{formErrors.departmentId}</p>}
@@ -910,10 +951,10 @@ const UserManagement = () => {
                                             <input
                                                 type="checkbox"
                                                 checked={formData.roleIds.includes(r.id)}
-                                                onChange={() => { handleRoleCheckboxChange(r.id); setFormErrors({...formErrors, roleIds: ''}); }}
+                                                onChange={() => { handleRoleCheckboxChange(r.id); setFormErrors({ ...formErrors, roleIds: '' }); }}
                                                 className="rounded text-action-blue focus:ring-action-blue"
                                             />
-                                            {r.name}
+                                            {r.roleName}
                                         </label>
                                     ))}
                                 </div>
@@ -991,7 +1032,7 @@ const UserManagement = () => {
                                 >
                                     <option value="">Chọn phòng ban...</option>
                                     {departments.map(d => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                        <option key={d.id} value={d.id}>{d.departmentName}</option>
                                     ))}
                                 </select>
                             </div>
@@ -1006,7 +1047,7 @@ const UserManagement = () => {
                                                 onChange={() => handleRoleCheckboxChange(r.id)}
                                                 className="rounded text-action-blue focus:ring-action-blue"
                                             />
-                                            {r.name}
+                                            {r.roleName}
                                         </label>
                                     ))}
                                 </div>
@@ -1063,19 +1104,18 @@ const UserManagement = () => {
                                 </button>
                             </div>
 
-                            <div 
-                                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                                    isDragging ? 'border-action-blue bg-blue-50/50' : 'border-platinum-tint hover:border-action-blue'
-                                } ${importStep > 1 ? 'opacity-60 pointer-events-none' : ''}`}
+                            <div
+                                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${isDragging ? 'border-action-blue bg-blue-50/50' : 'border-platinum-tint hover:border-action-blue'
+                                    } ${importStep > 1 ? 'opacity-60 pointer-events-none' : ''}`}
                                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                 onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-                                onDrop={(e) => { 
-                                    e.preventDefault(); 
+                                onDrop={(e) => {
+                                    e.preventDefault();
                                     setIsDragging(false);
                                     if (importStep > 1) return;
                                     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                                         setImportFile(e.dataTransfer.files[0]);
-                                        setValidationErrors([]); 
+                                        setValidationErrors([]);
                                         setImportResults([]);
                                         setImportStep(1);
                                     }
@@ -1086,10 +1126,10 @@ const UserManagement = () => {
                                     required={importStep === 1}
                                     accept=".xlsx, .xls, .csv"
                                     disabled={importStep > 1}
-                                    onChange={(e) => { 
-                                        setImportFile(e.target.files[0]); 
-                                        setValidationErrors([]); 
-                                        setImportResults([]); 
+                                    onChange={(e) => {
+                                        setImportFile(e.target.files[0]);
+                                        setValidationErrors([]);
+                                        setImportResults([]);
                                         setImportStep(1);
                                     }}
                                     className="hidden"
@@ -1234,9 +1274,8 @@ const UserManagement = () => {
                                     <button
                                         type="submit"
                                         disabled={importing || (importPhotos.length > 0 && !biometricConsentChecked)}
-                                        className={`px-4 py-2 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 ${
-                                            validationErrors.length > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-action-blue hover:bg-glacier-blue'
-                                        }`}
+                                        className={`px-4 py-2 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 ${validationErrors.length > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-action-blue hover:bg-glacier-blue'
+                                            }`}
                                     >
                                         {importing ? 'Đang xử lý...' : validationErrors.length > 0 ? 'Bỏ qua lỗi & Nhập hợp lệ' : 'Xác nhận Nhập'}
                                     </button>
@@ -1331,9 +1370,9 @@ const UserManagement = () => {
                                         <p className="text-sm text-slate-blue mt-0.5">{selectedUserDetail.email}</p>
                                         <div className="flex gap-1.5 mt-1 flex-wrap">
                                             {selectedUserDetail.roles?.map((r, idx) => {
-                                                const roleCode = typeof r === 'string' ? r : r.code || r.name;
-                                                const roleObj = roles.find(role => role.code === roleCode || role.name === roleCode || role.id === roleCode);
-                                                const roleName = roleObj ? roleObj.name : roleCode;
+                                                const roleCode = typeof r === 'string' ? r : (r.roleCode || r.code);
+                                                const roleObj = roles.find(role => role.roleCode === roleCode || role.id === roleCode);
+                                                const roleName = (typeof r === 'object' && r.roleName) || roleObj?.roleName || roleCode;
                                                 return (
                                                     <span key={idx} className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
                                                         {roleName}

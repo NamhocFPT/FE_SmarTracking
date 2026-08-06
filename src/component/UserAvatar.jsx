@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../utils/request';
 
 export const resolveAvatarUrl = (user) => {
     if (!user || typeof user !== 'object') return '';
@@ -31,11 +32,17 @@ const UserAvatar = ({
     const displayName = resolveDisplayName(user, name);
     const [failedUrl, setFailedUrl] = useState('');
 
+    let finalAvatarUrl = avatarUrl;
+    if (finalAvatarUrl && finalAvatarUrl.startsWith('/') && !finalAvatarUrl.startsWith('//')) {
+        const token = localStorage.getItem('token');
+        finalAvatarUrl = `${API_BASE_URL}${finalAvatarUrl}${finalAvatarUrl.includes('?') ? '&' : '?'}token=${token}`;
+    }
+
     useEffect(() => {
         setFailedUrl('');
-    }, [avatarUrl]);
+    }, [finalAvatarUrl]);
 
-    const shouldShowImage = Boolean(avatarUrl) && failedUrl !== avatarUrl;
+    const shouldShowImage = Boolean(finalAvatarUrl) && failedUrl !== finalAvatarUrl;
 
     return (
         <div
@@ -44,10 +51,10 @@ const UserAvatar = ({
         >
             {shouldShowImage ? (
                 <img
-                    src={avatarUrl}
+                    src={finalAvatarUrl}
                     alt={alt || `Ảnh đại diện của ${displayName}`}
                     className={`w-full h-full object-cover ${imageClassName}`}
-                    onError={() => setFailedUrl(avatarUrl)}
+                    onError={() => setFailedUrl(finalAvatarUrl)}
                 />
             ) : (
                 <span aria-hidden="true">{displayName.trim().charAt(0).toUpperCase() || '?'}</span>

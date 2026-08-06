@@ -6,34 +6,41 @@ import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap,
 /**
  * SystemSettings Component
  * UC-RUM-14: Cập nhật cấu hình ngưỡng thời gian chờ no-show
- * UC-RUM-15: Cập nhật cấu hình ngưỡng phát hiện phòng trống sớm
- * BR-NS-03: Cấu hình ngưỡng no-show và grace period
- * BR-PRIV-04: Cấu hình thời gian lưu trữ media (retention)
- * BR-MTG-OVERRUN-01: Cấu hình thời gian ân hạn kết thúc muộn
+ * BR-NS-03: Cấu hình ngưỡng no-show và tự động giải phóng phòng
+ * BR-PRIV-04: Cấu hình thời gian lưu trữ media (retention) — tab hiện đang ẩn, xem PLAN FE 2026-08-06
+ * BR-MTG-OVERRUN-01: Cấu hình thời gian ân hạn kết thúc muộn — tab hiện đang ẩn, xem PLAN FE 2026-08-06
+ *
+ * Pipeline No-show (theo PLAN FE gửi Nam 2026-08-06): Phát hiện vắng mặt (thresholdMinutes)
+ * → Cảnh báo (luôn tự động, không tắt được) → đợi (autoReleaseGraceMinutes) →
+ * [nếu autoReleaseEnabled] đổi trạng thái phòng. Tab "Ghi hình & Riêng tư" và "Tham số hệ thống"
+ * đang ẩn khỏi thanh chuyển tab theo yêu cầu, code giữ nguyên để dùng lại sau.
  */
 const SystemSettings = () => {
     // Tab State
-    const [activeTab, setActiveTab] = useState('workspace'); // workspace | recording | system | camera
+    const [activeTab, setActiveTab] = useState('workspace'); // workspace | camera (recording/system tạm ẩn)
 
     // API & UI States
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null); // Lỗi tải dữ liệu ban đầu — chặn form, có nút Thử lại
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
 
-    // Soft warning modal / state for aggressive thresholds (UC-RUM-15 E1)
-    const [showSoftWarning, setShowSoftWarning] = useState(false);
-    const [pendingConfigChange, setPendingConfigChange] = useState(null);
-
-    // Config Values State
-    const [configs, setConfigs] = useState({
-        is_auto_release_enabled: true,
+    // Cấu hình No-show (nguồn riêng: GET/PUT /no-show-config — KHÔNG dùng chung
+    // với /system-configurations, đúng theo PLAN FE gửi Nam 2026-08-06)
+    const [noShowConfig, setNoShowConfig] = useState({
         thresholdMinutes: 15,
-        warningGraceMinutes: 10,
         autoReleaseGraceMinutes: 5,
-        is_early_release_enabled: true,
-        early_departure_threshold_minutes: 10,
-        is_host_warning_enabled: true,
+        autoReleaseEnabled: true
+    });
+    const [dbNoShowConfig, setDbNoShowConfig] = useState({
+        thresholdMinutes: 15,
+        autoReleaseGraceMinutes: 5,
+        autoReleaseEnabled: true
+    });
+
+    // Config Values State — chỉ còn phục vụ 2 tab đang ẩn (Ghi hình & Riêng tư / Tham số hệ thống)
+    const [configs, setConfigs] = useState({
         recording_retention_days: 90,
         is_recording_consent_required: true,
         overrun_grace_minutes: 10
@@ -60,47 +67,49 @@ const SystemSettings = () => {
     // Fetch Configurations from API
     const fetchConfigs = useCallback(async () => {
         setLoading(true);
-        setError(null);
+        setLoadError(null);
         try {
-            const [res, channelRes, roomRes, noShowRes] = await Promise.all([
-                getSystemConfigs(),
-                getChannelMaps().catch(() => ({ success: true, data: [] })),
-                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] })),
-                getNoShowConfig().catch(() => ({ success: true, data: null }))
-            ]);
+            // No-show config là nguồn dữ liệu bắt buộc cho tab duy nhất đang hiển thị —
+            // nếu lỗi thì chặn form + hiện nút Thử lại, không dùng dữ liệu giả (AGENTS.md API RULES).
+            const noShowRes = await getNoShowConfig();
+            if (!noShowRes?.success || !noShowRes.data) {
+                throw new Error(noShowRes?.error?.message || 'Không thể tải cấu hình chính sách No-show.');
+            }
+            const nsData = noShowRes.data;
+            const mergedNoShow = {
+                thresholdMinutes: nsData.thresholdMinutes?.value ?? noShowConfig.thresholdMinutes,
+                autoReleaseGraceMinutes: nsData.autoReleaseGraceMinutes?.value ?? noShowConfig.autoReleaseGraceMinutes,
+                autoReleaseEnabled: nsData.autoReleaseEnabled?.value ?? noShowConfig.autoReleaseEnabled
+            };
+            setNoShowConfig(mergedNoShow);
+            setDbNoShowConfig(mergedNoShow);
 
-            if (res?.success && Array.isArray(res.data)) {
-                // Map array of { id, key, value, ... } to state object
-                const mappedConfigs = {};
-                res.data.forEach(item => {
-                    let parsedValue = item.value;
-                    // Parse values correctly
-                    if (parsedValue === 'true') parsedValue = true;
-                    else if (parsedValue === 'false') parsedValue = false;
-                    else if (!isNaN(parsedValue) && parsedValue !== '') parsedValue = Number(parsedValue);
-
-                    mappedConfigs[item.key] = parsedValue;
-                });
-
-                // Merge with default values in case some keys are missing
-                const merged = { ...configs, ...mappedConfigs };
-                
-                if (noShowRes?.success && noShowRes.data) {
-                    merged.thresholdMinutes = noShowRes.data.thresholdMinutes ?? merged.thresholdMinutes;
-                    merged.warningGraceMinutes = noShowRes.data.warningGraceMinutes ?? merged.warningGraceMinutes;
-                    merged.autoReleaseGraceMinutes = noShowRes.data.autoReleaseGraceMinutes ?? merged.autoReleaseGraceMinutes;
-                    if (noShowRes.data.is_auto_release_enabled !== undefined) {
-                         merged.is_auto_release_enabled = noShowRes.data.is_auto_release_enabled;
-                    }
+            // Cấu hình chung — chỉ phục vụ 2 tab đang ẩn, lỗi ở đây không chặn tab No-show/Camera
+            try {
+                const res = await getSystemConfigs();
+                if (res?.success && Array.isArray(res.data)) {
+                    const mappedConfigs = {};
+                    res.data.forEach(item => {
+                        let parsedValue = item.value;
+                        if (parsedValue === 'true') parsedValue = true;
+                        else if (parsedValue === 'false') parsedValue = false;
+                        else if (!isNaN(parsedValue) && parsedValue !== '') parsedValue = Number(parsedValue);
+                        mappedConfigs[item.key] = parsedValue;
+                    });
+                    const merged = { ...configs, ...mappedConfigs };
+                    setConfigs(merged);
+                    setDbConfigs(merged);
                 }
-
-                setConfigs(merged);
-                setDbConfigs(merged);
-            } else {
-                throw new Error('Không thể tải cấu hình từ hệ thống.');
+            } catch (genErr) {
+                console.error('Không thể tải cấu hình hệ thống chung (tab đang ẩn):', genErr);
             }
 
-            // Handle channel maps
+            // Channel maps + rooms (tab Camera & Cảm biến)
+            const [channelRes, roomRes] = await Promise.all([
+                getChannelMaps().catch(() => ({ success: true, data: [] })),
+                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] }))
+            ]);
+
             if (channelRes?.success && Array.isArray(channelRes.data)) {
                 const mappedChannels = {};
                 channelRes.data.forEach(item => {
@@ -109,14 +118,14 @@ const SystemSettings = () => {
                         if (typeof parsedValue === 'string' && parsedValue.trim().startsWith('{')) {
                             parsedValue = JSON.parse(parsedValue);
                         }
-                    } catch(e) {}
+                    } catch (e) {}
                     // Ensure numbers are numbers for thresholds
                     if (['ivss.presence.gap_threshold_seconds', 'campus.journey.gap_threshold_seconds', 'attendance.late_grace_minutes'].includes(item.key)) {
                         parsedValue = Number(parsedValue) || 0;
                     }
                     mappedChannels[item.key] = parsedValue;
                 });
-                
+
                 const mergedChannels = {
                     'ivss.channel_room_map': {},
                     'ivss.channel_direction_map': {},
@@ -125,7 +134,7 @@ const SystemSettings = () => {
                     'ivss.presence.gap_threshold_seconds': 30,
                     'campus.journey.gap_threshold_seconds': 60,
                     'attendance.late_grace_minutes': 15,
-                    ...mappedChannels 
+                    ...mappedChannels
                 };
                 setChannelMaps(mergedChannels);
                 setDbChannelMaps(mergedChannels);
@@ -156,21 +165,7 @@ const SystemSettings = () => {
                 setRooms(roomData);
             }
         } catch (err) {
-            // Mock default config database simulation for local development / fallback
-            const mockDb = {
-                is_auto_release_enabled: true,
-                thresholdMinutes: 15,
-                warningGraceMinutes: 10,
-                autoReleaseGraceMinutes: 5,
-                is_early_release_enabled: true,
-                early_departure_threshold_minutes: 10,
-                is_host_warning_enabled: true,
-                recording_retention_days: 90,
-                is_recording_consent_required: true,
-                overrun_grace_minutes: 10
-            };
-            setConfigs(mockDb);
-            setDbConfigs(mockDb);
+            setLoadError(err?.message || err?.error?.message || 'Không thể tải cấu hình hệ thống. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
@@ -195,7 +190,7 @@ const SystemSettings = () => {
         }
     }, [error]);
 
-    // Handle single input changes
+    // Handle single input changes (tab đang ẩn — Ghi hình & Riêng tư / Tham số hệ thống)
     const handleChange = (key, value) => {
         setConfigs(prev => ({
             ...prev,
@@ -203,15 +198,22 @@ const SystemSettings = () => {
         }));
     };
 
+    // Handle thay đổi cấu hình No-show
+    const handleNoShowChange = (key, value) => {
+        setNoShowConfig(prev => ({
+            ...prev,
+            [key]: value
+        }));
+    };
+
     // Form validation check
-    const validateConfigs = (data) => {
-        // Validation: Thresholds must be positive numbers
-        if (Number(data.thresholdMinutes) <= 0 || Number(data.warningGraceMinutes) <= 0 || Number(data.autoReleaseGraceMinutes) <= 0) {
-            setError('Thời gian chờ No-show và thời gian đếm ngược phải là số nguyên dương.');
+    const validateConfigs = (noShow, data) => {
+        if (Number(noShow.thresholdMinutes) <= 0) {
+            setError('Ngưỡng phát hiện vắng mặt phải là số nguyên dương.');
             return false;
         }
-        if (Number(data.early_departure_threshold_minutes) <= 0) {
-            setError('Ngưỡng phát hiện phòng trống phải là số nguyên dương.');
+        if (Number(noShow.autoReleaseGraceMinutes) <= 0) {
+            setError('Thời gian chờ phản hồi phải là số nguyên dương.');
             return false;
         }
         if (Number(data.recording_retention_days) <= 0) {
@@ -220,12 +222,6 @@ const SystemSettings = () => {
         }
         if (Number(data.overrun_grace_minutes) <= 0) {
             setError('Thời gian ân hạn quá hạn họp phải là số nguyên dương.');
-            return false;
-        }
-
-        // Logical validation: No-show warning + autoRelease should normally equal threshold
-        if (Number(data.warningGraceMinutes) > Number(data.thresholdMinutes)) {
-            setError('Thời gian cảnh báo không nên lớn hơn tổng thời gian ân hạn.');
             return false;
         }
 
@@ -254,7 +250,7 @@ const SystemSettings = () => {
                 setError(`ID Kênh Camera bị trùng lặp: ${id}`);
                 return;
             }
-            // Only add keys with non-empty values. 
+            // Only add keys with non-empty values.
             // Missing keys will be implicitly deleted since the BE fully replaces the JSON object.
             if (row.roomId) newRoomMap[id] = row.roomId;
             if (row.direction) newDirMap[id] = row.direction;
@@ -270,29 +266,20 @@ const SystemSettings = () => {
             'ivss.channel_zone_map': newZoneMap
         };
 
-        if (!validateConfigs(configs)) return;
-
-        // Check for aggressive threshold warning (UC-RUM-15 E1)
-        if (configs.is_early_release_enabled && Number(configs.early_departure_threshold_minutes) < 3) {
-            if (!showSoftWarning) {
-                setShowSoftWarning(true);
-                return;
-            }
-        }
+        if (!validateConfigs(noShowConfig, configs)) return;
 
         setSaving(true);
-        setShowSoftWarning(false);
 
-        // Find keys that changed compared to initial database values
+        // Cấu hình chung (tab đang ẩn) — key nào đổi so với DB
         const changedKeys = Object.keys(configs).filter(key => configs[key] !== dbConfigs[key]);
         const changedChannelKeys = Object.keys(currentChannelMaps).filter(key => {
             const currentVal = currentChannelMaps[key];
             const dbVal = dbChannelMaps[key];
-            
+
             // Check if value actually changed
             if (JSON.stringify(currentVal) === JSON.stringify(dbVal)) return false;
 
-            // Allow sending changed objects even if they appear "empty" 
+            // Allow sending changed objects even if they appear "empty"
             // (e.g. they only contain nulls to delete keys)
             if (typeof currentVal === 'object' && currentVal !== null) {
                 return true;
@@ -301,30 +288,32 @@ const SystemSettings = () => {
             }
         });
 
-        if (changedKeys.length === 0 && changedChannelKeys.length === 0) {
+        // No-show config — đổi field nào so với DB (toggle hoặc 2 ô số)
+        const noShowChanged = Object.keys(noShowConfig).some(key => noShowConfig[key] !== dbNoShowConfig[key]);
+
+        if (changedKeys.length === 0 && changedChannelKeys.length === 0 && !noShowChanged) {
             setSuccessMessage('Không có thay đổi nào cần lưu.');
             setSaving(false);
             return;
         }
 
         try {
-            // Update each changed config sequentially
-            const updatePromises = changedKeys
-                .filter(key => !['thresholdMinutes', 'warningGraceMinutes', 'autoReleaseGraceMinutes'].includes(key))
-                .map(key => {
-                    const valueString = String(configs[key]);
-                    return updateSystemConfig({ key, value: valueString });
-                });
+            const updatePromises = changedKeys.map(key => {
+                const valueString = String(configs[key]);
+                return updateSystemConfig({ key, value: valueString });
+            });
 
-            // Update no-show config if any of its fields changed
-            const noShowChanged = changedKeys.some(key => ['thresholdMinutes', 'warningGraceMinutes', 'autoReleaseGraceMinutes'].includes(key));
+            // PUT /no-show-config — luôn gửi đủ 4 field theo đúng payload PLAN FE gửi Nam
+            // 2026-08-06 (warningGraceMinutes ẩn khỏi UI nhưng vẫn gửi ngầm = 0).
             if (noShowChanged) {
                 updatePromises.push(updateNoShowConfig({
-                    thresholdMinutes: Number(configs.thresholdMinutes),
-                    warningGraceMinutes: Number(configs.warningGraceMinutes),
-                    autoReleaseGraceMinutes: Number(configs.autoReleaseGraceMinutes)
+                    thresholdMinutes: Number(noShowConfig.thresholdMinutes),
+                    warningGraceMinutes: 0,
+                    autoReleaseGraceMinutes: Number(noShowConfig.autoReleaseGraceMinutes),
+                    autoReleaseEnabled: Boolean(noShowConfig.autoReleaseEnabled)
                 }));
             }
+
             // Endpoint /system-configurations/channel-maps lưu thẳng vào cột config_json (JSONB) —
             // BE cần nhận value đúng kiểu gốc (object cho 4 map, number cho 3 ngưỡng), KHÔNG stringify.
             // Stringify object ở đây sẽ khiến BE báo "Value ... phải là object dạng {...}".
@@ -333,7 +322,7 @@ const SystemSettings = () => {
             });
 
             await Promise.all([...updatePromises, ...updateChannelPromises]);
-            
+
             // Re-fetch or sync state to ensure we have the absolute latest from DB
             await fetchConfigs();
             setSuccessMessage('Cập nhật chính sách và tham số cấu hình hệ thống thành công.');
@@ -345,38 +334,13 @@ const SystemSettings = () => {
         }
     };
 
-    // Confirm saving even with aggressive settings warning
-    const handleConfirmAggressiveSave = () => {
-        setShowSoftWarning(false);
-        // Execute save flow bypassing the threshold check since we are confirming
-        setTimeout(() => {
-            setSaving(true);
-            const changedKeys = Object.keys(configs).filter(key => configs[key] !== dbConfigs[key]);
-            
-            const performSave = async () => {
-                try {
-                    const updatePromises = changedKeys.map(key => 
-                        updateSystemConfig({ key, value: String(configs[key]) })
-                    );
-                    await Promise.all(updatePromises);
-                    setSuccessMessage('Đã cập nhật cấu hình hệ thống thành công (Đã bỏ qua cảnh báo ngưỡng thấp).');
-                    setDbConfigs({ ...configs });
-                } catch (err) {
-                    setError(err?.message || err?.error?.message || 'Không thể cập nhật cấu hình hệ thống. Vui lòng thử lại.');
-                } finally {
-                    setSaving(false);
-                }
-            };
-            performSave();
-        }, 100);
-    };
-
     // Reset current tab inputs to DB state
     const handleReset = () => {
         setError(null);
+        setNoShowConfig({ ...dbNoShowConfig });
         setConfigs({ ...dbConfigs });
         setChannelMaps({ ...dbChannelMaps });
-        
+
         // Build localChannels
         const roomMap = dbChannelMaps['ivss.channel_room_map'] || {};
         const dirMap = dbChannelMaps['ivss.channel_direction_map'] || {};
@@ -413,6 +377,27 @@ const SystemSettings = () => {
         );
     }
 
+    if (loadError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center px-4">
+                <svg className="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                    <p className="font-bold text-midnight-indigo">Không thể tải cấu hình hệ thống</p>
+                    <p className="text-sm text-slate-blue mt-1 max-w-md">{loadError}</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={fetchConfigs}
+                    className="px-4 py-2 bg-action-blue text-white hover:bg-glacier-blue rounded-xl text-sm font-semibold shadow-sm transition-all duration-200"
+                >
+                    Thử lại
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6 animate-fade-in-up max-w-5xl mx-auto">
             {/* Header */}
@@ -424,10 +409,10 @@ const SystemSettings = () => {
                     </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Cài đặt hệ thống</h1>
                     <p className="text-slate-blue text-sm mt-1">
-                        Cấu hình các tham số toàn cục, chính sách No-show, tự động giải phóng phòng và các quy tắc nghiệp vụ.
+                        Cấu hình chính sách No-show, tự động giải phóng phòng và ánh xạ camera.
                     </p>
                 </div>
-                
+
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                     <button
@@ -467,7 +452,8 @@ const SystemSettings = () => {
                 </div>
             )}
 
-            {/* Navigation Tabs */}
+            {/* Navigation Tabs — "Ghi hình & Riêng tư" và "Tham số hệ thống" tạm ẩn theo PLAN FE
+                gửi Nam 2026-08-06 (không xóa code, chỉ bỏ nút chuyển tab). */}
             <div className="border-b border-platinum-tint flex gap-2 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('workspace')}
@@ -478,26 +464,6 @@ const SystemSettings = () => {
                     }`}
                 >
                     Quy tắc không gian
-                </button>
-                <button
-                    onClick={() => setActiveTab('recording')}
-                    className={`whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
-                        activeTab === 'recording'
-                            ? 'border-action-blue text-action-blue'
-                            : 'border-transparent text-slate-blue hover:text-midnight-indigo'
-                    }`}
-                >
-                    Ghi hình & Riêng tư
-                </button>
-                <button
-                    onClick={() => setActiveTab('system')}
-                    className={`whitespace-nowrap px-4 py-2.5 text-sm font-bold border-b-2 transition-all ${
-                        activeTab === 'system'
-                            ? 'border-action-blue text-action-blue'
-                            : 'border-transparent text-slate-blue hover:text-midnight-indigo'
-                    }`}
-                >
-                    Tham số hệ thống
                 </button>
                 <button
                     onClick={() => setActiveTab('camera')}
@@ -514,11 +480,11 @@ const SystemSettings = () => {
             {/* Tab Contents */}
             <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2 overflow-hidden">
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    
+
                     {/* TAB 1: WORKSPACE RULES */}
                     {activeTab === 'workspace' && (
                         <div className="space-y-8">
-                            
+
                             {/* SECTION A: No-Show Policy */}
                             <div className="space-y-4">
                                 <div className="border-b border-platinum-tint/60 pb-3">
@@ -528,7 +494,7 @@ const SystemSettings = () => {
                                         </svg>
                                         Chính sách No-show (Vắng mặt)
                                     </h2>
-                                    <p className="text-xs text-slate-blue mt-1">Cấu hình thời gian giải phóng phòng họp khi không có người check-in.</p>
+                                    <p className="text-xs text-slate-blue mt-1">Phát hiện vắng mặt → gửi cảnh báo (luôn tự động) → chờ phản hồi → nếu bật, tự động đổi trạng thái phòng.</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
@@ -542,31 +508,29 @@ const SystemSettings = () => {
                                             <label className="relative inline-flex items-center cursor-pointer">
                                                 <input
                                                     type="checkbox"
-                                                    checked={configs.is_auto_release_enabled}
-                                                    onChange={(e) => handleChange('is_auto_release_enabled', e.target.checked)}
+                                                    checked={noShowConfig.autoReleaseEnabled}
+                                                    onChange={(e) => handleNoShowChange('autoReleaseEnabled', e.target.checked)}
                                                     className="sr-only peer"
                                                 />
                                                 <div className="w-11 h-6 bg-platinum-tint peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-action-blue"></div>
                                                 <span className="ml-3 text-sm font-semibold text-midnight-indigo">
-                                                    {configs.is_auto_release_enabled ? 'Bật' : 'Tắt'}
+                                                    {noShowConfig.autoReleaseEnabled ? 'Bật' : 'Tắt'}
                                                 </span>
                                             </label>
                                         </div>
                                     </div>
 
-                                    {/* Grace threshold minutes */}
-                                    <div className={`p-4 bg-white border rounded-xl space-y-2 transition-all ${
-                                        configs.is_auto_release_enabled ? 'border-platinum-tint' : 'border-platinum-tint/40 opacity-50 pointer-events-none'
-                                    }`}>
-                                        <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian ân hạn (Grace Period)</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Khoảng thời gian chờ trước khi gửi cảnh báo (phút).</span>
+                                    {/* Detection threshold minutes */}
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">Ngưỡng phát hiện vắng mặt</label>
+                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian không check-in kể từ giờ họp trước khi bị đánh dấu no-show (phút).</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
                                                 min="1"
-                                                max="60"
-                                                value={configs.warningGraceMinutes}
-                                                onChange={(e) => handleChange('warningGraceMinutes', Number(e.target.value))}
+                                                max="1440"
+                                                value={noShowConfig.thresholdMinutes}
+                                                onChange={(e) => handleNoShowChange('thresholdMinutes', Number(e.target.value))}
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
@@ -574,99 +538,19 @@ const SystemSettings = () => {
                                     </div>
 
                                     {/* Warning countdown minutes */}
-                                    <div className={`p-4 bg-white border rounded-xl space-y-2 transition-all ${
-                                        configs.is_auto_release_enabled ? 'border-platinum-tint' : 'border-platinum-tint/40 opacity-50 pointer-events-none'
-                                    }`}>
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian chờ phản hồi</label>
                                         <span className="text-xs text-steel-gray mt-0.5 block">Thời gian cho phép Host xác nhận trước khi nhả phòng (phút).</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
                                                 min="1"
-                                                max="60"
-                                                value={configs.autoReleaseGraceMinutes}
-                                                onChange={(e) => handleChange('autoReleaseGraceMinutes', Number(e.target.value))}
+                                                max="1440"
+                                                value={noShowConfig.autoReleaseGraceMinutes}
+                                                onChange={(e) => handleNoShowChange('autoReleaseGraceMinutes', Number(e.target.value))}
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* SECTION B: Early Departure Release Policy */}
-                            <div className="space-y-4 pt-4 border-t border-platinum-tint/60">
-                                <div className="pb-3">
-                                    <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-action-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                        Chính sách kết thúc và trả phòng sớm (Early Departure)
-                                    </h2>
-                                    <p className="text-xs text-slate-blue mt-1">Sử dụng cảm biến IoT đếm hiện diện để tự động giải phóng phòng khi cuộc họp trống người sớm.</p>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                                    {/* Early release toggle */}
-                                    <div className="p-4 bg-cloud-mist/50 border border-platinum-tint/70 rounded-xl space-y-2 flex flex-col justify-between h-full">
-                                        <div>
-                                            <span className="block text-xs font-bold text-slate-blue uppercase">Giải phóng phòng trống sớm</span>
-                                            <span className="text-xs text-steel-gray mt-1 block">Tự động trả phòng về trạng thái trống nếu cảm biến báo không có chuyển động.</span>
-                                        </div>
-                                        <div className="flex items-center mt-3">
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={configs.is_early_release_enabled}
-                                                    onChange={(e) => handleChange('is_early_release_enabled', e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-platinum-tint peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-action-blue"></div>
-                                                <span className="ml-3 text-sm font-semibold text-midnight-indigo">
-                                                    {configs.is_early_release_enabled ? 'Bật' : 'Tắt'}
-                                                </span>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Inactivity detection minutes */}
-                                    <div className={`p-4 bg-white border rounded-xl space-y-2 transition-all ${
-                                        configs.is_early_release_enabled ? 'border-platinum-tint' : 'border-platinum-tint/40 opacity-50 pointer-events-none'
-                                    }`}>
-                                        <label className="block text-xs font-bold text-slate-blue uppercase">Ngưỡng chờ xác nhận trống</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian không phát hiện chuyển động trước khi giải phóng (phút).</span>
-                                        <div className="mt-3 relative">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="60"
-                                                value={configs.early_departure_threshold_minutes}
-                                                onChange={(e) => handleChange('early_departure_threshold_minutes', Number(e.target.value))}
-                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
-                                            />
-                                            <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Prompt Host confirmation checkbox toggle */}
-                                    <div className={`p-4 bg-white border rounded-xl space-y-2 transition-all ${
-                                        configs.is_early_release_enabled ? 'border-platinum-tint' : 'border-platinum-tint/40 opacity-50 pointer-events-none'
-                                    }`}>
-                                        <span className="block text-xs font-bold text-slate-blue uppercase">Gửi cảnh báo trước giải phóng</span>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Gửi tin nhắn hỏi Host "Vẫn sử dụng phòng?" trước khi tự động kết thúc.</span>
-                                        <div className="flex items-center mt-3 pt-1">
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={configs.is_host_warning_enabled}
-                                                    onChange={(e) => handleChange('is_host_warning_enabled', e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-platinum-tint peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-action-blue"></div>
-                                                <span className="ml-3 text-sm font-semibold text-midnight-indigo">
-                                                    {configs.is_host_warning_enabled ? 'Bật' : 'Tắt'}
-                                                </span>
-                                            </label>
                                         </div>
                                     </div>
                                 </div>
@@ -675,7 +559,8 @@ const SystemSettings = () => {
                         </div>
                     )}
 
-                    {/* TAB 2: RECORDING & PRIVACY */}
+                    {/* TAB 2: RECORDING & PRIVACY — tạm ẩn khỏi thanh chuyển tab (PLAN FE gửi Nam
+                        2026-08-06), giữ nguyên code để dùng lại sau. */}
                     {activeTab === 'recording' && (
                         <div className="space-y-6">
                             <div className="border-b border-platinum-tint/60 pb-3">
@@ -748,7 +633,8 @@ const SystemSettings = () => {
                         </div>
                     )}
 
-                    {/* TAB 3: SYSTEM PARAMETERS */}
+                    {/* TAB 3: SYSTEM PARAMETERS — tạm ẩn khỏi thanh chuyển tab (PLAN FE gửi Nam
+                        2026-08-06), giữ nguyên code để dùng lại sau. */}
                     {activeTab === 'system' && (
                         <div className="space-y-6">
                             <div className="border-b border-platinum-tint/60 pb-3">
@@ -1003,59 +889,6 @@ const SystemSettings = () => {
                     )}
                 </form>
             </div>
-
-            {/* SOFT WARNING MODAL (UC-RUM-15 E1) */}
-            {showSoftWarning && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
-                    <div className="bg-white rounded-2xl border border-red-200 shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-red-100 flex items-center justify-between bg-red-50/50">
-                            <h3 className="font-bold text-red-700 flex items-center gap-2">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                                Cảnh báo thiết lập ngưỡng nhạy cảm
-                            </h3>
-                            <button onClick={() => setShowSoftWarning(false)} className="text-slate-blue hover:text-midnight-indigo">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        
-                        {/* Body */}
-                        <div className="p-6 space-y-4">
-                            <p className="text-sm text-midnight-indigo leading-relaxed">
-                                Ngưỡng phát hiện phòng trống sớm được thiết lập là <strong className="text-red-600">{configs.early_departure_threshold_minutes} phút</strong>.
-                            </p>
-                            <p className="text-xs text-slate-blue leading-normal">
-                                Thiết lập ngưỡng thời gian chờ quá ngắn (dưới 3 phút) có thể khiến hệ thống nhầm lẫn và tự động nhả phòng quá sớm khi mọi người chỉ tạm rời phòng trong giây lát.
-                            </p>
-                            <p className="text-xs font-semibold text-red-700">
-                                Bạn có chắc chắn muốn áp dụng mức cấu hình này không?
-                            </p>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-platinum-tint/50 bg-cloud-mist/30 flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setShowSoftWarning(false)}
-                                className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-all"
-                            >
-                                Quay lại chỉnh sửa
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirmAggressiveSave}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-                            >
-                                Tiếp tục áp dụng
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

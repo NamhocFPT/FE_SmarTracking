@@ -72,11 +72,24 @@ const BookMeeting = () => {
     const [departments, setDepartments] = useState([]);
     const [usersById, setUsersById] = useState({});
     const users = useMemo(() => Object.values(usersById), [usersById]);
-    const mergeUsers = (list) => {
+    // BE không trả departmentId trên user list/search (UserListItemDto,
+    // DepartmentMemberItemDto chỉ có id/fullName/email/employeeCode[...]).
+    // Khi biết trước phòng ban của kết quả (nạp mặc định theo phòng ban của
+    // currentUser, hoặc "Thêm cả phòng ban"), gắn tạm _departmentId để hiển thị
+    // badge đúng; nguồn không rõ phòng ban (search tự do) thì để trống, không suy đoán.
+    const mergeUsers = (list, departmentId) => {
         if (!Array.isArray(list) || list.length === 0) return;
         setUsersById(prev => {
             const next = { ...prev };
-            list.forEach(u => { if (u && u.id) next[u.id] = u; });
+            list.forEach(u => {
+                if (!u || !u.id) return;
+                const existing = next[u.id];
+                next[u.id] = {
+                    ...existing,
+                    ...u,
+                    _departmentId: departmentId || existing?._departmentId || null,
+                };
+            });
             return next;
         });
     };
@@ -185,10 +198,14 @@ const BookMeeting = () => {
                 // Không còn tải trước 1000 user như trước (tốn băng thông, không scale).
                 const deptId = parsedUser?.departmentId || parsedUser?.department_id;
                 let suggestions = [];
+                let suggestionsDeptId = null;
                 if (deptId) {
                     try {
                         const membersRes = await getDepartmentMembers(deptId);
-                        if (membersRes?.success) suggestions = membersRes.data || [];
+                        if (membersRes?.success) {
+                            suggestions = membersRes.data || [];
+                            suggestionsDeptId = deptId;
+                        }
                     } catch (err) {
                         console.error('Failed to load default department members', err);
                     }
@@ -197,11 +214,12 @@ const BookMeeting = () => {
                     try {
                         const usersRes = await getUsers({ limit: 30 });
                         if (usersRes?.success) suggestions = usersRes.data || [];
+                        suggestionsDeptId = null;
                     } catch (err) {
                         console.error('Failed to load default users', err);
                     }
                 }
-                mergeUsers(suggestions);
+                mergeUsers(suggestions, suggestionsDeptId);
                 setDefaultSuggestions(suggestions);
                 setSearchResults(suggestions);
             } catch (err) {
@@ -372,9 +390,15 @@ const BookMeeting = () => {
         );
     };
 
+    // BE (UserListItemDto/DepartmentMemberItemDto) không trả departmentId trên user
+    // — chỉ suy ra được phòng ban khi user đến từ một nguồn đã biết phòng ban
+    // (_departmentId gắn trong mergeUsers). DepartmentResponseDto dùng camelCase
+    // departmentCode/departmentName (trước đây đọc nhầm department_code/department_name
+    // nên badge luôn rỗng).
     const getUserDeptCode = (user) => {
-        const uDept = departments.find(d => d.id === user.departmentId || d.id === user.department_id);
-        return uDept ? uDept.department_code || uDept.department_name : '';
+        if (!user?._departmentId) return '';
+        const dept = departments.find(d => d.id === user._departmentId);
+        return dept ? (dept.departmentCode || dept.departmentName) : '';
     };
 
     // Gợi ý hiển thị trong dropdown tìm kiếm: kết quả search server (hoặc gợi ý
@@ -408,7 +432,7 @@ const BookMeeting = () => {
             const res = await getDepartmentMembers(deptId);
             if (res?.success) {
                 const members = res.data || [];
-                mergeUsers(members);
+                mergeUsers(members, deptId);
 
                 const dept = departments.find(d => d.id === deptId);
                 const deptName = dept?.departmentName || dept?.department_name || 'đã chọn';
@@ -1295,6 +1319,7 @@ const BookMeeting = () => {
                                                                     onMouseDown={() => {
                                                                         handleAddDepartment(dept.id);
                                                                         setSearchEmail('');
+                                                                        setSearchFocused(false);
                                                                     }}
                                                                     className="p-3 hover:bg-royal-amethyst/5 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between text-midnight-indigo transition-colors gap-3 bg-slate-50 border-b border-platinum-tint/50"
                                                                 >
@@ -1323,12 +1348,12 @@ const BookMeeting = () => {
                                                                     <div
                                                                         key={user.id}
                                                                         onMouseDown={(e) => {
-                                                                            // Prevent blurring the input so they can toggle multiple without closing
                                                                             e.preventDefault();
                                                                             toggleParticipant(user.id);
                                                                             if (!isSelected) {
                                                                                 setSearchEmail('');
                                                                             }
+                                                                            setSearchFocused(false);
                                                                         }}
                                                                         className={`p-3 cursor-pointer flex items-center justify-between transition-colors gap-3 min-w-0 group ${isSelected
                                                                             ? 'bg-action-blue/[0.04] hover:bg-rose-50/50 border-l-2 border-action-blue'
@@ -1400,69 +1425,90 @@ const BookMeeting = () => {
                                             <p className="text-xs font-bold text-midnight-indigo uppercase tracking-wider">
                                                 Nhân viên trong hệ thống đã chọn ({selectedParticipantIds.length}):
                                             </p>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-                                                {users
-                                                    .filter(u => selectedParticipantIds.includes(u.id))
-                                                    .map(user => {
-                                                        const deptCode = getUserDeptCode(user);
-                                                        return (
-                                                            <div
-                                                                key={user.id}
-                                                                onClick={() => toggleParticipant(user.id)}
-                                                                className="p-3 rounded-2xl border border-action-blue/20 bg-action-blue/[0.02] text-midnight-indigo shadow-sm flex items-center justify-between cursor-pointer select-none transition-all duration-200 hover:bg-rose-50/40 hover:border-rose-200 hover:shadow group gap-3 min-w-0"
-                                                                title="Nhấp để xóa người tham gia này"
-                                                            >
-                                                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                                    {/* Avatar */}
-                                                                    <div
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleOpenUserDetail(user.id);
-                                                                        }}
-                                                                        className="relative w-10 h-10 rounded-full overflow-hidden border border-action-blue/10 flex-shrink-0 bg-gradient-to-tr from-action-blue to-cyan-500 text-white flex items-center justify-center font-extrabold text-sm hover:scale-105 hover:shadow transition-all group/avatar cursor-pointer"
-                                                                        title="Xem thông tin chi tiết"
-                                                                    >
-                                                                        {user.avatarUrl ? (
-                                                                            <img src={user.avatarUrl} alt={user.fullName || user.full_name} className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            (user.fullName || user.full_name || 'U').charAt(0).toUpperCase()
-                                                                        )}
-                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-all duration-200">
-                                                                            <Info className="w-3.5 h-3.5 text-white" />
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="space-y-0.5 min-w-0 flex-1">
-                                                                        <div className="flex items-center gap-1.5 min-w-0">
-                                                                            <span
-                                                                                className="text-sm font-semibold text-midnight-indigo group-hover:text-rose-950 transition-colors truncate"
-                                                                                title={user.fullName || user.full_name}
-                                                                            >
-                                                                                {user.fullName || user.full_name}
-                                                                            </span>
-                                                                            {deptCode && (
-                                                                                <span
-                                                                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700 transition-colors shrink-0 max-w-[85px] truncate"
-                                                                                    title={deptCode}
-                                                                                >
-                                                                                    {deptCode}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                        <p
-                                                                            className="text-[11px] font-normal text-slate-blue/80 group-hover:text-rose-700/60 transition-colors truncate"
-                                                                            title={user.email}
-                                                                        >
-                                                                            {user.email}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all duration-200 shrink-0 group-hover:bg-rose-600 group-hover:border-rose-600 shadow-sm">
-                                                                    <Check className="w-3 h-3 block group-hover:hidden" />
-                                                                    <X className="w-3 h-3 hidden group-hover:block" />
-                                                                </div>
+                                            <div className="max-h-60 overflow-y-auto pr-1 space-y-4">
+                                                {(() => {
+                                                    const selectedUsers = users.filter(u => selectedParticipantIds.includes(u.id));
+                                                    const groupedUsers = {};
+                                                    selectedUsers.forEach(user => {
+                                                        const deptCode = getUserDeptCode(user) || 'Chưa phân bổ';
+                                                        if (!groupedUsers[deptCode]) groupedUsers[deptCode] = [];
+                                                        groupedUsers[deptCode].push(user);
+                                                    });
+                                                    
+                                                    return Object.entries(groupedUsers).map(([deptCode, deptUsers]) => (
+                                                        <div key={deptCode} className="space-y-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="h-px bg-platinum-tint/70 flex-1"></div>
+                                                                <span className="text-[10px] font-bold text-slate-blue tracking-widest uppercase px-2 py-0.5 rounded bg-cloud-mist/50 border border-platinum-tint/50 shadow-sm">
+                                                                    {deptCode} ({deptUsers.length})
+                                                                </span>
+                                                                <div className="h-px bg-platinum-tint/70 flex-1"></div>
                                                             </div>
-                                                        );
-                                                    })}
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                {deptUsers.map(user => {
+                                                                    const userDeptCode = getUserDeptCode(user);
+                                                                    return (
+                                                                        <div
+                                                                            key={user.id}
+                                                                            onClick={() => toggleParticipant(user.id)}
+                                                                            className="p-3 rounded-2xl border border-action-blue/20 bg-action-blue/[0.02] text-midnight-indigo shadow-sm flex items-center justify-between cursor-pointer select-none transition-all duration-200 hover:bg-rose-50/40 hover:border-rose-200 hover:shadow group gap-3 min-w-0"
+                                                                            title="Nhấp để xóa người tham gia này"
+                                                                        >
+                                                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                                                {/* Avatar */}
+                                                                                <div
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleOpenUserDetail(user.id);
+                                                                                    }}
+                                                                                    className="relative w-10 h-10 rounded-full overflow-hidden border border-action-blue/10 flex-shrink-0 bg-gradient-to-tr from-action-blue to-cyan-500 text-white flex items-center justify-center font-extrabold text-sm hover:scale-105 hover:shadow transition-all group/avatar cursor-pointer"
+                                                                                    title="Xem thông tin chi tiết"
+                                                                                >
+                                                                                    {user.avatarUrl ? (
+                                                                                        <img src={user.avatarUrl} alt={user.fullName || user.full_name} className="w-full h-full object-cover" />
+                                                                                    ) : (
+                                                                                        (user.fullName || user.full_name || 'U').charAt(0).toUpperCase()
+                                                                                    )}
+                                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-all duration-200">
+                                                                                        <Info className="w-3.5 h-3.5 text-white" />
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="space-y-0.5 min-w-0 flex-1">
+                                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                                        <span
+                                                                                            className="text-sm font-semibold text-midnight-indigo group-hover:text-rose-950 transition-colors truncate"
+                                                                                            title={user.fullName || user.full_name}
+                                                                                        >
+                                                                                            {user.fullName || user.full_name}
+                                                                                        </span>
+                                                                                        {userDeptCode && (
+                                                                                            <span
+                                                                                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-action-blue/10 text-action-blue group-hover:bg-rose-100 group-hover:text-rose-700 transition-colors shrink-0 max-w-[85px] truncate"
+                                                                                                title={userDeptCode}
+                                                                                            >
+                                                                                                {userDeptCode}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <p
+                                                                                        className="text-[11px] font-normal text-slate-blue/80 group-hover:text-rose-700/60 transition-colors truncate"
+                                                                                        title={user.email}
+                                                                                    >
+                                                                                        {user.email}
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="w-5 h-5 rounded-full bg-action-blue text-white border border-action-blue flex items-center justify-center transition-all duration-200 shrink-0 group-hover:bg-rose-600 group-hover:border-rose-600 shadow-sm">
+                                                                                <Check className="w-3 h-3 block group-hover:hidden" />
+                                                                                <X className="w-3 h-3 hidden group-hover:block" />
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ));
+                                                })()}
                                             </div>
                                         </div>
                                     )}
@@ -2140,27 +2186,23 @@ const BookMeeting = () => {
                                 </div>
                             ) : userDetail ? (
                                 <>
-                                    {/* Image area / Avatar */}
-                                    <div className="flex justify-center">
-                                        <div className="w-32 h-32 rounded-full overflow-hidden border border-platinum-tint bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-extrabold text-4xl shadow-md">
+                                    {/* Top header summary */}
+                                    <div className="flex items-center gap-4 bg-cloud-mist/55 p-4 rounded-xl border border-platinum-tint/50">
+                                        <div className="w-16 h-16 rounded-full overflow-hidden border border-platinum-tint bg-gradient-to-tr from-action-blue to-glacier-blue text-white flex items-center justify-center font-extrabold text-xl shadow-sm shrink-0">
                                             {userDetail.avatarUrl ? (
                                                 <img src={userDetail.avatarUrl} alt={userDetail.fullName} className="w-full h-full object-cover" />
                                             ) : (
                                                 (userDetail.fullName || userDetail.full_name || 'U').charAt(0).toUpperCase()
                                             )}
                                         </div>
+                                        <div>
+                                            <h4 className="text-lg font-bold text-midnight-indigo leading-tight">{userDetail.fullName || "Chưa thiết lập"}</h4>
+                                            <p className="text-sm text-slate-blue mt-0.5">{userDetail.email || "Chưa thiết lập"}</p>
+                                        </div>
                                     </div>
 
                                     {/* Info Grid */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Họ tên</span>
-                                            <span className="font-semibold text-midnight-indigo">{userDetail.fullName || "Chưa thiết lập"}</span>
-                                        </div>
-                                        <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
-                                            <span className="text-xs text-slate-blue block mb-0.5">Email</span>
-                                            <span className="font-semibold text-midnight-indigo">{userDetail.email || "Chưa thiết lập"}</span>
-                                        </div>
                                         <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
                                             <span className="text-xs text-slate-blue block mb-0.5">Mã nhân viên</span>
                                             <span className="font-semibold text-midnight-indigo">{userDetail.employeeCode || "Chưa thiết lập"}</span>

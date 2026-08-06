@@ -66,7 +66,7 @@ const AddInternalParticipantModal = ({ meetingId, open, onClose, onSuccess, user
         setManualLoading(true);
         setManualError(null);
         try {
-            const res = await addInternalParticipant(meetingId, { participantUserId: selectedUserId });
+            const res = await addInternalParticipant(meetingId, { userId: selectedUserId });
             if (res?.success) {
                 onSuccess?.('Đã thêm người tham dự nội bộ.');
                 reset();
@@ -254,7 +254,7 @@ const AddInternalParticipantModal = ({ meetingId, open, onClose, onSuccess, user
                                     <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                                     <div>
                                         <p className="text-sm font-bold text-blue-800">Bước 1: Tải file mẫu</p>
-                                        <p className="text-xs text-blue-600 mt-0.5">File mẫu có các cột: STT, Loại, Email, Mã nhân viên, Họ và tên, Tổ chức, Số điện thoại.</p>
+                                        <p className="text-xs text-blue-600 mt-0.5">File mẫu có các cột: type, email, employee_code, full_name, organization_name, phone_number.</p>
                                     </div>
                                 </div>
                                 <button

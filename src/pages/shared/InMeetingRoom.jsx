@@ -1383,9 +1383,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 {meetingState.status === 'in_progress' && (
                                     <div className="mb-4">
                                         <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest mb-3">Ghi âm & Gán người nói (Trạm cố định)</h3>
-                                        <StationRecorder 
-                                            meetingId={id} 
-                                            participants={meetingState.participants || []} 
+                                        <StationRecorder
+                                            meetingId={id}
+                                            meetingTitle={meetingState.title}
+                                            participants={meetingState.participants || []}
                                             onUploadSuccess={(sessionId) => {
                                                 showToast('Đã tải lên tệp ghi âm thành công', 'success');
                                                 setRecordingSessionId(sessionId);
