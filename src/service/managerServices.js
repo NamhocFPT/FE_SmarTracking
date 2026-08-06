@@ -413,3 +413,12 @@ export const uploadAgendaAttachment = async (meetingId, agendaId, formData) => {
 export const deleteAgendaAttachment = async (meetingId, agendaId, fileId) => {
     return await dele(`/meetings/${meetingId}/agendas/${agendaId}/attachments/${fileId}`);
 };
+
+/**
+ * Get rooms available in a given time range
+ * @param {object} params - { startTime, endTime, minCapacity }
+ */
+export const getAvailableRooms = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/rooms/available${query}`);
+};
