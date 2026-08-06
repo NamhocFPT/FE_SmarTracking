@@ -266,7 +266,8 @@ const handleResponse = async (response) => {
             error: {
                 message: message,
                 code: code,
-                requestId: requestId
+                requestId: requestId,
+                details: errorDetail.details
             },
             status: response.status,
             requestId: requestId
