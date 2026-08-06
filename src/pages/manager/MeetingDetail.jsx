@@ -147,11 +147,23 @@ const ManagerMeetingDetail = () => {
                 const normalized = normalizeMeetingDetail(res.data);
                 setMeeting(normalized);
                 initEditStates(normalized);
-                if (normalized.status === 'completed' && normalized.recordingEnabled) {
+                if (normalized.status === 'completed') {
                     try {
                         const mediaRes = await getMeetingMediaFiles(normalized.id);
                         if (mediaRes?.success) {
-                            setMediaFiles(mediaRes.data || []);
+                            const rawFiles = mediaRes.data || [];
+                            const processed = await Promise.all(rawFiles.map(async f => {
+                                if ((f.fileType || f.type || f.file_type || '').toLowerCase() === 'audio') {
+                                    try {
+                                        const res = await getMediaFile(f.id);
+                                        if (res?.success && res.data?.downloadUrl) {
+                                            return { ...f, downloadUrl: res.data.downloadUrl };
+                                        }
+                                    } catch(e) {}
+                                }
+                                return f;
+                            }));
+                            setMediaFiles(processed);
                         }
                     } catch (e) {
                         // ignore error for media
@@ -929,7 +941,7 @@ const ManagerMeetingDetail = () => {
                     </div>
 
                     {activeRightTab === 'transcript' ? (
-                        meeting.recordingEnabled && isCompleted ? (
+                        isCompleted ? (
                             <div className="space-y-6">
                                 {/* Audio Uploader */}
                                 {canManage && (
@@ -937,6 +949,36 @@ const ManagerMeetingDetail = () => {
                                         meetingId={meeting.id}
                                         onUploadSuccess={() => setRefreshTranscriptKey(prev => prev + 1)}
                                     />
+                                )}
+
+                                {/* Bản ghi âm */}
+                                {mediaFiles.filter(m => (m.fileType || m.type || m.file_type || '').toLowerCase() === 'audio').length > 0 && (
+                                    <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 mb-6">
+                                        <h3 className="text-sm font-bold text-slate-blue mb-4 flex items-center gap-2">
+                                            <Play className="w-4 h-4 text-action-blue" />
+                                            Bản ghi âm cuộc họp
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {mediaFiles.filter(m => (m.fileType || m.type || m.file_type || '').toLowerCase() === 'audio').map((audioFile, idx) => (
+                                                <div key={audioFile.id || idx} className="flex flex-col gap-2 p-3 bg-cloud-mist rounded-xl border border-outline-gray">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs font-bold text-midnight-indigo truncate pr-4">
+                                                            {audioFile.fileName || audioFile.file_name || `Bản ghi âm ${idx + 1}`}
+                                                        </span>
+                                                        {audioFile.downloadUrl && (
+                                                            <a href={audioFile.downloadUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-platinum-tint text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg text-xs font-bold transition-colors">
+                                                                <Download className="w-3.5 h-3.5" />
+                                                                Tải xuống
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    {audioFile.downloadUrl && (
+                                                        <audio controls src={audioFile.downloadUrl} className="w-full h-10 mt-1" />
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
 
                                 {/* Transcript Viewer */}
@@ -949,11 +991,9 @@ const ManagerMeetingDetail = () => {
                         ) : (
                             <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 text-center py-8 text-slate-blue">
                                 <Video className="w-8 h-8 mx-auto text-platinum-tint mb-2.5" />
-                                <h4 className="text-xs font-bold text-midnight-indigo uppercase">Không có Video ghi hình</h4>
+                                <h4 className="text-xs font-bold text-midnight-indigo uppercase">Chưa khả dụng</h4>
                                 <p className="text-[11px] mt-1 leading-relaxed text-slate-blue/80">
-                                    {meeting.recordingEnabled
-                                        ? 'Bản ghi hình và bản ghi chữ cuộc họp sẽ khả dụng sau khi cuộc họp kết thúc.'
-                                        : 'Cuộc họp này không đăng ký chế độ tự động ghi hình.'}
+                                    Bản ghi âm và bản ghi chữ cuộc họp sẽ khả dụng sau khi cuộc họp kết thúc.
                                 </p>
                             </div>
                         )
@@ -961,7 +1001,7 @@ const ManagerMeetingDetail = () => {
                         <MinutesTabContent 
                             meetingId={meeting.id} 
                             isHost={canManage} 
-                            transcriptStatus={meeting.recordingEnabled && isCompleted ? 'ready' : 'empty'} 
+                            transcriptStatus={isCompleted ? 'ready' : 'empty'} 
                         />
                     )}
                 </div>

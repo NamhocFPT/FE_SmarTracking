@@ -147,7 +147,7 @@ const EmployeeHomePage = () => {
                     const mapped = dataList.map(m => {
                         const hostName = m.host?.fullName || m.host?.full_name || m.hostName || m.host_name || 'Người tổ chức';
                         return {
-                            id: m.id || m._id,
+                            id: m.meetingId || m.id || m._id,
                             title: m.title || m.meetingTitle || 'Không có tiêu đề',
                             room: m.room?.roomName || m.room?.name || 'Phòng trực tuyến',
                             host: hostName,

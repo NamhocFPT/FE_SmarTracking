@@ -38,10 +38,10 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                 let meetingData = null;
                 try {
                     const resEmp = await getMeetingEmployee(meetingId);
-                    if (resEmp?.success) meetingData = resEmp.data?.meeting || resEmp.data;
+                    if (resEmp?.success) meetingData = resEmp.data;
                 } catch (e) {
                     const resMgr = await getMeetingManager(meetingId);
-                    if (resMgr?.success) meetingData = resMgr.data?.meeting || resMgr.data;
+                    if (resMgr?.success) meetingData = resMgr.data;
                 }
                 
                 if (meetingData?.participants) {
@@ -53,7 +53,7 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                 try {
                     let mediaRes = await getMediaEmp(meetingId);
                     if (!mediaRes?.success) throw new Error();
-                    const audioFile = mediaRes.data?.find(f => f.fileType === 'AUDIO' || f.file_type === 'AUDIO');
+                    const audioFile = mediaRes.data?.find(f => (f.fileType || f.file_type || '').toLowerCase() === 'audio');
                     if (audioFile) {
                         const fileRes = await getFileEmp(audioFile.id);
                         if (fileRes?.success) fetchedAudioUrl = fileRes.data?.downloadUrl;
@@ -62,7 +62,7 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                     try {
                         let mediaRes = await getMediaMgr(meetingId);
                         if (mediaRes?.success) {
-                            const audioFile = mediaRes.data?.find(f => f.fileType === 'AUDIO' || f.file_type === 'AUDIO');
+                            const audioFile = mediaRes.data?.find(f => (f.fileType || f.file_type || '').toLowerCase() === 'audio');
                             if (audioFile) {
                                 const fileRes = await getFileMgr(audioFile.id);
                                 if (fileRes?.success) fetchedAudioUrl = fileRes.data?.downloadUrl;

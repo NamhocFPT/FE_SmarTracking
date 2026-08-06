@@ -87,7 +87,7 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
 
             {/* Speaker Marker Section */}
             {isRecording && (
-                <div className="flex flex-col gap-2 border-t sm:border-t-0 sm:border-l border-platinum-tint pt-4 sm:pt-0 sm:pl-4">
+                <div className="flex flex-col gap-2 border-t border-platinum-tint pt-4">
                     {showToast && (
                         <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md animate-fade-in-up">
                             <Check className="w-3.5 h-3.5" />
@@ -108,11 +108,11 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
                             Đánh dấu người nói
                         </button>
                     ) : (
-                        <div className="flex items-center gap-2 animate-fade-in">
+                        <div className="flex flex-col gap-2 animate-fade-in">
                             <select
                                 value={selectedParticipant}
                                 onChange={(e) => setSelectedParticipant(e.target.value)}
-                                className="text-sm font-semibold border-platinum-tint focus:border-action-blue focus:ring-action-blue rounded-xl py-2 pl-3 pr-8 bg-cloud-mist"
+                                className="w-full text-sm font-semibold border-platinum-tint focus:border-action-blue focus:ring-action-blue rounded-xl py-2 pl-3 pr-8 bg-cloud-mist"
                             >
                                 <option value="">-- Chọn người dự họp --</option>
                                 {participants?.map(p => (
@@ -121,19 +121,21 @@ const StationRecorder = ({ meetingId, participants, onUploadSuccess }) => {
                                     </option>
                                 ))}
                             </select>
-                            <button
-                                onClick={handleAddMark}
-                                disabled={!selectedParticipant}
-                                className="p-2 bg-action-blue text-white rounded-xl hover:bg-glacier-blue disabled:opacity-50"
-                            >
-                                <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setShowParticipantSelect(false)}
-                                className="p-2 bg-white border border-platinum-tint text-slate-blue rounded-xl hover:bg-cloud-mist"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex gap-2 w-full">
+                                <button
+                                    onClick={handleAddMark}
+                                    disabled={!selectedParticipant}
+                                    className="flex-1 flex items-center justify-center p-2 bg-action-blue text-white rounded-xl hover:bg-glacier-blue disabled:opacity-50"
+                                >
+                                    <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setShowParticipantSelect(false)}
+                                    className="flex-1 flex items-center justify-center p-2 bg-white border border-platinum-tint text-slate-blue rounded-xl hover:bg-cloud-mist"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
