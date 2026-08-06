@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/request';
 
@@ -20,63 +21,74 @@ const EventSnapshotModal = ({ isOpen, onClose, eventId }) => {
         setErrorMsg('');
     }, [isOpen, eventId]);
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     const snapshotUrl = eventId ? `${API_BASE_URL}/ivss/device-events/${eventId}/snapshot?token=${token}` : null;
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-                {/* Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-platinum-tint bg-cloud-mist">
-                    <div className="flex items-center gap-2">
-                        <ImageIcon className="w-5 h-5 text-action-blue" />
-                        <h2 className="text-lg font-bold text-midnight-indigo">Ảnh hiện trường sự kiện</h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
-                        title="Đóng"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+    return createPortal(
+        <div 
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 animate-in fade-in duration-200"
+            onClick={onClose}
+        >
+            {/* Nút Đóng trôi */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                }}
+                className="absolute top-6 right-6 z-10 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Đóng"
+            >
+                <X className="w-6 h-6" />
+            </button>
 
-                {/* Content */}
-                <div className="p-6 bg-slate-50 min-h-[300px] flex items-center justify-center">
-                    {loading ? (
-                        <div className="flex flex-col items-center text-slate-400 gap-3">
-                            <div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"></div>
-                            <span className="text-sm font-semibold">Đang tải ảnh...</span>
-                        </div>
-                    ) : notFound ? (
-                        <div className="flex flex-col items-center text-slate-400 gap-3 p-8 border-2 border-dashed border-slate-200 rounded-xl">
-                            <ImageIcon className="w-12 h-12 text-slate-300" />
-                            <span className="text-sm font-medium text-slate-500">Không có ảnh cho sự kiện này</span>
-                        </div>
-                    ) : errorMsg ? (
-                        <div className="flex flex-col items-center text-red-500 gap-3 p-8 bg-red-50 rounded-xl">
-                            <AlertCircle className="w-12 h-12 text-red-400" />
-                            <span className="text-sm font-semibold text-red-600 text-center max-w-sm">{errorMsg}</span>
-                        </div>
-                    ) : snapshotUrl ? (
-                        <div className="w-full h-full max-h-[60vh] flex items-center justify-center">
-                            <img
-                                src={snapshotUrl}
-                                alt="Event Snapshot"
-                                className={`max-w-full max-h-[60vh] object-contain rounded border border-slate-200 shadow-sm ${loading ? 'hidden' : 'block'}`}
-                                onLoad={() => setLoading(false)}
-                                onError={() => {
-                                    setLoading(false);
-                                    setNotFound(true);
-                                }}
-                            />
-                        </div>
-                    ) : null}
+            {loading && (
+                <div className="flex flex-col items-center text-white/70 gap-3">
+                    <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                    <span className="text-sm font-semibold tracking-wide">Đang tải ảnh...</span>
                 </div>
-            </div>
-        </div>
+            )}
+
+            {!loading && notFound && (
+                <div 
+                    className="flex flex-col items-center text-white/70 gap-4 p-8 bg-slate-900/50 rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <ImageIcon className="w-16 h-16 text-white/30" />
+                    <span className="text-base font-medium">Không có ảnh cho sự kiện này</span>
+                </div>
+            )}
+
+            {!loading && errorMsg && (
+                <div 
+                    className="flex flex-col items-center text-red-400 gap-4 p-8 bg-slate-900/50 rounded-2xl backdrop-blur-md border border-red-500/20 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <AlertCircle className="w-16 h-16 text-red-400/50" />
+                    <span className="text-base font-medium text-center max-w-sm">{errorMsg}</span>
+                </div>
+            )}
+
+            {snapshotUrl && !notFound && !errorMsg && (
+                <div 
+                    className={`relative w-full max-w-7xl h-full max-h-[90vh] items-center justify-center ${loading ? 'hidden' : 'flex'} animate-in zoom-in duration-300`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <img
+                        src={snapshotUrl}
+                        alt="Event Snapshot"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                        onLoad={() => setLoading(false)}
+                        onError={() => {
+                            setLoading(false);
+                            setNotFound(true);
+                        }}
+                    />
+                </div>
+            )}
+        </div>,
+        document.body
     );
 };
 

@@ -9,6 +9,7 @@ import {
 } from '../../service/securityAlertService';
 import { getZones } from '../../service/zoneServices';
 import EventSnapshotModal from '../../component/EventSnapshotModal';
+import ThumbnailImage from '../../component/ThumbnailImage';
 
 const SecurityAlerts = () => {
     const [alerts, setAlerts] = useState([]);
@@ -405,16 +406,15 @@ const SecurityAlerts = () => {
                                                 </div>
                                             )}
                                             {alert.source_event_id && (
-                                                <button 
-                                                    onClick={() => {
-                                                        setSnapshotEventId(alert.source_event_id);
-                                                        setIsSnapshotOpen(true);
-                                                    }}
-                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-cloud-mist hover:bg-slate-200 text-slate-600 transition-colors"
-                                                    title="Xem ảnh hiện trường"
-                                                >
-                                                    <ImageIcon className="w-4 h-4" />
-                                                </button>
+                                                <div className="ml-2 inline-flex align-middle">
+                                                    <ThumbnailImage 
+                                                        eventId={alert.source_event_id}
+                                                        onClick={() => {
+                                                            setSnapshotEventId(alert.source_event_id);
+                                                            setIsSnapshotOpen(true);
+                                                        }}
+                                                    />
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
