@@ -12,6 +12,7 @@ import MinutesTabContent from '../../components/minutes/MinutesTabContent';
 import AddExternalParticipantModal from '../../component/AddExternalParticipantModal';
 import AddInternalParticipantModal from '../../component/AddInternalParticipantModal';
 import { removeInternalParticipant, removeExternalParticipant } from '../../service/businessAdminServices';
+import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
 
 // BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval
 // khiến 2 trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã hủy".
@@ -47,6 +48,7 @@ const EmployeeMeetingDetail = () => {
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
     const [showAddGuestModal, setShowAddGuestModal] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [detailModalState, setDetailModalState] = useState({ isOpen: false, participant: null, isExternal: false });
 
     // Edit fields
     const [editTitle, setEditTitle] = useState('');
@@ -808,7 +810,7 @@ const EmployeeMeetingDetail = () => {
                                                         );
                                                     }
                                                     return (
-                                                        <div key={p.id || idx} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center justify-between gap-3 group hover:bg-white transition-colors">
+                                                        <div key={p.id || idx} onClick={() => setDetailModalState({ isOpen: true, participant: p, isExternal: false })} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray flex items-center justify-between gap-3 group hover:bg-white transition-colors cursor-pointer">
                                                             <div className="flex items-center gap-3 overflow-hidden">
                                                                 <UserAvatar
                                                                     user={p}
@@ -821,7 +823,8 @@ const EmployeeMeetingDetail = () => {
                                                             </div>
                                                             {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                                                                 <button
-                                                                    onClick={async () => {
+                                                                    onClick={async (e) => {
+                                                                        e.stopPropagation();
                                                                         if (!window.confirm(`Bạn có chắc chắn muốn xóa ${p.fullName || p.full_name}?`)) return;
                                                                         try {
                                                                             const res = await removeInternalParticipant(meeting.id, p.id);
@@ -880,7 +883,7 @@ const EmployeeMeetingDetail = () => {
                                         <>
                                             <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto scrollbar-thin pr-2">
                                                 {paginated.map(p => (
-                                                    <div key={p.id} className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 flex items-center justify-between gap-3 group hover:bg-white transition-colors">
+                                                    <div key={p.id} onClick={() => setDetailModalState({ isOpen: true, participant: p, isExternal: true })} className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 flex items-center justify-between gap-3 group hover:bg-white transition-colors cursor-pointer">
                                                         <div className="flex items-center gap-3 overflow-hidden">
                                                             <div className="w-10 h-10 rounded-full shrink-0 font-bold text-sm bg-amber-100 text-amber-700 flex items-center justify-center">
                                                                 {(p.name || p.fullName || p.full_name || p.email || 'G').charAt(0).toUpperCase()}
@@ -893,7 +896,8 @@ const EmployeeMeetingDetail = () => {
                                                         </div>
                                                         {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                                                             <button
-                                                                onClick={async () => {
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
                                                                     if (!window.confirm(`Bạn có chắc chắn muốn xóa khách ${p.name || p.fullName || p.full_name}?`)) return;
                                                                     try {
                                                                         const res = await removeExternalParticipant(meeting.id, p.id);
@@ -1035,6 +1039,14 @@ const EmployeeMeetingDetail = () => {
                 </div>
 
             </div>
+
+            {/* MODAL: Participant Detail */}
+            <ParticipantDetailModal
+                isOpen={detailModalState.isOpen}
+                onClose={() => setDetailModalState({ isOpen: false, participant: null, isExternal: false })}
+                participant={detailModalState.participant}
+                isExternal={detailModalState.isExternal}
+            />
 
             {/* MODAL: Time Validation Warning */}
             <AnimatePresence>
