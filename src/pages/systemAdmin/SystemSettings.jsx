@@ -1,7 +1,7 @@
-import { Settings, Camera, Plus, Trash2 } from 'lucide-react';
+import { Settings, Camera, Plus, Trash2, Pencil } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
-import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getNoShowConfig, updateNoShowConfig } from '../../service/sysAdminServices';
+import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getZones, getNoShowConfig, updateNoShowConfig } from '../../service/sysAdminServices';
 
 /**
  * SystemSettings Component
@@ -14,6 +14,11 @@ import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap,
  * → Cảnh báo (luôn tự động, không tắt được) → đợi (autoReleaseGraceMinutes) →
  * [nếu autoReleaseEnabled] đổi trạng thái phòng. Tab "Ghi hình & Riêng tư" và "Tham số hệ thống"
  * đang ẩn khỏi thanh chuyển tab theo yêu cầu, code giữ nguyên để dùng lại sau.
+ *
+ * Ánh xạ Kênh Camera (theo PLAN FE "Thiết kế lại Ánh xạ Kênh Camera" 2026-08-06, QĐ-2
+ * "camera một-vai-một-channel"): chọn Vai trò trước, form đổi theo vai trò, lưu ngay lập tức
+ * (GET 4 map mới nhất → xóa channelId khỏi cả 4 → ghi vào đúng map theo vai trò → PATCH map đổi)
+ * — không còn gộp chung với nút "Lưu cấu hình" toàn trang.
  */
 const SystemSettings = () => {
     // Tab State
@@ -46,7 +51,7 @@ const SystemSettings = () => {
         overrun_grace_minutes: 10
     });
 
-    // Channel Maps State
+    // Channel Maps State (4 map ánh xạ kênh + 3 ngưỡng camera/attendance)
     const [channelMaps, setChannelMaps] = useState({
         'ivss.channel_room_map': {},
         'ivss.channel_direction_map': {},
@@ -57,12 +62,63 @@ const SystemSettings = () => {
         'attendance.late_grace_minutes': 15
     });
     const [dbChannelMaps, setDbChannelMaps] = useState({});
-    const [localChannels, setLocalChannels] = useState([]);
     const [rooms, setRooms] = useState([]);
+    const [zones, setZones] = useState([]);
     const [channelPage, setChannelPage] = useState(1); // phân trang danh sách ánh xạ kênh camera (client-side)
+
+    // Form "Thêm/Sửa kênh" theo Vai trò — lưu ngay lập tức, không gộp vào nút Lưu cấu hình toàn trang
+    const emptyChannelEditor = { open: false, mode: 'add', channelId: '', role: 'checkin_out', roomId: '', direction: 'enter', zoneId: '' };
+    const [channelEditor, setChannelEditor] = useState(emptyChannelEditor);
+    const [channelActionSaving, setChannelActionSaving] = useState(false);
 
     // Tracking which keys were modified compared to database
     const [dbConfigs, setDbConfigs] = useState({});
+
+    const CHANNEL_MAP_KEYS = [
+        'ivss.channel_room_map',
+        'ivss.channel_direction_map',
+        'ivss.channel_presence_zone_map',
+        'ivss.channel_zone_map'
+    ];
+
+    const ROLE_LABELS = {
+        checkin_out: 'Check-in/out phòng họp',
+        zone: 'Hiện diện khu vực (Zone)',
+        headcount: 'Đếm người / Ghi hình',
+        gate: 'Cổng / ANPR'
+    };
+
+    const DIRECTION_LABELS = { enter: 'Vào', leave: 'Ra', seen: 'Hiện diện' };
+
+    // Chuẩn hóa response GET channel-maps thành object 7 key — dùng chung cho fetchConfigs
+    // và cho thao tác Lưu/Xóa từng dòng (luôn GET mới nhất trước khi PATCH, an toàn vì
+    // BE ghi đè toàn bộ object theo key, không tự merge theo channelId).
+    const parseChannelMapsData = (rawArray) => {
+        const mappedChannels = {};
+        (rawArray || []).forEach(item => {
+            let parsedValue = item.value;
+            try {
+                if (typeof parsedValue === 'string' && parsedValue.trim().startsWith('{')) {
+                    parsedValue = JSON.parse(parsedValue);
+                }
+            } catch (e) {}
+            if (['ivss.presence.gap_threshold_seconds', 'campus.journey.gap_threshold_seconds', 'attendance.late_grace_minutes'].includes(item.key)) {
+                parsedValue = Number(parsedValue) || 0;
+            }
+            mappedChannels[item.key] = parsedValue;
+        });
+
+        return {
+            'ivss.channel_room_map': {},
+            'ivss.channel_direction_map': {},
+            'ivss.channel_presence_zone_map': {},
+            'ivss.channel_zone_map': {},
+            'ivss.presence.gap_threshold_seconds': 30,
+            'campus.journey.gap_threshold_seconds': 60,
+            'attendance.late_grace_minutes': 15,
+            ...mappedChannels
+        };
+    };
 
     // Fetch Configurations from API
     const fetchConfigs = useCallback(async () => {
@@ -104,57 +160,20 @@ const SystemSettings = () => {
                 console.error('Không thể tải cấu hình hệ thống chung (tab đang ẩn):', genErr);
             }
 
-            // Channel maps + rooms (tab Camera & Cảm biến)
-            const [channelRes, roomRes] = await Promise.all([
-                getChannelMaps().catch(() => ({ success: true, data: [] })),
-                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] }))
-            ]);
-
-            if (channelRes?.success && Array.isArray(channelRes.data)) {
-                const mappedChannels = {};
-                channelRes.data.forEach(item => {
-                    let parsedValue = item.value;
-                    try {
-                        if (typeof parsedValue === 'string' && parsedValue.trim().startsWith('{')) {
-                            parsedValue = JSON.parse(parsedValue);
-                        }
-                    } catch (e) {}
-                    // Ensure numbers are numbers for thresholds
-                    if (['ivss.presence.gap_threshold_seconds', 'campus.journey.gap_threshold_seconds', 'attendance.late_grace_minutes'].includes(item.key)) {
-                        parsedValue = Number(parsedValue) || 0;
-                    }
-                    mappedChannels[item.key] = parsedValue;
-                });
-
-                const mergedChannels = {
-                    'ivss.channel_room_map': {},
-                    'ivss.channel_direction_map': {},
-                    'ivss.channel_presence_zone_map': {},
-                    'ivss.channel_zone_map': {},
-                    'ivss.presence.gap_threshold_seconds': 30,
-                    'campus.journey.gap_threshold_seconds': 60,
-                    'attendance.late_grace_minutes': 15,
-                    ...mappedChannels
-                };
-                setChannelMaps(mergedChannels);
-                setDbChannelMaps(mergedChannels);
-
-                // Build localChannels
-                const roomMap = mergedChannels['ivss.channel_room_map'] || {};
-                const dirMap = mergedChannels['ivss.channel_direction_map'] || {};
-                const pZoneMap = mergedChannels['ivss.channel_presence_zone_map'] || {};
-                const zMap = mergedChannels['ivss.channel_zone_map'] || {};
-
-                const allKeys = new Set([...Object.keys(roomMap), ...Object.keys(dirMap), ...Object.keys(pZoneMap), ...Object.keys(zMap)]);
-                const rows = Array.from(allKeys).map(id => ({
-                    id,
-                    roomId: roomMap[id] || '',
-                    direction: dirMap[id] || '',
-                    presenceZone: pZoneMap[id] || '',
-                    zone: zMap[id] || ''
-                }));
-                setLocalChannels(rows);
+            // Channel maps là nguồn dữ liệu bắt buộc cho tab Camera & Cảm biến
+            const channelRes = await getChannelMaps();
+            if (!channelRes?.success || !Array.isArray(channelRes.data)) {
+                throw new Error(channelRes?.error?.message || 'Không thể tải cấu hình ánh xạ kênh camera.');
             }
+            const mergedChannels = parseChannelMapsData(channelRes.data);
+            setChannelMaps(mergedChannels);
+            setDbChannelMaps(mergedChannels);
+
+            // Rooms + Zones — nguồn cho dropdown của form Thêm/Sửa kênh, lỗi ở đây không chặn tab
+            const [roomRes, zoneRes] = await Promise.all([
+                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] })),
+                getZones({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] }))
+            ]);
 
             if (roomRes?.success) {
                 let roomData = [];
@@ -163,6 +182,13 @@ const SystemSettings = () => {
                 else if (Array.isArray(roomRes.data?.data)) roomData = roomRes.data.data;
                 else if (Array.isArray(roomRes.data)) roomData = roomRes.data;
                 setRooms(roomData);
+            }
+
+            if (zoneRes?.success) {
+                let zoneData = [];
+                if (Array.isArray(zoneRes.data)) zoneData = zoneRes.data;
+                else if (Array.isArray(zoneRes.data?.items)) zoneData = zoneRes.data.items;
+                setZones(zoneData);
             }
         } catch (err) {
             setLoadError(err?.message || err?.error?.message || 'Không thể tải cấu hình hệ thống. Vui lòng thử lại.');
@@ -228,43 +254,12 @@ const SystemSettings = () => {
         return true;
     };
 
-    // Save changes submit handler
+    // Save changes submit handler — chỉ còn xử lý No-show + cấu hình chung (tab ẩn) + 3 ngưỡng
+    // camera/attendance. 4 map ánh xạ kênh camera đã tách riêng, lưu ngay khi Thêm/Sửa/Xóa 1 dòng.
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         setError(null);
         setSuccessMessage(null);
-
-        // Build new maps from localChannels
-        const newRoomMap = {};
-        const newDirMap = {};
-        const newPZoneMap = {};
-        const newZoneMap = {};
-
-        for (const row of localChannels) {
-            const id = String(row.id).trim();
-            if (!id) {
-                setError('ID Kênh Camera không được để trống.');
-                return;
-            }
-            if (newRoomMap[id] !== undefined) {
-                setError(`ID Kênh Camera bị trùng lặp: ${id}`);
-                return;
-            }
-            // Only add keys with non-empty values.
-            // Missing keys will be implicitly deleted since the BE fully replaces the JSON object.
-            if (row.roomId) newRoomMap[id] = row.roomId;
-            if (row.direction) newDirMap[id] = row.direction;
-            if (row.presenceZone) newPZoneMap[id] = row.presenceZone;
-            if (row.zone) newZoneMap[id] = row.zone;
-        }
-
-        const currentChannelMaps = {
-            ...channelMaps,
-            'ivss.channel_room_map': newRoomMap,
-            'ivss.channel_direction_map': newDirMap,
-            'ivss.channel_presence_zone_map': newPZoneMap,
-            'ivss.channel_zone_map': newZoneMap
-        };
 
         if (!validateConfigs(noShowConfig, configs)) return;
 
@@ -272,26 +267,15 @@ const SystemSettings = () => {
 
         // Cấu hình chung (tab đang ẩn) — key nào đổi so với DB
         const changedKeys = Object.keys(configs).filter(key => configs[key] !== dbConfigs[key]);
-        const changedChannelKeys = Object.keys(currentChannelMaps).filter(key => {
-            const currentVal = currentChannelMaps[key];
-            const dbVal = dbChannelMaps[key];
 
-            // Check if value actually changed
-            if (JSON.stringify(currentVal) === JSON.stringify(dbVal)) return false;
-
-            // Allow sending changed objects even if they appear "empty"
-            // (e.g. they only contain nulls to delete keys)
-            if (typeof currentVal === 'object' && currentVal !== null) {
-                return true;
-            } else {
-                return currentVal !== '' && currentVal !== null && currentVal !== undefined;
-            }
-        });
+        // 3 ngưỡng camera/attendance — key nào đổi so với DB (không đụng 4 map ánh xạ kênh)
+        const changedThresholdKeys = ['ivss.presence.gap_threshold_seconds', 'campus.journey.gap_threshold_seconds', 'attendance.late_grace_minutes']
+            .filter(key => channelMaps[key] !== dbChannelMaps[key]);
 
         // No-show config — đổi field nào so với DB (toggle hoặc 2 ô số)
         const noShowChanged = Object.keys(noShowConfig).some(key => noShowConfig[key] !== dbNoShowConfig[key]);
 
-        if (changedKeys.length === 0 && changedChannelKeys.length === 0 && !noShowChanged) {
+        if (changedKeys.length === 0 && changedThresholdKeys.length === 0 && !noShowChanged) {
             setSuccessMessage('Không có thay đổi nào cần lưu.');
             setSaving(false);
             return;
@@ -314,14 +298,11 @@ const SystemSettings = () => {
                 }));
             }
 
-            // Endpoint /system-configurations/channel-maps lưu thẳng vào cột config_json (JSONB) —
-            // BE cần nhận value đúng kiểu gốc (object cho 4 map, number cho 3 ngưỡng), KHÔNG stringify.
-            // Stringify object ở đây sẽ khiến BE báo "Value ... phải là object dạng {...}".
-            const updateChannelPromises = changedChannelKeys.map(key => {
-                return updateChannelMap({ key, value: currentChannelMaps[key] });
+            const updateThresholdPromises = changedThresholdKeys.map(key => {
+                return updateChannelMap({ key, value: channelMaps[key] });
             });
 
-            await Promise.all([...updatePromises, ...updateChannelPromises]);
+            await Promise.all([...updatePromises, ...updateThresholdPromises]);
 
             // Re-fetch or sync state to ensure we have the absolute latest from DB
             await fetchConfigs();
@@ -340,33 +321,221 @@ const SystemSettings = () => {
         setNoShowConfig({ ...dbNoShowConfig });
         setConfigs({ ...dbConfigs });
         setChannelMaps({ ...dbChannelMaps });
-
-        // Build localChannels
-        const roomMap = dbChannelMaps['ivss.channel_room_map'] || {};
-        const dirMap = dbChannelMaps['ivss.channel_direction_map'] || {};
-        const pZoneMap = dbChannelMaps['ivss.channel_presence_zone_map'] || {};
-        const zMap = dbChannelMaps['ivss.channel_zone_map'] || {};
-
-        const allKeys = new Set([...Object.keys(roomMap), ...Object.keys(dirMap), ...Object.keys(pZoneMap), ...Object.keys(zMap)]);
-        const rows = Array.from(allKeys).map(id => ({
-            id,
-            roomId: roomMap[id] || '',
-            direction: dirMap[id] || '',
-            presenceZone: pZoneMap[id] || '',
-            zone: zMap[id] || ''
-        }));
-        setLocalChannels(rows);
-        setChannelPage(1);
+        setChannelEditor(emptyChannelEditor);
     };
 
-    // Phân trang danh sách kênh camera (client-side — dữ liệu đã có sẵn từ channel maps, không gọi lại API)
+    // ============================================================
+    // Ánh xạ Kênh Camera — chọn Vai trò trước, form đổi theo vai trò (QĐ-2)
+    // ============================================================
+
+    const getRoomName = (roomId) => {
+        const room = rooms.find(r => (r.id || r.roomId) === roomId);
+        return room ? (room.roomName || room.room_name || roomId) : roomId;
+    };
+
+    const getZoneName = (zoneId) => {
+        const zone = zones.find(z => z.id === zoneId);
+        return zone ? (zone.zoneName || zone.zone_name || zoneId) : zoneId;
+    };
+
+    // Suy ra vai trò hiện tại của 1 channelId từ 4 map — dùng để hiển thị danh sách và mở form Sửa.
+    const inferChannelRole = (channelId, maps) => {
+        const roomMap = maps['ivss.channel_room_map'] || {};
+        const dirMap = maps['ivss.channel_direction_map'] || {};
+        const pZoneMap = maps['ivss.channel_presence_zone_map'] || {};
+        const zMap = maps['ivss.channel_zone_map'] || {};
+
+        if (pZoneMap[channelId] !== undefined) {
+            return { role: 'zone', roomId: '', direction: '', zoneId: pZoneMap[channelId] };
+        }
+        if (zMap[channelId] !== undefined) {
+            return { role: 'gate', roomId: '', direction: '', zoneId: zMap[channelId] };
+        }
+        if (roomMap[channelId] !== undefined && dirMap[channelId] !== undefined) {
+            return { role: 'checkin_out', roomId: roomMap[channelId], direction: dirMap[channelId], zoneId: '' };
+        }
+        if (roomMap[channelId] !== undefined) {
+            return { role: 'headcount', roomId: roomMap[channelId], direction: '', zoneId: '' };
+        }
+        return { role: 'checkin_out', roomId: '', direction: 'enter', zoneId: '' };
+    };
+
+    const describeChannelDetail = (channelId, maps) => {
+        const inferred = inferChannelRole(channelId, maps);
+        switch (inferred.role) {
+            case 'checkin_out':
+                return `${getRoomName(inferred.roomId)} · ${DIRECTION_LABELS[inferred.direction] || inferred.direction}`;
+            case 'zone':
+                return getZoneName(inferred.zoneId);
+            case 'headcount':
+                return getRoomName(inferred.roomId);
+            case 'gate':
+                return getZoneName(inferred.zoneId);
+            default:
+                return '—';
+        }
+    };
+
+    // Danh sách hiển thị — tính lại từ channelMaps mỗi lần render (dữ liệu nhỏ, không cần memo hoá)
+    const channelRows = (() => {
+        const roomMap = channelMaps['ivss.channel_room_map'] || {};
+        const dirMap = channelMaps['ivss.channel_direction_map'] || {};
+        const pZoneMap = channelMaps['ivss.channel_presence_zone_map'] || {};
+        const zMap = channelMaps['ivss.channel_zone_map'] || {};
+        const allKeys = new Set([...Object.keys(roomMap), ...Object.keys(dirMap), ...Object.keys(pZoneMap), ...Object.keys(zMap)]);
+        return Array.from(allKeys)
+            .sort((a, b) => Number(a) - Number(b))
+            .map(id => ({
+                id,
+                role: inferChannelRole(id, channelMaps).role,
+                detail: describeChannelDetail(id, channelMaps)
+            }));
+    })();
+
     const CHANNELS_PER_PAGE = 8;
-    const totalChannelPages = Math.max(1, Math.ceil(localChannels.length / CHANNELS_PER_PAGE));
+    const totalChannelPages = Math.max(1, Math.ceil(channelRows.length / CHANNELS_PER_PAGE));
     const safeChannelPage = Math.min(channelPage, totalChannelPages);
-    const paginatedChannels = localChannels.slice(
+    const paginatedChannelRows = channelRows.slice(
         (safeChannelPage - 1) * CHANNELS_PER_PAGE,
         safeChannelPage * CHANNELS_PER_PAGE
     );
+
+    const openAddChannelEditor = () => {
+        setError(null);
+        setChannelEditor({ open: true, mode: 'add', channelId: '', role: 'checkin_out', roomId: '', direction: 'enter', zoneId: '' });
+    };
+
+    const openEditChannelEditor = (channelId) => {
+        setError(null);
+        const inferred = inferChannelRole(channelId, channelMaps);
+        setChannelEditor({
+            open: true,
+            mode: 'edit',
+            channelId,
+            role: inferred.role,
+            roomId: inferred.roomId,
+            direction: inferred.direction || 'enter',
+            zoneId: inferred.zoneId
+        });
+    };
+
+    const closeChannelEditor = () => setChannelEditor(emptyChannelEditor);
+
+    // Đổi Vai trò → xóa field không thuộc vai mới, tránh gửi lẫn dữ liệu của vai trước
+    const handleChannelRoleChange = (role) => {
+        setChannelEditor(prev => ({
+            ...prev,
+            role,
+            roomId: (role === 'checkin_out' || role === 'headcount') ? prev.roomId : '',
+            direction: role === 'checkin_out' ? (prev.direction || 'enter') : '',
+            zoneId: (role === 'zone' || role === 'gate') ? prev.zoneId : ''
+        }));
+    };
+
+    const handleChannelEditorFieldChange = (field, value) => {
+        setChannelEditor(prev => ({ ...prev, [field]: value }));
+    };
+
+    // Xóa channelId khỏi bản sao của cả 4 map — dùng chung cho Lưu và Xóa, đảm bảo 1 channel
+    // không bao giờ dính 2 vai trò cùng lúc (QĐ-2: camera một-vai-một-channel).
+    const cloneChannelMapsWithoutId = (freshMaps, channelId) => {
+        const cloned = {};
+        CHANNEL_MAP_KEYS.forEach(key => {
+            cloned[key] = { ...(freshMaps[key] || {}) };
+            delete cloned[key][channelId];
+        });
+        return cloned;
+    };
+
+    // So map mới với map vừa GET được, chỉ PATCH key nào thực sự đổi (BE ghi đè toàn bộ object
+    // theo key nên phải luôn GET-đầy-đủ trước — xem PLAN FE "Thiết kế lại Ánh xạ Kênh Camera").
+    const patchChangedChannelMaps = async (freshMaps, newMaps) => {
+        const changedKeys = CHANNEL_MAP_KEYS.filter(key =>
+            JSON.stringify(newMaps[key]) !== JSON.stringify(freshMaps[key] || {})
+        );
+        await Promise.all(changedKeys.map(key => updateChannelMap({ key, value: newMaps[key] })));
+    };
+
+    const saveChannelRow = async () => {
+        const channelId = String(channelEditor.channelId).trim();
+        if (!channelId || !/^\d+$/.test(channelId)) {
+            setError('ID Kênh phải là số nguyên (VD: 1, 2, 3...).');
+            return;
+        }
+        if (channelEditor.mode === 'add' && channelRows.some(r => r.id === channelId)) {
+            setError(`ID Kênh ${channelId} đã tồn tại.`);
+            return;
+        }
+        if ((channelEditor.role === 'checkin_out' || channelEditor.role === 'headcount') && !channelEditor.roomId) {
+            setError('Vui lòng chọn Phòng.');
+            return;
+        }
+        if (channelEditor.role === 'checkin_out' && !channelEditor.direction) {
+            setError('Vui lòng chọn Hướng.');
+            return;
+        }
+        if ((channelEditor.role === 'zone' || channelEditor.role === 'gate') && !channelEditor.zoneId) {
+            setError('Vui lòng chọn Khu vực.');
+            return;
+        }
+
+        setError(null);
+        setChannelActionSaving(true);
+        try {
+            const freshRes = await getChannelMaps();
+            if (!freshRes?.success || !Array.isArray(freshRes.data)) {
+                throw new Error(freshRes?.error?.message || 'Không thể tải lại cấu hình ánh xạ kênh.');
+            }
+            const freshMaps = parseChannelMapsData(freshRes.data);
+            const newMaps = cloneChannelMapsWithoutId(freshMaps, channelId);
+
+            if (channelEditor.role === 'checkin_out') {
+                newMaps['ivss.channel_room_map'][channelId] = channelEditor.roomId;
+                newMaps['ivss.channel_direction_map'][channelId] = channelEditor.direction;
+            } else if (channelEditor.role === 'headcount') {
+                newMaps['ivss.channel_room_map'][channelId] = channelEditor.roomId;
+            } else if (channelEditor.role === 'zone') {
+                newMaps['ivss.channel_presence_zone_map'][channelId] = channelEditor.zoneId;
+            } else if (channelEditor.role === 'gate') {
+                newMaps['ivss.channel_zone_map'][channelId] = channelEditor.zoneId;
+            }
+
+            await patchChangedChannelMaps(freshMaps, newMaps);
+            await fetchConfigs();
+            closeChannelEditor();
+            setSuccessMessage(channelEditor.mode === 'add' ? 'Đã thêm ánh xạ kênh camera.' : 'Đã cập nhật ánh xạ kênh camera.');
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể lưu ánh xạ kênh camera. Vui lòng thử lại.');
+        } finally {
+            setChannelActionSaving(false);
+        }
+    };
+
+    const deleteChannelRow = async (channelId) => {
+        if (!window.confirm(`Xóa ánh xạ kênh ${channelId}? Thao tác áp dụng ngay lập tức.`)) return;
+
+        setError(null);
+        setChannelActionSaving(true);
+        try {
+            const freshRes = await getChannelMaps();
+            if (!freshRes?.success || !Array.isArray(freshRes.data)) {
+                throw new Error(freshRes?.error?.message || 'Không thể tải lại cấu hình ánh xạ kênh.');
+            }
+            const freshMaps = parseChannelMapsData(freshRes.data);
+            const newMaps = cloneChannelMapsWithoutId(freshMaps, channelId);
+
+            await patchChangedChannelMaps(freshMaps, newMaps);
+            await fetchConfigs();
+
+            const newTotalPages = Math.max(1, Math.ceil((channelRows.length - 1) / CHANNELS_PER_PAGE));
+            if (safeChannelPage > newTotalPages) setChannelPage(newTotalPages);
+            setSuccessMessage('Đã xóa ánh xạ kênh camera.');
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể xóa ánh xạ kênh camera. Vui lòng thử lại.');
+        } finally {
+            setChannelActionSaving(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -686,7 +855,7 @@ const SystemSettings = () => {
                                     <Camera className="w-5 h-5 text-action-blue" />
                                     Cấu hình Camera & Cảm biến (IVSS)
                                 </h2>
-                                <p className="text-xs text-slate-blue mt-1">Ánh xạ kênh camera vào phòng họp và thiết lập ngưỡng thời gian vắng mặt.</p>
+                                <p className="text-xs text-slate-blue mt-1">Ánh xạ kênh camera vào phòng họp/khu vực theo vai trò và thiết lập ngưỡng thời gian vắng mặt.</p>
                             </div>
 
                             {/* Thresholds */}
@@ -723,136 +892,168 @@ const SystemSettings = () => {
                                 </div>
                             </div>
 
-                            {/* Map List (Compact Table + Phân trang — tránh giao diện kéo dài, không dùng scroll dọc) */}
+                            {/* Ánh xạ Kênh Camera — danh sách gọn + form Thêm/Sửa theo Vai trò, lưu ngay lập tức */}
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h3 className="font-bold text-midnight-indigo">Ánh xạ Kênh Camera</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const newChannels = [...localChannels, { id: '', roomId: '', direction: '', presenceZone: '', zone: '' }];
-                                            setLocalChannels(newChannels);
-                                            setChannelPage(Math.ceil(newChannels.length / CHANNELS_PER_PAGE)); // nhảy tới trang chứa kênh vừa thêm
-                                        }}
-                                        className="px-3 py-1.5 bg-action-blue text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
-                                    >
-                                        <Plus className="w-4 h-4" /> Thêm kênh
-                                    </button>
+                                    {!channelEditor.open && (
+                                        <button
+                                            type="button"
+                                            onClick={openAddChannelEditor}
+                                            className="px-3 py-1.5 bg-action-blue text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
+                                        >
+                                            <Plus className="w-4 h-4" /> Thêm kênh
+                                        </button>
+                                    )}
                                 </div>
 
-                                {localChannels.length === 0 ? (
+                                {/* Form Thêm/Sửa theo Vai trò — chỉ hiện field thuộc đúng vai đang chọn */}
+                                {channelEditor.open && (
+                                    <div className="p-4 bg-cloud-mist/40 border border-platinum-tint rounded-xl space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-bold text-slate-blue uppercase">ID Kênh</label>
+                                                <input
+                                                    type="text"
+                                                    value={channelEditor.channelId}
+                                                    onChange={(e) => handleChannelEditorFieldChange('channelId', e.target.value)}
+                                                    disabled={channelEditor.mode === 'edit'}
+                                                    placeholder="VD: 1"
+                                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue disabled:bg-cloud-mist disabled:text-slate-blue"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-bold text-slate-blue uppercase">Vai trò</label>
+                                                <select
+                                                    value={channelEditor.role}
+                                                    onChange={(e) => handleChannelRoleChange(e.target.value)}
+                                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
+                                                >
+                                                    <option value="checkin_out">{ROLE_LABELS.checkin_out}</option>
+                                                    <option value="zone">{ROLE_LABELS.zone}</option>
+                                                    <option value="headcount">{ROLE_LABELS.headcount}</option>
+                                                    <option value="gate">{ROLE_LABELS.gate}</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Field theo vai trò — field không thuộc vai đang chọn thì ẩn hẳn */}
+                                            {(channelEditor.role === 'checkin_out' || channelEditor.role === 'headcount') && (
+                                                <div className="space-y-1.5">
+                                                    <label className="block text-xs font-bold text-slate-blue uppercase">Phòng</label>
+                                                    <select
+                                                        value={channelEditor.roomId}
+                                                        onChange={(e) => handleChannelEditorFieldChange('roomId', e.target.value)}
+                                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
+                                                    >
+                                                        <option value="">-- Chọn phòng --</option>
+                                                        {rooms.map((room, idx) => (
+                                                            <option key={room.id || room.roomId || idx} value={room.id || room.roomId}>{room.roomName || room.room_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {channelEditor.role === 'checkin_out' && (
+                                                <div className="space-y-1.5">
+                                                    <label className="block text-xs font-bold text-slate-blue uppercase">Hướng</label>
+                                                    <select
+                                                        value={channelEditor.direction}
+                                                        onChange={(e) => handleChannelEditorFieldChange('direction', e.target.value)}
+                                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
+                                                    >
+                                                        <option value="enter">Vào</option>
+                                                        <option value="leave">Ra</option>
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {(channelEditor.role === 'zone' || channelEditor.role === 'gate') && (
+                                                <div className="space-y-1.5">
+                                                    <label className="block text-xs font-bold text-slate-blue uppercase">
+                                                        {channelEditor.role === 'zone' ? 'Khu vực' : 'Khu vực cổng'}
+                                                    </label>
+                                                    <select
+                                                        value={channelEditor.zoneId}
+                                                        onChange={(e) => handleChannelEditorFieldChange('zoneId', e.target.value)}
+                                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
+                                                    >
+                                                        <option value="">-- Chọn khu vực --</option>
+                                                        {zones.map((zone, idx) => (
+                                                            <option key={zone.id || idx} value={zone.id}>{zone.zoneName || zone.zone_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={closeChannelEditor}
+                                                disabled={channelActionSaving}
+                                                className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-all"
+                                            >
+                                                Hủy
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={saveChannelRow}
+                                                disabled={channelActionSaving}
+                                                className="px-4 py-2 bg-action-blue text-white hover:bg-glacier-blue rounded-xl text-xs font-semibold shadow-sm transition-all min-w-[90px]"
+                                            >
+                                                {channelActionSaving ? 'Đang lưu...' : 'Lưu'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {channelRows.length === 0 ? (
                                     <div className="p-8 text-center border border-platinum-tint border-dashed rounded-xl text-slate-blue text-sm">
                                         Chưa có cấu hình ánh xạ kênh nào. Bấm "Thêm kênh" để bắt đầu.
                                     </div>
                                 ) : (
                                     <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-left text-sm min-w-[760px]">
+                                            <table className="w-full text-left text-sm">
                                                 <thead className="bg-cloud-mist/50 border-b border-platinum-tint">
                                                     <tr>
                                                         <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-24">ID Kênh</th>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Phòng</th>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-44">Hướng di chuyển</th>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Phân vùng hiện diện</th>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Phân vùng chung</th>
-                                                        <th className="px-3 py-2.5 w-10"></th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-52">Vai trò</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Chi tiết</th>
+                                                        <th className="px-3 py-2.5 w-20"></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-platinum-tint">
-                                                    {paginatedChannels.map((row, pageIdx) => {
-                                                        const index = (safeChannelPage - 1) * CHANNELS_PER_PAGE + pageIdx;
-                                                        return (
-                                                            <tr key={index} className="hover:bg-cloud-mist/30 transition-colors">
-                                                                <td className="px-3 py-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={row.id}
-                                                                        onChange={(e) => {
-                                                                            const newChannels = [...localChannels];
-                                                                            newChannels[index].id = e.target.value;
-                                                                            setLocalChannels(newChannels);
-                                                                        }}
-                                                                        placeholder="VD: 1"
-                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs focus:border-action-blue"
-                                                                    />
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    <select
-                                                                        value={row.roomId}
-                                                                        onChange={(e) => {
-                                                                            const newChannels = [...localChannels];
-                                                                            newChannels[index].roomId = e.target.value;
-                                                                            setLocalChannels(newChannels);
-                                                                        }}
-                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs focus:border-action-blue"
-                                                                    >
-                                                                        <option value="">-- Chọn phòng --</option>
-                                                                        {rooms.map((room, idx) => (
-                                                                            <option key={room.id || room.roomId || idx} value={room.id || room.roomId}>{room.roomName || room.room_name}</option>
-                                                                        ))}
-                                                                    </select>
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    <select
-                                                                        value={row.direction}
-                                                                        onChange={(e) => {
-                                                                            const newChannels = [...localChannels];
-                                                                            newChannels[index].direction = e.target.value;
-                                                                            setLocalChannels(newChannels);
-                                                                        }}
-                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs focus:border-action-blue"
-                                                                    >
-                                                                        <option value="">-- Chọn hướng --</option>
-                                                                        <option value="enter">Vào (Enter)</option>
-                                                                        <option value="leave">Ra (Leave)</option>
-                                                                        <option value="seen">Hiện diện (Seen)</option>
-                                                                    </select>
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={row.presenceZone}
-                                                                        onChange={(e) => {
-                                                                            const newChannels = [...localChannels];
-                                                                            newChannels[index].presenceZone = e.target.value;
-                                                                            setLocalChannels(newChannels);
-                                                                        }}
-                                                                        placeholder="UUID phân vùng"
-                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs font-mono focus:border-action-blue"
-                                                                    />
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        value={row.zone}
-                                                                        onChange={(e) => {
-                                                                            const newChannels = [...localChannels];
-                                                                            newChannels[index].zone = e.target.value;
-                                                                            setLocalChannels(newChannels);
-                                                                        }}
-                                                                        placeholder="UUID phân vùng"
-                                                                        className="w-full px-2 py-1.5 border border-platinum-tint rounded-lg text-xs font-mono focus:border-action-blue"
-                                                                    />
-                                                                </td>
-                                                                <td className="px-3 py-2 text-right">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            const newChannels = [...localChannels];
-                                                                            newChannels.splice(index, 1);
-                                                                            setLocalChannels(newChannels);
-                                                                            const newTotalPages = Math.max(1, Math.ceil(newChannels.length / CHANNELS_PER_PAGE));
-                                                                            if (safeChannelPage > newTotalPages) setChannelPage(newTotalPages);
-                                                                        }}
-                                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                                        title="Xóa kênh"
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
+                                                    {paginatedChannelRows.map((row) => (
+                                                        <tr key={row.id} className="hover:bg-cloud-mist/30 transition-colors">
+                                                            <td className="px-3 py-2.5 font-mono text-xs font-semibold text-midnight-indigo">{row.id}</td>
+                                                            <td className="px-3 py-2.5">
+                                                                <span className="inline-flex px-2 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue">
+                                                                    {ROLE_LABELS[row.role]}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-2.5 text-slate-blue">{row.detail}</td>
+                                                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openEditChannelEditor(row.id)}
+                                                                    className="p-1.5 text-slate-blue hover:bg-cloud-mist rounded-lg transition-colors"
+                                                                    title="Sửa"
+                                                                >
+                                                                    <Pencil className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => deleteChannelRow(row.id)}
+                                                                    disabled={channelActionSaving}
+                                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                                    title="Xóa"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -860,7 +1061,7 @@ const SystemSettings = () => {
                                         {totalChannelPages > 1 && (
                                             <div className="px-4 py-3 bg-cloud-mist/30 border-t border-platinum-tint flex items-center justify-between">
                                                 <span className="text-xs font-medium text-slate-blue">
-                                                    Trang {safeChannelPage} / {totalChannelPages} (Tổng {localChannels.length} kênh)
+                                                    Trang {safeChannelPage} / {totalChannelPages} (Tổng {channelRows.length} kênh)
                                                 </span>
                                                 <div className="flex gap-2">
                                                     <button

@@ -252,6 +252,17 @@ export const getChannelMaps = async () => {
     return await get('/system-configurations/channel-maps');
 };
 
+/**
+ * Lấy danh sách khu vực (Zone) — dùng cho dropdown "Khu vực" khi ánh xạ kênh camera
+ * theo vai trò (Hiện diện khu vực / Cổng-ANPR).
+ * @param {object} params - { page, limit, search, status, zoneType, building, floor }
+ * @returns {Promise<object>} { success, data: [...zones], meta }
+ */
+export const getZones = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/zones${query}`);
+};
+
 export const updateChannelMap = async (data) => {
     return await patch('/system-configurations/channel-maps', data);
 };
