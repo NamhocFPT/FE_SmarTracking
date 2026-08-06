@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getRooms, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -69,6 +69,13 @@ const EmployeeMeetingDetail = () => {
     // Data lists for editing
     const [rooms, setRooms] = useState([]);
     const [users, setUsers] = useState([]);
+
+    // Participant conflict confirmation (409 PARTICIPANT_TIME_CONFLICT_WARNING)
+    const [participantConflictModal, setParticipantConflictModal] = useState({
+        isOpen: false,
+        conflicts: [],
+        pendingPayload: null,  // { startISO, endISO } - payload cần gửi lại
+    });
 
     // Recording & Transcript player states
     const [isPlaying, setIsPlaying] = useState(false);
@@ -242,17 +249,22 @@ const EmployeeMeetingDetail = () => {
 
     // Load helper data for edit forms
     useEffect(() => {
-        if (isEditModalOpen) {
+        if (isEditModalOpen && meeting?.id) {
             const loadHelpers = async () => {
                 try {
-                    const [roomsRes, usersRes] = await Promise.all([getRooms(), getUsers()]);
+                    // Dùng endpoint chuyên trách của BE: lọc phòng theo khung giờ cuộc họ p,
+                    // cộng thêm phòng hiện tại (includeCurrentRoom=true) để người dùng có thể giữ nguyên.
+                    const [roomsRes, usersRes] = await Promise.all([
+                        getAvailableRoomsForMeeting(meeting.id, { includeCurrentRoom: true }),
+                        getUsers()
+                    ]);
                     if (roomsRes?.success) setRooms(roomsRes.data || []);
                     if (usersRes?.success) setUsers(usersRes.data || []);
                 } catch (e) { }
             };
             loadHelpers();
         }
-    }, [isEditModalOpen]);
+    }, [isEditModalOpen, meeting?.id]);
 
     // Simulated playback updates for transcript
     useEffect(() => {
@@ -290,22 +302,35 @@ const EmployeeMeetingDetail = () => {
     const handleSaveEdit = async (e) => {
         e.preventDefault();
         setError(null);
-        try {
-            const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
-            const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
+        const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
+        const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
+        await doSaveEdit(startISO, endISO, false);
+    };
 
-            // BE tách riêng từng endpoint cho time/room/recording-config/title —
-            // PATCH /meetings/:id (updateMeeting) chỉ nhận title/description, các field khác
-            // sẽ bị ValidationPipe loại bỏ nếu gộp chung vào 1 payload. Gọi tách từng endpoint
-            // giống luồng manager để đảm bảo dữ liệu thực sự được lưu.
+    // Hàm thực thi lưu - có thể gọi lại với overrideParticipantConflict=true
+    const doSaveEdit = async (startISO, endISO, overrideParticipantConflict) => {
+        setError(null);
+        try {
             let successCount = 0;
+            let pendingApproval = false;
+
             if (startISO !== meeting.startTime || endISO !== meeting.endTime) {
-                const timeRes = await updateMeetingTime(meeting.id, { startTime: startISO, endTime: endISO });
-                if (timeRes?.success) successCount++;
+                let timePayload = { startTime: startISO, endTime: endISO };
+                if (overrideParticipantConflict) {
+                    timePayload.overrideParticipantConflict = true;
+                }
+                const timeRes = await updateMeetingTime(meeting.id, timePayload);
+                if (timeRes?.success) {
+                    successCount++;
+                    if (timeRes.data?.pendingApproval) pendingApproval = true;
+                }
             }
             if (editRoomId !== meeting.room?.id) {
                 const roomRes = await updateMeetingRoom(meeting.id, { newRoomId: editRoomId });
-                if (roomRes?.success) successCount++;
+                if (roomRes?.success) {
+                    successCount++;
+                    if (roomRes.data?.pendingApproval) pendingApproval = true;
+                }
             }
             if (editRecordingEnabled !== meeting.recordingEnabled) {
                 const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
@@ -317,14 +342,45 @@ const EmployeeMeetingDetail = () => {
             }
 
             if (successCount > 0 || (startISO === meeting.startTime && endISO === meeting.endTime && editRoomId === meeting.room?.id && editRecordingEnabled === meeting.recordingEnabled && editTitle === meeting.title)) {
-                setSuccessMsg('Đã cập nhật thông tin cuộc họp thành công.');
+                if (pendingApproval) {
+                    setSuccessMsg('Đã gửi yêu cầu thay đổi. Do cuộc họ p đã được xếp lịch, thay đổi giờ/phòng cần được Manager phê duyệt lại.');
+                } else {
+                    setSuccessMsg('Đã cập nhật thông tin cuộc họ p thành công.');
+                }
                 setIsEditModalOpen(false);
                 fetchMeeting();
             } else {
-                setError('Không thể cập nhật cuộc họp. Vui lòng thử lại.');
+                setError('Không thể cập nhật cuộc họ p. Vui lòng thử lại.');
             }
         } catch (err) {
-            setError(err?.message || err?.error?.message || 'Lỗi cập nhật cuộc họp. Vui lòng thử lại.');
+            const errData = err?.response?.data || err;
+            const errorCode = errData?.error?.code || '';
+
+            if (errorCode === 'PARTICIPANT_TIME_CONFLICT_WARNING') {
+                // 409 non-blocking: đặt lịch mới trung với người tham gia khác
+                // Hiển modal xác nhận thay vì chặn hoàn toàn
+                const conflicts = errData?.error?.details?.conflicts || [];
+                setParticipantConflictModal({
+                    isOpen: true,
+                    conflicts,
+                    pendingPayload: { startISO, endISO },
+                });
+                return;
+            }
+
+            if (errorCode === 'ROOM_TIME_CONFLICT') {
+                const details = errData?.error?.details || {};
+                const suggested = details.suggestedRooms || [];
+                let msg = errData?.message || 'Phòng họ p không khả dụng trong khung giờ mới.';
+                if (suggested.length > 0) {
+                    const names = suggested.map(r => r.roomName).join(', ');
+                    msg += ` Phòng gợi ý: ${names}.`;
+                }
+                setError(msg);
+                return;
+            }
+
+            setError(err?.message || errData?.message || 'Lỗi cập nhật cuộc họ p. Vui lòng thử lại.');
         }
     };
 
@@ -1143,9 +1199,11 @@ const EmployeeMeetingDetail = () => {
                                         onChange={(e) => setEditRoomId(e.target.value)}
                                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white focus:outline-none focus:border-action-blue"
                                     >
-                                        {rooms.map(r => (
-                                            <option key={r.id} value={r.id}>{r.roomName} ({r.siteName}) - Sức chứa: {r.capacity}</option>
-                                        ))}
+                                    {rooms.map((r, idx) => (
+                                        <option key={r.id || idx} value={r.id}>
+                                            {r.roomName} {r.siteName ? `(${r.siteName})` : ''} - Sức chứa: {r.capacity}
+                                        </option>
+                                    ))}
                                     </select>
                                 </div>
 
@@ -1388,6 +1446,60 @@ const EmployeeMeetingDetail = () => {
                         fetchMeeting();
                     }}
                 />
+            )}
+
+            {/* Participant Conflict Confirmation Modal */}
+            {participantConflictModal.isOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-2xl shadow-xl border border-amber-200 max-w-md w-full overflow-hidden"
+                    >
+                        <div className="px-6 py-4 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                            <div>
+                                <h3 className="font-bold text-amber-900 text-sm">Cảnh báo trùng lịch người tham gia</h3>
+                                <p className="text-xs text-amber-700 mt-0.5">Khung giờ mới trùng với lịch họp của một số người tham gia.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 space-y-3 max-h-60 overflow-y-auto">
+                            {participantConflictModal.conflicts.map((c, idx) => (
+                                <div key={idx} className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-sm">
+                                    <span className="font-semibold text-midnight-indigo">{c.fullName}</span>
+                                    {c.overlappingMeetings?.map((m, i) => (
+                                        <p key={i} className="text-xs text-slate-blue mt-1">
+                                            Trùng với: <span className="font-medium">"{m.title}"</span>
+                                            {' '}({new Date(m.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} – {new Date(m.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})
+                                        </p>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-platinum-tint flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setParticipantConflictModal({ isOpen: false, conflicts: [], pendingPayload: null })}
+                                className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const { startISO, endISO } = participantConflictModal.pendingPayload;
+                                    setParticipantConflictModal({ isOpen: false, conflicts: [], pendingPayload: null });
+                                    await doSaveEdit(startISO, endISO, true);
+                                }}
+                                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold"
+                            >
+                                Vẫn đổi lịch
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
             )}
         </>
     );

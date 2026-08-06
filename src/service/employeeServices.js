@@ -25,6 +25,18 @@ export const getRooms = async (params = {}) => {
 };
 
 /**
+ * Lấy danh sách phòng hợp KHẢ DỤNG cho một cuộc họ p cụ thể (lọc theo khung giờ của cuộc họ p).
+ * Sử dụng endpoint chuyên trách: GET /meetings/:meetingId/available-rooms
+ * Backend tự động loại các phòng bị đặt trung lịch, bao gồm cả phòng hiện tại của cuộc họ p.
+ * @param {string} meetingId - UUID cuộc họ p
+ * @param {object} options - { includeCurrentRoom?: boolean, capacityWarningMode?: boolean }
+ */
+export const getAvailableRoomsForMeeting = async (meetingId, options = {}) => {
+    const query = buildQuery(options);
+    return await get(`/meetings/${meetingId}/available-rooms${query}`);
+};
+
+/**
  * Tìm kiếm/lấy danh sách rút gọn nhân viên nội bộ (dùng cho autocomplete chọn participants)
  * @param {object} params - { page, limit, search }
  */
