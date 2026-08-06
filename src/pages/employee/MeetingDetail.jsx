@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRooms, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -58,6 +58,8 @@ const EmployeeMeetingDetail = () => {
     const [editRoomId, setEditRoomId] = useState('');
     const [editParticipants, setEditParticipants] = useState([]);
     const [editRecordingEnabled, setEditRecordingEnabled] = useState(false);
+    const [roomWarning, setRoomWarning] = useState(false);
+    const [isFetchingRooms, setIsFetchingRooms] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
 
     const [agendaList, setAgendaList] = useState([]);
@@ -75,6 +77,12 @@ const EmployeeMeetingDetail = () => {
         isOpen: false,
         conflicts: [],
         pendingPayload: null,  // { startISO, endISO } - payload cần gửi lại
+    });
+    // Room capacity confirmation (422 ROOM_CAPACITY_WARNING)
+    const [roomCapacityModal, setRoomCapacityModal] = useState({
+        isOpen: false,
+        message: '',
+        pendingPayload: null,  // { startISO, endISO }
     });
 
     // Recording & Transcript player states
@@ -247,24 +255,54 @@ const EmployeeMeetingDetail = () => {
         fetchMeeting();
     }, [fetchMeeting]);
 
-    // Load helper data for edit forms
+    // Load helper data for edit forms (users)
     useEffect(() => {
         if (isEditModalOpen && meeting?.id) {
-            const loadHelpers = async () => {
+            const loadUsers = async () => {
                 try {
-                    // Dùng endpoint chuyên trách của BE: lọc phòng theo khung giờ cuộc họ p,
-                    // cộng thêm phòng hiện tại (includeCurrentRoom=true) để người dùng có thể giữ nguyên.
-                    const [roomsRes, usersRes] = await Promise.all([
-                        getAvailableRoomsForMeeting(meeting.id, { includeCurrentRoom: true }),
-                        getUsers()
-                    ]);
-                    if (roomsRes?.success) setRooms(roomsRes.data || []);
+                    const usersRes = await getUsers();
                     if (usersRes?.success) setUsers(usersRes.data || []);
                 } catch (e) { }
             };
-            loadHelpers();
+            loadUsers();
         }
     }, [isEditModalOpen, meeting?.id]);
+
+    // Lọc phòng trống theo khung giờ mới (có debounce)
+    useEffect(() => {
+        if (isEditModalOpen && editDate && editStart && editEnd) {
+            const fetchAvailable = async () => {
+                setIsFetchingRooms(true);
+                try {
+                    const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
+                    const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
+                    
+                    const res = await getAvailableRooms({ startTime: startISO, endTime: endISO });
+                    if (res?.success) {
+                        const fetchedRooms = res.data || [];
+                        setRooms(fetchedRooms);
+                        
+                        if (editRoomId) {
+                            let isAvailable = fetchedRooms.some(r => r.id === editRoomId);
+                            // Nếu thời gian không đổi, phòng hiện tại của cuộc họp luôn được xem là hợp lệ
+                            const isTimeChanged = startISO !== meeting?.startTime && startISO !== meeting?.start_time || endISO !== meeting?.endTime && endISO !== meeting?.end_time;
+                            if (!isTimeChanged && editRoomId === meeting?.room?.id) {
+                                isAvailable = true;
+                            }
+                            setRoomWarning(!isAvailable);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch available rooms", e);
+                } finally {
+                    setIsFetchingRooms(false);
+                }
+            };
+
+            const timeoutId = setTimeout(fetchAvailable, 500);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [isEditModalOpen, editDate, editStart, editEnd]);
 
     // Simulated playback updates for transcript
     useEffect(() => {
@@ -304,17 +342,19 @@ const EmployeeMeetingDetail = () => {
         setError(null);
         const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
         const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
-        await doSaveEdit(startISO, endISO, false);
+        await doSaveEdit(startISO, endISO);
     };
 
-    // Hàm thực thi lưu - có thể gọi lại với overrideParticipantConflict=true
-    const doSaveEdit = async (startISO, endISO, overrideParticipantConflict) => {
+    // Hàm thực thi lưu - có thể gọi lại với overrideParticipantConflict/confirmCapacityOverride=true
+    // sau khi user xác nhận ở modal cảnh báo xung đột.
+    const doSaveEdit = async (startISO, endISO, options = {}) => {
+        const { overrideParticipantConflict = false, confirmCapacityOverride = false } = options;
         setError(null);
         try {
             let successCount = 0;
             let pendingApproval = false;
 
-            if (startISO !== meeting.startTime || endISO !== meeting.endTime) {
+            if (new Date(startISO).getTime() !== new Date(meeting.startTime).getTime() || new Date(endISO).getTime() !== new Date(meeting.endTime).getTime()) {
                 let timePayload = { startTime: startISO, endTime: endISO };
                 if (overrideParticipantConflict) {
                     timePayload.overrideParticipantConflict = true;
@@ -326,7 +366,11 @@ const EmployeeMeetingDetail = () => {
                 }
             }
             if (editRoomId !== meeting.room?.id) {
-                const roomRes = await updateMeetingRoom(meeting.id, { newRoomId: editRoomId });
+                let roomPayload = { newRoomId: editRoomId };
+                if (confirmCapacityOverride) {
+                    roomPayload.confirmCapacityOverride = true;
+                }
+                const roomRes = await updateMeetingRoom(meeting.id, roomPayload);
                 if (roomRes?.success) {
                     successCount++;
                     if (roomRes.data?.pendingApproval) pendingApproval = true;
@@ -341,7 +385,7 @@ const EmployeeMeetingDetail = () => {
                 successCount++;
             }
 
-            if (successCount > 0 || (startISO === meeting.startTime && endISO === meeting.endTime && editRoomId === meeting.room?.id && editRecordingEnabled === meeting.recordingEnabled && editTitle === meeting.title)) {
+            if (successCount > 0 || (new Date(startISO).getTime() === new Date(meeting.startTime).getTime() && new Date(endISO).getTime() === new Date(meeting.endTime).getTime() && editRoomId === meeting.room?.id && editRecordingEnabled === meeting.recordingEnabled && editTitle === meeting.title)) {
                 if (pendingApproval) {
                     setSuccessMsg('Đã gửi yêu cầu thay đổi. Do cuộc họ p đã được xếp lịch, thay đổi giờ/phòng cần được Manager phê duyệt lại.');
                 } else {
@@ -353,25 +397,23 @@ const EmployeeMeetingDetail = () => {
                 setError('Không thể cập nhật cuộc họ p. Vui lòng thử lại.');
             }
         } catch (err) {
-            const errData = err?.response?.data || err;
-            const errorCode = errData?.error?.code || '';
+            const errorCode = err?.error?.code || '';
+            const details = err?.error?.details || {};
 
             if (errorCode === 'PARTICIPANT_TIME_CONFLICT_WARNING') {
-                // 409 non-blocking: đặt lịch mới trung với người tham gia khác
+                // 409 non-blocking: đặt lịch mới trùng với người tham gia khác
                 // Hiển modal xác nhận thay vì chặn hoàn toàn
-                const conflicts = errData?.error?.details?.conflicts || [];
                 setParticipantConflictModal({
                     isOpen: true,
-                    conflicts,
+                    conflicts: details.conflicts || [],
                     pendingPayload: { startISO, endISO },
                 });
                 return;
             }
 
             if (errorCode === 'ROOM_TIME_CONFLICT') {
-                const details = errData?.error?.details || {};
                 const suggested = details.suggestedRooms || [];
-                let msg = errData?.message || 'Phòng họ p không khả dụng trong khung giờ mới.';
+                let msg = err?.error?.message || 'Phòng họp không khả dụng trong khung giờ mới.';
                 if (suggested.length > 0) {
                     const names = suggested.map(r => r.roomName).join(', ');
                     msg += ` Phòng gợi ý: ${names}.`;
@@ -380,7 +422,23 @@ const EmployeeMeetingDetail = () => {
                 return;
             }
 
-            setError(err?.message || errData?.message || 'Lỗi cập nhật cuộc họ p. Vui lòng thử lại.');
+            if (errorCode === 'ROOM_CONFLICT') {
+                // Đổi phòng (không đổi giờ) nhưng phòng mới đã có người đặt trùng khung giờ hiện tại.
+                setError(err?.error?.message || 'Phòng họp đã chọn không còn trống trong khung giờ này. Vui lòng chọn phòng khác.');
+                return;
+            }
+
+            if (errorCode === 'ROOM_CAPACITY_WARNING') {
+                // 422 non-blocking: phòng mới có sức chứa nhỏ hơn số người tham dự — cho phép xác nhận vẫn đổi
+                setRoomCapacityModal({
+                    isOpen: true,
+                    message: err?.error?.message || 'Phòng mới có sức chứa nhỏ hơn số người tham dự hiện tại.',
+                    pendingPayload: { startISO, endISO },
+                });
+                return;
+            }
+
+            setError(err?.error?.message || err?.message || 'Lỗi cập nhật cuộc họp. Vui lòng thử lại.');
         }
     };
 
@@ -579,6 +637,25 @@ const EmployeeMeetingDetail = () => {
 
     const videoMedia = mediaFiles.find(m => m.type === 'VIDEO');
     const transcriptMedia = mediaFiles.find(m => m.type === 'TRANSCRIPT');
+
+    const isFormChanged = () => {
+        if (!meeting) return false;
+        const startISO = editDate && editStart ? new Date(`${editDate}T${editStart}:00`).toISOString() : '';
+        const endISO = editDate && editEnd ? new Date(`${editDate}T${editEnd}:00`).toISOString() : '';
+        const origStart = meeting.startTime || meeting.start_time;
+        const origEnd = meeting.endTime || meeting.end_time;
+        const origRecording = meeting.recording_enabled || meeting.recordingEnabled || false;
+        
+        return (
+            new Date(startISO).getTime() !== new Date(origStart).getTime() ||
+            new Date(endISO).getTime() !== new Date(origEnd).getTime() ||
+            editRoomId !== meeting.room?.id ||
+            editRecordingEnabled !== origRecording ||
+            editTitle !== meeting.title
+        );
+    };
+    
+    const isSubmitDisabled = roomWarning || !isFormChanged();
 
     return (
         <>
@@ -1193,18 +1270,34 @@ const EmployeeMeetingDetail = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Chọn phòng họp</label>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">
+                                        Chọn phòng họp {isFetchingRooms && <span className="text-[10px] text-action-blue normal-case italic font-normal ml-2">(Đang tải danh sách phòng...)</span>}
+                                    </label>
                                     <select
                                         value={editRoomId}
-                                        onChange={(e) => setEditRoomId(e.target.value)}
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white focus:outline-none focus:border-action-blue"
+                                        onChange={(e) => {
+                                            setEditRoomId(e.target.value);
+                                            setRoomWarning(false);
+                                        }}
+                                        className={`w-full px-3 py-2 border rounded-xl text-sm bg-white focus:outline-none focus:border-action-blue ${roomWarning ? 'border-red-400' : 'border-platinum-tint'}`}
                                     >
-                                    {rooms.map((r, idx) => (
-                                        <option key={r.id || idx} value={r.id}>
-                                            {r.roomName} {r.siteName ? `(${r.siteName})` : ''} - Sức chứa: {r.capacity}
-                                        </option>
-                                    ))}
+                                        {roomWarning && (
+                                            <option value={editRoomId} className="hidden" disabled>
+                                                -- Phòng hiện tại (Không trống) --
+                                            </option>
+                                        )}
+                                        {rooms.map((r, idx) => (
+                                            <option key={r.id || idx} value={r.id}>
+                                                {r.roomName} {r.siteName ? `(${r.siteName})` : ''} - Sức chứa: {r.capacity}
+                                            </option>
+                                        ))}
                                     </select>
+                                    {roomWarning && (
+                                        <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1 font-medium">
+                                            <AlertTriangle className="w-3.5 h-3.5" />
+                                            Phòng hiện tại không còn trống ở khung giờ này, vui lòng chọn phòng khác.
+                                        </p>
+                                    )}
                                 </div>
 
                                 <label className="flex items-center gap-2.5 p-3 bg-cloud-mist rounded-xl border border-outline-gray cursor-pointer">
@@ -1227,7 +1320,8 @@ const EmployeeMeetingDetail = () => {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-5 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold"
+                                        disabled={isSubmitDisabled}
+                                        className={`px-5 py-2 rounded-xl text-xs font-bold transition-colors ${isSubmitDisabled ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-action-blue hover:bg-glacier-blue text-white'}`}
                                     >
                                         Lưu thay đổi
                                     </button>
@@ -1491,11 +1585,51 @@ const EmployeeMeetingDetail = () => {
                                 onClick={async () => {
                                     const { startISO, endISO } = participantConflictModal.pendingPayload;
                                     setParticipantConflictModal({ isOpen: false, conflicts: [], pendingPayload: null });
-                                    await doSaveEdit(startISO, endISO, true);
+                                    await doSaveEdit(startISO, endISO, { overrideParticipantConflict: true });
                                 }}
                                 className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold"
                             >
                                 Vẫn đổi lịch
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* Room Capacity Warning Modal (422 ROOM_CAPACITY_WARNING) */}
+            {roomCapacityModal.isOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-2xl shadow-xl border border-amber-200 max-w-md w-full overflow-hidden"
+                    >
+                        <div className="px-6 py-4 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                            <div>
+                                <h3 className="font-bold text-amber-900 text-sm">Cảnh báo sức chứa phòng</h3>
+                                <p className="text-xs text-amber-700 mt-0.5">{roomCapacityModal.message}</p>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-platinum-tint flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setRoomCapacityModal({ isOpen: false, message: '', pendingPayload: null })}
+                                className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const { startISO, endISO } = roomCapacityModal.pendingPayload;
+                                    setRoomCapacityModal({ isOpen: false, message: '', pendingPayload: null });
+                                    await doSaveEdit(startISO, endISO, { confirmCapacityOverride: true });
+                                }}
+                                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold"
+                            >
+                                Vẫn đổi phòng
                             </button>
                         </div>
                     </motion.div>
