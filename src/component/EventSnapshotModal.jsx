@@ -1,55 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { X, Image as ImageIcon, AlertCircle } from 'lucide-react';
-import { getEventSnapshot } from '../service/sysAdminServices';
+import { API_BASE_URL } from '../utils/request';
 
 const EventSnapshotModal = ({ isOpen, onClose, eventId }) => {
     const [loading, setLoading] = useState(false);
-    const [imgSrc, setImgSrc] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
     const [notFound, setNotFound] = useState(false);
 
     useEffect(() => {
         if (!isOpen || !eventId) {
-            // reset state when closed
-            if (imgSrc) {
-                URL.revokeObjectURL(imgSrc);
-                setImgSrc(null);
-            }
             setNotFound(false);
             setErrorMsg('');
+            setLoading(false);
             return;
         }
 
-        let isMounted = true;
-        const fetchImage = async () => {
-            setLoading(true);
-            setNotFound(false);
-            setErrorMsg('');
-            try {
-                const res = await getEventSnapshot(eventId);
-                if (!isMounted) return;
-
-                if (res.notFound) {
-                    setNotFound(true);
-                } else if (res.success && res.isBlob) {
-                    const objectUrl = URL.createObjectURL(res.data);
-                    setImgSrc(objectUrl);
-                } else {
-                    setErrorMsg(res.message || 'Không thể tải ảnh. Vui lòng thử lại sau.');
-                }
-            } catch (err) {
-                if (isMounted) setErrorMsg('Lỗi mạng hoặc lỗi kết nối máy chủ.');
-            } finally {
-                if (isMounted) setLoading(false);
-            }
-        };
-
-        fetchImage();
-
-        return () => {
-            isMounted = false;
-        };
+        setLoading(true);
+        setNotFound(false);
+        setErrorMsg('');
     }, [isOpen, eventId]);
+
+    const token = localStorage.getItem('token');
+    const snapshotUrl = eventId ? `${API_BASE_URL}/ivss/device-events/${eventId}/snapshot?token=${token}` : null;
 
     if (!isOpen) return null;
 
@@ -88,12 +60,17 @@ const EventSnapshotModal = ({ isOpen, onClose, eventId }) => {
                             <AlertCircle className="w-12 h-12 text-red-400" />
                             <span className="text-sm font-semibold text-red-600 text-center max-w-sm">{errorMsg}</span>
                         </div>
-                    ) : imgSrc ? (
+                    ) : snapshotUrl ? (
                         <div className="w-full h-full max-h-[60vh] flex items-center justify-center">
                             <img
-                                src={imgSrc}
+                                src={snapshotUrl}
                                 alt="Event Snapshot"
-                                className="max-w-full max-h-[60vh] object-contain rounded border border-slate-200 shadow-sm"
+                                className={`max-w-full max-h-[60vh] object-contain rounded border border-slate-200 shadow-sm ${loading ? 'hidden' : 'block'}`}
+                                onLoad={() => setLoading(false)}
+                                onError={() => {
+                                    setLoading(false);
+                                    setNotFound(true);
+                                }}
                             />
                         </div>
                     ) : null}

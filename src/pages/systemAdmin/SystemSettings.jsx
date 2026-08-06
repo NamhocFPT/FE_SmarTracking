@@ -1,7 +1,7 @@
 import { Settings, Camera, Plus, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
-import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms } from '../../service/sysAdminServices';
+import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getNoShowConfig, updateNoShowConfig } from '../../service/sysAdminServices';
 
 /**
  * SystemSettings Component
@@ -28,8 +28,9 @@ const SystemSettings = () => {
     // Config Values State
     const [configs, setConfigs] = useState({
         is_auto_release_enabled: true,
-        no_show_threshold_minutes: 10,
-        grace_minutes: 5,
+        thresholdMinutes: 15,
+        warningGraceMinutes: 10,
+        autoReleaseGraceMinutes: 5,
         is_early_release_enabled: true,
         early_departure_threshold_minutes: 10,
         is_host_warning_enabled: true,
@@ -61,10 +62,11 @@ const SystemSettings = () => {
         setLoading(true);
         setError(null);
         try {
-            const [res, channelRes, roomRes] = await Promise.all([
+            const [res, channelRes, roomRes, noShowRes] = await Promise.all([
                 getSystemConfigs(),
                 getChannelMaps().catch(() => ({ success: true, data: [] })),
-                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] }))
+                getRooms({ page: 1, limit: 100 }).catch(() => ({ success: true, data: [] })),
+                getNoShowConfig().catch(() => ({ success: true, data: null }))
             ]);
 
             if (res?.success && Array.isArray(res.data)) {
@@ -82,6 +84,16 @@ const SystemSettings = () => {
 
                 // Merge with default values in case some keys are missing
                 const merged = { ...configs, ...mappedConfigs };
+                
+                if (noShowRes?.success && noShowRes.data) {
+                    merged.thresholdMinutes = noShowRes.data.thresholdMinutes ?? merged.thresholdMinutes;
+                    merged.warningGraceMinutes = noShowRes.data.warningGraceMinutes ?? merged.warningGraceMinutes;
+                    merged.autoReleaseGraceMinutes = noShowRes.data.autoReleaseGraceMinutes ?? merged.autoReleaseGraceMinutes;
+                    if (noShowRes.data.is_auto_release_enabled !== undefined) {
+                         merged.is_auto_release_enabled = noShowRes.data.is_auto_release_enabled;
+                    }
+                }
+
                 setConfigs(merged);
                 setDbConfigs(merged);
             } else {
@@ -147,8 +159,9 @@ const SystemSettings = () => {
             // Mock default config database simulation for local development / fallback
             const mockDb = {
                 is_auto_release_enabled: true,
-                no_show_threshold_minutes: 10,
-                grace_minutes: 5,
+                thresholdMinutes: 15,
+                warningGraceMinutes: 10,
+                autoReleaseGraceMinutes: 5,
                 is_early_release_enabled: true,
                 early_departure_threshold_minutes: 10,
                 is_host_warning_enabled: true,
@@ -193,7 +206,7 @@ const SystemSettings = () => {
     // Form validation check
     const validateConfigs = (data) => {
         // Validation: Thresholds must be positive numbers
-        if (Number(data.no_show_threshold_minutes) <= 0 || Number(data.grace_minutes) <= 0) {
+        if (Number(data.thresholdMinutes) <= 0 || Number(data.warningGraceMinutes) <= 0 || Number(data.autoReleaseGraceMinutes) <= 0) {
             setError('Thời gian chờ No-show và thời gian đếm ngược phải là số nguyên dương.');
             return false;
         }
@@ -210,9 +223,9 @@ const SystemSettings = () => {
             return false;
         }
 
-        // Logical validation: No-show grace_minutes should normally be smaller or equal to threshold
-        if (Number(data.grace_minutes) > Number(data.no_show_threshold_minutes)) {
-            setError('Thời gian đếm ngược sau cảnh báo không nên lớn hơn thời gian ân hạn ban đầu.');
+        // Logical validation: No-show warning + autoRelease should normally equal threshold
+        if (Number(data.warningGraceMinutes) > Number(data.thresholdMinutes)) {
+            setError('Thời gian cảnh báo không nên lớn hơn tổng thời gian ân hạn.');
             return false;
         }
 
@@ -296,10 +309,22 @@ const SystemSettings = () => {
 
         try {
             // Update each changed config sequentially
-            const updatePromises = changedKeys.map(key => {
-                const valueString = String(configs[key]);
-                return updateSystemConfig({ key, value: valueString });
-            });
+            const updatePromises = changedKeys
+                .filter(key => !['thresholdMinutes', 'warningGraceMinutes', 'autoReleaseGraceMinutes'].includes(key))
+                .map(key => {
+                    const valueString = String(configs[key]);
+                    return updateSystemConfig({ key, value: valueString });
+                });
+
+            // Update no-show config if any of its fields changed
+            const noShowChanged = changedKeys.some(key => ['thresholdMinutes', 'warningGraceMinutes', 'autoReleaseGraceMinutes'].includes(key));
+            if (noShowChanged) {
+                updatePromises.push(updateNoShowConfig({
+                    thresholdMinutes: Number(configs.thresholdMinutes),
+                    warningGraceMinutes: Number(configs.warningGraceMinutes),
+                    autoReleaseGraceMinutes: Number(configs.autoReleaseGraceMinutes)
+                }));
+            }
             // Endpoint /system-configurations/channel-maps lưu thẳng vào cột config_json (JSONB) —
             // BE cần nhận value đúng kiểu gốc (object cho 4 map, number cho 3 ngưỡng), KHÔNG stringify.
             // Stringify object ở đây sẽ khiến BE báo "Value ... phải là object dạng {...}".
@@ -540,8 +565,8 @@ const SystemSettings = () => {
                                                 type="number"
                                                 min="1"
                                                 max="60"
-                                                value={configs.no_show_threshold_minutes}
-                                                onChange={(e) => handleChange('no_show_threshold_minutes', Number(e.target.value))}
+                                                value={configs.warningGraceMinutes}
+                                                onChange={(e) => handleChange('warningGraceMinutes', Number(e.target.value))}
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
@@ -559,8 +584,8 @@ const SystemSettings = () => {
                                                 type="number"
                                                 min="1"
                                                 max="60"
-                                                value={configs.grace_minutes}
-                                                onChange={(e) => handleChange('grace_minutes', Number(e.target.value))}
+                                                value={configs.autoReleaseGraceMinutes}
+                                                onChange={(e) => handleChange('autoReleaseGraceMinutes', Number(e.target.value))}
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
