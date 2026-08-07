@@ -451,3 +451,10 @@ export const deleteMinutesAttachment = async (minutesId, fileId) => {
 };
 
 // Background job polling — getBackgroundJobStatus đã được khai báo ở dòng 158
+
+// ============================================================
+// IVSS / PORTRAIT APIs
+// ============================================================
+export const resyncUserPortrait = async (userId) => {
+    return await post(`/admin/ivss/portrait/${userId}/resync`);
+};

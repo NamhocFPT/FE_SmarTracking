@@ -1,4 +1,4 @@
-import { Users } from 'lucide-react';
+import { Users, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -20,6 +20,7 @@ import {
     exportUsers,
     getImportTemplate,
     getUserById,
+    resyncUserPortrait,
 } from '../../service/businessAdminServices';
 
 
@@ -37,6 +38,7 @@ const UserManagement = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [isResyncing, setIsResyncing] = useState(false);
 
     // Global users map for avatars and phone numbers not returned by manage API
     const [usersMap, setUsersMap] = useState({});
@@ -304,6 +306,35 @@ const UserManagement = () => {
     };
 
     // Delete user (BR-PRIV-02 soft delete)
+    const handleResyncPortrait = async (userId) => {
+        setIsResyncing(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await resyncUserPortrait(userId);
+            if (res?.success) {
+                setSuccessMessage('Đã yêu cầu đồng bộ lại, có hiệu lực trong vài phút.');
+            } else {
+                if (res?.status === 404) {
+                    setError('Người dùng chưa từng được đăng ký vào kho nhận diện thường trực.');
+                } else {
+                    setError(res?.message || 'Có lỗi xảy ra khi đồng bộ lại nhận diện khuôn mặt.');
+                }
+            }
+        } catch (err) {
+            const status = err?.response?.status || err?.status;
+            if (status === 404 || err?.message?.includes('404')) {
+                setError('Người dùng chưa từng được đăng ký vào kho nhận diện thường trực.');
+            } else if (status === 403 || err?.message?.includes('403')) {
+                setError('Tài khoản của bạn không có quyền đồng bộ thiết bị (403). Vui lòng liên hệ System Admin hoặc Backend.');
+            } else {
+                setError(err?.message || err?.error?.message || 'Không thể đồng bộ lại. Vui lòng thử lại.');
+            }
+        } finally {
+            setIsResyncing(false);
+        }
+    };
+
     const handleDeleteUser = async (user) => {
         if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản ${user.fullName}?`)) return;
         setError(null);
@@ -1443,10 +1474,24 @@ const UserManagement = () => {
                                             </div>
                                             <div>
                                                 <span className="text-slate-blue block text-xs">Hồ sơ khuôn mặt (FaceID):</span>
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${selectedUserDetail.hasFaceProfile ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
-                                                    }`}>
-                                                    {selectedUserDetail.hasFaceProfile ? 'Đã hợp lệ' : 'Chưa đăng ký'}
-                                                </span>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${selectedUserDetail.hasFaceProfile ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                                                        }`}>
+                                                        {selectedUserDetail.hasFaceProfile ? 'Đã hợp lệ' : 'Chưa đăng ký'}
+                                                    </span>
+                                                    {selectedUserDetail.hasFaceProfile && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={isResyncing}
+                                                            onClick={() => handleResyncPortrait(selectedUserDetail.id)}
+                                                            className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-md text-[11px] font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            title="Yêu cầu hệ thống đồng bộ lại nhận diện khuôn mặt cho thiết bị"
+                                                        >
+                                                            <RefreshCw className={`w-3 h-3 ${isResyncing ? 'animate-spin' : ''}`} />
+                                                            Đồng bộ lại
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
