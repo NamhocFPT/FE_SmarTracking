@@ -5,6 +5,35 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-07 21:34
+* **Tên Plan / Yêu cầu**: Sửa lỗi 403 Forbidden khi tải thiết bị phòng họp đối với người dùng không phải Host.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`: Bổ sung thêm điều kiện kiểm tra `meetingState?.hostId === myParticipantId` trước khi gọi hàm `loadRoomDevices(roomId)` trong `useEffect`. Điều này đảm bảo chỉ Chủ tọa (Host) mới gọi API danh sách thiết bị IoT (`/api/v1/iot-devices`), tránh làm tràn console báo lỗi 403 đối với Thành viên / Khách tham dự thông thường (những người vốn dĩ không có tab "Quản lý" nên cũng không cần fetch dữ liệu này).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-07 21:19
+* **Tên Plan / Yêu cầu**: Căn giữa hàng dưới cùng của lưới màn hình họp khi số người tham dự lẻ.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingGrid.jsx`: Thay thế CSS Grid bằng Flexbox (`flex-wrap: wrap`, `justify-content: center`) cho container chứa video. Bọc `MeetingTile` bằng div với `flexShrink: 0` và kích thước tính toán được từ hook `useGridMath`, đảm bảo hàng cuối cùng luôn được tự động căn giữa khi số lượng ô video không lấp đầy hàng (đặc biệt khi số người tham dự lẻ).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-07 17:42
+* **Tên Plan / Yêu cầu**: Nâng cấp cơ chế lưới (Grid Layout) trong phòng họp (InMeetingRoom)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingGrid.jsx`:
+    * Triển khai Custom Hook `useGridMath` kết hợp `ResizeObserver` để tự động tính toán số cột $c$ nhằm tối đa hóa diện tích từng ô video mà không vỡ tỷ lệ 16:9, thay thế cho logic chia bậc (`calcCols`) cứng nhắc trước đây.
+    * Triển khai Custom Hook `usePriorityParticipants` tạo Hàng đợi ưu tiên (Priority Queue): Đưa Chủ tọa (Host) và Người đang nói (Active Speaker) lên đầu danh sách hiển thị.
+    * Bổ sung cơ chế chống giật layout (Hysteresis/Cooldown 2 giây) giúp duy trì vị trí của người đang nói ngay cả khi họ tạm ngừng, tránh việc các ô video bị đảo vị trí liên tục khi có nhiễu âm thanh ngắn.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-07 17:28
+* **Tên Plan / Yêu cầu**: Khắc phục lỗi báo thiếu "key" prop và lỗi 400 khi điểm danh thủ công trong màn hình InMeetingRoom
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Sửa lỗi gán giá trị `undefined` cho ID của người chủ trì (host) vào danh sách `participants` khi Backend không trả về `host_id` mặc định. Điều này khắc phục tình trạng React báo thiếu thuộc tính `key` (do key = undefined).
+    * Sửa logic lấy ID của host và khách mời: Bổ sung các điều kiện truy xuất từ `organizerId` và tự động rà soát qua danh sách thành viên API trả về để lấy được `userId` chính xác, ngăn ngừa lỗi 400 Bad Request khi gửi request `POST /attendance` với giá trị `userId` rỗng (undefined).
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-07 16:44
 * **Tên Plan / Yêu cầu**: Sửa lỗi báo trùng phòng ("Phòng hiện tại không còn trống") sai lệch khi chỉnh sửa thông tin cuộc họp
 * **Chi tiết thay đổi**:
