@@ -32,15 +32,17 @@ const AiGeneratorProgress = ({ jobId, onComplete, onError }) => {
     // Polling logic
     useEffect(() => {
         if (!jobId) return;
-        
+
+        let cancelled = false;
         let timeoutId;
         const checkStatus = async () => {
             try {
                 const res = await getBackgroundJob(jobId);
+                if (cancelled) return;
                 if (res?.success) {
                     const job = res.data;
                     setStatus(job.status);
-                    
+
                     if (job.status === 'completed') {
                         // Gọi callback để tab cha tự load lại minutes
                         if (onComplete) onComplete(job.result?.minutesId);
@@ -50,7 +52,7 @@ const AiGeneratorProgress = ({ jobId, onComplete, onError }) => {
                         else if (job.errorMessage === 'AI_OUTPUT_INVALID_SCHEMA') errorVi = 'Mô hình AI trả về kết quả không đúng cấu trúc biên bản chuẩn. Đã hủy xử lý.';
                         else if (job.errorMessage === 'TRANSCRIPT_TOO_LONG_FOR_MVP') errorVi = 'Độ dài biên bản cuộc họp vượt quá giới hạn xử lý của AI trong phiên bản này.';
                         else if (job.errorMessage) errorVi = `Lỗi hệ thống: ${job.errorMessage}`;
-                        
+
                         setErrorMessage(errorVi);
                         if (onError) onError(errorVi);
                     } else {
@@ -62,13 +64,14 @@ const AiGeneratorProgress = ({ jobId, onComplete, onError }) => {
                 }
             } catch (err) {
                 // Network error -> keep polling
-                timeoutId = setTimeout(checkStatus, 3000);
+                if (!cancelled) timeoutId = setTimeout(checkStatus, 3000);
             }
         };
 
         checkStatus();
 
         return () => {
+            cancelled = true;
             if (timeoutId) clearTimeout(timeoutId);
         };
     }, [jobId, onComplete, onError]);

@@ -82,9 +82,11 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
 
     // Polling Logic
     useEffect(() => {
+        let cancelled = false;
         let timeoutId;
         const checkStatus = async () => {
             const shouldPoll = await fetchJobs();
+            if (cancelled) return;
             if (shouldPoll) {
                 timeoutId = setTimeout(checkStatus, 3000); // poll every 3s
             } else if (status !== 'error') {
@@ -95,6 +97,7 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
         checkStatus();
 
         return () => {
+            cancelled = true;
             if (timeoutId) clearTimeout(timeoutId);
         };
     }, [fetchJobs, fetchTranscript]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -57,6 +57,12 @@ const GlobalSearchBar = ({ basePath }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
+
     const runSearch = useCallback(async (q) => {
         setLoading(true);
         try {

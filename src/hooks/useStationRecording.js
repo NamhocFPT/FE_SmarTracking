@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { uploadAudio, uploadStationSpeakerMarks, createTranscriptionJob } from '../service/transcriptionServices';
 
 // Helpers cho IndexedDB để chống mất dữ liệu khi browser crash
@@ -183,6 +183,19 @@ export const useStationRecording = (meetingId, meetingTitle) => {
             mediaRecorderRef.current.stop();
         });
     }, [meetingId, meetingTitle]);
+
+    // Stop mic and interval if the consumer component unmounts mid-recording
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+            }
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+            }
+        };
+    }, []);
 
     const addSpeakerMark = useCallback((participant) => {
         if (!isRecording || !startTime) return;
