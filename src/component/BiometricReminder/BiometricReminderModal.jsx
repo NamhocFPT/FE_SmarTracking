@@ -60,10 +60,19 @@ const BiometricReminderModal = () => {
                     const data = res.data;
                     setBiometricData(data);
 
+                    const userRoles = userProfile?.roles?.map(r => r.roleCode || r.role_code || r) || [];
+                    const isAdmin = userRoles.some(r => ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes(r));
+
+                    if (isAdmin) {
+                        setLoading(false);
+                        return; // Bỏ qua hoàn toàn cơ chế nhắc nhở sinh trắc học đối với Admin
+                    }
+
                     // Sử dụng chính xác cờ biometricRequired do BE trả về trong login-response
                     // kết hợp với trạng thái lấy từ API getBiometricStatus
                     const needsUpload = data.avatarReviewStatus === 'not_uploaded' || data.avatarReviewStatus === 'rejected';
-                    const isForced = (userProfile?.biometricRequired === true || data.biometricRequired === true || needsUpload) && needsUpload;
+                    // Đã bật lại bắt buộc đối với tất cả người dùng (trừ Admin đã chặn ở trên) nếu chưa nộp
+                    const isForced = needsUpload;
 
                     const dismissed = sessionStorage.getItem('avatarPopupDismissed_' + userId);
                     if (!isForced && dismissed === 'true') { setLoading(false); return; }
