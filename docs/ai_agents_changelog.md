@@ -5,6 +5,57 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-08 02:02
+* **Tên Plan / Yêu cầu**: Cải thiện tính năng Ghi âm phiên họp (Giữ tiến trình ghi âm chạy nền và làm gọn UI)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/hooks/useStationRecording.js`: Bổ sung cơ chế tự động gọi hàm `stopAndUpload` để lưu lại và gửi API file ghi âm nếu Component bị unmount (khi cuộc họp kết thúc hoặc người dùng rời phòng), giúp không bao giờ bị mất file ghi âm.
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`: Thay đổi logic render các Tab ở Sidebar (từ việc xóa bỏ Component sang dùng CSS `display: hidden`). Việc này giúp Component `StationRecorder` luôn sống ở chế độ nền khi người dùng chuyển qua lại các Tab khác (Chat, Điểm danh...), đảm bảo tiến trình ghi âm liên tục và ổn định.
+  * `[Cập nhật] src/components/transcription/StationRecorder.jsx`: Tối ưu hóa UI, giảm padding, thu nhỏ các nút bấm và dropdown chọn người nói. Giao diện trở nên gọn gàng, không bị kéo dài chiếm diện tích, phù hợp hơn với không gian hẹp của Sidebar.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 01:39
+* **Tên Plan / Yêu cầu**: Cập nhật hiệu ứng UI khi có người phát biểu trong phòng họp
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingGrid.jsx`: Bổ sung cơ chế mô phỏng cường độ âm lượng (`audioLevel`) thay đổi liên tục mỗi 150ms khi một người tham gia đang nói. Thay đổi viền xanh nhạt thành viền đỏ `border-red-500` và bổ sung hiệu ứng `box-shadow` cùng hiệu ứng phóng to (scale) viền nháy theo thời gian thực tương ứng với cường độ âm lượng mô phỏng, mang lại cảm giác sống động như âm thanh thật. Đã fix lỗi viền đỏ vẫn hiện khi người dùng bị tắt mic (bổ sung điều kiện `isActuallySpeaking = p.isSpeaking && !p.isMuted`).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 01:29
+* **Tên Plan / Yêu cầu**: Cập nhật hiển thị text Ngày họp đối với các cuộc họp kéo dài nhiều ngày
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`, `src/pages/manager/MeetingDetail.jsx`: Sửa thẻ hiển thị thông tin "Ngày họp" dạng read-only trên giao diện. Bổ sung logic kiểm tra xem nếu ngày bắt đầu khác ngày kết thúc thì tự động hiển thị dưới dạng khoảng ngày (Ví dụ: `08/08/2026 - 10/08/2026`) thay vì chỉ in ra mỗi ngày bắt đầu như trước đây.
+  * `[Cập nhật] src/pages/manager/MeetingApprovals.jsx`, `src/pages/manager/homePage.jsx`, `src/pages/bussinessAdmin/MeetingManagement.jsx`: Sửa lỗi hiển thị tương tự ở toàn bộ các thẻ thông tin và danh sách bên trang Phê duyệt (Approval) của Quản lý và Business Admin.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 01:19
+* **Tên Plan / Yêu cầu**: Chuyển đổi Date Range Picker sang giao diện 1 lịch duy nhất
+* **Chi tiết thay đổi**:
+  * Gỡ bỏ thư viện `react-tailwindcss-datepicker` do lỗi CSS và không hỗ trợ giao diện 1 tháng cho dải ngày (range).
+  * `[Cập nhật] tailwind.config.js`: Xóa bỏ cấu hình purge CSS cũ.
+  * Cài đặt thư viện `react-datepicker` và `date-fns`.
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`, `src/pages/manager/MeetingDetail.jsx`, `src/pages/employee/MeetingDetail.jsx`: Thay thế hoàn toàn sang component `<DatePicker selectsRange />` của `react-datepicker` kèm file CSS chuẩn. Chuyển đổi trạng thái quản lý ngày sang Object `Date[]` thay vì String. 
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 00:57
+* **Tên Plan / Yêu cầu**: Nâng cấp trường chọn Ngày họp sang dạng Date Range (Nhiều ngày)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] tailwind.config.js`: Khai báo quét css cho thư viện mới `react-tailwindcss-datepicker`.
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`: Nâng cấp `<input type="date">` thành component `<Datepicker>` cho phép kéo thả nhiều ngày.
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx` & `src/pages/employee/MeetingDetail.jsx`: Áp dụng Date Range Picker trên modal Đổi Giờ/Đổi Phòng.
+  * Sửa đổi logic tính khoảng cách giờ (`getMeetingDurationMinutes`) và format `startTime`/`endTime` để chấp nhận lịch nhiều ngày.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 00:27
+* **Tên Plan / Yêu cầu**: Cập nhật khung giờ 24h cho tất cả các input thời gian
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/AlertRules.jsx`: Thêm `lang="en-GB"` cho các input `type="time"`.
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx`: Thêm `lang="en-GB"` cho các input `type="time"`.
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`: Thêm `lang="en-GB"` cho các input `type="time"`.
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`: Thêm `lang="en-GB"` cho các input `type="time"`.
+  * `[Cập nhật] src/pages/bussinessAdmin/MeetingManagement.jsx`: Thêm `lang="en-GB"` cho input `type="datetime-local"`.
+  * `[Cập nhật] src/component/NotificationActionsPanel.jsx`: Thêm `lang="en-GB"` cho input `type="datetime-local"`.
+  * *Lý do*: Thuộc tính `lang="en-GB"` buộc trình duyệt hiển thị thời gian theo chuẩn 24 giờ (thay vì AM/PM 12 giờ) trên các trường nhập liệu gốc.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-08 00:09
 * **Tên Plan / Yêu cầu**: Sửa lỗi 404 khi bật tính năng ghi âm/ghi hình cho cuộc họp chưa từng được cấu hình.
 * **Chi tiết thay đổi**:
