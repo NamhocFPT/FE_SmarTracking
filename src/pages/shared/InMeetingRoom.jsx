@@ -1,6 +1,6 @@
 import {
     AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-    Clock, Cpu, Download, ExternalLink, FileText, Hand, Loader, Mic, MicOff,
+    Clock, Cpu, Download, ExternalLink, Eye, FileText, Hand, Loader, Mic, MicOff,
     MonitorUp, PhoneOff, Play, Plus, RefreshCw, Shield, Smile,
     Sparkles, StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
     Volume2, VolumeX, X
@@ -27,6 +27,7 @@ import {
     requestExtension as requestEmployeeExtension,
     decideExtension as decideEmployeeExtension,
     getRoomDevices as getEmployeeRoomDevices,
+    getMediaFile as getEmployeeMediaFile,
 } from '../../service/employeeServices';
 import {
     getMeetingById as getMeetingManager,
@@ -46,6 +47,7 @@ import {
     decideExtension as decideManagerExtension,
     getRoomDevices as getManagerRoomDevices,
     invalidateAttendanceRecord,
+    getMediaFile as getManagerMediaFile,
 } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
@@ -222,8 +224,35 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [agendaDocView, setAgendaDocView] = useState(null);
+    const [agendaDocUrl, setAgendaDocUrl] = useState(null);
+    const [agendaDocLoading, setAgendaDocLoading] = useState(false);
     const [admittedGuestCount, setAdmittedGuestCount] = useState(0);
     // agendaDocView: { agendaItem, selectedAttachmentIdx }
+
+    // Fetch download URL whenever the viewed attachment changes
+    useEffect(() => {
+        if (!agendaDocView) {
+            setAgendaDocUrl(null);
+            return;
+        }
+        const att = agendaDocView.agendaItem.attachments?.[agendaDocView.selectedAttachmentIdx ?? 0];
+        if (!att?.id) {
+            setAgendaDocUrl(null);
+            return;
+        }
+        let cancelled = false;
+        setAgendaDocUrl(null);
+        setAgendaDocLoading(true);
+        callWithFallback(getEmployeeMediaFile, getManagerMediaFile, att.id)
+            .then(res => {
+                if (!cancelled && res?.success && res.data?.downloadUrl) {
+                    setAgendaDocUrl(res.data.downloadUrl);
+                }
+            })
+            .catch(() => {})
+            .finally(() => { if (!cancelled) setAgendaDocLoading(false); });
+        return () => { cancelled = true; };
+    }, [agendaDocView]);
 
     // Refs
     const speakingOverrideRef = useRef(null);
@@ -1233,7 +1262,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
                                     {/* File viewer */}
                                     {(() => {
-                                        const att = agendaDocView.agendaItem.attachments?.[agendaDocView.selectedAttachmentIdx || 0];
+                                        const att = agendaDocView.agendaItem.attachments?.[agendaDocView.selectedAttachmentIdx ?? 0];
                                         if (!att) return (
                                             <div className="flex-1 flex items-center justify-center text-white/40 text-sm">Không có file đính kèm</div>
                                         );
@@ -1241,31 +1270,35 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext);
                                         const isPdf = ext === 'pdf';
                                         const isVideo = ['mp4', 'webm', 'mov'].includes(ext);
-                                        const downloadUrl = att.downloadUrl || att.url;
 
                                         return (
                                             <div className="flex-1 overflow-hidden flex flex-col">
-                                                {downloadUrl ? (
+                                                {agendaDocLoading ? (
+                                                    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50">
+                                                        <Loader className="w-8 h-8 animate-spin" />
+                                                        <p className="text-xs">Đang tải tài liệu...</p>
+                                                    </div>
+                                                ) : agendaDocUrl ? (
                                                     isImage ? (
                                                         <div className="flex-1 overflow-auto flex items-center justify-center p-4">
-                                                            <img src={downloadUrl} alt={att.fileName} className="max-w-full max-h-full object-contain rounded-xl" />
+                                                            <img src={agendaDocUrl} alt={att.fileName} className="max-w-full max-h-full object-contain rounded-xl" />
                                                         </div>
                                                     ) : isPdf ? (
                                                         <iframe
-                                                            src={downloadUrl}
+                                                            src={agendaDocUrl}
                                                             title={att.fileName}
                                                             className="flex-1 w-full border-0"
                                                         />
                                                     ) : isVideo ? (
                                                         <div className="flex-1 flex items-center justify-center p-4">
-                                                            <video src={downloadUrl} controls className="max-w-full max-h-full rounded-xl" />
+                                                            <video src={agendaDocUrl} controls className="max-w-full max-h-full rounded-xl" />
                                                         </div>
                                                     ) : (
                                                         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/60">
                                                             <FileText className="w-12 h-12" />
                                                             <p className="text-sm font-medium">{att.fileName}</p>
                                                             <a
-                                                                href={downloadUrl}
+                                                                href={agendaDocUrl}
                                                                 download={att.fileName}
                                                                 target="_blank"
                                                                 rel="noreferrer"
@@ -1277,16 +1310,16 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                     )
                                                 ) : (
                                                     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50">
-                                                        <Loader className="w-8 h-8 animate-spin" />
-                                                        <p className="text-xs">Đang tải tài liệu...</p>
+                                                        <FileText className="w-10 h-10 opacity-40" />
+                                                        <p className="text-xs text-white/40">Không thể tải tài liệu</p>
                                                     </div>
                                                 )}
                                                 {/* Download bar */}
                                                 <div className="shrink-0 px-4 py-2.5 border-t border-white/10 flex items-center justify-between bg-slate-900">
                                                     <span className="text-[11px] text-white/60 truncate max-w-[200px]">{att.fileName}</span>
-                                                    {downloadUrl && (
+                                                    {agendaDocUrl && (
                                                         <a
-                                                            href={downloadUrl}
+                                                            href={agendaDocUrl}
                                                             download={att.fileName}
                                                             target="_blank"
                                                             rel="noreferrer"
@@ -1434,10 +1467,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         <div className="flex-1 overflow-y-auto">
 
                             {/* ── TAB: Quản lý (host only) ── */}
-                            {activeChatTab === 'host' && isHost && (
-                                <div className="p-4 space-y-4">
+                            <div className={`p-4 space-y-4 ${activeChatTab === 'host' && isHost ? 'block' : 'hidden'}`}>
 
-                                    {/* Pending Extension Requests */}
+                                {/* Pending Extension Requests */}
                                     {pendingExtensions.length > 0 && (
                                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
                                             <h4 className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -1661,7 +1693,6 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         </div>
                                     )}
                                 </div>
-                            )}
 
                             {/* ── TAB: Chương trình ── */}
                             {activeChatTab === 'agenda' && (
@@ -1726,6 +1757,39 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                                 )}
                                                             </div>
                                                         </button>
+
+                                                        {/* Attachment strip — always visible, no expand needed */}
+                                                        {item.attachments?.length > 0 && (
+                                                            <div className={`px-3 py-2 border-t border-platinum-tint flex flex-wrap gap-1.5 ${isCurrent ? 'bg-blue-50/60' : 'bg-cloud-mist/50'}`}>
+                                                                {item.attachments.map((att, attIdx) => (
+                                                                    <div key={att.id} className="flex items-center gap-1 bg-white border border-platinum-tint rounded-lg px-2 py-1 max-w-full">
+                                                                        <FileText className="w-2.5 h-2.5 text-slate-blue shrink-0" />
+                                                                        <span className="text-[10px] font-medium text-midnight-indigo truncate max-w-[110px]">{att.fileName}</span>
+                                                                        <button
+                                                                            title="Xem trong phòng họp"
+                                                                            onClick={() => setAgendaDocView({ agendaItem: item, selectedAttachmentIdx: attIdx })}
+                                                                            className="ml-0.5 p-0.5 rounded hover:bg-action-blue/10 text-action-blue transition-colors shrink-0"
+                                                                        >
+                                                                            <Eye className="w-3 h-3" />
+                                                                        </button>
+                                                                        <button
+                                                                            title="Tải xuống"
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    const res = await callWithFallback(getEmployeeMediaFile, getManagerMediaFile, att.id);
+                                                                                    const url = res?.data?.downloadUrl;
+                                                                                    if (url) window.open(url, '_blank');
+                                                                                    else showToast('Không lấy được link tải', 'error');
+                                                                                } catch { showToast('Lỗi tải tài liệu', 'error'); }
+                                                                            }}
+                                                                            className="p-0.5 rounded hover:bg-slate-blue/10 text-slate-blue transition-colors shrink-0"
+                                                                        >
+                                                                            <Download className="w-3 h-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
 
                                                         {/* Expanded Detail */}
                                                         {isExpanded && (

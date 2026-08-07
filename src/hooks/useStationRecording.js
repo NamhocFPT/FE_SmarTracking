@@ -184,15 +184,27 @@ export const useStationRecording = (meetingId, meetingTitle) => {
         });
     }, [meetingId, meetingTitle]);
 
+    const stopAndUploadRef = useRef(stopAndUpload);
+    useEffect(() => { stopAndUploadRef.current = stopAndUpload; }, [stopAndUpload]);
+
+    const isRecordingRef = useRef(isRecording);
+    useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+
     // Stop mic and interval if the consumer component unmounts mid-recording
     useEffect(() => {
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach(track => track.stop());
-            }
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-                mediaRecorderRef.current.stop();
+            
+            if (isRecordingRef.current) {
+                // Tự động upload nếu component unmount (ví dụ: kết thúc cuộc họp)
+                stopAndUploadRef.current().catch(console.error);
+            } else {
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                }
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                }
             }
         };
     }, []);
