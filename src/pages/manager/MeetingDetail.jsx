@@ -1,10 +1,10 @@
-import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRooms, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/managerServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/managerServices';
 import UserAvatar from '../../component/UserAvatar';
 import MeetingAttendanceBoard from '../../component/MeetingAttendanceBoard';
 import MeetingPresenceIVSS from '../../component/MeetingPresenceIVSS';
@@ -80,6 +80,7 @@ const ManagerMeetingDetail = () => {
     const [newAgendaDuration, setNewAgendaDuration] = useState('15');
     const [newAgendaFile, setNewAgendaFile] = useState(null);
     const [agendaEditIndex, setAgendaEditIndex] = useState(null);
+    const [draggedAgendaIndex, setDraggedAgendaIndex] = useState(null);
 
     // Data lists for editing
     const [rooms, setRooms] = useState([]);
@@ -274,16 +275,21 @@ const ManagerMeetingDetail = () => {
                     const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
                     const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
                     
-                    const res = await getAvailableRooms({ startTime: startISO, endTime: endISO });
+                    const res = await getAvailableRoomsForMeeting(meeting.id, { startTime: startISO, endTime: endISO, includeCurrentRoom: true });
                     if (res?.success) {
                         const fetchedRooms = res.data || [];
                         setRooms(fetchedRooms);
                         
                         if (editRoomId) {
-                            let isAvailable = fetchedRooms.some(r => r.id === editRoomId);
+                            let isAvailable = fetchedRooms.some(r => String(r.id) === String(editRoomId));
+                            // Chuẩn hóa thời gian cũ từ API về ISO để so sánh chính xác với startISO/endISO
+                            const oldStartISO = meeting?.startTime || meeting?.start_time ? new Date(meeting.startTime || meeting.start_time).toISOString() : null;
+                            const oldEndISO = meeting?.endTime || meeting?.end_time ? new Date(meeting.endTime || meeting.end_time).toISOString() : null;
+                            
+                            const isTimeChanged = startISO !== oldStartISO || endISO !== oldEndISO;
+                            
                             // Nếu thời gian không đổi, phòng hiện tại của cuộc họp luôn được xem là hợp lệ
-                            const isTimeChanged = startISO !== meeting?.startTime && startISO !== meeting?.start_time || endISO !== meeting?.endTime && endISO !== meeting?.end_time;
-                            if (!isTimeChanged && editRoomId === meeting?.room?.id) {
+                            if (!isTimeChanged && String(editRoomId) === String(meeting?.room?.id)) {
                                 isAvailable = true;
                             }
                             setRoomWarning(!isAvailable);
@@ -1426,44 +1432,72 @@ const ManagerMeetingDetail = () => {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                                     {agendaList.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-center p-3 bg-cloud-mist rounded-xl border border-outline-gray">
-                                            <div className="text-left overflow-hidden">
-                                                <span className="text-xs font-bold text-midnight-indigo flex items-center gap-2 mb-1 truncate">
-                                                    {item.title}
-                                                </span>
-                                                <span className="text-[10px] text-slate-blue font-medium block">{item.durationMin} phút</span>
-                                                {item.attachments && item.attachments.length > 0 && (
-                                                    <div className="mt-1 flex flex-col gap-1">
-                                                        {item.attachments.map(att => (
-                                                            <div key={att.id} className="flex items-center justify-between text-[10px] text-action-blue bg-blue-50 px-2 py-0.5 rounded w-full max-w-xs">
-                                                                <div className="flex items-center gap-1.5 overflow-hidden">
-                                                                    <FileText className="w-3 h-3 shrink-0" />
-                                                                    <span className="truncate max-w-[180px]">{att.fileName}</span>
+                                        <div 
+                                            key={idx} 
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.effectAllowed = 'move';
+                                                setDraggedAgendaIndex(idx);
+                                            }}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                if (draggedAgendaIndex === null || draggedAgendaIndex === idx) return;
+                                                const newList = [...agendaList];
+                                                const draggedItem = newList.splice(draggedAgendaIndex, 1)[0];
+                                                newList.splice(idx, 0, draggedItem);
+                                                // Cập nhật lại orderIndex cho chuẩn
+                                                const reordered = newList.map((a, index) => ({ ...a, orderIndex: index }));
+                                                setAgendaList(reordered);
+                                                setDraggedAgendaIndex(null);
+                                            }}
+                                            onDragEnd={() => setDraggedAgendaIndex(null)}
+                                            className={`flex justify-between items-center p-3 rounded-xl border transition-all cursor-move ${
+                                                draggedAgendaIndex === idx ? 'opacity-50 border-action-blue bg-blue-50' : 'bg-cloud-mist border-outline-gray hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-start gap-2 overflow-hidden flex-1">
+                                                <GripVertical className="w-4 h-4 text-slate-400 shrink-0 mt-0.5 cursor-grab" />
+                                                <div className="text-left overflow-hidden flex-1">
+                                                    <span className="text-xs font-bold text-midnight-indigo flex items-center gap-2 mb-1 truncate">
+                                                        {item.title}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-blue font-medium block">{item.durationMin} phút</span>
+                                                    {item.attachments && item.attachments.length > 0 && (
+                                                        <div className="mt-1 flex flex-col gap-1">
+                                                            {item.attachments.map(att => (
+                                                                <div key={att.id} className="flex items-center justify-between text-[10px] text-action-blue bg-blue-50 px-2 py-0.5 rounded w-full max-w-xs">
+                                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                                        <FileText className="w-3 h-3 shrink-0" />
+                                                                        <span className="truncate max-w-[180px]">{att.fileName}</span>
+                                                                    </div>
+                                                                    <button onClick={() => handleDeleteAttachment(item.id, att.id)} className="text-red-500 hover:text-red-700 ml-2"><X className="w-3 h-3" /></button>
                                                                 </div>
-                                                                <button onClick={() => handleDeleteAttachment(item.id, att.id)} className="text-red-500 hover:text-red-700 ml-2"><X className="w-3 h-3" /></button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                {item.file && item.file instanceof File && (
-                                                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-max">
-                                                        <FileText className="w-3 h-3 shrink-0" />
-                                                        <span className="truncate max-w-[200px]">Mới: {item.file.name}</span>
-                                                    </div>
-                                                )}
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {item.file && item.file instanceof File && (
+                                                        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-max">
+                                                            <FileText className="w-3 h-3 shrink-0" />
+                                                            <span className="truncate max-w-[200px]">Mới: {item.file.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 shrink-0 ml-2">
                                                 <button
                                                     onClick={() => handleEditAgendaItem(idx)}
                                                     className="text-blue-500 hover:text-blue-700 p-1.5"
+                                                    title="Sửa"
                                                 >
                                                     <Edit3 className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleRemoveAgendaItem(idx)}
                                                     className="text-red-500 hover:text-red-700 p-1.5"
+                                                    title="Xóa"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
