@@ -84,7 +84,7 @@ const isPublicEndpoint = (path) => {
 };
 
 export const request = async (path, options = {}) => {
-    const { method = 'GET', body, headers = {}, isPublic: customIsPublic } = options;
+    const { method = 'GET', body, headers = {}, isPublic: customIsPublic, token: overrideToken } = options;
     const isPublic = customIsPublic !== undefined ? customIsPublic : isPublicEndpoint(path);
     const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
@@ -96,9 +96,9 @@ export const request = async (path, options = {}) => {
         ...headers,
     };
 
-    // Attach JWT Bearer Access Token if not public
-    const token = getAccessToken();
-    if (!isPublic && token) {
+    // overrideToken cho phép trang khách gắn guestToken thay vì accessToken nhân viên
+    const token = overrideToken ?? (isPublic ? null : getAccessToken());
+    if (token) {
         defaultHeaders['Authorization'] = `Bearer ${token}`;
     }
 

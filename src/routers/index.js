@@ -58,6 +58,8 @@ import EmployeeMeetingDetail from '../pages/employee/MeetingDetail';
 import EmployeeRecordings from '../pages/employee/Recordings';
 import InMeetingRoom from '../pages/shared/InMeetingRoom';
 import LegalAndSupport from '../pages/public/LegalAndSupport';
+import GuestJoin from '../pages/guest/GuestJoin';
+import GuestMeeting from '../pages/guest/GuestMeeting';
 
 export const router = [
     // ========== Auth Routes (public) ==========
@@ -82,8 +84,12 @@ export const router = [
         element: <ChangePass />
     },
     {
-        path: '/public/in-meeting/:id',
-        element: <InMeetingRoom isPublic={true} />
+        path: '/guest/join/:token',
+        element: <GuestJoin />
+    },
+    {
+        path: '/guest/meeting/:meetingId',
+        element: <GuestMeeting />
     },
     // ========== SystemAdmin Routes (protected) ==========
     {
