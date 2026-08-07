@@ -5,6 +5,13 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-08 00:09
+* **Tên Plan / Yêu cầu**: Sửa lỗi 404 khi bật tính năng ghi âm/ghi hình cho cuộc họp chưa từng được cấu hình.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/managerServices.js`: Xuất hàm `addRecordingConfig` để hỗ trợ gọi API tạo mới cấu hình.
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx` và `src/pages/employee/MeetingDetail.jsx`: Bổ sung logic fallback trong hàm lưu cập nhật. Nếu gọi PATCH (`updateMeetingRecordingConfig`) báo lỗi `RECORDING_CONFIG_NOT_FOUND`, FE sẽ tự động gọi POST (`addRecordingConfig`) để tạo mới cấu hình thay vì báo lỗi cho người dùng.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-07 21:34
 * **Tên Plan / Yêu cầu**: Sửa lỗi 403 Forbidden khi tải thiết bị phòng họp đối với người dùng không phải Host.
 * **Chi tiết thay đổi**:

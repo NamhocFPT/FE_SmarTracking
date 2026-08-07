@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -383,8 +383,17 @@ const EmployeeMeetingDetail = () => {
                 }
             }
             if (editRecordingEnabled !== meeting.recordingEnabled) {
-                const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
-                if (recRes?.success) successCount++;
+                try {
+                    const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
+                    if (recRes?.success) successCount++;
+                } catch (recErr) {
+                    if (recErr?.error?.code === 'RECORDING_CONFIG_NOT_FOUND') {
+                        const addRes = await addRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
+                        if (addRes?.success) successCount++;
+                    } else {
+                        throw recErr;
+                    }
+                }
             }
             if (editTitle !== meeting.title) {
                 await updateMeeting(meeting.id, { title: editTitle });

@@ -219,6 +219,10 @@ export const updateMeetingRecordingConfig = async (id, data) => {
     return await patch(`/meetings/${id}/recording-config`, data);
 };
 
+export const addRecordingConfig = async (meetingId, data) => {
+    return await post(`/meetings/${meetingId}/recording-config`, data);
+};
+
 /**
  * Thay thế toàn bộ agenda — BE dùng PUT /meetings/:id/agendas (ReplaceAgendaDto),
  * KHÔNG lồng vào PATCH /meetings/:id (updateMeeting chỉ nhận title/description).

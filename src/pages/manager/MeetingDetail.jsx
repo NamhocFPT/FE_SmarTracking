@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/managerServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/managerServices';
 import UserAvatar from '../../component/UserAvatar';
 import MeetingAttendanceBoard from '../../component/MeetingAttendanceBoard';
 import MeetingPresenceIVSS from '../../component/MeetingPresenceIVSS';
@@ -355,8 +355,17 @@ const ManagerMeetingDetail = () => {
             // BE UpdateRecordingConfigDto chỉ nhận enableVideo/enableAudio (không phải autoRecord/allowRecording —
             // đó là field của read-shape trong GET /meetings/:id, không phải write-shape của PATCH này).
             if (editRecordingEnabled !== meeting.recordingEnabled) {
-                const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
-                if (recRes?.success) successCount++;
+                try {
+                    const recRes = await updateMeetingRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
+                    if (recRes?.success) successCount++;
+                } catch (recErr) {
+                    if (recErr?.error?.code === 'RECORDING_CONFIG_NOT_FOUND') {
+                        const addRes = await addRecordingConfig(meeting.id, { enableVideo: editRecordingEnabled, enableAudio: editRecordingEnabled });
+                        if (addRes?.success) successCount++;
+                    } else {
+                        throw recErr;
+                    }
+                }
             }
 
             // 4. Update other info (Title) - Chờ BE-03
