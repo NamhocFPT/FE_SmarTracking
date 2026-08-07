@@ -26,7 +26,8 @@ import {
     BarChart2,
     PieChart,
     Clock,
-    ChevronDown
+    ChevronDown,
+    Fingerprint
 } from 'lucide-react';
 
 const chunkArray = (arr, size) => {
@@ -53,8 +54,7 @@ const STATIC_NAVIGATION_ITEMS = [
         isDropdown: true,
         icon: Calendar,
         children: [
-            { label: 'Lịch cá nhân', to: '/business-admin/schedule', icon: Calendar, requiredPermission: 'schedule.read.self' },
-            { label: 'Đăng ký họp', to: '/business-admin/book', icon: PlusCircle },
+
             { label: 'Quản lý cuộc họp', to: '/business-admin/meetings', icon: Settings },
         ],
     },
@@ -67,6 +67,7 @@ const STATIC_NAVIGATION_ITEMS = [
             { label: 'Phòng họp', to: '/business-admin/rooms', icon: Video },
             { label: 'Người dùng', to: '/business-admin/users', icon: Users },
             { label: 'Phòng ban', to: '/business-admin/departments', icon: Briefcase },
+            { label: 'Duyệt ảnh sinh trắc học', to: '/business-admin/biometric-submissions', icon: Fingerprint },
         ],
     },
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
     getRoles, getPermissions, getRolePermissions,
-    assignRolePermissions, revokeRolePermission, createRole, updateRole, deleteRole
+    assignRolePermissions, revokeRolePermission, createRole, deleteRole
 } from '../../service/permissionServices';
 import { PERMISSION_MODULE_STATUS } from '../../config/permissionModuleStatus';
 import { PERMISSION_DEPENDENCIES } from '../../config/permissionDependencies';

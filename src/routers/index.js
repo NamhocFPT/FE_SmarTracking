@@ -46,7 +46,7 @@ import ManagerHomePage from '../pages/manager/homePage';
 import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
-import BiometricSubmissionsReview from '../pages/manager/BiometricSubmissionsReview';
+import BiometricSubmissionsReview from '../pages/bussinessAdmin/BiometricSubmissionsReview';
 
 // Employee Layout + Pages
 import EmployeeLayout from '../pages/employee/layout/EmployeeLayout';
@@ -178,18 +178,7 @@ export const router = [
                 path: 'user-journey',
                 element: <UserJourney />
             },
-            {
-                path: 'book',
-                element: <BookMeeting />
-            },
-            {
-                path: 'schedule',
-                element: (
-                    <ProtectedRoute requiredPermission="schedule.read.self">
-                        <PersonalCalendar />
-                    </ProtectedRoute>
-                )
-            },
+
             {
                 path: 'meeting/:id',
                 element: <EmployeeMeetingDetail />
@@ -247,6 +236,10 @@ export const router = [
                 element: <BusinessRecordingManagement />
             },
             {
+                path: 'biometric-submissions',
+                element: <BiometricSubmissionsReview />
+            },
+            {
                 path: 'profile',
                 element: <Profile />
             },
@@ -286,18 +279,7 @@ export const router = [
                 path: 'vehicle-control-list',
                 element: <VehicleControlList />
             },
-            {
-                path: 'book',
-                element: <BookMeeting />
-            },
-            {
-                path: 'schedule',
-                element: (
-                    <ProtectedRoute requiredPermission="schedule.read.self">
-                        <PersonalCalendar />
-                    </ProtectedRoute>
-                )
-            },
+
             {
                 path: 'meeting/:id',
                 element: <EmployeeMeetingDetail />
@@ -369,10 +351,6 @@ export const router = [
             {
                 path: 'notifications',
                 element: <Notifications />
-            },
-            {
-                path: 'biometric-submissions',
-                element: <BiometricSubmissionsReview />
             },
             {
                 path: 'my-vehicles',

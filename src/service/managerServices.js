@@ -422,3 +422,14 @@ export const getAvailableRooms = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/rooms/available${query}`);
 };
+
+/**
+ * Lấy danh sách phòng trống cho một cuộc họp cụ thể đang sửa
+ * Backend tự động loại các phòng bị đặt trung lịch, bao gồm cả phòng hiện tại của cuộc họ p.
+ * @param {string} meetingId - UUID cuộc họ p
+ * @param {object} options - { includeCurrentRoom?: boolean, capacityWarningMode?: boolean, startTime, endTime }
+ */
+export const getAvailableRoomsForMeeting = async (meetingId, options = {}) => {
+    const query = buildQuery(options);
+    return await get(`/meetings/${meetingId}/available-rooms${query}`);
+};

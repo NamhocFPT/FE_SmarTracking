@@ -309,3 +309,18 @@ BẮT BUỘC:
 
 * Những yêu cầu chỉnh sửa bên Frontend KHÔNG ĐƯỢC tự ý thay đổi code Backend (BE) để phù hợp.
 * Nếu yêu cầu từ Frontend cần có sự chỉnh sửa hoặc thêm mới API từ Backend, AI Agent phải chỉ ra rõ ràng yêu cầu thay đổi đó để đội ngũ Backend thực hiện, tuyệt đối không tự ý chỉnh sửa code Backend.
+
+---
+
+# AI ACTION LOGGING RULES (MANDATORY)
+
+BẮT BUỘC ĐỐI VỚI AI AGENT:
+Mỗi khi AI Agent nhận một yêu cầu từ người dùng và thực hiện **bất kỳ sửa đổi nào đối với code hoặc tài liệu**, AI Agent BẮT BUỘC phải tự động ghi lại log của quá trình thay đổi mà không cần người dùng yêu cầu.
+
+* File ghi log: `docs/ai_agents_changelog.md`
+* Thời điểm ghi log: Cuối lượt xử lý của AI sau khi đã hoàn tất các thay đổi.
+* Định dạng log cho mỗi thay đổi phải tuân thủ nghiêm ngặt chuẩn Markdown và bao gồm các thông tin:
+  * **Thời gian thực hiện**: (VD: YYYY-MM-DD HH:MM)
+  * **Tên Plan / Yêu cầu**: Mô tả tóm tắt mục tiêu đã thực thi (VD: Tích hợp API Login, Cập nhật giao diện Dashboard).
+  * **Chi tiết thay đổi**: Liệt kê rõ các file bị ảnh hưởng (`[Tạo mới/Cập nhật/Xóa] tên_file`).
+  * **Trạng thái**: Hoàn thành / Cần người dùng review.

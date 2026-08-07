@@ -136,17 +136,7 @@ const STATIC_NAVIGATION_ITEMS = [
         isDropdown: true,
         icon: Calendar,
         children: [
-            {
-                label: 'Lịch của tôi',
-                to: '/system-admin/schedule',
-                icon: User,
-                requiredPermission: 'schedule.read.self',
-            },
-            {
-                label: 'Đăng ký cuộc họp',
-                to: '/system-admin/book',
-                icon: PlusCircle,
-            },
+
             {
                 label: 'Vận hành phòng họp',
                 to: '/system-admin/room-operations',
