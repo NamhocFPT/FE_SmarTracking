@@ -1,17 +1,57 @@
-import { AlertTriangle, Calendar, Check, ChevronRight, Hand, ListTodo, Mic, MicOff, MonitorUp, PhoneOff, Play, Shield, Smile, Sparkles, StickyNote, Users, Video as VideoIcon, VideoOff, Volume2, VolumeX, FileText, ExternalLink } from 'lucide-react';
+import {
+    AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
+    Clock, Cpu, Download, ExternalLink, FileText, Hand, Loader, Mic, MicOff,
+    MonitorUp, PhoneOff, Play, Plus, RefreshCw, Shield, Smile,
+    Sparkles, StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
+    Volume2, VolumeX, X
+} from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { getSocket, subscribeToMeeting } from '../../utils/socket';
 import { request } from '../../utils/request';
-import { getMeetingById as getMeetingEmployee, startMeeting as startEmployee, endMeeting as endEmployee, getPresentAttendees as getEmployeeAttendees, getMeetingAttendance as getEmployeeAttendance, createMeetingNote as createEmployeeNote, listMeetingNotes as listEmployeeNotes, startVideoRecording as startEmployeeVideoRecording, pauseVideoRecording as pauseEmployeeVideoRecording, resumeVideoRecording as resumeEmployeeVideoRecording, stopVideoRecording as stopEmployeeVideoRecording, getRecordingStatus as getEmployeeRecordingStatus, getMeetingMediaFiles as getEmployeeMediaFiles } from '../../service/employeeServices';
-import { getMeetingById as getMeetingManager, startMeeting as startManager, endMeeting as endManager, getPresentAttendees as getManagerAttendees, getMeetingAttendance as getManagerAttendance, createMeetingNote as createManagerNote, listMeetingNotes as listManagerNotes, startVideoRecording as startManagerVideoRecording, pauseVideoRecording as pauseManagerVideoRecording, resumeVideoRecording as resumeManagerVideoRecording, stopVideoRecording as stopManagerVideoRecording, getRecordingStatus as getManagerRecordingStatus, getMeetingMediaFiles as getManagerMediaFiles } from '../../service/managerServices';
+import {
+    getMeetingById as getMeetingEmployee,
+    startMeeting as startEmployee,
+    endMeeting as endEmployee,
+    getMeetingAttendance as getEmployeeAttendance,
+    createMeetingNote as createEmployeeNote,
+    listMeetingNotes as listEmployeeNotes,
+    startVideoRecording as startEmployeeVideoRecording,
+    pauseVideoRecording as pauseEmployeeVideoRecording,
+    resumeVideoRecording as resumeEmployeeVideoRecording,
+    stopVideoRecording as stopEmployeeVideoRecording,
+    getRecordingStatus as getEmployeeRecordingStatus,
+    getMeetingMediaFiles as getEmployeeMediaFiles,
+    requestExtension as requestEmployeeExtension,
+    decideExtension as decideEmployeeExtension,
+    getRoomDevices as getEmployeeRoomDevices,
+} from '../../service/employeeServices';
+import {
+    getMeetingById as getMeetingManager,
+    startMeeting as startManager,
+    endMeeting as endManager,
+    getMeetingAttendance as getManagerAttendance,
+    createMeetingNote as createManagerNote,
+    listMeetingNotes as listManagerNotes,
+    startVideoRecording as startManagerVideoRecording,
+    pauseVideoRecording as pauseManagerVideoRecording,
+    resumeVideoRecording as resumeManagerVideoRecording,
+    stopVideoRecording as stopManagerVideoRecording,
+    getRecordingStatus as getManagerRecordingStatus,
+    getMeetingMediaFiles as getManagerMediaFiles,
+    manualAttendanceCheckIn,
+    requestExtension as requestManagerExtension,
+    decideExtension as decideManagerExtension,
+    getRoomDevices as getManagerRoomDevices,
+    invalidateAttendanceRecord,
+} from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
+import GuestPanel from '../../components/meeting/GuestPanel';
 
-// CSS styles injected for custom floating reactions and voice sound wave animations
 const customStyles = `
 @keyframes floatUp {
   0% { transform: translateY(0) scale(0.8); opacity: 0; }
@@ -22,7 +62,6 @@ const customStyles = `
 .animate-float-up {
   animation: floatUp 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
-
 @keyframes voiceWave {
   0%, 100% { height: 4px; }
   50% { height: 18px; }
@@ -33,46 +72,40 @@ const customStyles = `
 `;
 
 const defaultMeeting = {
-    title: 'Họp kỹ thuật dự án FE SmarTracking',
-    roomName: 'Phòng Apollo 101 (Tòa nhà A)',
+    title: 'Họp kỹ thuật dự án SmarTracking',
+    roomName: 'Phòng Apollo 101',
     host: 'Nguyễn Văn A',
     hostId: 'mgr-uuid',
     host_id: 'mgr-uuid',
     status: 'scheduled',
     currentAgendaIndex: 0,
-    agendaTimeLeft: 600, 
+    agendaTimeLeft: 600,
     participants: [
-        { id: 'mgr-uuid', fullName: 'Nguyễn Văn A', role: 'Chủ tọa', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: false },
-        { id: 'bot-1', fullName: 'Lê Hoàng Hải', role: 'Thành viên', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: true },
-        { id: 'bot-2', fullName: 'Nguyễn Thị Minh', role: 'Thành viên', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: true },
-        { id: 'bot-3', fullName: 'Phan Văn Minh', role: 'Thành viên', isMuted: false, isCameraOff: false, isSpeaking: false, isBot: true }
+        { id: 'mgr-uuid', fullName: 'Nguyễn Văn A', role: 'Chủ tọa', isMuted: false, isSpeaking: false, isBot: false },
+        { id: 'bot-1', fullName: 'Lê Hoàng Hải', role: 'Thành viên', isMuted: false, isSpeaking: false, isBot: true },
+        { id: 'bot-2', fullName: 'Nguyễn Thị Minh', role: 'Thành viên', isMuted: false, isSpeaking: false, isBot: true },
+        { id: 'bot-3', fullName: 'Phan Văn Minh', role: 'Thành viên', isMuted: false, isSpeaking: false, isBot: true },
     ],
     agenda: [
         { title: 'Khởi động & Demo giao diện', durationMin: 10, orderIndex: 0 },
         { title: 'Thảo luận API tích hợp thiết bị', durationMin: 15, orderIndex: 1 },
-        { title: 'Chốt phương án & phân công nhiệm vụ', durationMin: 10, orderIndex: 2 }
+        { title: 'Chốt phương án & phân công nhiệm vụ', durationMin: 10, orderIndex: 2 },
     ],
     reactionsLocked: false,
-    lastReaction: null
+    lastReaction: null,
 };
 
-// Universal fallback caller for host actions
-// Thử gọi bằng quyền employee trước; nếu BE từ chối (403/permission), chuyển sang quyền manager.
-// Luôn log lại lần fallback để không che giấu lỗi phân quyền thật khi debug.
 const callWithFallback = async (employeeFn, managerFn, ...args) => {
     try {
         const res = await employeeFn(...args);
         if (res?.success) return res;
         throw new Error('Employee scope failed');
     } catch (e) {
-        console.warn(
-            `[InMeetingRoom] ${employeeFn.name || 'employeeFn'} thất bại (${e?.error?.message || e?.message || 'unknown error'}), fallback sang ${managerFn.name || 'managerFn'}.`
-        );
+        console.warn(`[InMeetingRoom] ${employeeFn.name || 'employeeFn'} thất bại, fallback sang ${managerFn.name || 'managerFn'}.`);
         return await managerFn(...args);
     }
 };
 
-// Format duration helper
 const formatDuration = (seconds) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -81,24 +114,28 @@ const formatDuration = (seconds) => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
-// Recording Timer Component (handles interval and polling without re-rendering parent)
+const PRESENCE_MAP = {
+    present: { label: 'Có mặt', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    late: { label: 'Muộn', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+    maybe_present: { label: 'Có mặt', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    checked_in: { label: 'Đã điểm danh', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    absent: { label: 'Vắng mặt', color: 'bg-red-50 text-red-600 border-red-200' },
+    unknown: { label: 'Chưa điểm danh', color: 'bg-slate-50 text-slate-500 border-slate-200' },
+};
+
 const RecordingTimer = ({ meetingId, sessionId, initialStatus, onStatusChange }) => {
     const [duration, setDuration] = useState(0);
     const [localStatus, setLocalStatus] = useState(initialStatus);
     const [fileSize, setFileSize] = useState(null);
 
-    useEffect(() => {
-        setLocalStatus(initialStatus);
-    }, [initialStatus]);
+    useEffect(() => { setLocalStatus(initialStatus); }, [initialStatus]);
 
-    // Local 1-second tick for duration
     useEffect(() => {
         if (localStatus !== 'recording') return;
         const interval = setInterval(() => setDuration(prev => prev + 1), 1000);
         return () => clearInterval(interval);
     }, [localStatus]);
 
-    // 5-second polling for real status
     useEffect(() => {
         if (!sessionId || ['inactive', 'completed', 'failed'].includes(localStatus)) return;
         const interval = setInterval(async () => {
@@ -113,57 +150,44 @@ const RecordingTimer = ({ meetingId, sessionId, initialStatus, onStatusChange })
                     if (data.durationSeconds != null) setDuration(data.durationSeconds);
                     if (data.fileSizeBytes != null) setFileSize(data.fileSizeBytes);
                 }
-            } catch (e) {}
+            } catch (e) { }
         }, 5000);
         return () => clearInterval(interval);
     }, [sessionId, localStatus, meetingId, onStatusChange]);
 
     const formatSize = (bytes) => {
         if (!bytes) return '';
-        const mb = (parseInt(bytes) / (1024 * 1024)).toFixed(1);
-        return ` - ${mb}MB`;
+        return ` · ${(parseInt(bytes) / (1024 * 1024)).toFixed(1)}MB`;
     };
 
-    if (['recording', 'starting', 'stopping', 'paused'].includes(localStatus)) {
-        return (
-            <div className={`px-3 py-2 rounded-xl border flex flex-col gap-1 text-xs font-bold ${localStatus === 'recording' ? 'bg-red-50 text-red-600 border-red-200' : localStatus === 'paused' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-action-blue border-blue-100'}`}>
-                <div className="flex items-center">
-                    {localStatus === 'recording' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" />}
-                    {localStatus === 'recording' ? `GHI HÌNH ${formatDuration(duration)}${formatSize(fileSize)}` : 
-                     localStatus === 'paused' ? `TẠM DỪNG ${formatDuration(duration)}${formatSize(fileSize)}` : 
+    if (!['recording', 'starting', 'stopping', 'paused'].includes(localStatus)) return null;
+
+    return (
+        <div className={`px-3 py-2 rounded-xl border flex flex-col gap-1 text-xs font-bold ${
+            localStatus === 'recording' ? 'bg-red-50 text-red-600 border-red-200' :
+            localStatus === 'paused' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+            'bg-blue-50 text-action-blue border-blue-100'
+        }`}>
+            <div className="flex items-center gap-2">
+                {localStatus === 'recording' && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />}
+                <span>
+                    {localStatus === 'recording' ? `GHI HÌNH · ${formatDuration(duration)}${formatSize(fileSize)}` :
+                     localStatus === 'paused' ? `TẠM DỪNG · ${formatDuration(duration)}${formatSize(fileSize)}` :
                      'Đang xử lý...'}
-                </div>
-                {localStatus === 'paused' && (
-                    <div className="text-[10px] font-normal opacity-80 italic">Đoạn tạm dừng sẽ không có trong file ghi</div>
-                )}
+                </span>
             </div>
-        );
-    }
-    return null;
-};
-
-const normalizeMeetingDetail = (raw, currentUserId) => {
-    // Basic mapping, keeping it flat for UI
-    return {
-        ...raw,
-        participants: raw.participants?.map(p => ({
-            id: p.userId || p.user_id || p.id,
-            fullName: p.fullName || p.full_name,
-            avatarUrl: resolveAvatarUrl(p),
-            role: p.participantRole || p.participant_role === 'host' ? 'Chủ tọa' : 'Thành viên',
-            isMuted: false,
-            isCameraOff: false,
-            isSpeaking: false,
-            isBot: p.userId !== currentUserId
-        })) || []
-    };
+            {localStatus === 'paused' && (
+                <div className="text-[10px] font-normal opacity-70">Khoảng dừng sẽ không có trong file ghi hình</div>
+            )}
+        </div>
+    );
 };
 
 const InMeetingRoom = ({ isPublic = false }) => {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    // Core States
+    // Core states
     const [loading, setLoading] = useState(true);
     const [meetingState, setMeetingState] = useState(null);
     const [toasts, setToasts] = useState([]);
@@ -175,44 +199,56 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [presentedFile, setPresentedFile] = useState(null);
     const [attendance, setAttendance] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
-    
-    // Recording state
-    const [recordingStatus, setRecordingStatus] = useState('inactive'); // 'inactive', 'starting', 'recording', 'paused', 'stopping', 'completed', 'failed', 'no_data'
+
+    // Recording
+    const [recordingStatus, setRecordingStatus] = useState('inactive');
     const [recordingSessionId, setRecordingSessionId] = useState(null);
     const [recordingStartedAt, setRecordingStartedAt] = useState(null);
-    const [recordingDuration, setRecordingDuration] = useState(0); // in seconds
     const [mediaFiles, setMediaFiles] = useState([]);
 
-    // User local settings
+    // Local settings
     const [isMicOn, setIsMicOn] = useState(true);
-    const [isVideoOn, setIsVideoOn] = useState(true);
     const [localName, setLocalName] = useState('');
     const [isLobbyReady, setIsLobbyReady] = useState(false);
-    // Tab đang mở trong Room Panel bên phải: 'host' | 'agenda' | 'notes' | 'attendance'
     const [activeChatTab, setActiveChatTab] = useState('host');
-    // Giơ tay — chỉ là trạng thái cục bộ hiển thị cho người trong phòng qua reaction,
-    // BE chưa có API riêng cho tính năng này (đã kiểm tra live-meeting/notifications modules).
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
 
-    // Reference variables
-    const videoRef = useRef(null);
-    const [stream, setStream] = useState(null);
+    // New features
+    const [expandedAgendaIdx, setExpandedAgendaIdx] = useState(null);
+    const [roomDevices, setRoomDevices] = useState([]);
+    const [extensionModal, setExtensionModal] = useState({ isOpen: false, minutes: 15, reason: '' });
+    const [pendingExtensions, setPendingExtensions] = useState([]);
+    const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [agendaDocView, setAgendaDocView] = useState(null);
+    const [admittedGuestCount, setAdmittedGuestCount] = useState(0);
+    // agendaDocView: { agendaItem, selectedAttachmentIdx }
+
+    // Refs
     const speakingOverrideRef = useRef(null);
     const prevMutedRef = useRef(false);
     const prevReactionsLockedRef = useRef(false);
+    const myParticipantIdRef = useRef(null);
+    const toastTimersRef = useRef([]);
+    const reactionTimersRef = useRef([]);
+    const participantsRef = useRef(null);
 
-    // Load user information
+    // Clear all pending timers on unmount
+    useEffect(() => {
+        return () => {
+            toastTimersRef.current.forEach(clearTimeout);
+            reactionTimersRef.current.forEach(clearTimeout);
+        };
+    }, []);
+
+    // Load current user
     const localUserStr = localStorage.getItem('user');
     let currentUser = null;
     if (localUserStr) {
-        try {
-            currentUser = JSON.parse(localUserStr);
-        } catch (e) {}
+        try { currentUser = JSON.parse(localUserStr); } catch (e) { }
     }
 
-    // Determine current user participant ID
-    const myParticipantIdRef = useRef(null);
     if (!myParticipantIdRef.current) {
         if (currentUser) {
             myParticipantIdRef.current = currentUser.id;
@@ -227,18 +263,14 @@ const InMeetingRoom = ({ isPublic = false }) => {
     }
     const myParticipantId = myParticipantIdRef.current;
 
-    // Toast helpers
     const showToast = (message, type = 'info') => {
         const toastId = Date.now() + Math.random();
         setToasts(prev => [...prev, { id: toastId, message, type }]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== toastId));
-        }, 3500);
+        const timerId = setTimeout(() => setToasts(prev => prev.filter(t => t.id !== toastId)), 3500);
+        toastTimersRef.current.push(timerId);
     };
 
-    // Format duration helper has been moved outside the component
-
-    // Load meeting details & synchronize
+    // ─── Data Loading ──────────────────────────────────────────────────
     const initMeetingState = async () => {
         setLoading(true);
         let baseMeeting = null;
@@ -273,34 +305,29 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         host_id: dto.host?.id || dto.hostId || dto.host_id || dto.organizer?.id,
                     };
                 }
-            } catch (err) {}
+            } catch (err) { }
         }
 
         const savedStateStr = localStorage.getItem(`meeting_state_${id}`);
-
         if (savedStateStr) {
             const savedState = JSON.parse(savedStateStr);
             if (baseMeeting) {
                 savedState.title = baseMeeting.title || savedState.title;
                 savedState.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || savedState.roomName;
                 savedState.room = baseMeeting.room || savedState.room || null;
-                if (baseMeeting.agendas && baseMeeting.agendas.length > 0) {
+                if (baseMeeting.agendas?.length > 0) {
                     savedState.agenda = baseMeeting.agendas.map((a, idx) => ({
                         id: a.id,
                         title: a.title,
+                        description: a.description || '',
                         durationMin: a.plannedDurationMinutes,
                         orderIndex: a.agendaOrder ?? idx,
                         attachments: a.attachments || [],
                     }));
                 }
-                savedState.participants = savedState.participants?.map((savedParticipant) => {
-                    const apiParticipant = baseMeeting.participants?.find((participant) => {
-                        const participantId = participant.userId || participant.user_id || participant.user?.id || participant.id;
-                        return participantId === savedParticipant.id;
-                    });
-                    return apiParticipant
-                        ? { ...savedParticipant, avatarUrl: resolveAvatarUrl(apiParticipant) || savedParticipant.avatarUrl }
-                        : savedParticipant;
+                savedState.participants = savedState.participants?.map((savedP) => {
+                    const apiP = baseMeeting.participants?.find(p => (p.userId || p.user_id || p.user?.id || p.id) === savedP.id);
+                    return apiP ? { ...savedP, avatarUrl: resolveAvatarUrl(apiP) || savedP.avatarUrl } : savedP;
                 });
             }
             setMeetingState(savedState);
@@ -311,65 +338,72 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 initial.title = baseMeeting.title || initial.title;
                 initial.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || initial.roomName;
                 initial.room = baseMeeting.room || null;
-                if (baseMeeting.agendas && baseMeeting.agendas.length > 0) {
+                if (baseMeeting.agendas?.length > 0) {
                     initial.agenda = baseMeeting.agendas.map((a, idx) => ({
                         id: a.id,
                         title: a.title,
+                        description: a.description || '',
                         durationMin: a.plannedDurationMinutes,
                         orderIndex: a.agendaOrder ?? idx,
                         attachments: a.attachments || [],
                     }));
                 }
-                initial.hostId = baseMeeting.host_id || baseMeeting.hostId || initial.hostId;
-                initial.status = baseMeeting.status || initial.status;
-                const apiHost = baseMeeting.participants?.find((participant) => {
-                    const participantId = participant.userId || participant.user_id || participant.user?.id || participant.id;
-                    return participantId === initial.hostId
-                        || participant.participantRole === 'host'
-                        || participant.participant_role === 'host';
-                }) || (typeof baseMeeting.host === 'object' ? baseMeeting.host : null);
-                initial.host = apiHost?.fullName || apiHost?.full_name || baseMeeting.hostName || baseMeeting.host_name
-                    || (typeof baseMeeting.host === 'string' ? baseMeeting.host : initial.host);
+                let hostId = baseMeeting.host_id || baseMeeting.hostId || baseMeeting.organizer_id || baseMeeting.organizerId || initial.hostId;
+                const apiHost = baseMeeting.participants?.find(p =>
+                    (p.userId || p.user_id || p.user?.id || p.id) === hostId ||
+                    p.participantRole === 'host' || p.participant_role === 'host'
+                ) || (typeof baseMeeting.host === 'object' ? baseMeeting.host : null);
 
-                const parts = [
-                    {
+                if (apiHost) {
+                    hostId = apiHost.userId || apiHost.user_id || apiHost.user?.id || apiHost.id || hostId;
+                }
+                initial.hostId = hostId;
+                initial.status = baseMeeting.status || initial.status;
+
+                initial.host = apiHost?.fullName || apiHost?.full_name || baseMeeting.hostName ||
+                    (typeof baseMeeting.host === 'string' ? baseMeeting.host : initial.host);
+
+                const parts = [];
+                if (initial.hostId) {
+                    parts.push({
                         id: initial.hostId,
                         fullName: initial.host,
-                        avatarUrl: resolveAvatarUrl(apiHost) || baseMeeting.hostAvatarUrl || baseMeeting.host_avatar_url || '',
+                        avatarUrl: resolveAvatarUrl(apiHost) || '',
                         role: 'Chủ tọa',
                         isMuted: false,
-                        isCameraOff: false,
                         isSpeaking: false,
                         isBot: false,
-                    }
-                ];
+                    });
+                }
+                
                 baseMeeting.participants?.forEach(p => {
-                    const participantId = p.userId || p.user_id || p.user?.id || p.id;
-                    if (participantId !== initial.hostId) {
+                    const pid = p.userId || p.user_id || p.user?.id || p.id;
+                    if (pid && pid !== initial.hostId) {
                         parts.push({
-                            id: participantId,
-                            fullName: p.fullName || p.full_name,
+                            id: pid,
+                            fullName: p.fullName || p.full_name || p.user?.fullName || 'Thành viên',
                             avatarUrl: resolveAvatarUrl(p),
                             role: 'Thành viên',
                             isMuted: false,
-                            isCameraOff: false,
                             isSpeaking: false,
-                            isBot: true
+                            isBot: true,
                         });
                     }
                 });
+                
                 (baseMeeting.externalParticipants || baseMeeting.external_participants || []).forEach(ep => {
-                    parts.push({
-                        id: ep.id,
-                        fullName: ep.name || ep.fullName || ep.full_name || ep.email,
-                        avatarUrl: '',
-                        role: 'Khách mời',
-                        isExternal: true, // explicit flag — do not infer external/internal from `role` text
-                        isMuted: false,
-                        isCameraOff: false,
-                        isSpeaking: false,
-                        isBot: false
-                    });
+                    if (ep.id) {
+                        parts.push({
+                            id: ep.id,
+                            fullName: ep.name || ep.fullName || ep.full_name || ep.email || 'Khách mời',
+                            avatarUrl: '',
+                            role: 'Khách mời',
+                            isExternal: true,
+                            isMuted: false,
+                            isSpeaking: false,
+                            isBot: false,
+                        });
+                    }
                 });
                 initial.participants = parts;
             }
@@ -379,323 +413,243 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setLoading(false);
     };
 
-    // Recording Polling & Duration Timer
-    useEffect(() => {
-        let interval;
-        if (['recording', 'starting', 'stopping'].includes(recordingStatus)) {
-            interval = setInterval(async () => {
-                if (recordingSessionId) {
-                    try {
-                        const res = await callWithFallback(getEmployeeRecordingStatus, getManagerRecordingStatus, id, recordingSessionId);
-                        if (res?.success) {
-                            const newStatus = res.data?.status?.toLowerCase() || 'inactive';
-                            if (newStatus !== recordingStatus) {
-                                setRecordingStatus(newStatus);
-                                if (newStatus === 'completed') {
-                                    showToast('Ghi hình đã hoàn tất, đang xử lý video.', 'success');
-                                    fetchMediaFiles(); // Refresh media list
-                                }
-                            }
-                            if (res.data?.startedAt && !recordingStartedAt) {
-                                setRecordingStartedAt(new Date(res.data.startedAt));
-                            }
-                        }
-                    } catch (e) {
-                        // Silent fail for polling
-                    }
-                }
-            }, 3000); // Poll every 3 seconds
-        }
-        return () => clearInterval(interval);
-    }, [recordingStatus, recordingSessionId, id, recordingStartedAt]);
+    const loadNotes = async () => {
+        try {
+            const res = await callWithFallback(listEmployeeNotes, listManagerNotes, id, { limit: 100 });
+            if (res?.success) {
+                setNotes(Array.isArray(res.data) ? res.data : (res.data?.items || []));
+            }
+        } catch (err) { }
+    };
 
-    useEffect(() => {
-        let timer;
-        if (recordingStatus === 'recording' && recordingStartedAt) {
-            timer = setInterval(() => {
-                const now = new Date();
-                const diff = Math.floor((now - recordingStartedAt) / 1000);
-                setRecordingDuration(diff > 0 ? diff : 0);
-            }, 1000);
-        }
-        return () => clearInterval(timer);
-    }, [recordingStatus, recordingStartedAt]);
+    const loadAttendance = async () => {
+        try {
+            const res = await callWithFallback(getEmployeeAttendance, getManagerAttendance, id);
+            if (res?.success) {
+                const dataItems = res.data?.items || res.data?.records || (Array.isArray(res.data) ? res.data : []);
+                setAttendance(dataItems);
+            }
+        } catch (err) { }
+    };
+
+    const loadRoomDevices = async (roomId) => {
+        if (!roomId) return;
+        try {
+            const res = await callWithFallback(getEmployeeRoomDevices, getManagerRoomDevices, roomId);
+            if (res?.success) {
+                setRoomDevices(Array.isArray(res.data) ? res.data : (res.data?.items || []));
+            }
+        } catch (err) { }
+    };
 
     const fetchMediaFiles = async () => {
         try {
             const res = await callWithFallback(getEmployeeMediaFiles, getManagerMediaFiles, id);
-            if (res?.success) {
-                setMediaFiles(res.data || []);
-            }
-        } catch (e) {
-            // Error loading media files silently ignored
-        }
+            if (res?.success) setMediaFiles(res.data || []);
+        } catch (e) { }
     };
 
-    // Realtime sync via WebSocket
-        useEffect(() => {
-            if (meetingState?.status === 'in_progress') {
-                const cleanup = subscribeToMeeting(id);
-                const s = getSocket();
-                s.on('meeting.session.started', () => {
-                    setMeetingState(prev => ({ ...prev, status: 'in_progress' }));
-                });
-                s.on('meeting.session.ended', () => {
-                    setMeetingState(prev => ({ ...prev, status: 'completed' }));
-                });
-                s.on('agenda:presented', (payload) => {
-                    setPresentedFile(payload);
-                });
-                s.on('agenda:present_stopped', () => {
-                    setPresentedFile(null);
-                });
-                return cleanup;
-            }
-        }, [meetingState?.status, id]);
+    // ─── Effects ──────────────────────────────────────────────────────
+    useEffect(() => {
+        let interval;
+        if (['recording', 'starting', 'stopping'].includes(recordingStatus) && recordingSessionId) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await callWithFallback(getEmployeeRecordingStatus, getManagerRecordingStatus, id, recordingSessionId);
+                    if (res?.success) {
+                        const newStatus = res.data?.status?.toLowerCase() || 'inactive';
+                        if (newStatus !== recordingStatus) {
+                            setRecordingStatus(newStatus);
+                            if (newStatus === 'completed') {
+                                showToast('Ghi hình đã hoàn tất, đang xử lý video.', 'success');
+                                fetchMediaFiles();
+                            }
+                        }
+                        if (res.data?.startedAt && !recordingStartedAt) {
+                            setRecordingStartedAt(new Date(res.data.startedAt));
+                        }
+                    }
+                } catch (e) { }
+            }, 3000);
+        }
+        return () => clearInterval(interval);
+    }, [recordingStatus, recordingSessionId, id]);
 
-        const loadNotes = async () => {
-            try {
-                const res = await callWithFallback(listEmployeeNotes, listManagerNotes, id, { limit: 100 });
-                if (res?.success) {
-                    setNotes(Array.isArray(res.data) ? res.data : (res.data?.items || []));
-                }
-            } catch (err) {}
-        };
-
-        const loadAttendance = async () => {
-            try {
-                const res = await callWithFallback(getEmployeeAttendees, getManagerAttendees, id);
-                if (res?.success) {
-                    const dataItems = res.data?.presentUsers || res.data?.items || (Array.isArray(res.data) ? res.data : []);
-                    setAttendance(dataItems);
-                }
-            } catch (err) {}
-        };
-
-        useEffect(() => {
-            let attendanceInterval;
-            if (meetingState?.status === 'in_progress') {
-                loadNotes();
-                loadAttendance();
-                attendanceInterval = setInterval(() => {
-                    loadAttendance();
-                }, 10000);
-            }
-            return () => {
-                if (attendanceInterval) clearInterval(attendanceInterval);
-            };
-        }, [meetingState?.status, id]);
 
     useEffect(() => {
-        initMeetingState();
-    }, [id]);
+        if (meetingState?.status === 'in_progress') {
+            const cleanup = subscribeToMeeting(id);
+            const s = getSocket();
+            const onSessionStarted = () => setMeetingState(prev => ({ ...prev, status: 'in_progress' }));
+            const onSessionEnded = () => setMeetingState(prev => ({ ...prev, status: 'completed' }));
+            const onAgendaPresented = (payload) => setPresentedFile(payload);
+            const onAgendaPresentStopped = () => setPresentedFile(null);
+            const onExtensionCreated = (payload) => {
+                setPendingExtensions(prev => [...prev, payload]);
+                showToast(`Yêu cầu gia hạn ${payload.requestedExtensionMinutes || '?'} phút từ ${payload.requesterName || 'thành viên'}.`, 'warning');
+            };
+            s.on('meeting.session.started', onSessionStarted);
+            s.on('meeting.session.ended', onSessionEnded);
+            s.on('agenda:presented', onAgendaPresented);
+            s.on('agenda:present_stopped', onAgendaPresentStopped);
+            s.on('meeting.extension_request.created', onExtensionCreated);
+            return () => {
+                s.off('meeting.session.started', onSessionStarted);
+                s.off('meeting.session.ended', onSessionEnded);
+                s.off('agenda:presented', onAgendaPresented);
+                s.off('agenda:present_stopped', onAgendaPresentStopped);
+                s.off('meeting.extension_request.created', onExtensionCreated);
+                cleanup();
+            };
+        }
+    }, [meetingState?.status, id]);
 
-    // Listen for tab synchronization via storage event
+    useEffect(() => {
+        let attendanceInterval;
+        if (meetingState?.status === 'in_progress') {
+            loadNotes();
+            loadAttendance();
+            fetchMediaFiles();
+            const roomId = meetingState?.room?.id || meetingState?.room?.room_id;
+            if (roomId && meetingState?.hostId === myParticipantId) loadRoomDevices(roomId);
+            attendanceInterval = setInterval(loadAttendance, 15000);
+        }
+        return () => { if (attendanceInterval) clearInterval(attendanceInterval); };
+    }, [meetingState?.status, meetingState?.hostId, myParticipantId, id]);
+
+    useEffect(() => { initMeetingState(); }, [id]);
+
     useEffect(() => {
         const handleStorageChange = (e) => {
             if (e.key === `meeting_state_${id}`) {
                 try {
                     const newState = JSON.parse(e.newValue);
-                    if (newState) {
-                        setMeetingState(newState);
-                    }
-                } catch (err) {}
+                    if (newState) setMeetingState(newState);
+                } catch (err) { }
             }
         };
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
     }, [id]);
 
-    // Webcam Preview Logic
-    useEffect(() => {
-        if (isVideoOn && !isLobbyReady && !loading) {
-            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-                .then(s => {
-                    setStream(s);
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = s;
-                    }
-                })
-                .catch(err => {
-                    console.warn("Lobby Webcam blocked or not found:", err);
-                    setStream(null);
-                });
-        } else {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                setStream(null);
-            }
-        }
-        return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, [isVideoOn, isLobbyReady, loading]);
-
-    // Active Meeting webcam support (inside meeting room)
-    useEffect(() => {
-        if (meetingState?.status === 'in_progress' && isVideoOn) {
-            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-                .then(s => {
-                    setStream(s);
-                    const userVid = document.getElementById(`video-${myParticipantId}`);
-                    if (userVid) {
-                        userVid.srcObject = s;
-                    }
-                })
-                .catch(() => {
-                    setStream(null);
-                });
-        } else {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                setStream(null);
-            }
-        }
-    }, [meetingState?.status, isVideoOn]);
-
-    // Monitor muting and locked reactions
     useEffect(() => {
         if (!meetingState) return;
         const me = meetingState.participants?.find(p => p.id === myParticipantId);
-        if (me) {
-            if (me.isMuted && !prevMutedRef.current) {
-                showToast('Bạn đã bị Chủ tọa tắt tiếng!', 'error');
-                setIsMicOn(false);
-            }
-            prevMutedRef.current = me.isMuted;
+        if (me?.isMuted && !prevMutedRef.current) {
+            showToast('Bạn đã bị Chủ tọa tắt tiếng!', 'error');
+            setIsMicOn(false);
         }
+        prevMutedRef.current = me?.isMuted;
 
         if (meetingState.reactionsLocked && !prevReactionsLockedRef.current) {
             showToast('Chủ tọa đã khóa tính năng thả cảm xúc!', 'warning');
         } else if (!meetingState.reactionsLocked && prevReactionsLockedRef.current) {
-            showToast('Chủ tọa đã mở khóa tính năng thả cảm xúc.', 'success');
+            showToast('Chủ tọa đã mở khóa cảm xúc.', 'success');
         }
         prevReactionsLockedRef.current = meetingState.reactionsLocked;
     }, [meetingState, myParticipantId]);
 
-    // Monitor reactions triggers
     useEffect(() => {
         if (!meetingState?.lastReaction) return;
         const { senderId, emoji, timestamp } = meetingState.lastReaction;
         if (Date.now() - timestamp < 1500) {
             const reactionId = `reaction-${Date.now()}-${Math.random()}`;
             setFloatingReactions(prev => [...prev, { id: reactionId, emoji, participantId: senderId }]);
-            setTimeout(() => {
-                setFloatingReactions(prev => prev.filter(r => r.id !== reactionId));
-            }, 2200);
+            const timerId = setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== reactionId)), 2200);
+            reactionTimersRef.current.push(timerId);
         }
     }, [meetingState?.lastReaction]);
 
-    // Automatic speaker rotation (bots only) every 12 seconds
+    useEffect(() => {
+        participantsRef.current = meetingState?.participants;
+    }, [meetingState?.participants]);
+
     useEffect(() => {
         if (!meetingState || meetingState.status !== 'in_progress') return;
-
         const interval = setInterval(() => {
-            if (speakingOverrideRef.current && Date.now() - speakingOverrideRef.current < 15000) {
-                return; 
-            }
-
-            const unmutedBots = meetingState.participants?.filter(p => p.isBot && !p.isMuted) || [];
+            if (speakingOverrideRef.current && Date.now() - speakingOverrideRef.current < 15000) return;
+            const unmutedBots = participantsRef.current?.filter(p => p.isBot && !p.isMuted) || [];
             if (unmutedBots.length === 0) return;
-
             const randomBot = unmutedBots[Math.floor(Math.random() * unmutedBots.length)];
-
             setMeetingState(prev => {
-                const next = {
-                    ...prev,
-                    participants: prev.participants.map(p => ({
-                        ...p,
-                        isSpeaking: p.id === randomBot.id
-                    }))
-                };
+                const next = { ...prev, participants: prev.participants.map(p => ({ ...p, isSpeaking: p.id === randomBot.id })) };
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                 return next;
             });
         }, 12000);
-
         return () => clearInterval(interval);
-    }, [meetingState?.status, meetingState?.participants]);
+    }, [meetingState?.status, id]);
 
-    // Countdown clock ticking logic
     const isHost = meetingState?.hostId === myParticipantId;
 
     useEffect(() => {
         if (!meetingState || meetingState.status !== 'in_progress') return;
-
         const countdown = setInterval(() => {
             if (isHost) {
                 setMeetingState(prev => {
-                    const nextTime = Math.max(0, prev.agendaTimeLeft - 1);
-                    const next = {
-                        ...prev,
-                        agendaTimeLeft: nextTime
-                    };
+                    const next = { ...prev, agendaTimeLeft: Math.max(0, prev.agendaTimeLeft - 1) };
                     localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                     return next;
                 });
             } else {
-                setMeetingState(prev => ({
-                    ...prev,
-                    agendaTimeLeft: Math.max(0, prev.agendaTimeLeft - 1)
-                }));
+                setMeetingState(prev => ({ ...prev, agendaTimeLeft: Math.max(0, prev.agendaTimeLeft - 1) }));
             }
         }, 1000);
-
         return () => clearInterval(countdown);
     }, [meetingState?.status, isHost, id]);
 
+    // ─── Helpers ──────────────────────────────────────────────────────
+    const getAttendanceRecord = (participantId) =>
+        attendance.find(a => (a.userId || a.user_id || a.id) === participantId);
+
+    const isCheckedIn = (participantId) => {
+        const record = getAttendanceRecord(participantId);
+        if (!record) return false;
+        const status = record.presenceStatus || record.attendanceStatus || '';
+        return ['present', 'late', 'checked_in', 'maybe_present'].includes(status);
+    };
+
+    const getPresenceStatus = (participantId) => {
+        const record = getAttendanceRecord(participantId);
+        return record ? (record.presenceStatus || record.attendanceStatus || 'unknown') : 'unknown';
+    };
+
+    const checkedInCount = meetingState?.participants?.filter(p => isCheckedIn(p.id)).length || 0;
+
     if (loading || !meetingState) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[450px]">
-                <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col items-center justify-center min-h-screen bg-cloud-mist">
+                <div className="w-10 h-10 border-4 border-action-blue border-t-transparent rounded-full animate-spin" />
                 <p className="mt-4 text-slate-blue text-sm font-semibold">Đang nạp dữ liệu phòng họp...</p>
             </div>
         );
     }
 
-    // Default Guest name helper
-    const getDefaultGuestName = () => {
-        return sessionStorage.getItem(`guest_name_${id}`) || `Khách ${myParticipantId.split('-')[1] || myParticipantId.substring(0, 4)}`;
-    };
+    const getDefaultGuestName = () =>
+        sessionStorage.getItem(`guest_name_${id}`) || `Khách ${myParticipantId.split('-')[1] || myParticipantId.substring(0, 4)}`;
 
-    // Actions
+    // ─── Handlers ─────────────────────────────────────────────────────
     const handleJoinLobby = () => {
-        const selectedName = localName.trim() || getDefaultGuestName();
+        const selectedName = localName.trim() || (currentUser ? currentUser.fullName || currentUser.full_name : getDefaultGuestName());
         sessionStorage.setItem(`guest_name_${id}`, selectedName);
-        
-        // Push user as active participant
         setMeetingState(prev => {
             const list = [...prev.participants];
             const exists = list.find(p => p.id === myParticipantId);
-            const userRole = isPublic ? 'Khách' : (isHost ? 'Chủ tọa' : 'Thành viên');
-            
+            const userRole = isPublic ? 'Khách' : (prev.hostId === myParticipantId ? 'Chủ tọa' : 'Thành viên');
             if (exists) {
                 exists.fullName = selectedName;
                 exists.avatarUrl = resolveAvatarUrl(currentUser) || exists.avatarUrl;
                 exists.role = userRole;
-                exists.isCameraOff = !isVideoOn;
                 exists.isMuted = !isMicOn;
             } else {
-                list.push({
-                    id: myParticipantId,
-                    fullName: selectedName,
-                    avatarUrl: resolveAvatarUrl(currentUser),
-                    role: userRole,
-                    isMuted: !isMicOn,
-                    isCameraOff: !isVideoOn,
-                    isSpeaking: false,
-                    isBot: false
-                });
+                list.push({ id: myParticipantId, fullName: selectedName, avatarUrl: resolveAvatarUrl(currentUser), role: userRole, isMuted: !isMicOn, isSpeaking: false, isBot: false });
             }
             const next = { ...prev, participants: list };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
             return next;
         });
-
         setIsLobbyReady(true);
-        showToast('Đã tham gia phòng chờ cuộc họp!', 'success');
+        showToast('Đã tham gia phòng chờ!', 'success');
     };
 
     const handleStartMeeting = async () => {
@@ -709,7 +663,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                     return next;
                 });
-                showToast('Bắt đầu cuộc họp!', 'success');
+                showToast('Cuộc họp đã bắt đầu!', 'success');
             } else {
                 showToast(res?.message || res?.error?.message || 'Lỗi khi bắt đầu', 'error');
             }
@@ -732,9 +686,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     return next;
                 });
                 showToast('Cuộc họp đã kết thúc', 'info');
-                setTimeout(() => {
-                    navigate(isPublic ? '/' : '/employee');
-                }, 1000);
+                setTimeout(() => navigate(isPublic ? '/' : '/employee'), 1200);
             } else {
                 showToast(res?.message || res?.error?.message || 'Lỗi khi kết thúc', 'error');
             }
@@ -755,8 +707,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 setRecordingStatus('starting');
                 setRecordingSessionId(res.data?.sessionId || res.data?.id || `rec-${Date.now()}`);
                 setRecordingStartedAt(new Date());
-                setRecordingDuration(0);
-                showToast('Đang khởi tạo camera và kết nối luồng stream...', 'info');
+                showToast('Đang khởi động ghi hình...', 'info');
             } else {
                 showToast('Lỗi khi bắt đầu ghi hình', 'error');
             }
@@ -772,17 +723,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setActionLoading(true);
         try {
             const res = await callWithFallback(pauseEmployeeVideoRecording, pauseManagerVideoRecording, id, recordingSessionId);
-            if (res?.success) {
-                setRecordingStatus('paused');
-                showToast('Đã tạm dừng ghi hình', 'info');
-            } else {
-                showToast('Lỗi khi tạm dừng ghi hình', 'error');
-            }
-        } catch (err) {
-            showToast('Lỗi kết nối server', 'error');
-        } finally {
-            setActionLoading(false);
-        }
+            if (res?.success) { setRecordingStatus('paused'); showToast('Đã tạm dừng ghi hình', 'info'); }
+        } catch (err) { showToast('Lỗi kết nối', 'error'); } finally { setActionLoading(false); }
     };
 
     const handleResumeRecording = async () => {
@@ -790,17 +732,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setActionLoading(true);
         try {
             const res = await callWithFallback(resumeEmployeeVideoRecording, resumeManagerVideoRecording, id, recordingSessionId);
-            if (res?.success) {
-                setRecordingStatus('recording');
-                showToast('Đã tiếp tục ghi hình', 'success');
-            } else {
-                showToast('Lỗi khi tiếp tục', 'error');
-            }
-        } catch (err) {
-            showToast('Lỗi kết nối server', 'error');
-        } finally {
-            setActionLoading(false);
-        }
+            if (res?.success) { setRecordingStatus('recording'); showToast('Đã tiếp tục ghi hình', 'success'); }
+        } catch (err) { showToast('Lỗi kết nối', 'error'); } finally { setActionLoading(false); }
     };
 
     const handleStopRecording = async () => {
@@ -808,68 +741,30 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setActionLoading(true);
         try {
             const res = await callWithFallback(stopEmployeeVideoRecording, stopManagerVideoRecording, id, recordingSessionId);
-            if (res?.success) {
-                setRecordingStatus('stopping');
-                showToast('Đang dừng ghi hình và lưu video...', 'info');
-            } else {
-                showToast('Lỗi khi dừng ghi hình', 'error');
-            }
-        } catch (err) {
-            showToast('Lỗi kết nối server', 'error');
-        } finally {
-            setActionLoading(false);
-        }
+            if (res?.success) { setRecordingStatus('stopping'); showToast('Đang dừng và lưu video...', 'info'); }
+        } catch (err) { showToast('Lỗi kết nối', 'error'); } finally { setActionLoading(false); }
     };
 
     const handleAddNote = async (e) => {
         e.preventDefault();
         if (!noteInput.trim()) return;
         try {
-            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, {
-                content: noteInput,
-                noteType: 'in_meeting'
-            });
+            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, { content: noteInput, noteType: 'in_meeting' });
             if (res?.success) {
                 setNoteInput('');
                 loadNotes();
                 showToast('Đã thêm ghi chú', 'success');
             }
-        } catch (err) {
-            showToast('Lỗi khi thêm ghi chú', 'error');
-        }
+        } catch (err) { showToast('Lỗi khi thêm ghi chú', 'error'); }
     };
-
-
 
     const handleMicToggle = () => {
         const me = meetingState.participants?.find(p => p.id === myParticipantId);
-        if (me?.isMuted && isMicOn) {
-            showToast('Không thể bật tiếng. Bạn đã bị Chủ tọa tắt tiếng!', 'error');
-            return;
-        }
-
+        if (me?.isMuted && isMicOn) { showToast('Bạn đã bị Chủ tọa tắt tiếng!', 'error'); return; }
         const nextVal = !isMicOn;
         setIsMicOn(nextVal);
-
         setMeetingState(prev => {
-            const next = {
-                ...prev,
-                participants: prev.participants.map(p => p.id === myParticipantId ? { ...p, isMuted: !nextVal } : p)
-            };
-            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-            return next;
-        });
-    };
-
-    const handleVideoToggle = () => {
-        const nextVal = !isVideoOn;
-        setIsVideoOn(nextVal);
-
-        setMeetingState(prev => {
-            const next = {
-                ...prev,
-                participants: prev.participants.map(p => p.id === myParticipantId ? { ...p, isCameraOff: !nextVal } : p)
-            };
+            const next = { ...prev, participants: prev.participants.map(p => p.id === myParticipantId ? { ...p, isMuted: !nextVal } : p) };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
             return next;
         });
@@ -878,20 +773,13 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const handleSelfSpeak = () => {
         speakingOverrideRef.current = Date.now();
         setMeetingState(prev => {
-            const next = {
-                ...prev,
-                participants: prev.participants.map(p => ({
-                    ...p,
-                    isSpeaking: p.id === myParticipantId
-                }))
-            };
+            const next = { ...prev, participants: prev.participants.map(p => ({ ...p, isSpeaking: p.id === myParticipantId })) };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
             return next;
         });
         showToast('Bạn đang phát biểu!', 'success');
     };
 
-    // Giơ tay — thuần local, chưa có BE lưu trạng thái này cho người khác trong phòng thấy.
     const handleToggleRaiseHand = () => {
         const next = !isHandRaised;
         setIsHandRaised(next);
@@ -899,24 +787,133 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     const sendReaction = (emoji) => {
-        if (meetingState.reactionsLocked && !isHost) {
-            showToast('Tính năng thả cảm xúc đang bị Chủ tọa khóa!', 'error');
-            return;
-        }
-
+        if (meetingState.reactionsLocked && !isHost) { showToast('Cảm xúc đang bị Chủ tọa khóa!', 'error'); return; }
         setMeetingState(prev => {
-            const next = {
-                ...prev,
-                lastReaction: {
-                    senderId: myParticipantId,
-                    emoji,
-                    timestamp: Date.now()
-                }
-            };
+            const next = { ...prev, lastReaction: { senderId: myParticipantId, emoji, timestamp: Date.now() } };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
             return next;
         });
         setShowReactionPicker(false);
+    };
+
+    const handleHostMuteToggle = (pId, currentMuteState) => {
+        if (!isHost) return;
+        setMeetingState(prev => {
+            const next = { ...prev, participants: prev.participants.map(p => p.id === pId ? { ...p, isMuted: !currentMuteState } : p) };
+            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+            return next;
+        });
+        showToast(currentMuteState ? 'Đã bật tiếng cho thành viên.' : 'Đã tắt tiếng thành viên.', 'info');
+    };
+
+    const handleHostMuteAll = () => {
+        if (!isHost) return;
+        setMeetingState(prev => {
+            const next = { ...prev, participants: prev.participants.map(p => p.id !== myParticipantId ? { ...p, isMuted: true } : p) };
+            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+            return next;
+        });
+        showToast('Đã tắt tiếng tất cả!', 'warning');
+    };
+
+    const handleHostToggleLockReactions = () => {
+        if (!isHost) return;
+        const nextLocked = !meetingState.reactionsLocked;
+        setMeetingState(prev => {
+            const next = { ...prev, reactionsLocked: nextLocked };
+            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+            return next;
+        });
+    };
+
+    const handleNextAgenda = () => {
+        if (!isHost) return;
+        if (meetingState.currentAgendaIndex + 1 < (meetingState.agenda?.length || 0)) {
+            setMeetingState(prev => {
+                const nextIdx = prev.currentAgendaIndex + 1;
+                const next = { ...prev, currentAgendaIndex: nextIdx, agendaTimeLeft: (prev.agenda[nextIdx].durationMin || 10) * 60 };
+                localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+                return next;
+            });
+            showToast('Đã chuyển sang mục tiếp theo trong chương trình.', 'success');
+        } else {
+            showToast('Chương trình đã kết thúc.', 'warning');
+        }
+    };
+
+    const handleManualCheckIn = async (participant) => {
+        setManualCheckInLoading(participant.id);
+        try {
+            const res = await manualAttendanceCheckIn(id, { userId: participant.id, checkInMethod: 'manual' });
+            if (res?.success) {
+                showToast(`Đã điểm danh thủ công cho ${participant.fullName}`, 'success');
+                await loadAttendance();
+            } else {
+                showToast(res?.error?.message || 'Lỗi khi điểm danh thủ công', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        } finally {
+            setManualCheckInLoading(null);
+        }
+    };
+
+    const handleInvalidateAttendance = async (participant) => {
+        const record = getAttendanceRecord(participant.id);
+        if (!record?.id) return;
+        setManualCheckInLoading(participant.id);
+        try {
+            const res = await invalidateAttendanceRecord(id, record.id, { reason: 'Chủ tọa hủy điểm danh thủ công' });
+            if (res?.success) {
+                showToast(`Đã hủy điểm danh của ${participant.fullName}`, 'info');
+                await loadAttendance();
+            } else {
+                showToast(res?.error?.message || 'Lỗi khi hủy điểm danh', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        } finally {
+            setManualCheckInLoading(null);
+        }
+    };
+
+    const handleRequestExtension = async () => {
+        if (!extensionModal.minutes || extensionModal.minutes < 1) return;
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(requestEmployeeExtension, requestManagerExtension, id, {
+                requestedExtensionMinutes: Number(extensionModal.minutes),
+                reason: extensionModal.reason || 'Cần thêm thời gian để hoàn thành chương trình',
+            });
+            if (res?.success) {
+                showToast(`Đã gửi yêu cầu gia hạn ${extensionModal.minutes} phút.`, 'success');
+                setExtensionModal({ isOpen: false, minutes: 15, reason: '' });
+            } else {
+                showToast(res?.error?.message || 'Lỗi khi gửi yêu cầu gia hạn', 'error');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDecideExtension = async (requestId, decision) => {
+        setActionLoading(true);
+        try {
+            const res = await callWithFallback(decideEmployeeExtension, decideManagerExtension, id, requestId, {
+                decision,
+                decisionNote: decision === 'approved' ? 'Chủ tọa đã duyệt gia hạn' : 'Chủ tọa từ chối gia hạn',
+            });
+            if (res?.success) {
+                setPendingExtensions(prev => prev.filter(r => r.id !== requestId));
+                showToast(decision === 'approved' ? 'Đã duyệt yêu cầu gia hạn.' : 'Đã từ chối yêu cầu gia hạn.', decision === 'approved' ? 'success' : 'info');
+            }
+        } catch (err) {
+            showToast('Lỗi kết nối server', 'error');
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleRenameSelf = () => {
@@ -930,170 +927,113 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     const submitRename = (name) => {
-        if (name && name.trim()) {
+        if (name?.trim()) {
             setMeetingState(prev => {
-                const next = {
-                    ...prev,
-                    participants: prev.participants.map(p => p.id === renameModal.targetId ? { ...p, fullName: name.trim() } : p)
-                };
+                const next = { ...prev, participants: prev.participants.map(p => p.id === renameModal.targetId ? { ...p, fullName: name.trim() } : p) };
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                 return next;
             });
-            showToast(renameModal.isSelf ? 'Đổi tên thành công!' : 'Chủ tọa đã thay đổi tên của thành viên!', 'success');
+            showToast(renameModal.isSelf ? 'Đổi tên thành công!' : 'Đã thay đổi tên thành viên!', 'success');
         }
         setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true });
     };
 
-    const handleHostMuteToggle = (pId, currentMuteState) => {
-        if (!isHost) return;
-        setMeetingState(prev => {
-            const next = {
-                ...prev,
-                participants: prev.participants.map(p => p.id === pId ? { ...p, isMuted: !currentMuteState } : p)
-            };
-            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-            return next;
-        });
-        showToast(currentMuteState ? 'Đã bật tiếng cho thành viên.' : 'Đã tắt tiếng thành viên.', 'info');
-    };
-
-    const handleHostMuteAll = () => {
-        if (!isHost) return;
-        setMeetingState(prev => {
-            const next = {
-                ...prev,
-                participants: prev.participants.map(p => p.id !== myParticipantId ? { ...p, isMuted: true } : p)
-            };
-            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-            return next;
-        });
-        showToast('Đã tắt tiếng tất cả mọi người!', 'warning');
-    };
-
-    const handleHostToggleLockReactions = () => {
-        if (!isHost) return;
-        const nextLocked = !meetingState.reactionsLocked;
-        setMeetingState(prev => {
-            const next = {
-                ...prev,
-                reactionsLocked: nextLocked
-            };
-            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-            return next;
-        });
-    };
-
-    const handleNextAgenda = () => {
-        if (!isHost) return;
-        if (meetingState.currentAgendaIndex + 1 < (meetingState.agenda?.length || 0)) {
-            setMeetingState(prev => {
-                const nextIdx = prev.currentAgendaIndex + 1;
-                const next = {
-                    ...prev,
-                    currentAgendaIndex: nextIdx,
-                    agendaTimeLeft: (prev.agenda[nextIdx].durationMin || 10) * 60
-                };
-                localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-                return next;
-            });
-            showToast('Đã chuyển phần tiếp theo trong chương trình.', 'success');
-        } else {
-            showToast('Chương trình đã kết thúc.', 'warning');
-        }
-    };
-
-    const handleLeaveRoom = () => {
-        setConfirmLeaveModal(true);
-    };
+    const handleLeaveRoom = () => setConfirmLeaveModal(true);
 
     const confirmLeave = () => {
         setMeetingState(prev => {
-            const next = {
-                ...prev,
-                participants: prev.participants.filter(p => p.id !== myParticipantId)
-            };
+            const next = { ...prev, participants: prev.participants.filter(p => p.id !== myParticipantId) };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
             return next;
         });
         navigate(isPublic ? '/' : '/employee');
     };
 
+    // ─── Computed ─────────────────────────────────────────────────────
+    // Show ALL participants (internal + external guests) regardless of attendance status
+    const activeGridParticipants = meetingState.participants || [];
+    const uncheckedParticipants = (meetingState.participants || []).filter(p => !isCheckedIn(p.id));
+
+    const tabs = [
+        ...(isHost ? [{ id: 'host', label: 'Quản lý', icon: Shield }] : []),
+        { id: 'agenda', label: 'Chương trình', icon: Calendar },
+        { id: 'notes', label: 'Ghi chú', icon: StickyNote },
+        { id: 'attendance', label: 'Người tham gia', icon: Users },
+        ...(isHost ? [{ id: 'guests', label: 'Khách', icon: UserCheck }] : []),
+    ];
+
+    // ─── RENDER ───────────────────────────────────────────────────────
     return (
         <div className="fixed inset-0 z-[100] bg-cloud-mist text-midnight-indigo flex flex-col overflow-hidden">
             <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
-            {/* HEADER BAR */}
-            <header className="h-16 border-b border-platinum-tint bg-white px-6 flex items-center justify-between z-10 shadow-sm-1">
+            {/* HEADER */}
+            <header className="h-14 border-b border-platinum-tint bg-white px-5 flex items-center justify-between z-10 shadow-sm">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleLeaveRoom}
-                        className="p-2 bg-cloud-mist hover:bg-pale-gray text-slate-blue hover:text-midnight-indigo rounded-xl transition-all"
+                        className="p-1.5 bg-cloud-mist hover:bg-pale-gray text-slate-blue hover:text-midnight-indigo rounded-lg transition-all"
                     >
                         <ChevronRight className="w-4 h-4 rotate-180" />
                     </button>
                     <div>
-                        <h1 className="text-sm font-extrabold text-midnight-indigo tracking-wide flex items-center gap-1.5">
-                            <Sparkles className="w-4 h-4 text-action-blue" />
+                        <h1 className="text-sm font-extrabold text-midnight-indigo flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-action-blue shrink-0" />
                             {meetingState.title}
                         </h1>
-                        <span className="text-[11px] text-slate-blue font-semibold">{meetingState.roomName}</span>
+                        <span className="text-[11px] text-slate-blue">{meetingState.roomName}</span>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {meetingState.status === 'in_progress' && (
-                        <span className="inline-flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 font-bold text-xs rounded-full border border-red-100">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            Đang diễn ra
-                        </span>
+                        <>
+                            {admittedGuestCount > 0 && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-bold">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    {admittedGuestCount} khách ngoài đang xem
+                                </span>
+                            )}
+                            {pendingExtensions.length > 0 && isHost && (
+                                <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-bold">
+                                    {pendingExtensions.length} yêu cầu gia hạn
+                                </span>
+                            )}
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 font-bold text-[11px] rounded-full border border-red-100">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                Đang diễn ra
+                            </span>
+                        </>
                     )}
                 </div>
             </header>
 
-            {/* VIEW A: LOBBY SCREEN */}
+            {/* VIEW A: LOBBY */}
             {!isLobbyReady && meetingState.status === 'scheduled' && (
                 <div className="flex-1 flex items-center justify-center p-6 z-10">
-                    <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 rounded-3xl border border-platinum-tint shadow-sm-2">
-
-                        {/* Preview Screen */}
-                        <div className="flex flex-col justify-between space-y-4">
-                            <h2 className="text-base font-bold text-midnight-indigo uppercase tracking-wider">Khung xem trước thiết bị</h2>
-                            <div className="relative aspect-video rounded-2xl bg-slate-900 overflow-hidden border border-platinum-tint flex items-center justify-center group shadow-inner">
-                                {isVideoOn ? (
-                                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
-                                ) : (
-                                    <div className="w-24 h-24 rounded-full bg-slate-800 border-2 border-action-blue/30 flex items-center justify-center text-action-blue shadow-lg">
-                                        <Volume2 className="w-8 h-8" />
-                                    </div>
-                                )}
-                                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-slate-900/80 px-4 py-2 rounded-xl border border-white/10 backdrop-blur-md">
-                                    <button
-                                        onClick={() => setIsMicOn(!isMicOn)}
-                                        className={`p-2.5 rounded-lg transition-all ${isMicOn ? 'bg-action-blue text-white' : 'bg-red-600/90 text-white'}`}
-                                    >
-                                        {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                                    </button>
-                                    <button
-                                        onClick={() => setIsVideoOn(!isVideoOn)}
-                                        className={`p-2.5 rounded-lg transition-all ${isVideoOn ? 'bg-action-blue text-white' : 'bg-red-600/90 text-white'}`}
-                                    >
-                                        {isVideoOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                                    </button>
-                                </div>
+                    <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-platinum-tint shadow-sm-2 space-y-6">
+                        <div className="text-center space-y-1">
+                            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <Sparkles className="w-7 h-7 text-action-blue" />
                             </div>
-                            <p className="text-[11px] text-slate-blue text-center leading-relaxed">Vui lòng kiểm tra Micrô và Máy ảnh trước khi tham gia cuộc họp.</p>
+                            <h2 className="text-xl font-extrabold text-midnight-indigo">{meetingState.title}</h2>
+                            <p className="text-xs text-slate-blue">{meetingState.roomName}</p>
                         </div>
 
-                        {/* Setup Name and Ready Button */}
-                        <div className="flex flex-col justify-center space-y-6">
-                            <div className="space-y-2">
-                                <h3 className="text-2xl font-extrabold text-midnight-indigo">Sẵn sàng tham gia?</h3>
-                                <p className="text-xs text-slate-blue">Bạn chuẩn bị bước vào cuộc họp cùng với các thành viên khác.</p>
+                        <div className="bg-cloud-mist rounded-2xl p-4 border border-platinum-tint space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-blue font-medium">Chủ tọa</span>
+                                <span className="font-bold text-midnight-indigo">{meetingState.host}</span>
                             </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-blue font-medium">Thành viên</span>
+                                <span className="font-bold text-midnight-indigo">{meetingState.participants?.length || 0} người</span>
+                            </div>
+                        </div>
 
-                            <div className="space-y-4">
+                        <div className="space-y-3">
+                            {(!currentUser || isPublic) && (
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-2">Tên hiển thị của bạn</label>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1.5">Tên hiển thị của bạn</label>
                                     <input
                                         type="text"
                                         value={localName}
@@ -1102,51 +1042,59 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         className="w-full px-4 py-3 bg-cloud-mist border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue transition-colors text-midnight-indigo font-semibold"
                                     />
                                     {isPublic && (
-                                        <p className="text-[10px] text-emerald-600 mt-1.5 font-medium">Bạn đang tham gia với tư cách Khách ngoài hệ thống.</p>
+                                        <p className="text-[10px] text-emerald-600 mt-1 font-medium">Tham gia với tư cách Khách ngoài hệ thống.</p>
                                     )}
                                 </div>
+                            )}
 
+                            <div className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-platinum-tint">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-midnight-indigo">
+                                    {isMicOn ? <Mic className="w-4 h-4 text-action-blue" /> : <MicOff className="w-4 h-4 text-red-500" />}
+                                    Microphone
+                                </div>
                                 <button
-                                    onClick={handleJoinLobby}
-                                    className="w-full py-3 bg-action-blue hover:bg-glacier-blue active:scale-[0.98] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-action-blue/20"
+                                    onClick={() => setIsMicOn(!isMicOn)}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isMicOn ? 'bg-action-blue' : 'bg-pale-gray'}`}
                                 >
-                                    Tham gia phòng chờ
+                                    <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${isMicOn ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                 </button>
                             </div>
-                        </div>
 
+                            <button
+                                onClick={handleJoinLobby}
+                                className="w-full py-3 bg-action-blue hover:bg-glacier-blue active:scale-[0.98] text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-action-blue/20"
+                            >
+                                Tham gia phòng chờ
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* VIEW B: WAITING LOBBY (WAITING FOR HOST TO START) */}
+            {/* VIEW B: WAITING LOBBY */}
             {isLobbyReady && meetingState.status === 'scheduled' && (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 z-10 text-center">
+                <div className="flex-1 flex flex-col items-center justify-center p-6 z-10">
                     <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-platinum-tint shadow-sm-2 space-y-6">
-
-                        <div className="w-16 h-16 border-4 border-action-blue border-t-transparent rounded-full animate-spin mx-auto shadow-inner" />
-
-                        <div className="space-y-2">
-                            <h2 className="text-xl font-bold text-midnight-indigo uppercase tracking-wider">Chờ chủ tọa bắt đầu...</h2>
+                        <div className="w-14 h-14 border-4 border-action-blue border-t-transparent rounded-full animate-spin mx-auto" />
+                        <div className="text-center space-y-1.5">
+                            <h2 className="text-lg font-extrabold text-midnight-indigo">Chờ chủ tọa bắt đầu...</h2>
                             <p className="text-xs text-slate-blue leading-relaxed">
-                                Bạn đã sẵn sàng trong phòng chờ. Cuộc họp sẽ tự động bắt đầu khi Chủ tọa (<strong>{meetingState.host}</strong>) nhấn nút bắt đầu cuộc họp.
+                                Cuộc họp sẽ tự động bắt đầu khi <strong>{meetingState.host}</strong> nhấn bắt đầu.
                             </p>
                         </div>
 
-                        {/* List current lobby members */}
-                        <div className="bg-cloud-mist rounded-2xl p-4 border border-platinum-tint text-left space-y-3">
-                            <span className="text-[10px] font-bold text-action-blue uppercase tracking-wider">Đã tham gia phòng chờ ({meetingState.participants?.length || 0})</span>
-                            <div className="max-h-36 overflow-y-auto space-y-2 pr-1.5 scrollbar-thin">
+                        <div className="bg-cloud-mist rounded-2xl p-4 border border-platinum-tint space-y-2">
+                            <span className="text-[10px] font-bold text-action-blue uppercase tracking-wider block">
+                                Trong phòng chờ ({meetingState.participants?.length || 0})
+                            </span>
+                            <div className="max-h-40 overflow-y-auto space-y-1.5">
                                 {meetingState.participants?.map(p => (
                                     <div key={p.id} className="flex items-center justify-between text-xs p-2 bg-white rounded-lg border border-platinum-tint/60">
                                         <div className="flex items-center gap-2">
-                                            <UserAvatar
-                                                user={p}
-                                                className="w-6 h-6 rounded-full shrink-0 font-bold text-[10px]"
-                                            />
+                                            <UserAvatar user={p} className="w-6 h-6 rounded-full shrink-0 text-[10px] font-bold" />
                                             <span className="font-semibold text-midnight-indigo">{p.fullName}</span>
                                         </div>
-                                        <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold tracking-wider uppercase ${
+                                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
                                             p.role === 'Chủ tọa' ? 'bg-red-50 text-red-600' :
                                             p.role === 'Khách' ? 'bg-emerald-50 text-emerald-600' :
                                             'bg-blue-50 text-action-blue'
@@ -1159,96 +1107,206 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         {isHost && (
                             <button
                                 onClick={handleStartMeeting}
-                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/20"
+                                disabled={actionLoading}
+                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
                             >
-                                <Play className="w-4 h-4 fill-white inline-block mr-1.5 -mt-0.5" /> Bắt đầu cuộc họp ngay
+                                <Play className="w-4 h-4 fill-white" />
+                                {actionLoading ? 'Đang bắt đầu...' : 'Bắt đầu cuộc họp'}
                             </button>
                         )}
                     </div>
                 </div>
             )}
 
-            {/* VIEW D: END MEETING */}
+            {/* VIEW D: COMPLETED */}
             {meetingState.status === 'completed' && (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 z-10 text-center">
-                    <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-platinum-tint shadow-sm-2 space-y-6">
-                        <div className="w-16 h-16 rounded-full bg-blue-50 text-action-blue flex items-center justify-center mx-auto shadow-inner">
-                            <Check className="w-8 h-8" />
+                <div className="flex-1 flex items-center justify-center p-6 z-10">
+                    <div className="max-w-sm w-full bg-white p-8 rounded-3xl border border-platinum-tint shadow-sm-2 text-center space-y-5">
+                        <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto">
+                            <Check className="w-8 h-8 text-action-blue" />
                         </div>
-                        <h2 className="text-xl font-bold text-midnight-indigo uppercase tracking-wider">Cuộc họp đã kết thúc</h2>
-                        <button onClick={handleLeaveRoom} className="w-full py-3 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-xl text-xs font-extrabold uppercase transition-all">Quay lại trang chủ</button>
+                        <div>
+                            <h2 className="text-lg font-extrabold text-midnight-indigo">Cuộc họp đã kết thúc</h2>
+                            <p className="text-xs text-slate-blue mt-1">Cảm ơn bạn đã tham dự!</p>
+                        </div>
+                        <button onClick={handleLeaveRoom} className="w-full py-3 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-xl text-sm font-bold transition-all">
+                            Quay về trang chủ
+                        </button>
                     </div>
                 </div>
             )}
-            {/* VIEW C: ACTIVE MEETING ROOM (in_progress) */}
+
+            {/* VIEW C: IN PROGRESS */}
             {meetingState.status === 'in_progress' && (
-                <div className="flex-1 flex flex-col lg:flex-row relative z-10">
+                <div className="flex-1 flex flex-col lg:flex-row relative z-10 overflow-hidden">
 
-                    {/* Lưới video (2/3 width) */}
-                    <div className="flex-1 flex flex-col bg-white p-6 relative select-none">
+                    {/* Left: Video Grid + Controls */}
+                    <div className="flex-1 flex flex-col bg-slate-950 relative select-none overflow-hidden">
 
-                        {/* Banner Trình chiếu tài liệu */}
+                        {/* Document Presentation Banner */}
                         {presentedFile && (
-                            <motion.div 
-                                initial={{ opacity: 0, y: -20 }}
+                            <motion.div
+                                initial={{ opacity: 0, y: -16 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="mb-4 bg-blue-50 border border-action-blue/30 p-3 rounded-xl flex items-center justify-between shadow-sm"
+                                className="absolute top-3 left-3 right-3 z-20 bg-midnight-indigo/90 backdrop-blur-md border border-white/10 p-3 rounded-xl flex items-center justify-between shadow-lg"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-action-blue flex items-center justify-center text-white shadow-inner shrink-0">
+                                    <div className="w-8 h-8 rounded-lg bg-action-blue flex items-center justify-center text-white shrink-0">
                                         <MonitorUp className="w-4 h-4" />
                                     </div>
                                     <div>
                                         <div className="text-[10px] font-bold text-action-blue uppercase tracking-wider">Đang trình chiếu</div>
-                                        <div className="text-sm font-extrabold text-midnight-indigo truncate max-w-[300px]">{presentedFile.fileName || 'Tài liệu'}</div>
+                                        <div className="text-sm font-bold text-white truncate max-w-[220px]">{presentedFile.fileName || 'Tài liệu'}</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {isHost && (
-                                        <button 
+                                        <button
                                             onClick={() => getSocket().emit('agenda:present_stop', { meetingId: id })}
-                                            className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-[10px] font-extrabold uppercase transition-colors"
+                                            className="px-2.5 py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-[10px] font-bold"
                                         >
                                             Dừng chiếu
                                         </button>
                                     )}
-                                    <button 
+                                    <button
                                         onClick={async () => {
                                             try {
                                                 const res = await request(`/media-files/${presentedFile.fileId}`, { method: 'GET' });
-                                                const url = res.data?.data?.downloadUrl || res.data?.downloadUrl || (res.data?.success && res.data?.data?.url);
+                                                const url = res.data?.data?.downloadUrl || res.data?.downloadUrl;
                                                 if (url) window.open(url, '_blank');
-                                                else showToast('Không tìm thấy link tải tài liệu', 'error');
-                                            } catch (e) {
-                                                showToast('Lỗi khi mở tài liệu', 'error');
-                                            }
+                                                else showToast('Không tìm thấy link tài liệu', 'error');
+                                            } catch (e) { showToast('Lỗi khi mở tài liệu', 'error'); }
                                         }}
-                                        className="px-3 py-1.5 bg-action-blue text-white hover:bg-glacier-blue rounded-lg text-xs font-bold transition-colors shadow flex items-center gap-1.5"
+                                        className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[10px] font-bold flex items-center gap-1"
                                     >
-                                        Mở tài liệu <ExternalLink className="w-3.5 h-3.5" />
+                                        Mở <ExternalLink className="w-3 h-3" />
                                     </button>
                                 </div>
                             </motion.div>
                         )}
 
-                        {/* Lưới người tham gia — số cột tự tính theo số người, không còn "ghế" cố định */}
-                        <div className="flex-1 min-h-[420px] flex items-start">
-                            {(() => {
-                                const presentUserIds = new Set(
-                                    attendance
-                                        .filter(a => ['present', 'maybe_present', 'late', 'checked_in'].includes(a.presenceStatus || a.attendanceStatus || ''))
-                                        .map(a => a.userId || a.user_id || a.id)
-                                );
-                                const activeParticipants = (meetingState.participants || []).filter(
-                                    p => presentUserIds.has(p.id) || p.id === myParticipantId || p.role === 'Chủ tọa' || p.isBot
-                                );
+                        {/* Participant Grid / Agenda Doc Viewer */}
+                        <div className="flex-1 overflow-hidden relative">
+                            {agendaDocView ? (
+                                <div className="w-full h-full flex flex-col bg-slate-950">
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-action-blue" />
+                                            <span className="text-sm font-bold text-white truncate max-w-[280px]">
+                                                {agendaDocView.agendaItem.title}
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => setAgendaDocView(null)}
+                                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
 
-                                return (
+                                    {/* Attachment tabs */}
+                                    {agendaDocView.agendaItem.attachments?.length > 1 && (
+                                        <div className="flex gap-1 px-4 py-2 border-b border-white/10 overflow-x-auto shrink-0">
+                                            {agendaDocView.agendaItem.attachments.map((att, idx) => (
+                                                <button
+                                                    key={att.id}
+                                                    onClick={() => setAgendaDocView(v => ({ ...v, selectedAttachmentIdx: idx }))}
+                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-colors ${
+                                                        agendaDocView.selectedAttachmentIdx === idx
+                                                            ? 'bg-action-blue text-white'
+                                                            : 'bg-white/10 text-white/70 hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    {att.fileName}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Description */}
+                                    {agendaDocView.agendaItem.description && (
+                                        <div className="px-4 py-2 bg-white/5 border-b border-white/10 shrink-0">
+                                            <p className="text-[11px] text-white/70 leading-relaxed">{agendaDocView.agendaItem.description}</p>
+                                        </div>
+                                    )}
+
+                                    {/* File viewer */}
+                                    {(() => {
+                                        const att = agendaDocView.agendaItem.attachments?.[agendaDocView.selectedAttachmentIdx || 0];
+                                        if (!att) return (
+                                            <div className="flex-1 flex items-center justify-center text-white/40 text-sm">Không có file đính kèm</div>
+                                        );
+                                        const ext = (att.fileName || '').split('.').pop()?.toLowerCase();
+                                        const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext);
+                                        const isPdf = ext === 'pdf';
+                                        const isVideo = ['mp4', 'webm', 'mov'].includes(ext);
+                                        const downloadUrl = att.downloadUrl || att.url;
+
+                                        return (
+                                            <div className="flex-1 overflow-hidden flex flex-col">
+                                                {downloadUrl ? (
+                                                    isImage ? (
+                                                        <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+                                                            <img src={downloadUrl} alt={att.fileName} className="max-w-full max-h-full object-contain rounded-xl" />
+                                                        </div>
+                                                    ) : isPdf ? (
+                                                        <iframe
+                                                            src={downloadUrl}
+                                                            title={att.fileName}
+                                                            className="flex-1 w-full border-0"
+                                                        />
+                                                    ) : isVideo ? (
+                                                        <div className="flex-1 flex items-center justify-center p-4">
+                                                            <video src={downloadUrl} controls className="max-w-full max-h-full rounded-xl" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/60">
+                                                            <FileText className="w-12 h-12" />
+                                                            <p className="text-sm font-medium">{att.fileName}</p>
+                                                            <a
+                                                                href={downloadUrl}
+                                                                download={att.fileName}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="px-4 py-2 bg-action-blue text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-glacier-blue transition-colors"
+                                                            >
+                                                                <Download className="w-4 h-4" /> Tải xuống
+                                                            </a>
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50">
+                                                        <Loader className="w-8 h-8 animate-spin" />
+                                                        <p className="text-xs">Đang tải tài liệu...</p>
+                                                    </div>
+                                                )}
+                                                {/* Download bar */}
+                                                <div className="shrink-0 px-4 py-2.5 border-t border-white/10 flex items-center justify-between bg-slate-900">
+                                                    <span className="text-[11px] text-white/60 truncate max-w-[200px]">{att.fileName}</span>
+                                                    {downloadUrl && (
+                                                        <a
+                                                            href={downloadUrl}
+                                                            download={att.fileName}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5" />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            ) : (
+                                <div className="w-full h-full p-4 flex items-start overflow-auto">
                                     <MeetingGrid
-                                        participants={activeParticipants}
+                                        participants={activeGridParticipants}
                                         myParticipantId={myParticipantId}
                                         isHost={isHost}
-                                        isVideoOn={isVideoOn}
+                                        isVideoOn={false}
                                         onHostMuteToggle={handleHostMuteToggle}
                                         onRename={(pId, currentName, isSelf) => {
                                             if (isSelf) handleRenameSelf();
@@ -1258,72 +1316,64 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             acc[fr.participantId] = fr.emoji;
                                             return acc;
                                         }, {})}
+                                        sidebarOpen={isSidebarOpen}
                                     />
-                                );
-                            })()}
+                                </div>
+                            )}
                         </div>
 
-                        {/* THANH ĐIỀU KHIỂN DƯỚI CÙNG */}
-                        <div className="h-20 mt-4 bg-white border border-platinum-tint rounded-2xl px-5 flex items-center justify-between gap-4 shadow-sm-1">
+                        {/* Bottom Control Bar */}
+                        <div className="h-20 bg-midnight-indigo/95 backdrop-blur-sm border-t border-white/10 px-5 flex items-center justify-between gap-3 shrink-0">
 
-                            {/* Mic / Camera */}
-                            <div className="flex items-center gap-2.5">
-                                <button
-                                    onClick={handleMicToggle}
-                                    className={`w-14 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all ${
-                                        isMicOn ? 'bg-action-blue text-white shadow-md shadow-action-blue/25' : 'bg-red-50 text-red-600 border border-red-200'
-                                    }`}
-                                    title={isMicOn ? 'Tắt mic' : 'Bật mic'}
-                                >
-                                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                                    <span className="text-[9px] font-bold uppercase tracking-wide">Mic</span>
-                                </button>
-                                <button
-                                    onClick={handleVideoToggle}
-                                    className={`w-14 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all ${
-                                        isVideoOn ? 'bg-action-blue text-white shadow-md shadow-action-blue/25' : 'bg-red-50 text-red-600 border border-red-200'
-                                    }`}
-                                    title={isVideoOn ? 'Tắt camera' : 'Bật camera'}
-                                >
-                                    {isVideoOn ? <VideoIcon className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                                    <span className="text-[9px] font-bold uppercase tracking-wide">Camera</span>
-                                </button>
-                            </div>
+                            {/* Mic */}
+                            <button
+                                onClick={handleMicToggle}
+                                className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all text-white ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-600/80 hover:bg-red-600'}`}
+                                title={isMicOn ? 'Tắt mic' : 'Bật mic'}
+                            >
+                                {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                                <span className="text-[9px] font-bold uppercase tracking-wide">{isMicOn ? 'Mic bật' : 'Mic tắt'}</span>
+                            </button>
 
-                            <div className="w-px h-8 bg-platinum-tint hidden sm:block" />
+                            <div className="w-px h-8 bg-white/10" />
 
-                            {/* Giơ tay / Phát biểu / Reaction — thuần local, chưa có BE lưu trạng thái chia sẻ cho người khác */}
+                            {/* Interactions */}
                             <div className="flex items-center gap-1.5 relative">
                                 <button
                                     onClick={handleToggleRaiseHand}
+                                    className={`p-2.5 rounded-xl transition-all text-white ${isHandRaised ? 'bg-amber-500/80' : 'bg-white/10 hover:bg-white/20'}`}
                                     title="Giơ tay"
-                                    className={`p-2.5 rounded-xl transition-all ${isHandRaised ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'text-slate-blue hover:bg-cloud-mist'}`}
                                 >
-                                    <Hand className="w-4.5 h-4.5" />
+                                    <Hand className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={handleSelfSpeak}
+                                    className="p-2.5 rounded-xl text-white bg-white/10 hover:bg-white/20 transition-all"
                                     title="Phát biểu"
-                                    className="p-2.5 rounded-xl text-slate-blue hover:bg-cloud-mist transition-all"
                                 >
-                                    <Volume2 className="w-4.5 h-4.5" />
+                                    <Volume2 className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => setShowReactionPicker(v => !v)}
-                                    title="Thả cảm xúc"
                                     disabled={meetingState.reactionsLocked && !isHost}
-                                    className="p-2.5 rounded-xl text-slate-blue hover:bg-cloud-mist transition-all disabled:opacity-40"
+                                    className="p-2.5 rounded-xl text-white bg-white/10 hover:bg-white/20 transition-all disabled:opacity-30"
+                                    title="Cảm xúc"
                                 >
-                                    <Smile className="w-4.5 h-4.5" />
+                                    <Smile className="w-4 h-4" />
                                 </button>
+                                {!isHost && (
+                                    <button
+                                        onClick={() => setExtensionModal({ isOpen: true, minutes: 15, reason: '' })}
+                                        className="p-2.5 rounded-xl text-white bg-white/10 hover:bg-white/20 transition-all"
+                                        title="Yêu cầu gia hạn"
+                                    >
+                                        <Timer className="w-4 h-4" />
+                                    </button>
+                                )}
                                 {showReactionPicker && (
-                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex gap-1.5 bg-white p-2 rounded-xl border border-platinum-tint shadow-sm-2 z-20">
-                                        {['👏', '❤️', '👍', '🎉', '😂'].map(emoji => (
-                                            <button
-                                                key={emoji}
-                                                onClick={() => sendReaction(emoji)}
-                                                className="text-lg hover:scale-125 transition-transform px-1"
-                                            >
+                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex gap-1 bg-midnight-indigo border border-white/10 p-2 rounded-xl shadow-xl z-20">
+                                        {['👏', '❤️', '👍', '🎉', '😂', '🔥'].map(emoji => (
+                                            <button key={emoji} onClick={() => sendReaction(emoji)} className="text-lg hover:scale-125 transition-transform px-0.5">
                                                 {emoji}
                                             </button>
                                         ))}
@@ -1331,367 +1381,635 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 )}
                             </div>
 
-                            {/* Rời phòng */}
+                            {/* Leave */}
                             <button
                                 onClick={handleLeaveRoom}
-                                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-full text-xs font-bold transition-colors flex items-center gap-2 shadow-md shadow-red-600/20"
+                                className="ml-auto px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-red-900/40"
                             >
                                 <PhoneOff className="w-4 h-4" /> Rời khỏi
                             </button>
                         </div>
-
                     </div>
 
-                    {/* ROOM PANEL — sidebar phải, dạng tab */}
-                    <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-platinum-tint bg-white flex flex-col overflow-y-auto">
-                        <div className="px-6 pt-6 pb-4 border-b border-platinum-tint">
-                            <h2 className="text-sm font-extrabold text-midnight-indigo">Bảng điều khiển</h2>
-                            <p className="text-[11px] text-slate-blue">Quản lý phiên họp</p>
-                        </div>
+                    {/* Sidebar Toggle Button */}
+                    <button
+                        onClick={() => setIsSidebarOpen(v => !v)}
+                        className="hidden lg:flex items-center justify-center w-5 bg-slate-900 hover:bg-slate-800 border-x border-white/10 text-white/50 hover:text-white transition-all shrink-0 z-20"
+                        title={isSidebarOpen ? 'Đóng bảng' : 'Mở bảng'}
+                    >
+                        {isSidebarOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+                    </button>
 
-                        {/* Tab điều hướng */}
-                        <nav className="flex flex-col px-2 py-2 border-b border-platinum-tint">
-                            {[
-                                ...(isHost ? [{ id: 'host', label: 'Quản lý phòng', icon: Shield }] : []),
-                                { id: 'agenda', label: 'Lịch trình', icon: Calendar },
-                                { id: 'notes', label: 'Ghi chú', icon: StickyNote },
-                                { id: 'attendance', label: 'Người tham gia', icon: Users },
-                            ].map(tab => (
+                    {/* Right: Room Panel */}
+                    <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full lg:w-[320px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0'}`}>
+
+                        {/* Tabs */}
+                        <nav className="flex border-b border-platinum-tint shrink-0">
+                            {tabs.map(tab => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveChatTab(tab.id)}
-                                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-left ${
+                                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 text-[10px] font-bold transition-all border-b-2 ${
                                         activeChatTab === tab.id
-                                            ? 'bg-blue-50 text-action-blue'
-                                            : 'text-slate-blue hover:bg-cloud-mist'
+                                            ? 'border-action-blue text-action-blue bg-blue-50/50'
+                                            : 'border-transparent text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
                                     }`}
                                 >
                                     <tab.icon className="w-4 h-4" />
-                                    {tab.label}
+                                    <span className="uppercase tracking-wide">{tab.label}</span>
+                                    {tab.id === 'attendance' && (
+                                        <span className="text-[9px] text-emerald-600 font-extrabold">{checkedInCount}/{meetingState.participants?.length}</span>
+                                    )}
+                                    {tab.id === 'guests' && admittedGuestCount > 0 && (
+                                        <span className="text-[9px] text-amber-600 font-extrabold">{admittedGuestCount} đang xem</span>
+                                    )}
+                                    {tab.id === 'host' && pendingExtensions.length > 0 && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 absolute top-1 right-1" />
+                                    )}
                                 </button>
                             ))}
                         </nav>
 
-                        <div className="flex-1 p-5 flex flex-col gap-5 overflow-y-auto">
+                        {/* Tab Content */}
+                        <div className="flex-1 overflow-y-auto">
 
-                        {/* TAB: Host Controls */}
-                        {activeChatTab === 'host' && isHost && (
-                            <>
-                                {/* TODO: BE chưa trả room.hasMicrophone ở GET /meetings/:meetingId (BUG-02, phía BE) —
-                                    tạm gate theo status cuộc họp; đổi lại thành `meetingState?.room?.hasMicrophone`
-                                    khi BE bổ sung field, để không hiện nút ghi âm ở phòng không có mic. */}
-                                {meetingState.status === 'in_progress' && (
-                                    <div className="mb-4">
-                                        <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest mb-3">Ghi âm & Gán người nói (Trạm cố định)</h3>
-                                        <StationRecorder
-                                            meetingId={id}
-                                            meetingTitle={meetingState.title}
-                                            participants={meetingState.participants || []}
-                                            onUploadSuccess={(sessionId) => {
-                                                showToast('Đã tải lên tệp ghi âm thành công', 'success');
-                                                setRecordingSessionId(sessionId);
-                                            }}
-                                        />
+                            {/* ── TAB: Quản lý (host only) ── */}
+                            {activeChatTab === 'host' && isHost && (
+                                <div className="p-4 space-y-4">
+
+                                    {/* Pending Extension Requests */}
+                                    {pendingExtensions.length > 0 && (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                                            <h4 className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Timer className="w-3.5 h-3.5" /> Yêu cầu gia hạn ({pendingExtensions.length})
+                                            </h4>
+                                            {pendingExtensions.map(req => (
+                                                <div key={req.id} className="bg-white border border-amber-100 rounded-lg p-2.5 space-y-1.5">
+                                                    <p className="text-xs font-semibold text-midnight-indigo">
+                                                        <span className="font-bold">{req.requesterName || 'Thành viên'}</span> yêu cầu gia hạn <span className="text-action-blue font-extrabold">+{req.requestedExtensionMinutes} phút</span>
+                                                    </p>
+                                                    {req.reason && <p className="text-[10px] text-slate-blue italic">"{req.reason}"</p>}
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleDecideExtension(req.id, 'approved')}
+                                                            className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
+                                                        >
+                                                            <Check className="w-3 h-3" /> Duyệt
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDecideExtension(req.id, 'rejected')}
+                                                            className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
+                                                        >
+                                                            <VolumeX className="w-3 h-3" /> Từ chối
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Điểm danh thủ công */}
+                                    <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                        <div className="flex items-center justify-between px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                            <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
+                                                <UserCheck className="w-3.5 h-3.5 text-action-blue" /> Điểm danh thủ công
+                                            </h4>
+                                            <button onClick={loadAttendance} className="p-1 text-slate-blue hover:text-action-blue transition-colors">
+                                                <RefreshCw className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <div className="divide-y divide-platinum-tint max-h-44 overflow-y-auto">
+                                            {uncheckedParticipants.length === 0 ? (
+                                                <p className="text-[11px] text-slate-blue italic text-center py-3">Tất cả đã điểm danh.</p>
+                                            ) : (
+                                                uncheckedParticipants.map(p => (
+                                                    <div key={p.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-cloud-mist transition-colors">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <UserAvatar user={p} className="w-6 h-6 rounded-full shrink-0 text-[9px] font-bold" />
+                                                            <span className="text-xs font-semibold text-midnight-indigo truncate">{p.fullName}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleManualCheckIn(p)}
+                                                            disabled={manualCheckInLoading === p.id}
+                                                            className="ml-2 shrink-0 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-[9px] font-extrabold flex items-center gap-1 transition-all"
+                                                        >
+                                                            {manualCheckInLoading === p.id ? (
+                                                                <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                            ) : (
+                                                                <><UserCheck className="w-3 h-3" /> Điểm danh</>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
-                                )}
 
-                                <div className="bg-white border border-platinum-tint rounded-2xl p-4 space-y-3.5 shadow-sm-1">
-                                    <h3 className="text-xs font-bold text-midnight-indigo uppercase tracking-widest">Quyền tương tác</h3>
-
-                                    {/* Screen Share — BE hiện chưa có endpoint hỗ trợ, để disabled thay vì giả lập chạy được */}
-                                    <div className="flex items-center justify-between opacity-60" title="BE chưa hỗ trợ chia sẻ màn hình">
-                                        <span className="text-xs font-semibold text-midnight-indigo flex items-center gap-1.5">
-                                            <MonitorUp className="w-4 h-4" /> Chia sẻ màn hình
-                                        </span>
-                                        <span className="relative inline-flex h-5 w-9 items-center rounded-full bg-pale-gray cursor-not-allowed">
-                                            <span className="inline-block h-4 w-4 translate-x-0.5 rounded-full bg-white shadow" />
-                                        </span>
+                                    {/* Gia hạn cuộc họp */}
+                                    <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                        <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                            <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
+                                                <Timer className="w-3.5 h-3.5 text-action-blue" /> Gia hạn cuộc họp
+                                            </h4>
+                                        </div>
+                                        <div className="p-3">
+                                            <button
+                                                onClick={() => setExtensionModal({ isOpen: true, minutes: 15, reason: '' })}
+                                                className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-action-blue border border-blue-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Gửi yêu cầu gia hạn
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {/* Record Session — gắn thật vào recording-config / recording-session BE */}
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-midnight-indigo flex items-center gap-1.5">
-                                            <VideoIcon className="w-4 h-4" /> Ghi hình cuộc họp
-                                        </span>
-                                        <button
-                                            type="button"
-                                            disabled={actionLoading || recordingStatus === 'starting' || recordingStatus === 'stopping'}
-                                            onClick={() => {
-                                                if (recordingStatus === 'inactive') handleStartRecording();
-                                                else if (recordingStatus === 'recording' || recordingStatus === 'paused') handleStopRecording();
-                                            }}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-                                                recordingStatus !== 'inactive' ? 'bg-action-blue' : 'bg-pale-gray'
-                                            }`}
-                                        >
-                                            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${recordingStatus !== 'inactive' ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                        </button>
-                                    </div>
+                                    {/* Ghi âm */}
+                                    {meetingState.status === 'in_progress' && (
+                                        <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                            <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                                <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider">Ghi âm phiên họp</h4>
+                                            </div>
+                                            <div className="p-3">
+                                                <StationRecorder
+                                                    meetingId={id}
+                                                    meetingTitle={meetingState.title}
+                                                    participants={meetingState.participants || []}
+                                                    onUploadSuccess={(sessionId) => {
+                                                        showToast('Đã tải lên tệp ghi âm thành công', 'success');
+                                                        setRecordingSessionId(sessionId);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
 
-                                    {['recording', 'starting', 'stopping', 'paused'].includes(recordingStatus) && (
-                                        <>
+                                    {/* Ghi hình */}
+                                    <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                        <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                            <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
+                                                <VideoIcon className="w-3.5 h-3.5" /> Ghi hình camera phòng họp
+                                            </h4>
+                                        </div>
+                                        <div className="p-3 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-midnight-indigo font-semibold">
+                                                    {recordingStatus === 'inactive' ? 'Chưa ghi hình' :
+                                                     recordingStatus === 'recording' ? 'Đang ghi hình' :
+                                                     recordingStatus === 'paused' ? 'Đã tạm dừng' :
+                                                     'Đang xử lý...'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    disabled={actionLoading || recordingStatus === 'starting' || recordingStatus === 'stopping'}
+                                                    onClick={() => {
+                                                        if (recordingStatus === 'inactive') handleStartRecording();
+                                                        else if (['recording', 'paused'].includes(recordingStatus)) handleStopRecording();
+                                                    }}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${recordingStatus !== 'inactive' ? 'bg-action-blue' : 'bg-pale-gray'}`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${recordingStatus !== 'inactive' ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </div>
                                             <RecordingTimer
                                                 meetingId={id}
                                                 sessionId={recordingSessionId}
                                                 initialStatus={recordingStatus}
                                                 onStatusChange={setRecordingStatus}
                                             />
-                                            <div className="flex gap-2">
-                                                {recordingStatus === 'recording' && (
-                                                    <button onClick={handlePauseRecording} className="flex-1 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold">Tạm dừng</button>
-                                                )}
-                                                {recordingStatus === 'paused' && (
-                                                    <button onClick={handleResumeRecording} className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold">Tiếp tục</button>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col gap-2">
-                                    <button
-                                        onClick={handleHostMuteAll}
-                                        className="w-full py-2 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                                    >
-                                        <VolumeX className="w-4 h-4" /> Mute tất cả mọi người
-                                    </button>
-                                    <button
-                                        onClick={handleHostToggleLockReactions}
-                                        className={`w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border ${
-                                            meetingState.reactionsLocked
-                                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                                : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
-                                        }`}
-                                    >
-                                        <Smile className="w-4 h-4" />
-                                        {meetingState.reactionsLocked ? 'Mở khóa thả Reactions' : 'Khóa thả Reactions'}
-                                    </button>
-                                </div>
-
-                                {/* Next agenda item */}
-                                {meetingState.agenda?.[meetingState.currentAgendaIndex + 1] && (
-                                    <div className="bg-action-blue rounded-2xl p-4 text-white space-y-1 shadow-md shadow-action-blue/20">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-80">Mục lịch trình tiếp theo</span>
-                                        <h4 className="text-sm font-extrabold leading-snug">
-                                            {meetingState.agenda[meetingState.currentAgendaIndex + 1].title}
-                                        </h4>
-                                        <p className="text-[11px] opacity-90">
-                                            Bắt đầu trong {Math.max(1, Math.ceil(meetingState.agendaTimeLeft / 60))} phút
-                                        </p>
-                                        {meetingState.currentAgendaIndex + 1 < meetingState.agenda.length && (
-                                            <button
-                                                onClick={handleNextAgenda}
-                                                className="w-full mt-2 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1"
-                                            >
-                                                Chuyển ngay <ChevronRight className="w-3.5 h-3.5" />
-                                            </button>
-                                        )}
+                                            {['recording', 'paused'].includes(recordingStatus) && (
+                                                <div className="flex gap-2">
+                                                    {recordingStatus === 'recording' && (
+                                                        <button onClick={handlePauseRecording} className="flex-1 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold">Tạm dừng</button>
+                                                    )}
+                                                    {recordingStatus === 'paused' && (
+                                                        <button onClick={handleResumeRecording} className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold">Tiếp tục</button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                )}
-                            </>
-                        )}
 
-                        {/* TAB: Agenda */}
-                        {activeChatTab === 'agenda' && (
-                            <div className="flex flex-col gap-4">
-                                {meetingState.agenda && meetingState.agenda.length > 0 ? (
-                                    <>
-                                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-3">
-                                            <div>
-                                                <span className="text-[10px] font-extrabold text-action-blue uppercase tracking-wider block">Đang thảo luận</span>
-                                                <h4 className="font-extrabold text-midnight-indigo text-sm mt-0.5 leading-snug">
-                                                    {meetingState.agenda[meetingState.currentAgendaIndex]?.title}
+                                    {/* Tương tác */}
+                                    <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                        <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                            <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider">Kiểm soát tương tác</h4>
+                                        </div>
+                                        <div className="p-3 space-y-2">
+                                            <button
+                                                onClick={handleHostMuteAll}
+                                                className="w-full py-2 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                                            >
+                                                <VolumeX className="w-3.5 h-3.5" /> Tắt tiếng tất cả
+                                            </button>
+                                            <button
+                                                onClick={handleHostToggleLockReactions}
+                                                className={`w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border ${
+                                                    meetingState.reactionsLocked
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                                        : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                                }`}
+                                            >
+                                                <Smile className="w-3.5 h-3.5" />
+                                                {meetingState.reactionsLocked ? 'Mở khóa cảm xúc' : 'Khóa cảm xúc'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Thiết bị phòng */}
+                                    {roomDevices.length > 0 && (
+                                        <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
+                                            <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                                <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Cpu className="w-3.5 h-3.5 text-action-blue" /> Thiết bị phòng ({roomDevices.length})
                                                 </h4>
-                                                {meetingState.agenda[meetingState.currentAgendaIndex]?.attachments?.length > 0 && (
-                                                    <div className="mt-2 space-y-1.5">
-                                                        {meetingState.agenda[meetingState.currentAgendaIndex].attachments.map(att => (
-                                                            <div key={att.id} className="flex items-center justify-between bg-white border border-blue-100 p-2 rounded-lg">
-                                                                <div className="flex items-center gap-1.5 truncate">
-                                                                    <FileText className="w-3.5 h-3.5 text-slate-blue shrink-0" />
-                                                                    <span className="text-[11px] font-semibold text-midnight-indigo truncate">{att.fileName}</span>
-                                                                </div>
-                                                                {isHost && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            if (presentedFile?.fileId === att.id) {
-                                                                                getSocket().emit('agenda:present_stop', { meetingId: id });
-                                                                            } else {
-                                                                                getSocket().emit('agenda:present', {
-                                                                                    meetingId: id,
-                                                                                    agendaId: meetingState.agenda[meetingState.currentAgendaIndex].id,
-                                                                                    fileId: att.id,
-                                                                                    fileName: att.fileName,
-                                                                                    presentedBy: myParticipantId
-                                                                                });
-                                                                            }
-                                                                        }}
-                                                                        className={`shrink-0 ml-2 px-2 py-1 rounded text-[9px] font-extrabold uppercase transition-colors ${
-                                                                            presentedFile?.fileId === att.id 
-                                                                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                                                            : 'bg-action-blue text-white hover:bg-glacier-blue'
-                                                                        }`}
-                                                                    >
-                                                                        {presentedFile?.fileId === att.id ? 'Dừng chiếu' : 'Chiếu'}
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                            </div>
+                                            <div className="divide-y divide-platinum-tint">
+                                                {roomDevices.map((device, idx) => (
+                                                    <div key={device.id || idx} className="flex items-center justify-between px-3 py-2">
+                                                        <span className="text-xs text-midnight-indigo font-semibold truncate">{device.name || device.deviceName || `Thiết bị ${idx + 1}`}</span>
+                                                        <span className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
+                                                            device.status === 'online' || device.isOnline
+                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                : 'bg-red-50 text-red-600 border-red-200'
+                                                        }`}>
+                                                            {device.status === 'online' || device.isOnline ? 'Online' : 'Offline'}
+                                                        </span>
                                                     </div>
-                                                )}
+                                                ))}
                                             </div>
-                                            <div className="flex justify-between items-center bg-white px-2.5 py-1.5 rounded-lg border border-blue-100">
-                                                <span className="text-[10px] text-slate-blue font-bold">Thời gian còn lại:</span>
-                                                <span className="text-xs font-mono font-extrabold text-action-blue">
-                                                    {Math.floor(meetingState.agendaTimeLeft / 60)}:{(meetingState.agendaTimeLeft % 60).toString().padStart(2, '0')}
-                                                </span>
+                                        </div>
+                                    )}
+
+                                    {/* Chuyển chương trình tiếp theo */}
+                                    {meetingState.agenda?.length > 0 && (
+                                        <div className="bg-action-blue rounded-xl p-4 text-white">
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-70">Đang thảo luận</span>
+                                            <h4 className="text-sm font-extrabold mt-0.5 leading-snug">
+                                                {meetingState.agenda[meetingState.currentAgendaIndex]?.title}
+                                            </h4>
+                                            <div className="flex items-center gap-1.5 mt-1 text-[11px] opacity-80">
+                                                <Clock className="w-3 h-3" />
+                                                Còn lại: {Math.floor(meetingState.agendaTimeLeft / 60)}:{(meetingState.agendaTimeLeft % 60).toString().padStart(2, '0')}
                                             </div>
-                                            {isHost && meetingState.currentAgendaIndex + 1 < meetingState.agenda.length && (
+                                            {meetingState.currentAgendaIndex + 1 < meetingState.agenda.length && (
                                                 <button
                                                     onClick={handleNextAgenda}
-                                                    className="w-full py-1.5 bg-action-blue hover:bg-glacier-blue text-white rounded-lg text-[10.5px] font-extrabold transition-all flex items-center justify-center gap-0.5"
+                                                    className="w-full mt-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all"
                                                 >
-                                                    Mục tiếp theo <ChevronRight className="w-3.5 h-3.5" />
+                                                    Chuyển mục tiếp theo <ChevronRight className="w-3.5 h-3.5" />
                                                 </button>
                                             )}
                                         </div>
+                                    )}
+                                </div>
+                            )}
 
-                                        {mediaFiles.length > 0 && (
-                                            <div>
-                                                <h4 className="text-xs font-bold text-midnight-indigo uppercase mb-2 flex items-center gap-1.5">
-                                                    <ListTodo className="w-3.5 h-3.5" /> Video ghi hình ({mediaFiles.length})
-                                                </h4>
-                                                <div className="space-y-2">
-                                                    {mediaFiles.map((file, idx) => (
-                                                        <div key={file.id || idx} className="p-3 bg-cloud-mist border border-platinum-tint rounded-xl flex items-center justify-between">
-                                                            <div className="flex items-center">
-                                                                <VideoIcon className="w-4 h-4 text-action-blue mr-2 shrink-0" />
-                                                                <div className="text-left">
-                                                                    <p className="text-xs font-semibold text-midnight-indigo">{file.title || `Video_${idx + 1}`}</p>
-                                                                    <p className="text-[9px] text-slate-blue">{file.duration ? formatDuration(file.duration) : 'Recording'}</p>
-                                                                </div>
+                            {/* ── TAB: Chương trình ── */}
+                            {activeChatTab === 'agenda' && (
+                                <div className="p-4 space-y-3">
+                                    {meetingState.agenda?.length > 0 ? (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider">Chương trình họp</h3>
+                                                <span className="text-[10px] text-slate-blue font-medium">
+                                                    {meetingState.currentAgendaIndex + 1}/{meetingState.agenda.length} mục
+                                                </span>
+                                            </div>
+
+                                            {meetingState.agenda.map((item, idx) => {
+                                                const isCurrent = idx === meetingState.currentAgendaIndex;
+                                                const isPast = idx < meetingState.currentAgendaIndex;
+                                                const isExpanded = expandedAgendaIdx === idx;
+
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className={`rounded-xl border overflow-hidden transition-all ${
+                                                            isCurrent ? 'border-action-blue shadow-md shadow-action-blue/10' :
+                                                            isPast ? 'border-platinum-tint opacity-60' :
+                                                            'border-platinum-tint'
+                                                        }`}
+                                                    >
+                                                        {/* Header */}
+                                                        <button
+                                                            className={`w-full flex items-start gap-3 p-3 text-left transition-colors ${
+                                                                isCurrent ? 'bg-blue-50' : 'bg-white hover:bg-cloud-mist'
+                                                            }`}
+                                                            onClick={() => setExpandedAgendaIdx(isExpanded ? null : idx)}
+                                                        >
+                                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5 ${
+                                                                isCurrent ? 'bg-action-blue text-white' :
+                                                                isPast ? 'bg-emerald-100 text-emerald-700' :
+                                                                'bg-cloud-mist text-slate-blue border border-platinum-tint'
+                                                            }`}>
+                                                                {isPast ? <Check className="w-3 h-3" /> : idx + 1}
                                                             </div>
-                                                            <a href={file.downloadUrl || '#'} target="_blank" rel="noreferrer" className="p-1.5 bg-white border border-platinum-tint rounded-lg text-action-blue hover:text-glacier-blue">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <p className={`text-xs font-bold leading-snug ${isCurrent ? 'text-action-blue' : 'text-midnight-indigo'}`}>
+                                                                        {item.title}
+                                                                    </p>
+                                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 ${isCurrent ? 'bg-action-blue/10 text-action-blue' : 'bg-cloud-mist text-slate-blue'}`}>
+                                                                        {item.durationMin || item.plannedDurationMinutes}ph
+                                                                    </span>
+                                                                </div>
+                                                                {isCurrent && (
+                                                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-action-blue font-semibold">
+                                                                        <Clock className="w-3 h-3" />
+                                                                        Còn {Math.floor(meetingState.agendaTimeLeft / 60)}:{(meetingState.agendaTimeLeft % 60).toString().padStart(2, '0')}
+                                                                    </div>
+                                                                )}
+                                                                {(item.description || item.attachments?.length > 0) && (
+                                                                    <div className={`flex items-center gap-1 mt-0.5 text-[9px] ${isCurrent ? 'text-action-blue/70' : 'text-slate-blue'}`}>
+                                                                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                                        {isExpanded ? 'Thu gọn' : 'Xem chi tiết'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </button>
+
+                                                        {/* Expanded Detail */}
+                                                        {isExpanded && (
+                                                            <div className="px-3 pb-3 pt-0 bg-white border-t border-platinum-tint space-y-2">
+                                                                {item.description && (
+                                                                    <p className="text-[11px] text-slate-blue leading-relaxed pt-2">{item.description}</p>
+                                                                )}
+                                                                {item.attachments?.length > 0 && (
+                                                                    <div className="space-y-1.5">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="text-[9px] font-bold text-slate-blue uppercase tracking-wider">Tài liệu đính kèm</span>
+                                                                            <button
+                                                                                onClick={() => setAgendaDocView({ agendaItem: item, selectedAttachmentIdx: 0 })}
+                                                                                className="px-2 py-1 bg-action-blue text-white rounded-lg text-[9px] font-bold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
+                                                                            >
+                                                                                <FileText className="w-3 h-3" /> Xem tài liệu
+                                                                            </button>
+                                                                        </div>
+                                                                        {item.attachments.map(att => (
+                                                                            <div key={att.id} className="flex items-center justify-between bg-cloud-mist p-2 rounded-lg border border-platinum-tint">
+                                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                                    <FileText className="w-3.5 h-3.5 text-slate-blue shrink-0" />
+                                                                                    <span className="text-[11px] font-medium text-midnight-indigo truncate">{att.fileName}</span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-1 ml-2 shrink-0">
+                                                                                    {isHost && isCurrent && (
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                if (presentedFile?.fileId === att.id) {
+                                                                                                    getSocket().emit('agenda:present_stop', { meetingId: id });
+                                                                                                } else {
+                                                                                                    getSocket().emit('agenda:present', {
+                                                                                                        meetingId: id,
+                                                                                                        agendaId: item.id,
+                                                                                                        fileId: att.id,
+                                                                                                        fileName: att.fileName,
+                                                                                                        presentedBy: myParticipantId,
+                                                                                                    });
+                                                                                                }
+                                                                                            }}
+                                                                                            className={`px-2 py-1 rounded text-[9px] font-bold ${
+                                                                                                presentedFile?.fileId === att.id
+                                                                                                    ? 'bg-red-50 text-red-600'
+                                                                                                    : 'bg-action-blue text-white'
+                                                                                            }`}
+                                                                                        >
+                                                                                            {presentedFile?.fileId === att.id ? 'Dừng' : 'Chiếu'}
+                                                                                        </button>
+                                                                                    )}
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            try {
+                                                                                                const res = await request(`/media-files/${att.id}`, { method: 'GET' });
+                                                                                                const url = res.data?.data?.downloadUrl || res.data?.downloadUrl;
+                                                                                                if (url) window.open(url, '_blank');
+                                                                                                else showToast('Không có link tải', 'error');
+                                                                                            } catch { showToast('Lỗi mở tài liệu', 'error'); }
+                                                                                        }}
+                                                                                        className="p-1 text-slate-blue hover:text-action-blue transition-colors"
+                                                                                    >
+                                                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                {isHost && isCurrent && meetingState.currentAgendaIndex + 1 < meetingState.agenda.length && (
+                                                                    <button
+                                                                        onClick={handleNextAgenda}
+                                                                        className="w-full py-1.5 bg-action-blue hover:bg-glacier-blue text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
+                                                                    >
+                                                                        Chuyển mục tiếp theo <ChevronRight className="w-3 h-3" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Media files */}
+                                            {mediaFiles.length > 0 && (
+                                                <div className="space-y-1.5">
+                                                    <h4 className="text-[10px] font-bold text-slate-blue uppercase tracking-wider flex items-center gap-1.5">
+                                                        <VideoIcon className="w-3 h-3" /> Video ghi hình ({mediaFiles.length})
+                                                    </h4>
+                                                    {mediaFiles.map((file, idx) => (
+                                                        <div key={file.id || idx} className="p-2.5 bg-cloud-mist border border-platinum-tint rounded-xl flex items-center justify-between">
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-midnight-indigo">{file.title || `Video_${idx + 1}`}</p>
+                                                                <p className="text-[9px] text-slate-blue">{file.duration ? formatDuration(file.duration) : 'Đã ghi'}</p>
+                                                            </div>
+                                                            <a href={file.downloadUrl || '#'} target="_blank" rel="noreferrer" className="p-1.5 bg-white border border-platinum-tint rounded-lg text-action-blue hover:text-glacier-blue transition-colors">
                                                                 <Play className="w-3 h-3" />
                                                             </a>
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-10">
+                                            <Calendar className="w-8 h-8 text-pale-gray mx-auto mb-2" />
+                                            <p className="text-xs text-slate-blue italic">Chưa có chương trình cuộc họp.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                        <span className="text-[10px] font-bold text-slate-blue uppercase tracking-widest block">Nội dung kế tiếp</span>
-                                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                                            {meetingState.agenda.slice(meetingState.currentAgendaIndex + 1).map((item, idx) => (
-                                                <div key={idx} className="flex flex-col gap-1 p-2.5 bg-cloud-mist rounded-lg border border-platinum-tint">
-                                                    <div className="flex justify-between items-center text-[11px] font-semibold text-midnight-indigo">
-                                                        <span className="truncate max-w-[140px]">{item.title}</span>
-                                                        <span className="text-[10px] text-action-blue font-bold bg-blue-50 px-2 py-0.5 rounded shrink-0">{item.durationMin || item.plannedDurationMinutes} phút</span>
+                            {/* ── TAB: Ghi chú ── */}
+                            {activeChatTab === 'notes' && (
+                                <div className="flex flex-col h-full">
+                                    {/* Note input */}
+                                    <form onSubmit={handleAddNote} className="p-3 border-b border-platinum-tint bg-cloud-mist shrink-0">
+                                        <textarea
+                                            value={noteInput}
+                                            onChange={e => setNoteInput(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddNote(e); }}}
+                                            placeholder="Nhập ghi chú cuộc họp... (Enter để gửi, Shift+Enter xuống dòng)"
+                                            rows={2}
+                                            className="w-full px-3 py-2 bg-white border border-platinum-tint rounded-xl text-xs text-midnight-indigo focus:outline-none focus:border-action-blue resize-none"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!noteInput.trim()}
+                                            className="mt-2 w-full py-2 bg-action-blue hover:bg-glacier-blue disabled:opacity-40 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Thêm ghi chú
+                                        </button>
+                                    </form>
+
+                                    {/* Notes list */}
+                                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                                        {notes.length === 0 ? (
+                                            <div className="text-center py-10">
+                                                <StickyNote className="w-8 h-8 text-pale-gray mx-auto mb-2" />
+                                                <p className="text-xs text-slate-blue italic">Chưa có ghi chú nào.</p>
+                                            </div>
+                                        ) : (
+                                            notes.map((note, idx) => {
+                                                const authorName = note.author?.fullName || note.authorName || 'Người dùng';
+                                                const createdAt = note.createdAt || note.created_at;
+                                                const timeStr = createdAt ? new Date(createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+                                                return (
+                                                    <div key={note.id || idx} className="bg-white border border-platinum-tint rounded-xl p-3 space-y-1.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[10px] font-extrabold text-action-blue">{authorName}</span>
+                                                            {timeStr && <span className="text-[9px] text-slate-blue">{timeStr}</span>}
+                                                        </div>
+                                                        <p className="text-xs text-midnight-indigo leading-relaxed">{note.content}</p>
                                                     </div>
-                                                    {item.attachments?.length > 0 && (
-                                                        <div className="flex items-center gap-1 mt-0.5 opacity-70">
-                                                            <FileText className="w-3 h-3 text-slate-blue" />
-                                                            <span className="text-[9px] text-slate-blue font-medium">{item.attachments.length} tài liệu</span>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── TAB: Người tham gia ── */}
+                            {activeChatTab === 'attendance' && (
+                                <div className="p-3 space-y-3">
+                                    {/* Summary */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="bg-cloud-mist border border-platinum-tint rounded-xl p-2.5 text-center">
+                                            <div className="text-lg font-extrabold text-midnight-indigo">{meetingState.participants?.length || 0}</div>
+                                            <div className="text-[9px] text-slate-blue font-medium uppercase tracking-wide mt-0.5">Tổng</div>
+                                        </div>
+                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center">
+                                            <div className="text-lg font-extrabold text-emerald-700">{checkedInCount}</div>
+                                            <div className="text-[9px] text-emerald-700 font-medium uppercase tracking-wide mt-0.5">Có mặt</div>
+                                        </div>
+                                        <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-center">
+                                            <div className="text-lg font-extrabold text-red-600">{(meetingState.participants?.length || 0) - checkedInCount}</div>
+                                            <div className="text-[9px] text-red-600 font-medium uppercase tracking-wide mt-0.5">Chưa điểm</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Participant list */}
+                                    <div className="space-y-1.5">
+                                        {meetingState.participants?.map(p => {
+                                            const status = getPresenceStatus(p.id);
+                                            const presenceInfo = PRESENCE_MAP[status] || PRESENCE_MAP['unknown'];
+                                            const record = getAttendanceRecord(p.id);
+                                            const checkedInTime = record?.checkInTime || record?.check_in_time || record?.createdAt;
+                                            const timeStr = checkedInTime ? new Date(checkedInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+
+                                            return (
+                                                <div key={p.id} className={`bg-white border rounded-xl p-3 flex items-center gap-3 ${isCheckedIn(p.id) ? 'border-emerald-100' : 'border-platinum-tint'}`}>
+                                                    <div className="relative shrink-0">
+                                                        <UserAvatar user={p} className="w-8 h-8 rounded-full text-xs font-bold" />
+                                                        {isCheckedIn(p.id) && (
+                                                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
+                                                                <Check className="w-2 h-2 text-white" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs font-bold text-midnight-indigo truncate">{p.fullName}</span>
+                                                            {p.role === 'Chủ tọa' && (
+                                                                <span className="text-[8px] px-1.5 py-0.5 bg-red-50 text-red-600 rounded font-extrabold shrink-0">CT</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${presenceInfo.color}`}>
+                                                                {presenceInfo.label}
+                                                            </span>
+                                                            {timeStr && <span className="text-[9px] text-slate-blue">{timeStr}</span>}
+                                                        </div>
+                                                    </div>
+
+                                                    {isHost && (
+                                                        <div className="shrink-0">
+                                                            {isCheckedIn(p.id) ? (
+                                                                <button
+                                                                    onClick={() => handleInvalidateAttendance(p)}
+                                                                    disabled={manualCheckInLoading === p.id}
+                                                                    className="p-1.5 text-slate-blue hover:text-red-600 transition-colors disabled:opacity-50"
+                                                                    title="Hủy điểm danh"
+                                                                >
+                                                                    {manualCheckInLoading === p.id
+                                                                        ? <span className="w-3.5 h-3.5 border-2 border-slate-blue/30 border-t-slate-blue rounded-full animate-spin block" />
+                                                                        : <UserX className="w-3.5 h-3.5" />
+                                                                    }
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleManualCheckIn(p)}
+                                                                    disabled={manualCheckInLoading === p.id}
+                                                                    className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-[9px] font-bold flex items-center gap-1 transition-all"
+                                                                >
+                                                                    {manualCheckInLoading === p.id
+                                                                        ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                                        : <><UserCheck className="w-3 h-3" /> Điểm</>
+                                                                    }
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
-                                            ))}
-                                            {meetingState.currentAgendaIndex + 1 >= meetingState.agenda.length && (
-                                                <p className="text-[10px] text-slate-blue italic text-center py-2">Không còn hạng mục nào tiếp theo.</p>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <p className="text-xs text-slate-blue italic text-center py-4">Chưa cài đặt Agenda cho cuộc họp.</p>
-                                )}
-                            </div>
-                        )}
+                                            );
+                                        })}
+                                    </div>
 
-                        {/* TAB: Notes */}
-                        {activeChatTab === 'notes' && (
-                            <div className="flex flex-col gap-3 flex-1">
-                                <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[420px]">
-                                    {notes.map((note, idx) => {
-                                        const authorName = note.author?.fullName || note.authorName || 'Chưa rõ';
-                                        return (
-                                            <div key={idx} className="bg-cloud-mist p-2.5 rounded-lg border border-platinum-tint">
-                                                <div className="text-[10px] text-action-blue font-bold mb-1">{authorName}</div>
-                                                <div className="text-xs text-midnight-indigo">{note.content}</div>
-                                            </div>
-                                        );
-                                    })}
-                                    {notes.length === 0 && <p className="text-xs text-slate-blue italic">Chưa có ghi chú nào.</p>}
+                                    <button
+                                        onClick={loadAttendance}
+                                        className="w-full py-2 bg-cloud-mist hover:bg-pale-gray text-slate-blue border border-platinum-tint rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                                    >
+                                        <RefreshCw className="w-3.5 h-3.5" /> Làm mới
+                                    </button>
                                 </div>
-                                <form onSubmit={handleAddNote} className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={noteInput}
-                                        onChange={e => setNoteInput(e.target.value)}
-                                        placeholder="Thêm ghi chú..."
-                                        className="flex-1 px-3 py-1.5 bg-cloud-mist border border-platinum-tint rounded-lg text-xs text-midnight-indigo focus:outline-none focus:border-action-blue"
-                                    />
-                                    <button type="submit" disabled={actionLoading} className="px-3 py-1.5 bg-action-blue hover:bg-glacier-blue text-white rounded-lg text-xs font-bold">Gửi</button>
-                                </form>
-                            </div>
-                        )}
+                            )}
 
-                        {/* TAB: Attendance */}
-                        {activeChatTab === 'attendance' && (
-                            <div className="flex flex-col gap-2 flex-1 overflow-y-auto max-h-[460px]">
-                                {attendance.map((att, idx) => {
-                                    const name = att.fullName || att.userFullName || 'Chưa rõ';
-                                    const status = att.presenceStatus || att.attendanceStatus || 'unknown';
-                                    return (
-                                        <div key={idx} className="flex items-center justify-between bg-cloud-mist p-2.5 rounded-lg border border-platinum-tint">
-                                            <div className="text-xs text-midnight-indigo font-semibold">{name}</div>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                                                status === 'present' ? 'bg-emerald-50 text-emerald-700' :
-                                                status === 'maybe_present' || status === 'late' ? 'bg-amber-50 text-amber-700' :
-                                                'bg-red-50 text-red-600'
-                                            }`}>
-                                                {status}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                                {attendance.length === 0 && <p className="text-xs text-slate-blue italic">Chưa có dữ liệu điểm danh từ thiết bị.</p>}
-                            </div>
-                        )}
-
-                    </div>
+                            {/* ── TAB: Khách ngoài công ty (host only) ── */}
+                            {activeChatTab === 'guests' && isHost && (
+                                <GuestPanel
+                                    meetingId={id}
+                                    onGuestCountChange={setAdmittedGuestCount}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* RENAME MODAL */}
             {renameModal.isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm transition-all">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
                     <div className="bg-white border border-platinum-tint rounded-2xl p-6 w-full max-w-sm shadow-sm-3">
-                        <h3 className="text-lg font-bold text-midnight-indigo mb-2">
-                            {renameModal.isSelf ? 'Nhập tên hiển thị mới của bạn:' : `Thay đổi tên cho thành viên "${renameModal.currentName}":`}
+                        <h3 className="text-base font-bold text-midnight-indigo mb-3">
+                            {renameModal.isSelf ? 'Đổi tên hiển thị của bạn' : `Đổi tên cho "${renameModal.currentName}"`}
                         </h3>
                         <input
                             type="text"
                             autoFocus
-                            defaultValue={renameModal.currentName}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') submitRename(e.target.value);
-                            }}
                             id="renameInput"
-                            className="w-full px-4 py-3 bg-cloud-mist border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue transition-colors text-midnight-indigo font-semibold mb-6"
+                            defaultValue={renameModal.currentName}
+                            onKeyDown={(e) => { if (e.key === 'Enter') submitRename(e.target.value); }}
+                            className="w-full px-4 py-3 bg-cloud-mist border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-semibold mb-5"
                         />
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true })}
-                                className="px-4 py-2 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo rounded-xl text-xs font-bold transition-colors"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={() => submitRename(document.getElementById('renameInput').value)}
-                                className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-action-blue/20"
-                            >
-                                Lưu thay đổi
-                            </button>
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={() => setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true })} className="px-4 py-2 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo rounded-xl text-xs font-bold">Hủy</button>
+                            <button onClick={() => submitRename(document.getElementById('renameInput').value)} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold shadow-lg shadow-action-blue/20">Lưu</button>
                         </div>
                     </div>
                 </div>
@@ -1699,63 +2017,110 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
             {/* CONFIRM LEAVE MODAL */}
             {confirmLeaveModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm transition-all">
-                    <div className="bg-white border border-platinum-tint rounded-2xl p-6 w-full max-w-sm shadow-sm-3">
-                        <h3 className="text-lg font-bold text-midnight-indigo mb-2">Xác nhận rời phòng</h3>
-                        <p className="text-sm text-slate-blue mb-6">Bạn có chắc chắn muốn rời phòng họp?</p>
-                        <div className="flex flex-col gap-2">
-                            {isHost && (
-                                <button
-                                    onClick={handleEndMeeting}
-                                    disabled={actionLoading}
-                                    className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-red-600/20"
-                                >
-                                    {actionLoading ? 'Đang kết thúc...' : 'Kết thúc cuộc họp cho tất cả'}
-                                </button>
-                            )}
-                            <div className="flex gap-2 w-full">
-                                <button
-                                    onClick={() => setConfirmLeaveModal(false)}
-                                    className="flex-1 px-4 py-2.5 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo rounded-xl text-xs font-bold transition-colors"
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    onClick={confirmLeave}
-                                    className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                                        isHost
-                                            ? 'bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint'
-                                            : 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20'
-                                    }`}
-                                >
-                                    Rời đi
-                                </button>
-                            </div>
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="bg-white border border-platinum-tint rounded-2xl p-6 w-full max-w-sm shadow-sm-3 space-y-4">
+                        <div>
+                            <h3 className="text-base font-bold text-midnight-indigo">Rời phòng họp?</h3>
+                            <p className="text-sm text-slate-blue mt-1">Bạn có chắc muốn rời khỏi phòng họp?</p>
+                        </div>
+                        {isHost && (
+                            <button
+                                onClick={handleEndMeeting}
+                                disabled={actionLoading}
+                                className="w-full py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white rounded-xl text-sm font-bold"
+                            >
+                                {actionLoading ? 'Đang kết thúc...' : 'Kết thúc cuộc họp cho tất cả'}
+                            </button>
+                        )}
+                        <div className="flex gap-2">
+                            <button onClick={() => setConfirmLeaveModal(false)} className="flex-1 py-2.5 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-xl text-sm font-bold">Hủy</button>
+                            <button
+                                onClick={confirmLeave}
+                                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                    isHost ? 'bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint' : 'bg-red-600 hover:bg-red-500 text-white'
+                                }`}
+                            >
+                                Rời đi
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* TOAST ALERTS OVERLAY */}
-            <div className="fixed bottom-24 right-6 z-50 flex flex-col gap-2">
+            {/* EXTENSION MODAL */}
+            {extensionModal.isOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="bg-white border border-platinum-tint rounded-2xl p-6 w-full max-w-sm shadow-sm-3 space-y-4">
+                        <div>
+                            <h3 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
+                                <Timer className="w-5 h-5 text-action-blue" /> Yêu cầu gia hạn cuộc họp
+                            </h3>
+                            <p className="text-xs text-slate-blue mt-1">Gửi yêu cầu gia hạn đến chủ tọa để phê duyệt.</p>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1.5">Gia hạn thêm (phút)</label>
+                                <div className="flex gap-2">
+                                    {[15, 30, 45, 60].map(m => (
+                                        <button
+                                            key={m}
+                                            onClick={() => setExtensionModal(prev => ({ ...prev, minutes: m }))}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                                extensionModal.minutes === m
+                                                    ? 'bg-action-blue text-white border-action-blue'
+                                                    : 'bg-cloud-mist text-midnight-indigo border-platinum-tint hover:border-action-blue'
+                                            }`}
+                                        >
+                                            {m}ph
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1.5">Lý do</label>
+                                <textarea
+                                    value={extensionModal.reason}
+                                    onChange={e => setExtensionModal(prev => ({ ...prev, reason: e.target.value }))}
+                                    placeholder="Lý do cần gia hạn (không bắt buộc)..."
+                                    rows={2}
+                                    className="w-full px-3 py-2 bg-cloud-mist border border-platinum-tint rounded-xl text-xs text-midnight-indigo focus:outline-none focus:border-action-blue resize-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setExtensionModal({ isOpen: false, minutes: 15, reason: '' })} className="flex-1 py-2.5 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-xl text-sm font-bold">Hủy</button>
+                            <button
+                                onClick={handleRequestExtension}
+                                disabled={actionLoading}
+                                className="flex-1 py-2.5 bg-action-blue hover:bg-glacier-blue disabled:opacity-60 text-white rounded-xl text-sm font-bold"
+                            >
+                                {actionLoading ? 'Đang gửi...' : `Gửi yêu cầu +${extensionModal.minutes}ph`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TOAST OVERLAY */}
+            <div className="fixed bottom-24 right-5 z-[9998] flex flex-col gap-2 pointer-events-none">
                 <AnimatePresence>
                     {toasts.map(t => (
                         <motion.div
                             key={t.id}
-                            initial={{ opacity: 0, y: 25 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            className={`px-4 py-3 rounded-xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 text-white ${
-                                t.type === 'error' ? 'bg-red-600 border-red-500 shadow-red-950/40' :
-                                t.type === 'warning' ? 'bg-amber-500 border-amber-400 shadow-amber-950/40' :
-                                t.type === 'success' ? 'bg-emerald-600 border-emerald-500 shadow-emerald-950/40' :
-                                'bg-indigo-950 border-indigo-800 shadow-indigo-950/40'
+                            initial={{ opacity: 0, x: 30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 30 }}
+                            className={`px-4 py-3 rounded-xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 text-white max-w-[260px] ${
+                                t.type === 'error' ? 'bg-red-600 border-red-500' :
+                                t.type === 'warning' ? 'bg-amber-500 border-amber-400' :
+                                t.type === 'success' ? 'bg-emerald-600 border-emerald-500' :
+                                'bg-midnight-indigo border-indigo-800'
                             }`}
                         >
-                            {t.type === 'error' && <VolumeX className="w-4 h-4 shrink-0" />}
-                            {t.type === 'warning' && <AlertTriangle className="w-4 h-4 shrink-0" />}
-                            {t.type === 'success' && <Check className="w-4 h-4 shrink-0" />}
-                            <span>{t.message}</span>
+                            {t.type === 'error' && <VolumeX className="w-3.5 h-3.5 shrink-0" />}
+                            {t.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                            {t.type === 'success' && <Check className="w-3.5 h-3.5 shrink-0" />}
+                            <span className="leading-snug">{t.message}</span>
                         </motion.div>
                     ))}
                 </AnimatePresence>
