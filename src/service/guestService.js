@@ -48,10 +48,6 @@ export const getGuestMeeting = (meetingId) =>
 export const listMeetingGuests = (meetingId) =>
     get(`/live-meetings/${meetingId}/guests`);
 
-/** Hàng chờ duyệt (lobby) */
-export const getMeetingLobby = (meetingId) =>
-    get(`/live-meetings/${meetingId}/guests/lobby`);
-
 /** Duyệt khách vào họp */
 export const admitGuest = (meetingId, externalParticipantId) =>
     post(`/live-meetings/${meetingId}/guests/${externalParticipantId}/admit`);
