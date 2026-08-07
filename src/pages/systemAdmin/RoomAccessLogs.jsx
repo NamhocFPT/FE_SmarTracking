@@ -211,21 +211,62 @@ const RoomAccessLogs = () => {
         fetchMeetings();
     }, [fetchMeetings]);
 
-    // Fetch access logs — server-side pagination + search
     const fetchLogs = useCallback(async () => {
         setLogsLoading(true);
         setError(null);
         try {
-            const res = await getRoomAccessLog(selectedRoomId, selectedDate, {
-                page: currentPage,
-                limit: LOGS_PER_PAGE,
+            // Lần gọi đầu tiên để lấy tổng số trang/record (với limit tối đa của BE là 100)
+            const firstRes = await getRoomAccessLog(selectedRoomId, selectedDate, {
+                page: 1,
+                limit: 100, 
                 search: debouncedSearch || undefined,
                 meetingId: selectedMeetingId || undefined
             });
-            if (res?.success && res.data) {
-                setLogsData(res.data);
+
+            if (firstRes?.success && firstRes.data) {
+                let allEvents = [...(firstRes.data.events || [])];
+                const meta = firstRes.data;
+                const pagination = meta.pagination || {};
+                
+                // Xác định số trang dựa trên dữ liệu trả về
+                const totalItems = pagination.total ?? pagination.totalItems ?? pagination.totalEvents ?? meta.totalEvents ?? allEvents.length;
+                const backendTotalPages = pagination.totalPages ?? Math.max(1, Math.ceil(totalItems / 100));
+
+                // Nếu BE chia làm nhiều trang do limit 100, ta gọi Promise.all để lấy nốt các trang còn lại
+                if (backendTotalPages > 1) {
+                    const promises = [];
+                    for (let p = 2; p <= backendTotalPages; p++) {
+                        promises.push(
+                            getRoomAccessLog(selectedRoomId, selectedDate, {
+                                page: p,
+                                limit: 100,
+                                search: debouncedSearch || undefined,
+                                meetingId: selectedMeetingId || undefined
+                            }).catch(() => null) // Bỏ qua lỗi lẻ tẻ để không sập toàn bộ
+                        );
+                    }
+                    
+                    const results = await Promise.all(promises);
+                    results.forEach(res => {
+                        if (res?.success && res.data?.events) {
+                            allEvents = [...allEvents, ...res.data.events];
+                        }
+                    });
+                }
+                
+                // Cập nhật lại logsData với mảng toàn bộ sự kiện
+                setLogsData({
+                    ...meta,
+                    events: allEvents,
+                    // Cập nhật lại thông tin tổng để hiển thị đúng
+                    totalEvents: allEvents.length,
+                    pagination: {
+                        ...pagination,
+                        total: allEvents.length
+                    }
+                });
             } else {
-                throw new Error(res?.message || 'Không thể tải dữ liệu nhật ký ra/vào.');
+                throw new Error(firstRes?.message || 'Không thể tải dữ liệu nhật ký ra/vào.');
             }
         } catch (err) {
             // BE hiện chỉ có route theo từng phòng (/ivss/rooms/:roomId/access-log) — route tổng hợp
@@ -238,7 +279,7 @@ const RoomAccessLogs = () => {
         } finally {
             setLogsLoading(false);
         }
-    }, [selectedRoomId, selectedDate, currentPage, debouncedSearch, selectedMeetingId]);
+    }, [selectedRoomId, selectedDate, debouncedSearch, selectedMeetingId]);
 
     useEffect(() => {
         fetchLogs();
@@ -254,30 +295,36 @@ const RoomAccessLogs = () => {
     }
 
     const events = logsData?.events || [];
-    const pagination = logsData?.pagination || {};
-    // BE có thể đặt tên field tổng số bản ghi khác nhau tuỳ phiên bản — phòng thủ nhiều tên
-    const totalItems = pagination.total ?? pagination.totalItems ?? pagination.totalEvents ?? logsData?.totalEvents ?? events.length;
-    const totalPages = pagination.totalPages ?? Math.max(1, Math.ceil(totalItems / LOGS_PER_PAGE));
-    const matchedCount = logsData?.matchedCount ?? events.filter(ev => getIdentityStatus(ev) === 'matched').length;
-    const unmatchedCount = logsData?.unmatchedCount ?? events.filter(ev => getIdentityStatus(ev) === 'unmatched').length;
-    const strangerCount = logsData?.strangerCount ?? events.filter(ev => getIdentityStatus(ev) === 'stranger').length;
+    
+    // Thống kê dựa trên toàn bộ sự kiện lấy được (chưa áp dụng filter theo trang)
+    const matchedCount = events.filter(ev => getIdentityStatus(ev) === 'matched').length;
+    const unmatchedCount = events.filter(ev => getIdentityStatus(ev) === 'unmatched').length;
+    const strangerCount = events.filter(ev => getIdentityStatus(ev) === 'stranger').length;
 
-    // Direction/trạng thái chỉ lọc trong phạm vi trang hiện tại (BE chưa hỗ trợ 2 filter này ở query param)
+    // Filter theo hướng và trạng thái
     const filteredEvents = events.filter(ev => {
         const matchesDirection = !directionFilter || ev.direction === directionFilter;
         const matchesStatus = !statusFilter || getIdentityStatus(ev) === statusFilter;
         return matchesDirection && matchesStatus;
     });
 
-    const sortedEvents = [...filteredEvents].sort((a, b) => {
+    // Sắp xếp TOÀN BỘ dữ liệu đã filter
+    const allSortedEvents = [...filteredEvents].sort((a, b) => {
         const timeA = new Date(a.eventTime || a.timestamp).getTime();
         const timeB = new Date(b.eventTime || b.timestamp).getTime();
         return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
     });
 
-    const showRoomColumn = !selectedRoomId;
+    const totalItems = allSortedEvents.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / LOGS_PER_PAGE));
+    
+    // Phân trang trên Frontend: cắt mảng allSortedEvents
     const rangeStart = totalItems === 0 ? 0 : (currentPage - 1) * LOGS_PER_PAGE + 1;
     const rangeEnd = Math.min(currentPage * LOGS_PER_PAGE, totalItems);
+    
+    const sortedEvents = allSortedEvents.slice((currentPage - 1) * LOGS_PER_PAGE, currentPage * LOGS_PER_PAGE);
+
+    const showRoomColumn = !selectedRoomId;
 
     return (
         <div className="max-w-[1440px] mx-auto space-y-6">

@@ -29,6 +29,10 @@ const UserJourney = () => {
     const [journeyData, setJourneyData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    
+    // Pagination for Journey Events
+    const [page, setPage] = useState(1);
+    const eventsPerPage = 10;
 
     const dropdownRef = useRef(null);
 
@@ -101,6 +105,7 @@ const UserJourney = () => {
             });
             if (res?.success) {
                 setJourneyData(res.data);
+                setPage(1);
                 // Sync to URL
                 setSearchParams({ 
                     userId: selectedUser.id || selectedUser.uuid, 
@@ -188,6 +193,20 @@ const UserJourney = () => {
                 );
         }
     };
+
+    // Pagination logic
+    const sortedEvents = React.useMemo(() => {
+        if (!journeyData?.events) return [];
+        return [...journeyData.events].sort((a, b) => new Date(b.time) - new Date(a.time));
+    }, [journeyData?.events]);
+
+    const totalEvents = sortedEvents.length;
+    const totalPages = Math.ceil(totalEvents / eventsPerPage);
+
+    const currentEvents = React.useMemo(() => {
+        const start = (page - 1) * eventsPerPage;
+        return sortedEvents.slice(start, start + eventsPerPage);
+    }, [sortedEvents, page, eventsPerPage]);
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-fade-in-up">
@@ -434,7 +453,7 @@ const UserJourney = () => {
 
                         {/* Vertical Timeline container */}
                         <div className="relative pl-6 sm:pl-8 border-l border-platinum-tint/80 ml-5 sm:ml-6 space-y-10 pb-4">
-                            {journeyData.events.map((event, idx) => {
+                            {currentEvents.map((event, idx) => {
                                 const timeStr = formatToVNTime(event.time);
                                 const fullTimeTooltip = formatVNFullDateTime(event.time);
                                 const eventType = (event.type || '').toLowerCase();
@@ -518,6 +537,33 @@ const UserJourney = () => {
                                 );
                             })}
                         </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-8 border-t border-platinum-tint/60 pt-6">
+                                <div className="text-sm text-slate-blue">
+                                    Hiển thị <span className="font-bold text-midnight-indigo">{(page - 1) * eventsPerPage + 1}</span> đến <span className="font-bold text-midnight-indigo">{Math.min(page * eventsPerPage, totalEvents)}</span> trong số <span className="font-bold text-midnight-indigo">{totalEvents}</span> sự kiện
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={page === 1}
+                                        className="px-3 py-1.5 rounded-lg border border-platinum-tint text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Trước
+                                    </button>
+                                    <span className="text-sm font-bold px-3 py-1.5 bg-cloud-mist rounded-lg">
+                                        {page} / {totalPages}
+                                    </span>
+                                    <button 
+                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={page === totalPages}
+                                        className="px-3 py-1.5 rounded-lg border border-platinum-tint text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Sau
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
