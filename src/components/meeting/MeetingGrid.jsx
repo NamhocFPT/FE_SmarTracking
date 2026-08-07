@@ -139,15 +139,36 @@ const MeetingTile = ({
     reactionEmoji,
     large,
 }) => {
-    const showMicBadge = p.isMuted || p.isSpeaking;
+    const isActuallySpeaking = p.isSpeaking && !p.isMuted;
+    const showMicBadge = p.isMuted || isActuallySpeaking;
+    const [audioLevel, setAudioLevel] = useState(0);
+
+    useEffect(() => {
+        let interval;
+        if (isActuallySpeaking) {
+            setAudioLevel(Math.floor(Math.random() * 50) + 50);
+            interval = setInterval(() => {
+                setAudioLevel(Math.floor(Math.random() * 80) + 20); // 20 to 100
+            }, 150);
+        } else {
+            setAudioLevel(0);
+        }
+        return () => clearInterval(interval);
+    }, [isActuallySpeaking]);
+
+    const speakingOpacity = audioLevel ? 0.3 + (audioLevel / 100) * 0.7 : 0;
+    const shadowSize = audioLevel ? (audioLevel / 100) * 15 : 0;
 
     return (
         <div
             className={`relative w-full h-full rounded-2xl overflow-hidden transition-all duration-300 ${
-                p.isSpeaking
-                    ? 'border-2 border-action-blue ring-2 ring-action-blue/40 shadow-lg shadow-action-blue/20'
+                isActuallySpeaking
+                    ? 'border-2 border-red-500'
                     : 'border border-white/10'
             }`}
+            style={{
+                boxShadow: isActuallySpeaking ? `0 0 ${shadowSize}px rgba(239, 68, 68, 0.5)` : 'none'
+            }}
         >
             {/* Avatar / Background */}
             <div className="absolute inset-0 bg-slate-800">
@@ -158,9 +179,15 @@ const MeetingTile = ({
                 />
             </div>
 
-            {/* Speaking pulse overlay */}
-            {p.isSpeaking && (
-                <div className="absolute inset-0 border-2 border-action-blue rounded-2xl pointer-events-none animate-pulse" />
+            {/* Speaking volume overlay */}
+            {isActuallySpeaking && (
+                <div 
+                    className="absolute inset-0 border-[4px] border-red-500 rounded-2xl pointer-events-none transition-all duration-150 ease-out z-10" 
+                    style={{
+                        opacity: speakingOpacity,
+                        transform: `scale(${1 + (audioLevel / 100) * 0.02})`
+                    }}
+                />
             )}
 
             {/* Mic badge */}
