@@ -1,4 +1,4 @@
-import { BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Fingerprint, Home, MapPin, PieChart, PlusCircle, Shield } from 'lucide-react';
+import { BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Home, MapPin, PieChart, PlusCircle, Shield } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -52,11 +52,6 @@ const STATIC_NAVIGATION_ITEMS = [
                 label: 'Cuộc họp',
                 to: '/manager/meeting-approvals',
                 icon: FileCheck,
-            },
-            {
-                label: 'Sinh trắc học FaceID',
-                to: '/manager/biometric-submissions',
-                icon: Fingerprint,
             },
         ],
     },
