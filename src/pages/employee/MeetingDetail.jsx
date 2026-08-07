@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { vi } from 'date-fns/locale/vi';
 
 import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
 import UserAvatar from '../../component/UserAvatar';
@@ -52,7 +55,19 @@ const EmployeeMeetingDetail = () => {
 
     // Edit fields
     const [editTitle, setEditTitle] = useState('');
-    const [editDate, setEditDate] = useState('');
+    const [editDateRange, setEditDateRange] = useState([null, null]);
+    const [editStartDate, editEndDate] = editDateRange;
+
+    const formatDateToLocal = (dateObj) => {
+        if (!dateObj) return '';
+        const d = new Date(dateObj);
+        const m = d.getMonth() + 1;
+        const day = d.getDate();
+        return `${d.getFullYear()}-${m < 10 ? '0'+m : m}-${day < 10 ? '0'+day : day}`;
+    };
+    const editStartStr = formatDateToLocal(editStartDate);
+    const editEndStr = formatDateToLocal(editEndDate || editStartDate);
+
     const [editStart, setEditStart] = useState('');
     const [editEnd, setEditEnd] = useState('');
     const [editRoomId, setEditRoomId] = useState('');
@@ -242,10 +257,12 @@ const EmployeeMeetingDetail = () => {
     const initEditStates = (data) => {
         setEditTitle(data.title || '');
         const startVal = data.start_time || data.startTime;
+        const endVal = data.end_time || data.endTime;
         const startDate = new Date(startVal);
-        setEditDate(startDate.toISOString().split('T')[0]);
+        const endDate = new Date(endVal);
+        setEditDateRange([startDate, endDate]);
         setEditStart(startDate.toTimeString().substring(0, 5));
-        setEditEnd(new Date(data.end_time || data.endTime).toTimeString().substring(0, 5));
+        setEditEnd(endDate.toTimeString().substring(0, 5));
         setEditRoomId(data.room?.id || '');
         setEditParticipants(data.participants?.map(p => p.id) || []);
         setEditRecordingEnabled(data.recording_enabled || data.recordingEnabled || false);
@@ -271,12 +288,12 @@ const EmployeeMeetingDetail = () => {
 
     // Lọc phòng trống theo khung giờ mới (có debounce)
     useEffect(() => {
-        if (isEditModalOpen && editDate && editStart && editEnd) {
+        if (isEditModalOpen && editStartStr && editEndStr && editStart && editEnd) {
             const fetchAvailable = async () => {
                 setIsFetchingRooms(true);
                 try {
-                    const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
-                    const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
+                    const startISO = new Date(`${editStartStr}T${editStart}:00`).toISOString();
+                    const endISO = new Date(`${editEndStr}T${editEnd}:00`).toISOString();
                     
                     const res = await getAvailableRoomsForMeeting(meeting.id, { startTime: startISO, endTime: endISO, includeCurrentRoom: true });
                     if (res?.success) {
@@ -308,7 +325,7 @@ const EmployeeMeetingDetail = () => {
             const timeoutId = setTimeout(fetchAvailable, 500);
             return () => clearTimeout(timeoutId);
         }
-    }, [isEditModalOpen, editDate, editStart, editEnd]);
+    }, [isEditModalOpen, editStartStr, editStart, editEnd]);
 
     // Simulated playback updates for transcript
     useEffect(() => {
@@ -346,8 +363,8 @@ const EmployeeMeetingDetail = () => {
     const handleSaveEdit = async (e) => {
         e.preventDefault();
         setError(null);
-        const startISO = new Date(`${editDate}T${editStart}:00`).toISOString();
-        const endISO = new Date(`${editDate}T${editEnd}:00`).toISOString();
+        const startISO = new Date(`${editStartStr}T${editStart}:00`).toISOString();
+        const endISO = new Date(`${editEndStr}T${editEnd}:00`).toISOString();
         await doSaveEdit(startISO, endISO);
     };
 
@@ -655,8 +672,8 @@ const EmployeeMeetingDetail = () => {
 
     const isFormChanged = () => {
         if (!meeting) return false;
-        const startISO = editDate && editStart ? new Date(`${editDate}T${editStart}:00`).toISOString() : '';
-        const endISO = editDate && editEnd ? new Date(`${editDate}T${editEnd}:00`).toISOString() : '';
+        const startISO = editStartStr && editStart ? new Date(`${editStartStr}T${editStart}:00`).toISOString() : '';
+        const endISO = editEndStr && editEnd ? new Date(`${editEndStr}T${editEnd}:00`).toISOString() : '';
         const origStart = meeting.startTime || meeting.start_time;
         const origEnd = meeting.endTime || meeting.end_time;
         const origRecording = meeting.recording_enabled || meeting.recordingEnabled || false;
@@ -774,7 +791,12 @@ const EmployeeMeetingDetail = () => {
                             <Calendar className="w-5 h-5 text-action-blue shrink-0" />
                             <div>
                                 <span className="block text-[10px] uppercase font-bold text-slate-blue tracking-wider">Ngày họp</span>
-                                <span className="text-xs font-semibold text-midnight-indigo">{new Date(meeting.start_time || meeting.startTime).toLocaleDateString('vi-VN')}</span>
+                                <span className="text-xs font-semibold text-midnight-indigo">
+                                    {new Date(meeting.start_time || meeting.startTime).toLocaleDateString('vi-VN')}
+                                    {new Date(meeting.start_time || meeting.startTime).toLocaleDateString('vi-VN') !== new Date(meeting.end_time || meeting.endTime).toLocaleDateString('vi-VN') 
+                                        ? ` - ${new Date(meeting.end_time || meeting.endTime).toLocaleDateString('vi-VN')}` 
+                                        : ''}
+                                </span>
                             </div>
                         </div>
 
@@ -1251,21 +1273,27 @@ const EmployeeMeetingDetail = () => {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Ngày họp</label>
-                                        <input
-                                            type="date"
-                                            required
-                                            value={editDate}
-                                            onChange={(e) => setEditDate(e.target.value)}
-                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                        />
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 relative">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Khung ngày họp</label>
+                                        <div className="relative w-full z-50">
+                                            <DatePicker 
+                                                selectsRange={true}
+                                                startDate={editStartDate}
+                                                endDate={editEndDate}
+                                                onChange={(update) => setEditDateRange(update)}
+                                                locale={vi}
+                                                dateFormat="dd/MM/yyyy"
+                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                                wrapperClassName="w-full"
+                                                placeholderText="DD/MM/YYYY - DD/MM/YYYY"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Bắt đầu</label>
                                         <input
-                                            type="time"
+                                            type="time" lang="en-GB"
                                             required
                                             value={editStart}
                                             onChange={(e) => setEditStart(e.target.value)}
@@ -1275,7 +1303,7 @@ const EmployeeMeetingDetail = () => {
                                     <div>
                                         <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Kết thúc</label>
                                         <input
-                                            type="time"
+                                            type="time" lang="en-GB"
                                             required
                                             value={editEnd}
                                             onChange={(e) => setEditEnd(e.target.value)}

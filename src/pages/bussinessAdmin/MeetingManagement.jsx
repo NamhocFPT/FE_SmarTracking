@@ -293,6 +293,9 @@ const MeetingManagement = () => {
                                                 <div className="flex items-center gap-1">
                                                     <Calendar className="w-3.5 h-3.5 text-slate-blue" />
                                                     {new Date(m.startTime).toLocaleDateString('vi-VN')}
+                                                    {new Date(m.startTime).toLocaleDateString('vi-VN') !== new Date(m.endTime).toLocaleDateString('vi-VN') 
+                                                        ? ` - ${new Date(m.endTime).toLocaleDateString('vi-VN')}` 
+                                                        : ''}
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <Clock className="w-3.5 h-3.5 text-slate-blue" />
@@ -394,7 +397,7 @@ const MeetingManagement = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Bắt đầu</label>
                                     <input
-                                        type="datetime-local"
+                                        type="datetime-local" lang="en-GB"
                                         required
                                         value={formData.startTime}
                                         onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
@@ -404,7 +407,7 @@ const MeetingManagement = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Kết thúc</label>
                                     <input
-                                        type="datetime-local"
+                                        type="datetime-local" lang="en-GB"
                                         required
                                         value={formData.endTime}
                                         onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}

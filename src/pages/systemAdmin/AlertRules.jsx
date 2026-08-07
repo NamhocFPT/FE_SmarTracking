@@ -575,7 +575,7 @@ const AlertRules = () => {
                                     <div className="flex items-center gap-3">
                                         <div className="flex-1">
                                             <input 
-                                                type="time" 
+                                                type="time" lang="en-GB" 
                                                 value={formData.allow_from}
                                                 onChange={(e) => handleFormChange('allow_from', e.target.value)}
                                                 className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:outline-none focus:bg-white transition-colors ${formErrors.allow_from ? 'border-red-500 focus:border-red-500' : 'border-platinum-tint focus:border-action-blue'}`}
@@ -585,7 +585,7 @@ const AlertRules = () => {
                                         <span className="text-slate-blue font-medium mt-1">đến</span>
                                         <div className="flex-1">
                                             <input 
-                                                type="time" 
+                                                type="time" lang="en-GB" 
                                                 value={formData.allow_to}
                                                 onChange={(e) => handleFormChange('allow_to', e.target.value)}
                                                 className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:outline-none focus:bg-white transition-colors ${formErrors.allow_to ? 'border-red-500 focus:border-red-500' : 'border-platinum-tint focus:border-action-blue'}`}

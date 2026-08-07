@@ -340,7 +340,7 @@ const NotificationActionsPanel = ({ meetingId, meetingStatus, minutesList = [], 
                     <div className="space-y-1.5">
                         <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider">Thời điểm gửi</label>
                         <input
-                            type="datetime-local"
+                            type="datetime-local" lang="en-GB"
                             value={reminderSendAt}
                             onChange={e => setReminderSendAt(e.target.value)}
                             className="w-full px-4 py-2.5 bg-slate-50 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:bg-white focus:border-action-blue transition-colors"

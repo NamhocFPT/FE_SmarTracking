@@ -450,6 +450,9 @@ const MeetingApprovals = () => {
                                                 <div>
                                                     <span className="font-semibold text-midnight-indigo block">
                                                         {new Date(req.requestedStartTime).toLocaleDateString('vi-VN')}
+                                                        {new Date(req.requestedStartTime).toLocaleDateString('vi-VN') !== new Date(req.requestedEndTime).toLocaleDateString('vi-VN') 
+                                                            ? ` - ${new Date(req.requestedEndTime).toLocaleDateString('vi-VN')}` 
+                                                            : ''}
                                                     </span>
                                                     <span className="text-[10px] font-medium mt-0.5 block text-slate-blue">
                                                         <Clock className="w-3 h-3 inline mr-1 opacity-70" />
@@ -562,6 +565,9 @@ const MeetingApprovals = () => {
                                             <td className="p-4 text-xs text-slate-blue font-medium whitespace-nowrap">
                                                 <span className="block font-bold text-midnight-indigo/90">
                                                     {new Date(req.requestedStartTime).toLocaleDateString('vi-VN')}
+                                                    {new Date(req.requestedStartTime).toLocaleDateString('vi-VN') !== new Date(req.requestedEndTime).toLocaleDateString('vi-VN') 
+                                                        ? ` - ${new Date(req.requestedEndTime).toLocaleDateString('vi-VN')}` 
+                                                        : ''}
                                                 </span>
                                                 <span className="block text-[10px] mt-0.5 text-slate-blue font-semibold">
                                                     {new Date(req.requestedStartTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(req.requestedEndTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
@@ -716,7 +722,7 @@ const MeetingApprovals = () => {
                                                 )}
                                                 <p className="pt-1 flex items-center gap-1.5 text-slate-blue">
                                                     <Calendar className="w-3.5 h-3.5 text-action-blue" />
-                                                    <span>Ngày {new Date(selectedRequest.requestedStartTime).toLocaleDateString('vi-VN')}</span>
+                                                    <span>Ngày {new Date(selectedRequest.requestedStartTime).toLocaleDateString('vi-VN')} {new Date(selectedRequest.requestedStartTime).toLocaleDateString('vi-VN') !== new Date(selectedRequest.requestedEndTime).toLocaleDateString('vi-VN') ? `- ${new Date(selectedRequest.requestedEndTime).toLocaleDateString('vi-VN')}` : ''}</span>
                                                 </p>
                                                 <p className="flex items-center gap-1.5 text-slate-blue">
                                                     <Clock className="w-3.5 h-3.5 text-action-blue" />

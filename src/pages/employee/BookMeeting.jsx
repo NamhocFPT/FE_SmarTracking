@@ -8,6 +8,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, uploadAgendaAttachment, getUsers, getUserById, getUserPublicProfile } from '../../service/employeeServices';
 import { getDepartments, getDepartmentMembers } from '../../service/businessAdminServices';
 import * as XLSX from 'xlsx';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { vi } from 'date-fns/locale/vi';
 
 const getInitialTimes = () => {
     const now = new Date();
@@ -48,7 +51,18 @@ const BookMeeting = () => {
     const [meetingMode, setMeetingMode] = useState('offline');
     const [hostId, setHostId] = useState('');
     const [selectedRoomId, setSelectedRoomId] = useState('');
-    const [meetingDate, setMeetingDate] = useState(new Date().toLocaleDateString('en-CA'));
+    const [dateRange, setDateRange] = useState([new Date(), new Date()]);
+    const [startDate, endDate] = dateRange;
+
+    const formatDateToLocal = (dateObj) => {
+        if (!dateObj) return '';
+        const d = new Date(dateObj);
+        const m = d.getMonth() + 1;
+        const day = d.getDate();
+        return `${d.getFullYear()}-${m < 10 ? '0'+m : m}-${day < 10 ? '0'+day : day}`;
+    };
+    const startStr = formatDateToLocal(startDate);
+    const endStr = formatDateToLocal(endDate || startDate);
     const [startTime, setStartTime] = useState(initialTimes.start);
     const [endTime, setEndTime] = useState(initialTimes.end);
     const [expectedAttendeeCount, setExpectedAttendeeCount] = useState('');
@@ -273,12 +287,10 @@ const BookMeeting = () => {
     const selectedRoom = availableRooms.find(r => r.id === selectedRoomId);
 
     const getMeetingDurationMinutes = () => {
-        if (!startTime || !endTime) return 0;
-        const [sh, sm] = startTime.split(':').map(Number);
-        const [eh, em] = endTime.split(':').map(Number);
-        const startTotal = sh * 60 + sm;
-        const endTotal = eh * 60 + em;
-        return Math.max(0, endTotal - startTotal);
+        if (!startStr || !endStr || !startTime || !endTime) return 0;
+        const start = new Date(`${startStr}T${startTime}:00`).getTime();
+        const end = new Date(`${endStr}T${endTime}:00`).getTime();
+        return Math.max(0, Math.floor((end - start) / 60000));
     };
 
     const meetingDuration = getMeetingDurationMinutes();
@@ -290,27 +302,28 @@ const BookMeeting = () => {
         || actualAttendeeCount > selectedRoom.capacity
     );
 
-    const buildIsoRange = () => ({
-        isoStart: new Date(`${meetingDate}T${startTime}:00`).toISOString(),
-        isoEnd: new Date(`${meetingDate}T${endTime}:00`).toISOString(),
-    });
+    const buildIsoRange = () => {
+        return {
+            isoStart: new Date(`${startStr || new Date().toLocaleDateString('en-CA')}T${startTime}:00`).toISOString(),
+            isoEnd: new Date(`${endStr || startStr || new Date().toLocaleDateString('en-CA')}T${endTime}:00`).toISOString(),
+        };
+    };
 
     const handleSearchRooms = async () => {
         setSearchingRooms(true);
         setErrorMsg('');
 
         const now = new Date();
-        const selectedStart = new Date(`${meetingDate}T${startTime}:00`);
+        const selectedStart = new Date(`${startStr || new Date().toLocaleDateString('en-CA')}T${startTime}:00`);
         if (selectedStart < now) {
             setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
             setSearchingRooms(false);
             return;
         }
 
-        const [sh, sm] = startTime.split(':').map(Number);
-        const [eh, em] = endTime.split(':').map(Number);
-        if (sh * 60 + sm >= eh * 60 + em) {
-            setErrorMsg('Giờ bắt đầu phải trước giờ kết thúc.');
+        const selectedEnd = new Date(`${endStr || startStr || new Date().toLocaleDateString('en-CA')}T${endTime}:00`);
+        if (selectedEnd <= selectedStart) {
+            setErrorMsg('Thời gian kết thúc phải sau thời gian bắt đầu.');
             setSearchingRooms(false);
             return;
         }
@@ -723,16 +736,15 @@ const BookMeeting = () => {
         setAlternativeRooms([]);
 
         const now = new Date();
-        const selectedStart = new Date(`${meetingDate}T${startTime}:00`);
+        const selectedStart = new Date(`${startStr || new Date().toLocaleDateString('en-CA')}T${startTime}:00`);
         if (selectedStart < now) {
             setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
             return;
         }
 
-        const [sh, sm] = startTime.split(':').map(Number);
-        const [eh, em] = endTime.split(':').map(Number);
-        if (sh * 60 + sm >= eh * 60 + em) {
-            setErrorMsg('Giờ bắt đầu phải trước giờ kết thúc.');
+        const selectedEnd = new Date(`${endStr || startStr || new Date().toLocaleDateString('en-CA')}T${endTime}:00`);
+        if (selectedEnd <= selectedStart) {
+            setErrorMsg('Thời gian kết thúc phải sau thời gian bắt đầu.');
             return;
         }
 
@@ -995,25 +1007,31 @@ const BookMeeting = () => {
                                 <Clock className="w-4 h-4 text-action-blue" /> Khung thời gian họp
                             </h3>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Ngày họp *</label>
-                                    <input
-                                        type="date"
-                                        value={meetingDate}
-                                        min={new Date().toLocaleDateString('en-CA')}
-                                        onChange={(e) => {
-                                            setMeetingDate(e.target.value);
-                                            setSelectedRoomId('');
-                                        }}
-                                        className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
-                                        required
-                                    />
+                            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 relative">
+                                <div className="sm:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Khung ngày họp *</label>
+                                    <div className="relative w-full z-20">
+                                        <DatePicker 
+                                            selectsRange={true}
+                                            startDate={startDate}
+                                            endDate={endDate}
+                                            onChange={(update) => {
+                                                setDateRange(update);
+                                                setSelectedRoomId('');
+                                            }}
+                                            minDate={new Date()}
+                                            locale={vi}
+                                            dateFormat="dd/MM/yyyy"
+                                            className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
+                                            wrapperClassName="w-full"
+                                            placeholderText="DD/MM/YYYY - DD/MM/YYYY"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Giờ bắt đầu *</label>
                                     <input
-                                        type="time"
+                                        type="time" lang="en-GB"
                                         value={startTime}
                                         onChange={(e) => {
                                             setStartTime(e.target.value);
@@ -1026,7 +1044,7 @@ const BookMeeting = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Giờ kết thúc *</label>
                                     <input
-                                        type="time"
+                                        type="time" lang="en-GB"
                                         value={endTime}
                                         onChange={(e) => {
                                             setEndTime(e.target.value);
@@ -1167,7 +1185,7 @@ const BookMeeting = () => {
                                                 {startTime} - {endTime}
                                             </p>
                                             <p className="text-[11px] text-slate-blue font-semibold">
-                                                Ngày {meetingDate.split('-').reverse().join('/')}
+                                                Ngày {startStr?.split('-').reverse().join('/')} {endStr && endStr !== startStr ? `- ${endStr.split('-').reverse().join('/')}` : ''}
                                             </p>
                                         </div>
                                     </div>
