@@ -356,14 +356,26 @@ const SecurityAlerts = () => {
                                             />
                                         </td>
                                         <td className="p-4">
-                                            <p className="text-sm font-bold text-midnight-indigo">{formatDateTime(alert.triggered_at)}</p>
-                                            <p className="text-xs text-slate-blue mt-1">ID: {alert.id.substring(0,8)}...</p>
+                                            <p className="text-sm font-bold text-midnight-indigo" title="Gần nhất">
+                                                {formatDateTime(alert.updated_at || alert.triggered_at)}
+                                            </p>
+                                            <p className="text-xs text-slate-blue mt-1" title="Lần đầu">
+                                                Lần đầu: {formatDateTime(alert.created_at || alert.triggered_at)}
+                                            </p>
+                                            <p className="text-xs text-slate-blue/60 mt-0.5">ID: {alert.id.substring(0,8)}...</p>
                                         </td>
                                         <td className="p-4">
                                             <p className="text-sm font-bold text-midnight-indigo uppercase">{alert.alert_type.replace(/_/g, ' ')}</p>
-                                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityStyle(alert.severity)}`}>
-                                                {alert.severity?.toUpperCase() || 'NORMAL'}
-                                            </span>
+                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityStyle(alert.severity)}`}>
+                                                    {alert.severity?.toUpperCase() || 'NORMAL'}
+                                                </span>
+                                                {(alert.occurrence_count > 1 || alert.occurrenceCount > 1) && (
+                                                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200" title={`Cảnh báo này đã lặp lại ${(alert.occurrence_count || alert.occurrenceCount)} lần`}>
+                                                        Đã xảy ra: {alert.occurrence_count || alert.occurrenceCount} lần
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4 text-sm text-midnight-indigo">
                                             {zones.find(z => z.id === alert.zone_id)?.zone_name || 'Hệ thống'}
