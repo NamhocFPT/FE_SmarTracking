@@ -281,7 +281,7 @@ const ManagerMeetingDetail = () => {
                         setRooms(fetchedRooms);
                         
                         if (editRoomId) {
-                            let isAvailable = fetchedRooms.some(r => String(r.id) === String(editRoomId));
+                            let isAvailable = fetchedRooms.some(r => String(r.roomId) === String(editRoomId));
                             // Chuẩn hóa thời gian cũ từ API về ISO để so sánh chính xác với startISO/endISO
                             const oldStartISO = meeting?.startTime || meeting?.start_time ? new Date(meeting.startTime || meeting.start_time).toISOString() : null;
                             const oldEndISO = meeting?.endTime || meeting?.end_time ? new Date(meeting.endTime || meeting.end_time).toISOString() : null;
@@ -1320,7 +1320,7 @@ const ManagerMeetingDetail = () => {
                                             </option>
                                         )}
                                         {rooms.map((r, idx) => (
-                                            <option key={r.id || idx} value={r.id}>
+                                            <option key={r.roomId || idx} value={r.roomId}>
                                                 {r.roomName} {r.siteName ? `(${r.siteName})` : ''} - Sức chứa: {r.capacity}
                                             </option>
                                         ))}
