@@ -11,6 +11,10 @@ Dựa trên quá trình đối chiếu API giữa Frontend (FE) và Backend (BE)
     *   **Hành động cần thiết (BE):**
         *   Hoàn thiện phát triển ticket BE-11.
         *   Sau khi hoàn thành, cung cấp lại thông tin chính xác về Path và Request Body payload cho FE để tiến hành gọi lại.
+*   **API Cập nhật/Đổi tên Tệp đa phương tiện (Bản ghi)**
+    *   **Thực trạng:** Tại giao diện màn hình trong cuộc họp, FE đã bổ sung tính năng Đổi tên bản ghi trực tiếp bằng cách gọi endpoint `PATCH /media-files/:fileId` (Request body chứa `title: string`). Hiện FE đang sử dụng cơ chế Optimistic Update vì API này chưa có trên BE, dẫn đến khi F5 sẽ bị mất tên đã đổi.
+    *   **Hành động cần thiết (BE):**
+        *   Bổ sung route `PATCH /media-files/:id` hoặc `PUT /media-files/:id` cho phép client cập nhật trường `title` (và các meta-data cơ bản khác nếu cần) của file media/bản ghi âm.
 
 ## 2. Các điểm BE cần rà soát và xác nhận
 
