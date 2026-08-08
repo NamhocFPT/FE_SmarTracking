@@ -60,7 +60,9 @@ const BiometricReminderModal = () => {
                     const data = res.data;
                     setBiometricData(data);
 
-                    const userRoles = userProfile?.roles?.map(r => r.roleCode || r.role_code || r) || [];
+                    // Dùng `user` (đọc từ localStorage) thay vì `userProfile` state
+                    // vì setState là async — userProfile vẫn là null tại thời điểm này
+                    const userRoles = user.roles?.map(r => r.roleCode || r.role_code || r) || [];
                     const isAdmin = userRoles.some(r => ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes(r));
 
                     if (isAdmin) {
@@ -78,9 +80,9 @@ const BiometricReminderModal = () => {
                     if (!isForced && dismissed === 'true') { setLoading(false); return; }
 
                     if (data.shouldShowAvatarPopup === true || isForced) {
-                        if (isForced) {
-                            setView('webcam'); // Bỏ qua tuỳ chọn, đi thẳng vào webcam
-                        }
+                        // Luôn mở màn hình options để user chọn phương thức (webcam/upload/avatar)
+                        // Không force thẳng vào webcam — tránh kẹt khi camera unavailable
+                        setView('options');
                         setOpen(true);
                     }
                 }
@@ -111,6 +113,9 @@ const BiometricReminderModal = () => {
 
 
     const handleDismiss = () => {
+        // Defense-in-depth: không cho đóng khi trạng thái bắt buộc nộp
+        const status = biometricData?.avatarReviewStatus;
+        if (status === 'not_uploaded' || status === 'rejected') return;
         try {
             if (userProfile) {
                 sessionStorage.setItem('avatarPopupDismissed_' + (userProfile.id || 'anon'), 'true');
@@ -324,6 +329,18 @@ const BiometricReminderModal = () => {
         handleUploadSuccess();
     };
 
+    // Chặn Escape và tất cả phím tắt có thể thoát khi modal bắt buộc
+    useEffect(() => {
+        if (!open) return;
+        const needsUploadNow = biometricData?.avatarReviewStatus === 'not_uploaded' || biometricData?.avatarReviewStatus === 'rejected';
+        if (!needsUploadNow) return;
+        const handler = (e) => {
+            if (e.key === 'Escape') e.preventDefault();
+        };
+        document.addEventListener('keydown', handler, true);
+        return () => document.removeEventListener('keydown', handler, true);
+    }, [open, biometricData]);
+
     if (!open || loading) return null;
 
     const status = biometricData?.avatarReviewStatus || 'not_uploaded';
@@ -370,10 +387,15 @@ const BiometricReminderModal = () => {
     };
 
     const needsUpload = biometricData?.avatarReviewStatus === 'not_uploaded' || biometricData?.avatarReviewStatus === 'rejected';
-    const isForced = (userProfile?.biometricRequired === true || biometricData?.biometricRequired === true || needsUpload) && needsUpload;
+    const isForced = needsUpload;
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xl p-4">
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cấu hình Sinh trắc học FaceID"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xl p-4"
+        >
             <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden border border-platinum-tint flex flex-col max-h-[95vh] animate-fade-in-up">
                 
                 {/* Header */}
@@ -573,6 +595,9 @@ const BiometricReminderModal = () => {
                                         <AlertCircle className="w-8 h-8" />
                                         <p>{cameraError}</p>
                                         <button type="button" onClick={startWebcam} className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold">Thử lại</button>
+                                        <button type="button" onClick={() => { stopWebcam(); setView('options'); }} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold text-white/80">
+                                            Chọn phương thức khác
+                                        </button>
                                     </div>
                                 ) : phase === 'captured' && capturedPreview ? (
                                     <img src={capturedPreview} alt="Captured Snapshot" className="w-full h-full object-cover" />
