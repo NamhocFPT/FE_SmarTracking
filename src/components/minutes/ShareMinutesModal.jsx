@@ -4,14 +4,14 @@ import {
     Share2, X, CheckCircle, AlertTriangle,
     Loader2, Search, Trash2, UserPlus, Mail
 } from 'lucide-react';
-import { getUsers } from '../service/employeeServices';
+import { getUsers } from '../../service/employeeServices';
 import { 
     createMinutesShare, 
     getMinutesShares, 
     revokeMinutesShare 
-} from '../service/businessAdminServices';
+} from '../../service/businessAdminServices';
 import { motion, AnimatePresence } from 'framer-motion';
-import UserAvatar from './UserAvatar';
+import UserAvatar from '../common/UserAvatar';
 
 /**
  * ShareMinutesModal — M6.3, M6.4, M6.5

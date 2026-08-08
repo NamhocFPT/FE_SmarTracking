@@ -7,10 +7,10 @@ import {
 import {
     downloadParticipantImportTemplate,
     importMeetingParticipants
-} from '../service/businessAdminServices';
-import { addInternalParticipant } from '../service/employeeServices';
+} from '../../service/businessAdminServices';
+import { addInternalParticipant } from '../../service/employeeServices';
 import { motion } from 'framer-motion';
-import UserAvatar from './UserAvatar';
+import UserAvatar from '../common/UserAvatar';
 
 const AddInternalParticipantModal = ({ meetingId, open, onClose, onSuccess, users = [] }) => {
     const [activeTab, setActiveTab] = useState('manual'); // 'manual' | 'import'

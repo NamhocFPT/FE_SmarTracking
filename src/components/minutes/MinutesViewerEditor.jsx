@@ -6,8 +6,8 @@ import {
     Share2, Download
 } from 'lucide-react';
 import { updateMeetingMinutes, issueMeetingMinutes } from '../../service/minutesServices';
-import ExportMinutesModal from '../../component/ExportMinutesModal';
-import ShareMinutesModal from '../../component/ShareMinutesModal';
+import ExportMinutesModal from './ExportMinutesModal';
+import ShareMinutesModal from './ShareMinutesModal';
 
 const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
     const [isEditing, setIsEditing] = useState(false);

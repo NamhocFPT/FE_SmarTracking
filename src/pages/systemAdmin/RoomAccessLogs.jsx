@@ -1,9 +1,9 @@
 import { AlertTriangle, ArrowUpDown, Building, Calendar, CheckCircle2, Clock, DoorOpen, Filter, RotateCw, Search, ShieldAlert, ShieldQuestion, Users, Image as ImageIcon, Eye } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
-import EventSnapshotModal from '../../component/EventSnapshotModal';
-import ThumbnailImage from '../../component/ThumbnailImage';
-import UserAvatar from '../../component/UserAvatar';
+import EventSnapshotModal from '../../components/security/EventSnapshotModal';
+import ThumbnailImage from '../../components/common/ThumbnailImage';
+import UserAvatar from '../../components/common/UserAvatar';
 
 import {
     getRooms,

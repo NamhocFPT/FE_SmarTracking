@@ -2,7 +2,7 @@ import { Building } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import UserAvatar from '../../component/UserAvatar';
+import UserAvatar from '../../components/common/UserAvatar';
 import {
     getDepartments,
     createDepartment,

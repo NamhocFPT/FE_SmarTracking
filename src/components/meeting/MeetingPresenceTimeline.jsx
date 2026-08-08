@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getMeetingPresence } from '../service/managerServices';
+import { getMeetingPresence } from '../../service/managerServices';
 import { Activity, Clock, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 

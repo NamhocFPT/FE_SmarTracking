@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getStrangerAlerts } from '../service/businessAdminServices';
-import { acknowledgeSecurityAlert, resolveSecurityAlert } from '../service/securityAlertService';
+import { getStrangerAlerts } from '../../service/businessAdminServices';
+import { acknowledgeSecurityAlert, resolveSecurityAlert } from '../../service/securityAlertService';
 import { 
     ShieldAlert, CheckCircle, Search, UserX, Activity, 
     AlertCircle, RefreshCw, FileX

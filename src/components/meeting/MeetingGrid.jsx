@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Edit2, Mic, MicOff } from 'lucide-react';
-import UserAvatar from '../../component/UserAvatar';
+import UserAvatar from '../common/UserAvatar';
 
 /**
  * Custom Hook: Sắp xếp người tham gia theo thứ tự ưu tiên (Host > Đang nói)

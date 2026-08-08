@@ -567,6 +567,16 @@ export const updateNoShowConfig = async (data) => {
     return await request('/no-show-config', { method: 'PUT', body: data });
 };
 
+// B-M9.6b — Lấy cấu hình Security Alerts (GET /security-alerts-config)
+export const getSecurityAlertsConfig = async () => {
+    return await get('/security-alerts-config');
+};
+
+// B-M9.6c — Cập nhật cấu hình Security Alerts (PUT /security-alerts-config)
+export const updateSecurityAlertsConfig = async (data) => {
+    return await request('/security-alerts-config', { method: 'PUT', body: data });
+};
+
 // B-M9.7 — Lấy cấu hình Early Vacancy
 export const getEarlyVacancyConfig = async () => {
     return await get('/early-vacancy-config');

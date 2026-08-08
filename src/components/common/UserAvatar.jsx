@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../utils/request';
+import { API_BASE_URL } from '../../utils/request';
 
 export const resolveAvatarUrl = (user) => {
     if (!user || typeof user !== 'object') return '';

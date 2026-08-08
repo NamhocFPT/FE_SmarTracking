@@ -1117,6 +1117,13 @@ const BookMeeting = () => {
                                                         <p className="text-xs text-slate-blue mt-1 line-clamp-1">
                                                             {room.siteName || room.site_name} • {room.areaName || room.area_name || 'Khu vực chính'}
                                                         </p>
+                                                        {/* Nhóm D — cảnh báo mềm, không loại phòng khỏi danh sách */}
+                                                        {room.pendingConflicts?.length > 0 && (
+                                                            <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title="Chưa được duyệt nên chưa chắc chắn giữ được phòng">
+                                                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                                                {room.pendingConflicts.length} yêu cầu khác đang chờ duyệt cùng giờ
+                                                            </p>
+                                                        )}
                                                     </div>
 
                                                     {/* Facilities Icons */}

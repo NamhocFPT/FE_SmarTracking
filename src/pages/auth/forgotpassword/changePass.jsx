@@ -1,10 +1,10 @@
 import { useId, useMemo, useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { confirmPasswordReset } from "../../../service/authService";
-import AuthFormSkeleton from "../../../component/Skeleton/AuthFormSkeleton";
-import AuthLayout from "../../../component/Auth/AuthLayout";
-import AuthAlert from "../../../component/Auth/AuthAlert";
-import PasswordInput from "../../../component/Auth/PasswordInput";
+import AuthFormSkeleton from "../../../components/common/Skeleton/AuthFormSkeleton";
+import AuthLayout from "../../../components/auth/AuthLayout";
+import AuthAlert from "../../../components/auth/AuthAlert";
+import PasswordInput from "../../../components/auth/PasswordInput";
 
 
 const strengthSegments = 3;

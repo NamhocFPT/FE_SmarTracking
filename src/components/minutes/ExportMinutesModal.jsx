@@ -4,8 +4,8 @@ import {
     FileText, X, Download, CheckCircle, AlertTriangle,
     Clock, RefreshCw, FileDown
 } from 'lucide-react';
-import { exportMinutes, getMediaFile } from '../service/businessAdminServices';
-import usePollJob from '../hooks/usePollJob';
+import { exportMinutes, getMediaFile } from '../../service/businessAdminServices';
+import usePollJob from '../../hooks/usePollJob';
 import { motion } from 'framer-motion';
 
 /**

@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { getRoomAnalytics } from '../../service/sysAdminServices';
 import { get } from '../../utils/request';
-import ExportReportModal from '../../component/ExportReportModal';
+import ExportReportModal from '../../components/common/ExportReportModal';
 
 const RoomUsageAnalytics = () => {
     const [loading, setLoading] = useState(false);

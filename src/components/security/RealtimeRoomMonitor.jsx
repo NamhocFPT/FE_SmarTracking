@@ -6,7 +6,7 @@ import {
     handleNoShowCase, 
     releaseNoShowRoom,
     getAllNoShowCases
-} from '../service/businessAdminServices';
+} from '../../service/businessAdminServices';
 import { 
     Activity, Users, AlertTriangle, CheckCircle, 
     XCircle, Clock, Video, Eye, Unlock, RefreshCw,

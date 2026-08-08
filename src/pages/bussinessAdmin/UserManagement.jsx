@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import UserAvatar from '../../component/UserAvatar';
+import UserAvatar from '../../components/common/UserAvatar';
 import {
     getUsers,
     getUsersForManagement,

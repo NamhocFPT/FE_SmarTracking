@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { requestPasswordResetOtp } from "../../../service/authService";
-import AuthFormSkeleton from "../../../component/Skeleton/AuthFormSkeleton";
-import AuthLayout from "../../../component/Auth/AuthLayout";
-import AuthAlert from "../../../component/Auth/AuthAlert";
+import AuthFormSkeleton from "../../../components/common/Skeleton/AuthFormSkeleton";
+import AuthLayout from "../../../components/auth/AuthLayout";
+import AuthAlert from "../../../components/auth/AuthAlert";
 
 const OTP_LENGTH = 6;
 

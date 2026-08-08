@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
     UserPlus, X, CheckCircle, AlertTriangle, Loader2, Mail, Phone, Building
 } from 'lucide-react';
-import { addExternalParticipant } from '../service/businessAdminServices';
+import { addExternalParticipant } from '../../service/businessAdminServices';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**

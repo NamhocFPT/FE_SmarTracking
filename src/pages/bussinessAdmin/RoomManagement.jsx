@@ -9,9 +9,9 @@ import {
     deleteRoom
 } from '../../service/businessAdminServices';
 
-import RealtimeRoomMonitor from '../../component/RealtimeRoomMonitor';
-import StrangerAlerts from '../../component/StrangerAlerts';
-import UnmappedVerifyReview from '../../component/UnmappedVerifyReview';
+import RealtimeRoomMonitor from '../../components/security/RealtimeRoomMonitor';
+import StrangerAlerts from '../../components/security/StrangerAlerts';
+import UnmappedVerifyReview from '../../components/security/UnmappedVerifyReview';
 
 const RoomManagement = () => {
     const [viewMode, setViewMode] = useState('list');

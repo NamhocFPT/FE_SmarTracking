@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -8,12 +8,12 @@ import "react-datepicker/dist/react-datepicker.css";
 import { vi } from 'date-fns/locale/vi';
 
 import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
-import UserAvatar from '../../component/UserAvatar';
+import UserAvatar from '../../components/common/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
-import AddExternalParticipantModal from '../../component/AddExternalParticipantModal';
-import AddInternalParticipantModal from '../../component/AddInternalParticipantModal';
+import AddExternalParticipantModal from '../../components/meeting/AddExternalParticipantModal';
+import AddInternalParticipantModal from '../../components/meeting/AddInternalParticipantModal';
 import { removeInternalParticipant, removeExternalParticipant } from '../../service/businessAdminServices';
 import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
 
@@ -73,8 +73,9 @@ const EmployeeMeetingDetail = () => {
     const [editRoomId, setEditRoomId] = useState('');
     const [editParticipants, setEditParticipants] = useState([]);
     const [editRecordingEnabled, setEditRecordingEnabled] = useState(false);
-    const [roomWarning, setRoomWarning] = useState(false);
     const [isFetchingRooms, setIsFetchingRooms] = useState(false);
+    const [checkStatus, setCheckStatus] = useState('idle'); // 'idle' | 'ok' | 'conflict'
+    const [selectedRoomInfo, setSelectedRoomInfo] = useState(null);
     const [cancelReason, setCancelReason] = useState('');
 
     const [agendaList, setAgendaList] = useState([]);
@@ -107,6 +108,8 @@ const EmployeeMeetingDetail = () => {
 
     // Force re-render flag for TranscriptViewer when upload succeeds
     const [refreshTranscriptKey, setRefreshTranscriptKey] = useState(0);
+    const [audioPage, setAudioPage] = useState(1);
+    const audioItemsPerPage = 5;
     const [activeRightTab, setActiveRightTab] = useState('transcript');
 
     /**
@@ -264,6 +267,13 @@ const EmployeeMeetingDetail = () => {
         setEditStart(startDate.toTimeString().substring(0, 5));
         setEditEnd(endDate.toTimeString().substring(0, 5));
         setEditRoomId(data.room?.id || '');
+        setSelectedRoomInfo(data.room ? {
+            roomId: data.room.id,
+            roomName: data.room.room_name || data.room.roomName,
+            siteName: data.room.site_name || data.room.siteName,
+            capacity: data.room.capacity,
+        } : null);
+        setCheckStatus('idle');
         setEditParticipants(data.participants?.map(p => p.id) || []);
         setEditRecordingEnabled(data.recording_enabled || data.recordingEnabled || false);
         setAgendaList(data.agenda || []);
@@ -286,34 +296,19 @@ const EmployeeMeetingDetail = () => {
         }
     }, [isEditModalOpen, meeting?.id]);
 
-    // Lọc phòng trống theo khung giờ mới (có debounce)
+    // Nạp danh sách phòng còn trống 1 LẦN khi mở modal (dùng giờ gốc của cuộc họp) — KHÔNG tự
+    // động chạy lại khi user đổi giờ nữa. Việc kiểm tra lại theo giờ mới do người dùng chủ động
+    // bấm nút "Kiểm tra trùng lịch & phòng" (xem handleCheckAvailability bên dưới).
     useEffect(() => {
         if (isEditModalOpen && editStartStr && editEndStr && editStart && editEnd) {
-            const fetchAvailable = async () => {
+            const fetchInitialRooms = async () => {
                 setIsFetchingRooms(true);
                 try {
                     const startISO = new Date(`${editStartStr}T${editStart}:00`).toISOString();
                     const endISO = new Date(`${editEndStr}T${editEnd}:00`).toISOString();
-                    
                     const res = await getAvailableRoomsForMeeting(meeting.id, { startTime: startISO, endTime: endISO, includeCurrentRoom: true });
                     if (res?.success) {
-                        const fetchedRooms = res.data || [];
-                        setRooms(fetchedRooms);
-                        
-                        if (editRoomId) {
-                            let isAvailable = fetchedRooms.some(r => String(r.roomId) === String(editRoomId));
-                            // Chuẩn hóa thời gian cũ từ API về ISO để so sánh chính xác với startISO/endISO
-                            const oldStartISO = meeting?.startTime || meeting?.start_time ? new Date(meeting.startTime || meeting.start_time).toISOString() : null;
-                            const oldEndISO = meeting?.endTime || meeting?.end_time ? new Date(meeting.endTime || meeting.end_time).toISOString() : null;
-                            
-                            const isTimeChanged = startISO !== oldStartISO || endISO !== oldEndISO;
-                            
-                            // Nếu thời gian không đổi, phòng hiện tại của cuộc họp luôn được xem là hợp lệ
-                            if (!isTimeChanged && String(editRoomId) === String(meeting?.room?.id)) {
-                                isAvailable = true;
-                            }
-                            setRoomWarning(!isAvailable);
-                        }
+                        setRooms(res.data || []);
                     }
                 } catch (e) {
                     console.error("Failed to fetch available rooms", e);
@@ -321,11 +316,35 @@ const EmployeeMeetingDetail = () => {
                     setIsFetchingRooms(false);
                 }
             };
-
-            const timeoutId = setTimeout(fetchAvailable, 500);
-            return () => clearTimeout(timeoutId);
+            fetchInitialRooms();
         }
-    }, [isEditModalOpen, editStartStr, editStart, editEnd]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditModalOpen, meeting?.id]);
+
+    // Đổi giờ → chỉ reset trạng thái check về 'idle' (nhắc nhở mềm), KHÔNG tự gọi API.
+    useEffect(() => {
+        setCheckStatus('idle');
+    }, [editStart, editEnd, editStartStr, editEndStr]);
+
+    const handleCheckAvailability = async () => {
+        if (!editStartStr || !editEndStr || !editStart || !editEnd) return;
+        setIsFetchingRooms(true);
+        try {
+            const startISO = new Date(`${editStartStr}T${editStart}:00`).toISOString();
+            const endISO = new Date(`${editEndStr}T${editEnd}:00`).toISOString();
+            const res = await getAvailableRoomsForMeeting(meeting.id, { startTime: startISO, endTime: endISO, includeCurrentRoom: true });
+            if (res?.success) {
+                const fetchedRooms = res.data || [];
+                setRooms(fetchedRooms);
+                const isAvailable = fetchedRooms.some(r => String(r.roomId) === String(editRoomId));
+                setCheckStatus(isAvailable ? 'ok' : 'conflict');
+            }
+        } catch (e) {
+            console.error("Failed to check room availability", e);
+        } finally {
+            setIsFetchingRooms(false);
+        }
+    };
 
     // Simulated playback updates for transcript
     useEffect(() => {
@@ -687,7 +706,34 @@ const EmployeeMeetingDetail = () => {
         );
     };
     
-    const isSubmitDisabled = roomWarning || !isFormChanged();
+    // checkStatus giờ chỉ dùng để hiển thị banner/border, KHÔNG chặn Lưu nữa — lưới an toàn
+    // cuối là recheck ở BE lúc updateMeetingTime / Manager duyệt lại.
+    const isSubmitDisabled = !isFormChanged();
+
+    const hasUncheckedTimeEdit = () => {
+        if (checkStatus !== 'idle' || !meeting) return false;
+        const startISO = editStartStr && editStart ? new Date(`${editStartStr}T${editStart}:00`).toISOString() : '';
+        const endISO = editEndStr && editEnd ? new Date(`${editEndStr}T${editEnd}:00`).toISOString() : '';
+        const origStart = meeting.startTime || meeting.start_time;
+        const origEnd = meeting.endTime || meeting.end_time;
+        return (
+            new Date(startISO).getTime() !== new Date(origStart).getTime() ||
+            new Date(endISO).getTime() !== new Date(origEnd).getTime()
+        );
+    };
+
+    // Đảm bảo phòng đang chọn luôn có mặt trong option list, kể cả khi bị loại khỏi `rooms`
+    // sau lần kiểm tra gần nhất (không tự động khoá/xoá lựa chọn của người dùng).
+    const roomOptionsToRender = rooms.some(r => String(r.roomId) === String(editRoomId))
+        ? rooms
+        : (selectedRoomInfo ? [...rooms, selectedRoomInfo] : rooms);
+    const suggestedAlternativeRooms = rooms.filter(r => String(r.roomId) !== String(editRoomId)).slice(0, 5);
+    // Nhóm D — cảnh báo mềm: request pending khác đang xin cùng phòng/giờ với
+    // phòng đang chọn (chỉ hiện sau khi đã bấm Kiểm tra ít nhất 1 lần, không
+    // chặn gì cả).
+    const selectedRoomPendingConflicts = checkStatus !== 'idle'
+        ? (rooms.find(r => String(r.roomId) === String(editRoomId))?.pendingConflicts || [])
+        : [];
 
     return (
         <>
@@ -1154,34 +1200,65 @@ const EmployeeMeetingDetail = () => {
                                 )}
 
                                 {/* Bản ghi âm */}
-                                {mediaFiles.filter(m => (m.fileType || m.type || m.file_type || '').toLowerCase() === 'audio').length > 0 && (
-                                    <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 mb-6">
-                                        <h3 className="text-sm font-bold text-slate-blue mb-4 flex items-center gap-2">
-                                            <Play className="w-4 h-4 text-action-blue" />
-                                            Bản ghi âm cuộc họp
-                                        </h3>
-                                        <div className="space-y-4">
-                                            {mediaFiles.filter(m => (m.fileType || m.type || m.file_type || '').toLowerCase() === 'audio').map((audioFile, idx) => (
-                                                <div key={audioFile.id || idx} className="flex flex-col gap-2 p-3 bg-cloud-mist rounded-xl border border-outline-gray">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-xs font-bold text-midnight-indigo truncate pr-4">
-                                                            {audioFile.fileName || audioFile.file_name || `Bản ghi âm ${idx + 1}`}
+                                {(() => {
+                                    const audioFiles = mediaFiles.filter(m => (m.fileType || m.type || m.file_type || '').toLowerCase() === 'audio');
+                                    if (audioFiles.length === 0) return null;
+                                    
+                                    const totalAudioPages = Math.ceil(audioFiles.length / audioItemsPerPage);
+                                    const currentAudioFiles = audioFiles.slice((audioPage - 1) * audioItemsPerPage, audioPage * audioItemsPerPage);
+
+                                    return (
+                                        <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2 mb-6">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="text-sm font-bold text-slate-blue flex items-center gap-2">
+                                                    <Play className="w-4 h-4 text-action-blue" />
+                                                    Bản ghi âm cuộc họp
+                                                </h3>
+                                                {totalAudioPages > 1 && (
+                                                    <div className="flex items-center gap-1.5 bg-cloud-mist rounded-lg p-1 border border-platinum-tint">
+                                                        <button 
+                                                            onClick={() => setAudioPage(p => Math.max(1, p - 1))}
+                                                            disabled={audioPage === 1}
+                                                            className="p-1 text-slate-blue hover:text-action-blue disabled:opacity-30 disabled:hover:text-slate-blue rounded transition-colors"
+                                                        >
+                                                            <ChevronLeft className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <span className="text-[10px] font-bold text-midnight-indigo px-1">
+                                                            {audioPage} / {totalAudioPages}
                                                         </span>
+                                                        <button 
+                                                            onClick={() => setAudioPage(p => Math.min(totalAudioPages, p + 1))}
+                                                            disabled={audioPage === totalAudioPages}
+                                                            className="p-1 text-slate-blue hover:text-action-blue disabled:opacity-30 disabled:hover:text-slate-blue rounded transition-colors"
+                                                        >
+                                                            <ChevronRight className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="space-y-4">
+                                                {currentAudioFiles.map((audioFile, idx) => (
+                                                    <div key={audioFile.id || idx} className="flex flex-col gap-2 p-3 bg-cloud-mist rounded-xl border border-outline-gray">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs font-bold text-midnight-indigo truncate pr-4">
+                                                                {audioFile.fileName || audioFile.file_name || `Bản ghi âm ${(audioPage - 1) * audioItemsPerPage + idx + 1}`}
+                                                            </span>
+                                                            {audioFile.downloadUrl && (
+                                                                <a href={audioFile.downloadUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-platinum-tint text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg text-xs font-bold transition-colors">
+                                                                    <Download className="w-3.5 h-3.5" />
+                                                                    Tải xuống
+                                                                </a>
+                                                            )}
+                                                        </div>
                                                         {audioFile.downloadUrl && (
-                                                            <a href={audioFile.downloadUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-platinum-tint text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg text-xs font-bold transition-colors">
-                                                                <Download className="w-3.5 h-3.5" />
-                                                                Tải xuống
-                                                            </a>
+                                                            <audio controls src={audioFile.downloadUrl} className="w-full h-10 mt-1" />
                                                         )}
                                                     </div>
-                                                    {audioFile.downloadUrl && (
-                                                        <audio controls src={audioFile.downloadUrl} className="w-full h-10 mt-1" />
-                                                    )}
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
 
                                 {/* Transcript Viewer */}
                                 <TranscriptViewer
@@ -1312,6 +1389,23 @@ const EmployeeMeetingDetail = () => {
                                     </div>
                                 </div>
 
+                                <div className="flex items-center justify-between gap-3 -mt-2">
+                                    {hasUncheckedTimeEdit() ? (
+                                        <p className="text-[11px] text-slate-blue flex items-center gap-1">
+                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                            Bạn đã đổi giờ họp — nên kiểm tra lại trước khi lưu.
+                                        </p>
+                                    ) : <span />}
+                                    <button
+                                        type="button"
+                                        onClick={handleCheckAvailability}
+                                        disabled={isFetchingRooms || !editStart || !editEnd}
+                                        className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-action-blue text-action-blue hover:bg-action-blue hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-action-blue"
+                                    >
+                                        {isFetchingRooms ? 'Đang kiểm tra...' : 'Kiểm tra trùng lịch & phòng'}
+                                    </button>
+                                </div>
+
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">
                                         Chọn phòng họp {isFetchingRooms && <span className="text-[10px] text-action-blue normal-case italic font-normal ml-2">(Đang tải danh sách phòng...)</span>}
@@ -1320,25 +1414,54 @@ const EmployeeMeetingDetail = () => {
                                         value={editRoomId}
                                         onChange={(e) => {
                                             setEditRoomId(e.target.value);
-                                            setRoomWarning(false);
+                                            const picked = rooms.find(r => String(r.roomId) === String(e.target.value));
+                                            if (picked) setSelectedRoomInfo(picked);
+                                            setCheckStatus('idle');
                                         }}
-                                        className={`w-full px-3 py-2 border rounded-xl text-sm bg-white focus:outline-none focus:border-action-blue ${roomWarning ? 'border-red-400' : 'border-platinum-tint'}`}
+                                        className={`w-full px-3 py-2 border rounded-xl text-sm bg-white focus:outline-none focus:border-action-blue ${checkStatus === 'conflict' ? 'border-red-400' : 'border-platinum-tint'}`}
                                     >
-                                        {roomWarning && (
-                                            <option value={editRoomId} className="hidden" disabled>
-                                                -- Phòng hiện tại (Không trống) --
-                                            </option>
-                                        )}
-                                        {rooms.map((r, idx) => (
+                                        {roomOptionsToRender.map((r, idx) => (
                                             <option key={r.roomId || idx} value={r.roomId}>
-                                                {r.roomName} {r.siteName ? `(${r.siteName})` : ''} - Sức chứa: {r.capacity}
+                                                {r.roomName} {r.siteName ? `(${r.siteName})` : ''}{r.capacity ? ` - Sức chứa: ${r.capacity}` : ''}
                                             </option>
                                         ))}
                                     </select>
-                                    {roomWarning && (
-                                        <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1 font-medium">
-                                            <AlertTriangle className="w-3.5 h-3.5" />
-                                            Phòng hiện tại không còn trống ở khung giờ này, vui lòng chọn phòng khác.
+                                    {checkStatus === 'ok' && (
+                                        <p className="text-[11px] text-emerald-600 mt-1.5 flex items-center gap-1 font-medium">
+                                            <Check className="w-3.5 h-3.5" />
+                                            Phòng đang chọn còn trống ở khung giờ này.
+                                        </p>
+                                    )}
+                                    {checkStatus === 'conflict' && (
+                                        <div className="mt-1.5">
+                                            <p className="text-[11px] text-red-500 flex items-center gap-1 font-medium">
+                                                <AlertTriangle className="w-3.5 h-3.5" />
+                                                Phòng đang chọn không còn trống ở khung giờ này. Bạn vẫn có thể giữ nguyên lựa chọn này (yêu cầu sẽ được gửi Manager duyệt lại) hoặc chọn phòng khác:
+                                            </p>
+                                            {suggestedAlternativeRooms.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                    {suggestedAlternativeRooms.map((r, idx) => (
+                                                        <button
+                                                            key={r.roomId || idx}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditRoomId(r.roomId);
+                                                                setSelectedRoomInfo(r);
+                                                                setCheckStatus('ok');
+                                                            }}
+                                                            className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-cloud-mist border border-outline-gray text-slate-blue hover:bg-action-blue hover:text-white hover:border-action-blue transition-colors"
+                                                        >
+                                                            {r.roomName}{r.siteName ? ` (${r.siteName})` : ''}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {selectedRoomPendingConflicts.length > 0 && (
+                                        <p className="text-[11px] text-amber-600 mt-1.5 flex items-start gap-1">
+                                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                            Đã có {selectedRoomPendingConflicts.length} yêu cầu khác đang chờ duyệt cho phòng/khung giờ này (chưa được duyệt nên chưa chắc chắn giữ được phòng — Manager sẽ quyết định khi có nhiều yêu cầu trùng nhau).
                                         </p>
                                     )}
                                 </div>

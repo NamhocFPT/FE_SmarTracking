@@ -282,6 +282,23 @@ const Notifications = () => {
                                             )}
                                         </div>
                                         <p className="text-xs text-slate-blue leading-relaxed">{noti.body}</p>
+                                        {noti.payloadJson?.conflictDetails?.length > 0 && (
+                                            <div className="bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-2 text-[11px] text-rose-800 space-y-1 mt-1">
+                                                <p className="font-semibold">Xung đột với:</p>
+                                                {noti.payloadJson.conflictDetails.map((c, idx) => (
+                                                    <p key={c.bookingId || idx}>
+                                                        {c.meetingTitle || 'Cuộc họp khác'} — {c.roomName || ''}
+                                                        {' · '}{new Date(c.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}-{new Date(c.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                        {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
+                                                    </p>
+                                                ))}
+                                                {noti.payloadJson?.suggestedAlternatives?.length > 0 && (
+                                                    <p className="pt-1 text-rose-700">
+                                                        Phòng còn trống gợi ý: {noti.payloadJson.suggestedAlternatives.map(r => r.roomName).join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                         <div className="flex items-center gap-1 text-[10px] text-steel-gray pt-1">
                                             <Calendar className="w-3.5 h-3.5" />
                                             <span>{formatDate(noti.createdAt)}</span>

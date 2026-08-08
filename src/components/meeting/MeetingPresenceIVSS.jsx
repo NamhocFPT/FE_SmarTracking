@@ -3,7 +3,7 @@ import {
     getMeetingPresence, 
     getUserPresence, 
     getMeetingPresenceReport 
-} from '../service/managerServices';
+} from '../../service/managerServices';
 import { 
     Users, 
     Clock, 

@@ -7,7 +7,7 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 
-import DashboardBanner from '../../component/DashboardBanner';
+import DashboardBanner from '../../components/common/DashboardBanner';
 import { getEmployeeSummary } from '../../service/campusService';
 import { getMySchedule } from '../../service/employeeServices';
 

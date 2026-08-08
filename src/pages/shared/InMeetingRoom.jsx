@@ -3,7 +3,7 @@ import {
     Clock, Cpu, Download, ExternalLink, Eye, FileText, Hand, Loader, Mic, MicOff,
     MonitorUp, PhoneOff, Play, Plus, RefreshCw, Shield, Smile,
     Sparkles, StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
-    Volume2, VolumeX, X
+    Volume2, VolumeX, X, Edit2
 } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -49,7 +49,7 @@ import {
     invalidateAttendanceRecord,
     getMediaFile as getManagerMediaFile,
 } from '../../service/managerServices';
-import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
+import UserAvatar, { resolveAvatarUrl } from '../../components/common/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
 import GuestPanel from '../../components/meeting/GuestPanel';
@@ -198,6 +198,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [confirmLeaveModal, setConfirmLeaveModal] = useState(false);
     const [notes, setNotes] = useState([]);
     const [noteInput, setNoteInput] = useState('');
+    const [shareNoteWithGuest, setShareNoteWithGuest] = useState(false);
     const [presentedFile, setPresentedFile] = useState(null);
     const [attendance, setAttendance] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
@@ -207,6 +208,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [recordingSessionId, setRecordingSessionId] = useState(null);
     const [recordingStartedAt, setRecordingStartedAt] = useState(null);
     const [mediaFiles, setMediaFiles] = useState([]);
+    const [editingMediaId, setEditingMediaId] = useState(null);
+    const [editingMediaTitle, setEditingMediaTitle] = useState('');
 
     // Local settings
     const [isMicOn, setIsMicOn] = useState(true);
@@ -222,6 +225,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [extensionModal, setExtensionModal] = useState({ isOpen: false, minutes: 15, reason: '' });
     const [pendingExtensions, setPendingExtensions] = useState([]);
     const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
+    const [isManualAttendanceExpanded, setIsManualAttendanceExpanded] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [agendaDocView, setAgendaDocView] = useState(null);
     const [agendaDocUrl, setAgendaDocUrl] = useState(null);
@@ -358,6 +362,23 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     const apiP = baseMeeting.participants?.find(p => (p.userId || p.user_id || p.user?.id || p.id) === savedP.id);
                     return apiP ? { ...savedP, avatarUrl: resolveAvatarUrl(apiP) || savedP.avatarUrl } : savedP;
                 });
+                // Thêm khách mới xuất hiện sau khi cache đã tồn tại (chưa có trong savedState)
+                const existingIds = new Set(savedState.participants?.map(p => p.id) || []);
+                const newExternal = (baseMeeting.externalParticipants || baseMeeting.external_participants || [])
+                    .filter(ep => ep.id && !existingIds.has(ep.id))
+                    .map(ep => ({
+                        id: ep.id,
+                        fullName: ep.name || ep.fullName || ep.full_name || ep.email || 'Khách mời',
+                        avatarUrl: '',
+                        role: 'Khách mời',
+                        isExternal: true,
+                        isMuted: false,
+                        isSpeaking: false,
+                        isBot: false,
+                    }));
+                if (newExternal.length > 0) {
+                    savedState.participants = [...(savedState.participants || []), ...newExternal];
+                }
             }
             setMeetingState(savedState);
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(savedState));
@@ -476,6 +497,35 @@ const InMeetingRoom = ({ isPublic = false }) => {
             const res = await callWithFallback(getEmployeeMediaFiles, getManagerMediaFiles, id);
             if (res?.success) setMediaFiles(res.data || []);
         } catch (e) { }
+    };
+
+    const handleRenameMedia = async (fileId) => {
+        if (!editingMediaTitle.trim()) {
+            showToast('Tên bản ghi không được để trống', 'error');
+            return;
+        }
+        
+        // Optimistic update
+        const originalMedia = [...mediaFiles];
+        setMediaFiles(prev => prev.map(f => f.id === fileId ? { ...f, title: editingMediaTitle.trim() } : f));
+        setEditingMediaId(null);
+
+        try {
+            const res = await request(`/media-files/${fileId}`, {
+                method: 'PATCH',
+                data: { title: editingMediaTitle.trim() }
+            });
+            if (res?.success || res?.data) {
+                showToast('Đổi tên bản ghi thành công', 'success');
+                fetchMediaFiles(); 
+            } else {
+                setMediaFiles(originalMedia);
+                showToast(res?.error?.message || res?.message || 'Lỗi: Backend chưa hỗ trợ đổi tên file này', 'error');
+            }
+        } catch (error) {
+            setMediaFiles(originalMedia);
+            showToast('Lỗi API đổi tên bản ghi (đang chờ BE hỗ trợ)', 'error');
+        }
     };
 
     // ─── Effects ──────────────────────────────────────────────────────
@@ -778,9 +828,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
         e.preventDefault();
         if (!noteInput.trim()) return;
         try {
-            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, { content: noteInput, noteType: 'in_meeting' });
+            const payload = { content: noteInput, noteType: 'in_meeting' };
+            if (shareNoteWithGuest) payload.visibilityLevel = 'guest_shared';
+            const res = await callWithFallback(createEmployeeNote, createManagerNote, id, payload);
             if (res?.success) {
                 setNoteInput('');
+                setShareNoteWithGuest(false);
                 loadNotes();
                 showToast('Đã thêm ghi chú', 'success');
             }
@@ -1506,35 +1559,42 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
                                                 <UserCheck className="w-3.5 h-3.5 text-action-blue" /> Điểm danh thủ công
                                             </h4>
-                                            <button onClick={loadAttendance} className="p-1 text-slate-blue hover:text-action-blue transition-colors">
-                                                <RefreshCw className="w-3 h-3" />
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={loadAttendance} className="p-1 text-slate-blue hover:text-action-blue transition-colors">
+                                                    <RefreshCw className="w-3 h-3" />
+                                                </button>
+                                                <button onClick={() => setIsManualAttendanceExpanded(!isManualAttendanceExpanded)} className="p-1 text-slate-blue hover:text-action-blue transition-colors">
+                                                    {isManualAttendanceExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="divide-y divide-platinum-tint max-h-44 overflow-y-auto">
-                                            {uncheckedParticipants.length === 0 ? (
-                                                <p className="text-[11px] text-slate-blue italic text-center py-3">Tất cả đã điểm danh.</p>
-                                            ) : (
-                                                uncheckedParticipants.map(p => (
-                                                    <div key={p.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-cloud-mist transition-colors">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <UserAvatar user={p} className="w-6 h-6 rounded-full shrink-0 text-[9px] font-bold" />
-                                                            <span className="text-xs font-semibold text-midnight-indigo truncate">{p.fullName}</span>
+                                        {isManualAttendanceExpanded && (
+                                            <div className="divide-y divide-platinum-tint max-h-44 overflow-y-auto">
+                                                {uncheckedParticipants.length === 0 ? (
+                                                    <p className="text-[11px] text-slate-blue italic text-center py-3">Tất cả đã điểm danh.</p>
+                                                ) : (
+                                                    uncheckedParticipants.map(p => (
+                                                        <div key={p.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-cloud-mist transition-colors">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <UserAvatar user={p} className="w-6 h-6 rounded-full shrink-0 text-[9px] font-bold" />
+                                                                <span className="text-xs font-semibold text-midnight-indigo truncate">{p.fullName}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleManualCheckIn(p)}
+                                                                disabled={manualCheckInLoading === p.id}
+                                                                className="ml-2 shrink-0 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-[9px] font-extrabold flex items-center gap-1 transition-all"
+                                                            >
+                                                                {manualCheckInLoading === p.id ? (
+                                                                    <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <><UserCheck className="w-3 h-3" /> Điểm danh</>
+                                                                )}
+                                                            </button>
                                                         </div>
-                                                        <button
-                                                            onClick={() => handleManualCheckIn(p)}
-                                                            disabled={manualCheckInLoading === p.id}
-                                                            className="ml-2 shrink-0 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-[9px] font-extrabold flex items-center gap-1 transition-all"
-                                                        >
-                                                            {manualCheckInLoading === p.id ? (
-                                                                <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                                            ) : (
-                                                                <><UserCheck className="w-3 h-3" /> Điểm danh</>
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Gia hạn cuộc họp */}
@@ -1568,6 +1628,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                     onUploadSuccess={(sessionId) => {
                                                         showToast('Đã tải lên tệp ghi âm thành công', 'success');
                                                         setRecordingSessionId(sessionId);
+                                                        fetchMediaFiles();
                                                     }}
                                                 />
                                             </div>
@@ -1875,15 +1936,47 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             {mediaFiles.length > 0 && (
                                                 <div className="space-y-1.5">
                                                     <h4 className="text-[10px] font-bold text-slate-blue uppercase tracking-wider flex items-center gap-1.5">
-                                                        <VideoIcon className="w-3 h-3" /> Video ghi hình ({mediaFiles.length})
+                                                        <FileText className="w-3 h-3" /> Tệp đa phương tiện ({mediaFiles.length})
                                                     </h4>
                                                     {mediaFiles.map((file, idx) => (
-                                                        <div key={file.id || idx} className="p-2.5 bg-cloud-mist border border-platinum-tint rounded-xl flex items-center justify-between">
-                                                            <div>
-                                                                <p className="text-xs font-semibold text-midnight-indigo">{file.title || `Video_${idx + 1}`}</p>
-                                                                <p className="text-[9px] text-slate-blue">{file.duration ? formatDuration(file.duration) : 'Đã ghi'}</p>
+                                                        <div key={file.id || idx} className="p-2.5 bg-cloud-mist border border-platinum-tint rounded-xl flex items-center justify-between group">
+                                                            <div className="flex-1 min-w-0 pr-2">
+                                                                {editingMediaId === file.id ? (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingMediaTitle}
+                                                                            onChange={(e) => setEditingMediaTitle(e.target.value)}
+                                                                            onKeyDown={(e) => { if (e.key === 'Enter') handleRenameMedia(file.id); }}
+                                                                            className="flex-1 text-xs font-semibold text-midnight-indigo bg-white border border-action-blue focus:outline-none rounded px-1.5 py-0.5 min-w-0"
+                                                                            autoFocus
+                                                                        />
+                                                                        <button onClick={() => handleRenameMedia(file.id)} className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 p-1 rounded">
+                                                                            <Check className="w-3 h-3" />
+                                                                        </button>
+                                                                        <button onClick={() => setEditingMediaId(null)} className="text-slate-500 hover:text-slate-700 bg-slate-100 p-1 rounded">
+                                                                            <X className="w-3 h-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="text-xs font-semibold text-midnight-indigo truncate" title={file.title || `Bản_ghi_${idx + 1}`}>
+                                                                            {file.title || `Bản_ghi_${idx + 1}`}
+                                                                        </p>
+                                                                        {isHost && (
+                                                                            <button 
+                                                                                onClick={() => { setEditingMediaId(file.id); setEditingMediaTitle(file.title || `Bản_ghi_${idx + 1}`); }}
+                                                                                className="p-1 text-slate-400 hover:text-action-blue transition-colors bg-white rounded shadow-sm border border-platinum-tint/50"
+                                                                                title="Đổi tên"
+                                                                            >
+                                                                                <Edit2 className="w-3 h-3" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                <p className="text-[9px] text-slate-blue mt-0.5">{file.duration ? formatDuration(file.duration) : 'Đã lưu'}</p>
                                                             </div>
-                                                            <a href={file.downloadUrl || '#'} target="_blank" rel="noreferrer" className="p-1.5 bg-white border border-platinum-tint rounded-lg text-action-blue hover:text-glacier-blue transition-colors">
+                                                            <a href={file.downloadUrl || '#'} target="_blank" rel="noreferrer" className="p-1.5 bg-white border border-platinum-tint rounded-lg text-action-blue hover:text-glacier-blue transition-colors shrink-0">
                                                                 <Play className="w-3 h-3" />
                                                             </a>
                                                         </div>
@@ -1913,6 +2006,17 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             rows={2}
                                             className="w-full px-3 py-2 bg-white border border-platinum-tint rounded-xl text-xs text-midnight-indigo focus:outline-none focus:border-action-blue resize-none"
                                         />
+                                        {isHost && (
+                                            <label className="flex items-center gap-1.5 mt-2 text-[10px] font-semibold text-slate-blue cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={shareNoteWithGuest}
+                                                    onChange={e => setShareNoteWithGuest(e.target.checked)}
+                                                    className="w-3.5 h-3.5 accent-action-blue"
+                                                />
+                                                Chia sẻ ghi chú này với khách ngoài công ty
+                                            </label>
+                                        )}
                                         <button
                                             type="submit"
                                             disabled={!noteInput.trim()}
@@ -1993,6 +2097,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                             {p.role === 'Chủ tọa' && (
                                                                 <span className="text-[8px] px-1.5 py-0.5 bg-red-50 text-red-600 rounded font-extrabold shrink-0">CT</span>
                                                             )}
+                                                            {p.isExternal && (
+                                                                <span className="text-[8px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-extrabold shrink-0">KHÁCH</span>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 mt-0.5">
                                                             <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${presenceInfo.color}`}>
@@ -2002,7 +2109,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                         </div>
                                                     </div>
 
-                                                    {isHost && (
+                                                    {isHost && !p.isExternal && (
                                                         <div className="shrink-0">
                                                             {isCheckedIn(p.id) ? (
                                                                 <button

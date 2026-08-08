@@ -24,7 +24,7 @@ import { getZones } from '../../service/zoneServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getVehicleControlList } from '../../service/anprService';
 import { getBusinessAdminSummary } from '../../service/campusService';
-import DashboardBanner from '../../component/DashboardBanner';
+import DashboardBanner from '../../components/common/DashboardBanner';
 
 // Premium color palettes
 const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];

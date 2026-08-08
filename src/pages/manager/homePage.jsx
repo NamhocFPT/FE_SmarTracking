@@ -24,7 +24,7 @@ import {
     getDepartments
 } from '../../service/managerServices';
 import { getManagerSummary } from '../../service/campusService';
-import DashboardBanner from '../../component/DashboardBanner';
+import DashboardBanner from '../../components/common/DashboardBanner';
 
 const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
 

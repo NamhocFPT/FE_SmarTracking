@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { get } from '../../utils/request';
 import { updateSelfProfile } from '../../service/employeeServices';
 import { getBiometricStatus, updateSelfAvatar } from '../../service/avatarService';
-import BiometricUploadForm from '../../component/BiometricReminder/BiometricUploadForm';
+import BiometricUploadForm from '../../components/biometric/BiometricUploadForm';
 
 const STATUS_LABEL = {
     not_uploaded: { label: "Chưa nộp ảnh", badge: "bg-amber-50 text-amber-700 border border-amber-200" },

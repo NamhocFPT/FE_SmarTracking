@@ -9,7 +9,7 @@ import {
     sendMeetingReminder,
     sendCancellationNotification,
     sendMinutesDistribution
-} from '../service/businessAdminServices';
+} from '../../service/businessAdminServices';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ──────────────────────────────────────────

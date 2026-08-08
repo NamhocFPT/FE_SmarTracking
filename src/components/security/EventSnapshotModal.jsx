@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Image as ImageIcon, AlertCircle } from 'lucide-react';
-import { API_BASE_URL } from '../utils/request';
+import { API_BASE_URL } from '../../utils/request';
 
 const EventSnapshotModal = ({ isOpen, onClose, eventId }) => {
     const [loading, setLoading] = useState(false);

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
-import { API_BASE_URL } from '../utils/request';
+import { API_BASE_URL } from '../../utils/request';
 
-const ThumbnailImage = ({ eventId, onClick, alt = "Snapshot", className = "w-20 h-20" }) => {
+const ThumbnailImage = ({ eventId, onClick, alt = "Snapshot", className = "w-28 aspect-video" }) => {
     const [error, setError] = useState(false);
 
     // We get the token directly here so the parent doesn't need to pass it
@@ -23,7 +23,7 @@ const ThumbnailImage = ({ eventId, onClick, alt = "Snapshot", className = "w-20 
                 <img
                     src={`${API_BASE_URL}/ivss/device-events/${eventId}/snapshot?token=${token}`}
                     alt={alt}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onError={() => setError(true)}
                 />
             ) : (

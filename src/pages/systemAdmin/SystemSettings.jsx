@@ -1,7 +1,7 @@
 import { Settings, Camera, Plus, Trash2, Pencil } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
-import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getZones, getNoShowConfig, updateNoShowConfig } from '../../service/sysAdminServices';
+import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getZones, getNoShowConfig, updateNoShowConfig, getSecurityAlertsConfig, updateSecurityAlertsConfig } from '../../service/sysAdminServices';
 
 /**
  * SystemSettings Component
@@ -43,6 +43,10 @@ const SystemSettings = () => {
         autoReleaseGraceMinutes: 5,
         autoReleaseEnabled: true
     });
+
+    // Cấu hình Security Alerts (nguồn riêng: GET/PUT /security-alerts-config)
+    const [securityAlertsConfig, setSecurityAlertsConfig] = useState({ autoResolveTimeoutMinutes: 15 });
+    const [dbSecurityAlertsConfig, setDbSecurityAlertsConfig] = useState({ autoResolveTimeoutMinutes: 15 });
 
     // Config Values State — chỉ còn phục vụ 2 tab đang ẩn (Ghi hình & Riêng tư / Tham số hệ thống)
     const [configs, setConfigs] = useState({
@@ -140,6 +144,18 @@ const SystemSettings = () => {
             setNoShowConfig(mergedNoShow);
             setDbNoShowConfig(mergedNoShow);
 
+            // Security alerts config — lỗi không chặn phần còn lại
+            try {
+                const saRes = await getSecurityAlertsConfig();
+                if (saRes?.success && saRes.data) {
+                    const saData = { autoResolveTimeoutMinutes: saRes.data.autoResolveTimeoutMinutes ?? 15 };
+                    setSecurityAlertsConfig(saData);
+                    setDbSecurityAlertsConfig(saData);
+                }
+            } catch (saErr) {
+                console.error('Không thể tải cấu hình Security Alerts:', saErr);
+            }
+
             // Cấu hình chung — chỉ phục vụ 2 tab đang ẩn, lỗi ở đây không chặn tab No-show/Camera
             try {
                 const res = await getSystemConfigs();
@@ -233,6 +249,10 @@ const SystemSettings = () => {
     };
 
     // Form validation check
+    const handleSecurityAlertsChange = (value) => {
+        setSecurityAlertsConfig({ autoResolveTimeoutMinutes: value });
+    };
+
     const validateConfigs = (noShow, data) => {
         if (Number(noShow.thresholdMinutes) <= 0) {
             setError('Ngưỡng phát hiện vắng mặt phải là số nguyên dương.');
@@ -275,7 +295,10 @@ const SystemSettings = () => {
         // No-show config — đổi field nào so với DB (toggle hoặc 2 ô số)
         const noShowChanged = Object.keys(noShowConfig).some(key => noShowConfig[key] !== dbNoShowConfig[key]);
 
-        if (changedKeys.length === 0 && changedThresholdKeys.length === 0 && !noShowChanged) {
+        // Security alerts config
+        const securityAlertsChanged = securityAlertsConfig.autoResolveTimeoutMinutes !== dbSecurityAlertsConfig.autoResolveTimeoutMinutes;
+
+        if (changedKeys.length === 0 && changedThresholdKeys.length === 0 && !noShowChanged && !securityAlertsChanged) {
             setSuccessMessage('Không có thay đổi nào cần lưu.');
             setSaving(false);
             return;
@@ -295,6 +318,13 @@ const SystemSettings = () => {
                     warningGraceMinutes: 0,
                     autoReleaseGraceMinutes: Number(noShowConfig.autoReleaseGraceMinutes),
                     autoReleaseEnabled: Boolean(noShowConfig.autoReleaseEnabled)
+                }));
+            }
+
+            // PUT /security-alerts-config
+            if (securityAlertsChanged) {
+                updatePromises.push(updateSecurityAlertsConfig({
+                    autoResolveTimeoutMinutes: Number(securityAlertsConfig.autoResolveTimeoutMinutes)
                 }));
             }
 
@@ -319,6 +349,7 @@ const SystemSettings = () => {
     const handleReset = () => {
         setError(null);
         setNoShowConfig({ ...dbNoShowConfig });
+        setSecurityAlertsConfig({ ...dbSecurityAlertsConfig });
         setConfigs({ ...dbConfigs });
         setChannelMaps({ ...dbChannelMaps });
         setChannelEditor(emptyChannelEditor);
@@ -717,6 +748,41 @@ const SystemSettings = () => {
                                                 max="1440"
                                                 value={noShowConfig.autoReleaseGraceMinutes}
                                                 onChange={(e) => handleNoShowChange('autoReleaseGraceMinutes', Number(e.target.value))}
+                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                            />
+                                            <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION B: Security Alerts Auto-resolve */}
+                            <div className="space-y-4">
+                                <div className="border-b border-platinum-tint/60 pb-3">
+                                    <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-action-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                        </svg>
+                                        Cảnh báo bảo mật
+                                    </h2>
+                                    <p className="text-xs text-slate-blue mt-1">Kiểm soát thời gian hệ thống tự động đóng cảnh báo không tái phát.</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                                    <div className="md:col-span-1 p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">
+                                            Thời gian tự động đóng cảnh báo không tái phát
+                                        </label>
+                                        <span className="text-xs text-steel-gray mt-0.5 block">
+                                            Nếu một cảnh báo không xảy ra lại trong khoảng thời gian này, hệ thống coi là đã kết thúc và tự động đóng — lần vi phạm tiếp theo sẽ tạo cảnh báo mới thay vì gộp vào cảnh báo cũ.
+                                        </span>
+                                        <div className="mt-3 relative">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="1440"
+                                                value={securityAlertsConfig.autoResolveTimeoutMinutes}
+                                                onChange={(e) => handleSecurityAlertsChange(Number(e.target.value))}
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>

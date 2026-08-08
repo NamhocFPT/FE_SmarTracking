@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, MapPin, Cpu, Car, User, Calendar } from 'lucide-react';
-import { globalSearch } from '../service/searchService';
+import { globalSearch } from '../../service/searchService';
 
 const SEARCH_TYPES = ['zone', 'device', 'vehicle', 'user', 'meeting'];
 

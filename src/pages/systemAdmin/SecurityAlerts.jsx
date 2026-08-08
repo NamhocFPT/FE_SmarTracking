@@ -8,8 +8,8 @@ import {
     resolveSecurityAlert, bulkAcknowledgeSecurityAlerts 
 } from '../../service/securityAlertService';
 import { getZones } from '../../service/zoneServices';
-import EventSnapshotModal from '../../component/EventSnapshotModal';
-import ThumbnailImage from '../../component/ThumbnailImage';
+import EventSnapshotModal from '../../components/security/EventSnapshotModal';
+import ThumbnailImage from '../../components/common/ThumbnailImage';
 
 const SecurityAlerts = () => {
     const [alerts, setAlerts] = useState([]);

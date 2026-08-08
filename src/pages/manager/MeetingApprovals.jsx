@@ -391,7 +391,7 @@ const MeetingApprovals = () => {
                     ) : viewMode === 'grid' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-cloud-mist/10">
                             {requests.map(req => {
-                                const hasConflict = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+                                const hasConflict = (req.conflictDetails && req.conflictDetails.length > 0) || req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
                                 return (
                                     <div key={req.id} className="bg-white border border-platinum-tint/60 hover:border-action-blue/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 h-full">
                                         {/* Header: Request Code & Status */}
@@ -536,7 +536,7 @@ const MeetingApprovals = () => {
                             </thead>
                             <tbody>
                                 {requests.map(req => {
-                                    const hasConflict = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+                                    const hasConflict = (req.conflictDetails && req.conflictDetails.length > 0) || req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
                                     return (
                                         <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/10 transition-colors">
                                             {/* Code */}
@@ -760,27 +760,51 @@ const MeetingApprovals = () => {
                                     </div>
 
                                     {/* Conflict Alerts */}
-                                    {selectedRequest.approvalStatus === 'pending' && (
-                                        <div className={`p-4 rounded-xl border flex gap-3 ${selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
-                                            ? 'bg-rose-50 border-rose-200 text-rose-800'
-                                            : 'bg-emerald-50 border-emerald-250 text-emerald-800'
-                                            }`}>
-                                            <AlertTriangle className={`w-5 h-5 shrink-0 ${selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked' ? 'text-red-600 animate-pulse' : 'text-emerald-600'
-                                                }`} />
-                                            <div className="text-xs space-y-1">
-                                                <p className="font-bold">
-                                                    {selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
-                                                        ? 'Cảnh báo trùng lịch phòng họp!'
-                                                        : 'Phòng họp trống trong khung giờ này'}
-                                                </p>
-                                                <p className="leading-relaxed opacity-90">
-                                                    {selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked'
-                                                        ? 'Khung giờ này đã được đăng ký hoặc có lịch họp trùng lắp cùng phòng họp. Vui lòng cân nhắc từ chối hoặc sắp xếp phương án khác.'
-                                                        : 'Không phát hiện bất kì lịch họp trùng nào cho phòng họp Apollo này trong khung giờ được yêu cầu.'}
-                                                </p>
+                                    {selectedRequest.approvalStatus === 'pending' && (() => {
+                                        // Nhóm E: conflictDetails (check TƯƠI, luôn đáng tin cho xung đột
+                                        // PHÒNG) là nguồn quyết định chính — conflictCheckStatus cũ chỉ còn
+                                        // đúng cho xung đột PARTICIPANT (ghi lúc tạo), với xung đột phòng nó
+                                        // luôn là 'clear' vì lần ghi duy nhất nằm trong transaction bị
+                                        // rollback ở approve(). Dùng field sai sẽ khiến banner đỏ không bao
+                                        // giờ hiện dù conflictDetails có dữ liệu thật.
+                                        const hasRoomConflict = selectedRequest.conflictDetails && selectedRequest.conflictDetails.length > 0;
+                                        const hasLegacyWarning = selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked';
+                                        const showAlert = hasRoomConflict || hasLegacyWarning;
+                                        return (
+                                            <div className={`p-4 rounded-xl border flex gap-3 ${showAlert
+                                                ? 'bg-rose-50 border-rose-200 text-rose-800'
+                                                : 'bg-emerald-50 border-emerald-250 text-emerald-800'
+                                                }`}>
+                                                <AlertTriangle className={`w-5 h-5 shrink-0 ${showAlert ? 'text-red-600 animate-pulse' : 'text-emerald-600'
+                                                    }`} />
+                                                <div className="text-xs space-y-2 flex-1">
+                                                    <p className="font-bold">
+                                                        {showAlert ? 'Cảnh báo trùng lịch phòng họp!' : 'Phòng họp trống trong khung giờ này'}
+                                                    </p>
+                                                    {hasRoomConflict ? (
+                                                        <div className="space-y-1.5">
+                                                            <p className="opacity-90">Khung giờ này đã trùng với {selectedRequest.conflictDetails.length} cuộc họp khác đã được duyệt tại cùng phòng:</p>
+                                                            <ul className="space-y-1">
+                                                                {selectedRequest.conflictDetails.map((c, idx) => (
+                                                                    <li key={c.bookingId || idx} className="bg-white/60 rounded-lg px-2.5 py-1.5 border border-rose-100">
+                                                                        <span className="font-semibold">{c.meetingTitle || 'Cuộc họp khác'}</span>
+                                                                        {' — '}{c.roomName || 'phòng đã chọn'}
+                                                                        {' · '}{new Date(c.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}-{new Date(c.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                                        {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                            <p className="opacity-80 italic">Vui lòng cân nhắc từ chối yêu cầu này hoặc yêu cầu khác cho phù hợp.</p>
+                                                        </div>
+                                                    ) : hasLegacyWarning ? (
+                                                        <p className="leading-relaxed opacity-90">Khung giờ này trùng lịch với một hoặc nhiều người tham dự bắt buộc. Vui lòng cân nhắc trước khi duyệt.</p>
+                                                    ) : (
+                                                        <p className="leading-relaxed opacity-90">Không phát hiện bất kì lịch họp trùng nào cho phòng họp này trong khung giờ được yêu cầu.</p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
 
                                     {/* Approval/Rejection Log (For approved/rejected status) */}
                                     {selectedRequest.approvalStatus !== 'pending' && (

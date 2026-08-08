@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Phone, Building2, Briefcase, ShieldAlert, BadgeCheck } from 'lucide-react';
-import UserAvatar from '../../component/UserAvatar';
+import UserAvatar from '../common/UserAvatar';
 import { getUserById } from '../../service/employeeServices';
 
 /**

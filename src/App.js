@@ -1,4 +1,4 @@
-import AllRouter from "./component/AllRouter";
+import AllRouter from "./routers/AllRouter";
 
 function App() {
   return (

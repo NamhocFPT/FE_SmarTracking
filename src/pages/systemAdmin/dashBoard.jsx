@@ -11,7 +11,7 @@ import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getVehicleControlList } from '../../service/anprService';
 import { getBusinessAdminSummary } from '../../service/campusService';
 
-import DashboardBanner from '../../component/DashboardBanner';
+import DashboardBanner from '../../components/common/DashboardBanner';
 
 const SEVERITY_STYLES = {
     critical: 'bg-red-50 text-red-700',

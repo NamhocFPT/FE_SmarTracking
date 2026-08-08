@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, ShieldAlert, BellRing } from 'lucide-react';
-import { getNotifications } from '../service/sysAdminServices';
-import { getSecurityAlerts } from '../service/securityAlertService';
+import { getNotifications } from '../../service/sysAdminServices';
+import { getSecurityAlerts } from '../../service/securityAlertService';
 
 const SEVERITY_DOT = {
     critical: 'bg-red-600',
@@ -17,9 +17,28 @@ const SEVERITY_DOT = {
  * Badge số đếm CHỈ tính security alerts mới, vì /notifications chưa có field is-read thật từ BE
  * (xem src/pages/systemAdmin/Notifications.jsx — read luôn hardcode false phía client).
  */
-const NotificationBell = ({ basePath }) => {
+const NotificationBell = ({
+    basePath,
+    dark = false,
+    dropdownAlign = 'right',
+    dropUp = false,
+    isOpen: isOpenControlled,
+    onIsOpenChange,
+}) => {
     const navigate = useNavigate();
-    const [isOpen, setIsOpen] = useState(false);
+    const isControlled = isOpenControlled !== undefined;
+    const [isOpenInternal, setIsOpenInternal] = useState(false);
+    const isOpen = isControlled ? isOpenControlled : isOpenInternal;
+
+    const setIsOpen = useCallback((value) => {
+        const newValue = typeof value === 'function' ? value(isOpen) : value;
+        if (isControlled) {
+            onIsOpenChange?.(newValue);
+        } else {
+            setIsOpenInternal(newValue);
+        }
+    }, [isControlled, isOpen, onIsOpenChange]);
+
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
     const [feedItems, setFeedItems] = useState([]);
@@ -46,6 +65,10 @@ const NotificationBell = ({ basePath }) => {
                     title: item.subject,
                     body: item.content,
                     timestamp: item.createdAt,
+                    // [Nhóm E] payloadJson.conflictDetails/suggestedAlternatives — chỉ
+                    // dùng cho notificationType = meeting_request_rejected khi có xung
+                    // đột phòng, xem render phía dưới.
+                    payloadJson: item.payloadJson ?? null,
                 }))
                 : [];
 
@@ -102,27 +125,22 @@ const NotificationBell = ({ basePath }) => {
     }, []);
 
     const handleToggle = () => {
-        setIsOpen((prev) => {
-            const nextOpen = !prev;
-            if (nextOpen) {
-                // Mark all currently loaded notifications as read in localStorage
-                try {
-                    const readIds = JSON.parse(localStorage.getItem('readNotificationIds') || '[]');
-                    const notiIdsToMark = feedItems
-                        .filter(item => item.source === 'notification' && !readIds.includes(item.id))
-                        .map(item => item.id);
-                    if (notiIdsToMark.length > 0) {
-                        const updatedIds = [...readIds, ...notiIdsToMark];
-                        localStorage.setItem('readNotificationIds', JSON.stringify(updatedIds));
-                        // Update badge count
-                        setUnreadCount(prev => Math.max(0, prev - notiIdsToMark.length));
-                    }
-                } catch (e) {
-                    console.error(e);
+        const nextOpen = !isOpen;
+        if (nextOpen) {
+            try {
+                const readIds = JSON.parse(localStorage.getItem('readNotificationIds') || '[]');
+                const notiIdsToMark = feedItems
+                    .filter(item => item.source === 'notification' && !readIds.includes(item.id))
+                    .map(item => item.id);
+                if (notiIdsToMark.length > 0) {
+                    localStorage.setItem('readNotificationIds', JSON.stringify([...readIds, ...notiIdsToMark]));
+                    setUnreadCount(prev => Math.max(0, prev - notiIdsToMark.length));
                 }
+            } catch (e) {
+                console.error(e);
             }
-            return nextOpen;
-        });
+        }
+        setIsOpen(nextOpen);
     };
 
     const handleViewAll = () => {
@@ -136,7 +154,7 @@ const NotificationBell = ({ basePath }) => {
                 type="button"
                 aria-label="Thông báo & cảnh báo"
                 onClick={handleToggle}
-                className="relative p-2 rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors duration-200"
+                className={`relative p-2 rounded-lg transition-colors duration-200 ${dark ? 'text-white/70 hover:text-white hover:bg-white/[0.08]' : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'}`}
             >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -147,7 +165,7 @@ const NotificationBell = ({ basePath }) => {
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-outline-gray rounded-xl shadow-sm-2 z-50 flex flex-col overflow-hidden">
+                <div className={`absolute ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'} ${dropdownAlign === 'left' ? 'left-0' : 'right-0'} w-80 bg-white border border-outline-gray rounded-xl shadow-sm-2 z-50 flex flex-col overflow-hidden`}>
                     <div className="px-4 py-3 border-b border-outline-gray bg-cloud-mist flex items-center gap-2 flex-shrink-0">
                         <BellRing className="w-4 h-4 text-slate-blue" />
                         <p className="text-sm font-bold text-midnight-indigo">Thông báo & Cảnh báo an ninh</p>
@@ -172,7 +190,12 @@ const NotificationBell = ({ basePath }) => {
                                     )}
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-semibold text-midnight-indigo truncate">{item.title}</p>
-                                        <p className="text-xs text-slate-blue truncate">{item.body}</p>
+                                        <p className="text-xs text-slate-blue truncate">
+                                            {item.body}
+                                            {item.payloadJson?.conflictDetails?.[0] && (
+                                                <span className="text-rose-600 font-medium"> — trùng với "{item.payloadJson.conflictDetails[0].meetingTitle}"</span>
+                                            )}
+                                        </p>
                                     </div>
                                 </div>
                             ))

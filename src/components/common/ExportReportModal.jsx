@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, FileText, CheckCircle, AlertTriangle, Download, RefreshCw } from 'lucide-react';
-import { post, get } from '../utils/request';
+import { post, get } from '../../utils/request';
 
 const ExportReportModal = ({ isOpen, onClose }) => {
     const [format, setFormat] = useState('xlsx');

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Lock, AlertTriangle, Eye, EyeOff, CheckCircle, Check, X } from 'lucide-react';
-import { changePassword } from '../service/authService';
+import { changePassword } from '../../service/authService';
 
 const ChangePasswordModal = ({ isOpen, onClose }) => {
     const [formData, setFormData] = useState({

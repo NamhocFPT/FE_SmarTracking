@@ -1,11 +1,11 @@
 import { useId, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { requestPasswordResetOtp } from "../../../service/authService";
-import AuthFormSkeleton from "../../../component/Skeleton/AuthFormSkeleton";
-import AuthLayout from "../../../component/Auth/AuthLayout";
-import AuthAlert from "../../../component/Auth/AuthAlert";
+import AuthFormSkeleton from "../../../components/common/Skeleton/AuthFormSkeleton";
+import AuthLayout from "../../../components/auth/AuthLayout";
+import AuthAlert from "../../../components/auth/AuthAlert";
 
-import AuthTextInput from "../../../component/Auth/AuthTextInput";
+import AuthTextInput from "../../../components/auth/AuthTextInput";
 
 const ForgotPassword = () => {
     const emailId = useId();

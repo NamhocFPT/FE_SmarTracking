@@ -10,7 +10,7 @@ import {
     rejectAvatarSubmission,
 } from "../../service/avatarReviewService";
 import { getDepartments } from "../../service/sysAdminServices";
-import UserAvatar from "../../component/UserAvatar";
+import UserAvatar from "../../components/common/UserAvatar";
 
 const STATUS_MAP = {
     pending_review: { label: "Đang chờ duyệt", badge: "bg-blue-50 text-action-blue border border-blue-200" },

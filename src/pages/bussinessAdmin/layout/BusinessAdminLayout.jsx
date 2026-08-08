@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
 import logo from '../../../assets/images/logo.png';
-import BiometricReminderModal from '../../../component/BiometricReminder/BiometricReminderModal';
-import UserAvatar from '../../../component/UserAvatar';
-import ChangePasswordModal from '../../../component/ChangePasswordModal';
-import NotificationBell from '../../../component/NotificationBell';
+import BiometricReminderModal from '../../../components/biometric/BiometricReminderModal';
+import UserAvatar from '../../../components/common/UserAvatar';
+import ChangePasswordModal from '../../../components/auth/ChangePasswordModal';
+import NotificationBell from '../../../components/common/NotificationBell';
 import { buildDynamicNavigation, filterStaticNavigation } from '../../../utils/buildDynamicNavigation';
 import {
     Home,

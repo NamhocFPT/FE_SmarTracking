@@ -1,5 +1,5 @@
 import Skeleton from './Skeleton';
-import AuthLayout from '../Auth/AuthLayout';
+import AuthLayout from '../../auth/AuthLayout';
 
 /**
  * Skeleton loading for auth form pages

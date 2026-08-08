@@ -4,13 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users, Clock, CheckCircle, AlertTriangle, AlertCircle, XCircle, Edit3, Save, X, RotateCcw
 } from 'lucide-react';
-import UserAvatar from './UserAvatar';
+import UserAvatar from '../common/UserAvatar';
 import { 
     getMeetingAttendance, 
     updateAttendanceStatus, 
     invalidateAttendanceRecord,
     manualAttendanceCheckIn 
-} from '../service/managerServices';
+} from '../../service/managerServices';
 
 const MeetingAttendanceBoard = ({ meetingId }) => {
     const [loading, setLoading] = useState(true);

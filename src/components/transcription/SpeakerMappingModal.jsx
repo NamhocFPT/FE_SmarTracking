@@ -4,7 +4,7 @@ import { X, Play, AlertCircle, CheckCircle, Headphones } from 'lucide-react';
 import { getTranscriptSpeakers, updateSpeakerMappings } from '../../service/transcriptionServices';
 import { getMeetingById as getMeetingEmployee, getMeetingMediaFiles as getMediaEmp, getMediaFile as getFileEmp } from '../../service/employeeServices';
 import { getMeetingById as getMeetingManager, getMeetingMediaFiles as getMediaMgr, getMediaFile as getFileMgr } from '../../service/managerServices';
-import UserAvatar, { resolveAvatarUrl } from '../../component/UserAvatar';
+import UserAvatar, { resolveAvatarUrl } from '../common/UserAvatar';
 
 const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappingSuccess }) => {
     const [speakers, setSpeakers] = useState([]);

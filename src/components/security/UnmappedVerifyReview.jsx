@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getUnmappedVerifies, mapUnmappedVerify } from '../service/sysAdminServices';
-import { getUsers } from '../service/managerServices'; // assuming this exists and returns users
+import { getUnmappedVerifies, mapUnmappedVerify } from '../../service/sysAdminServices';
+import { getUsers } from '../../service/managerServices'; // assuming this exists and returns users
 import { 
     UserX, CheckCircle, Search, Activity, AlertCircle, RefreshCw, FileX, UserCheck
 } from 'lucide-react';
