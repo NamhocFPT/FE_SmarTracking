@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { vi } from 'date-fns/locale/vi';
+import TimePicker from '../../components/common/TimePicker';
 
 import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
 import UserAvatar from '../../components/common/UserAvatar';
@@ -603,18 +604,23 @@ const EmployeeMeetingDetail = () => {
             if (res?.success) {
                 if (res.data?.items) {
                     const savedItems = res.data.items;
+                    const uploadErrors = [];
                     for (let i = 0; i < agendaList.length; i++) {
                         const localItem = agendaList[i];
-                        const savedItem = savedItems[i];
+                        const savedItem = savedItems.find(s => localItem.id ? s.id === localItem.id : s.title === localItem.title) || savedItems[i];
                         if (localItem.file && localItem.file instanceof File && savedItem) {
                             const formData = new FormData();
                             formData.append('file', localItem.file);
                             try {
                                 await uploadAgendaAttachment(meeting.id, savedItem.id, formData);
                             } catch (e) {
-                                console.error('Failed to upload attachment', e);
+                                uploadErrors.push(`- "${localItem.title}": ${e?.error?.message || e?.message || 'Lỗi không xác định'}`);
                             }
                         }
+                    }
+                    if (uploadErrors.length > 0) {
+                        setError(`Đã lưu chương trình nhưng có lỗi khi tải lên tài liệu đính kèm:\n${uploadErrors.join('\n')}`);
+                        return; // Không đóng modal để user xem lỗi
                     }
                 }
                 setSuccessMsg('Cập nhật chương trình Agenda thành công.');
@@ -1369,22 +1375,16 @@ const EmployeeMeetingDetail = () => {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Bắt đầu</label>
-                                        <input
-                                            type="time" lang="en-GB"
-                                            required
+                                        <TimePicker
                                             value={editStart}
-                                            onChange={(e) => setEditStart(e.target.value)}
-                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                                            onChange={(newTime) => setEditStart(newTime)}
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Kết thúc</label>
-                                        <input
-                                            type="time" lang="en-GB"
-                                            required
+                                        <TimePicker
                                             value={editEnd}
-                                            onChange={(e) => setEditEnd(e.target.value)}
-                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                                            onChange={(newTime) => setEditEnd(newTime)}
                                         />
                                     </div>
                                 </div>

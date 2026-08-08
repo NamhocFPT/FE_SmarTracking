@@ -5,6 +5,95 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-09 00:52
+* **Tên Plan / Yêu cầu**: Nâng cấp UI/UX màn hình phòng họp (Layout Header & Thanh công cụ).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Tái cấu trúc lại Header: Đặt Logo nằm ở một phía bên trái, bên cạnh là Tên cuộc họp và Tên phòng họp xếp chồng gọn gàng thành 2 dòng, được căn chỉnh hoàn hảo thông qua Flexbox (có vạch ngăn cách mờ).
+    * Thiết kế lại nút Quay lại (Back): Chuyển thành dạng nút tròn (circular button) hiện đại, sử dụng icon `IoArrowBack` mới với hiệu ứng trượt nhẹ (animation) khi trỏ chuột vào.
+    * Nâng cấp toàn diện thanh công cụ (Bottom Control Bar): Thay thế toàn bộ Icon `lucide-react` bằng bộ Icon xịn xò, sắc nét hơn từ `react-icons/io5` (Ionicons). Các nút bấm cũng được bo góc (rounded-2xl) to hơn, đổ bóng `shadow-sm` giúp mang lại cảm giác bấm (touch-target) cực kỳ cao cấp giống giao diện ứng dụng quốc tế.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 00:43
+* **Tên Plan / Yêu cầu**: Cập nhật Frontend theo báo cáo sửa lỗi hiển thị tài liệu đính kèm Agenda (Live Meeting).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx` & `src/pages/manager/MeetingDetail.jsx`:
+    * Sửa cơ chế lưu file Agenda: Ghép file với mục Agenda trả về từ API thông qua `id` (nếu có) hoặc `title` thay vì dựa theo thứ tự mảng `index`, để tránh đính kèm nhầm file nếu BE trả về mảng bị đảo lộn.
+    * Bổ sung cơ chế thông báo lỗi: Thu thập chi tiết các lỗi trong quá trình upload file (nếu có) và hiển thị cảnh báo cụ thể (file nào lỗi, lý do gì) cho người dùng, thay vì báo thành công ảo và ghi log âm thầm.
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Loại bỏ việc nạp danh sách `agenda` từ `localStorage` cache, buộc nạp trực tiếp bằng dữ liệu từ API để tránh rò rỉ dữ liệu khi đăng nhập nhiều tài khoản trên cùng trình duyệt.
+    * Tính năng đồng bộ thời gian thực: Khi Host bấm chuyển Agenda, FE sẽ tự động phát sóng (`emit`) sự kiện Socket `agenda:changed` kèm vị trí Agenda mới, đồng thời các Participant cũng sẽ tự động chuyển UI theo khi nhận sự kiện này (Yêu cầu BE hỗ trợ hứng và phát sự kiện tương ứng nếu cần thiết).
+    * Thay đổi hiển thị UI: Đổi tên section "Tệp đa phương tiện" thành "Bản ghi cuộc họp" để tránh sự hiểu lầm của người dùng.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 00:23
+* **Tên Plan / Yêu cầu**: Điều chỉnh kích thước Logo và căn lề tiêu đề phòng họp theo chuẩn Design System.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Tái cấu trúc Flexbox (sử dụng `flex-col`, `gap-1` và căn chỉnh text) tại thanh Header để đảm bảo khoảng cách trên/dưới và căn giữa hoàn hảo giữa Logo - Tên cuộc họp - Tên phòng.
+    * Thay đổi tỷ lệ ảnh Logo sang `h-7 w-auto` (Thay vì ép vuông tỷ lệ lớn gây mất thẩm mỹ) để Logo SmarTracking hiển thị đúng hình dạng chuẩn thiết kế hệ thống, không bị quá to.
+    * Đưa Box chứa Logo ở màn hình Lobby về chuẩn tỷ lệ `w-20 h-20` cùng các hiệu ứng đổ bóng (drop-shadow) gọn gàng, tinh tế hơn.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 00:18
+* **Tên Plan / Yêu cầu**: Cập nhật ảnh Logo đúng chuẩn (SmarTracking.png).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Đổi đường dẫn file Logo từ `logo.png` (Logo icon) sang `SmarTracking.png` để hiển thị logo chính thức (có chữ) trên thanh Header và màn hình chờ Lobby của phòng họp.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 00:09
+* **Tên Plan / Yêu cầu**: Khắc phục lỗi thông báo (Toast) bị kẹt và tiếp tục làm lớn Logo Web.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Chỉnh sửa lại hàm render Toast Notification: Cập nhật cơ chế sinh ID ngẫu nhiên ổn định hơn để `setTimeout` xóa thông báo tự động (sau 3.5s) hoạt động chính xác tuyệt đối.
+    * Bổ sung thêm nút **[x] (Đóng)** bên cạnh mỗi thông báo và bật `pointer-events-auto`, giúp bạn có thể tự tay bấm tắt ngay lập tức mà không cần phải chờ hết thời gian.
+    * **Phóng to thêm Logo Web:** Tăng kích thước hộp chứa và ảnh Logo ở thanh Header (w-10, scale 1.3) và đặc biệt là ở màn hình chờ Lobby (box lớn w-28, ảnh scale 1.4) để Logo thực sự nổi bật và dễ nhìn hơn nữa.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 23:48
+* **Tên Plan / Yêu cầu**: Sửa lỗi không hiển thị Khách ngoài (Guest) trên Grid Video sau khi được duyệt.
+* **Chi tiết thay đổi**:
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/GuestPanel.jsx`: Đổi prop `onGuestCountChange` thành `onGuestsUpdate` để truyền danh sách khách đã duyệt lên Component cha.
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Thay đổi cách render `GuestPanel`: Luôn mount ngầm (ẩn bằng CSS `hidden` khi ở tab khác) thay vì unmount. Việc này giúp duy trì gọi API lấy dữ liệu liên tục ở background, khắc phục triệt để lỗi mất danh sách khách khi reload trang hoặc khi đang ở tab khác.
+    * Gỡ bỏ điều kiện giới hạn tab: Đảm bảo Khách ngoài đã duyệt luôn luôn xuất hiện trên lưới Video ở bất kỳ Tab nào (Bằng cách gộp chung vào `activeGridParticipants` mà không cần ràng buộc `activeChatTab`).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 23:38
+* **Tên Plan / Yêu cầu**: Đổi biểu tượng cuộc họp thành Logo Website (SmarTracking).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Thay thế biểu tượng mặc định (`Sparkles` từ `lucide-react`) thành Logo chính thức của trang web (`src/assets/images/logo.png`) tại 2 vị trí: Header thu gọn và Màn hình Lobby chờ duyệt.
+    * Tăng đáng kể kích thước hiển thị của Logo và Tên cuộc họp (Header: tăng từ text-sm lên text-lg, logo to hơn; Lobby: tăng box từ w-14 lên w-20, chữ từ text-xl lên text-2xl) giúp giao diện nổi bật, dễ đọc và đẹp mắt hơn.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 23:32
+* **Tên Plan / Yêu cầu**: Format và CSS lại input chọn giờ sang dạng cuộn xoay (scroll wheel).
+* **Chi tiết thay đổi**:
+  * `[Thêm mới] src/components/common/TimePicker.jsx`: Tạo Component chọn thời gian tùy chỉnh sử dụng hiệu ứng xoay 2 trục (Giờ/Phút) với `snap-y mandatory` và lớp phủ Mask-image để tạo cảm giác scroll 3D giống trên iOS.
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx`:
+    * Thay thế thư viện `react-datepicker` bằng component `TimePicker` tự build giúp trải nghiệm cuộn mượt mà hơn và mang lại cảm giác native.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 23:26
+* **Tên Plan / Yêu cầu**: Cập nhật tính năng kéo thả (Drag & Drop) cho Agenda ở màn hình Đặt lịch họp.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`: Bổ sung tính năng kéo thả (Drag & Drop) bằng HTML5 native để người dùng có thể dễ dàng thay đổi thứ tự các chương trình họp (Agenda) tương tự như bên màn hình Chi tiết cuộc họp. Các Agenda thêm mới vẫn giữ nguyên cơ chế đẩy xuống cuối danh sách (append) như cũ, nhưng giờ đây có thể tự do sắp xếp lại.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 23:20
+* **Tên Plan / Yêu cầu**: Khắc phục triệt để lỗi hiển thị 12h (AM/PM) trên các trường chọn thời gian.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx`:
+    * Thay thế hoàn toàn thẻ `<input type="time">` gốc của trình duyệt (vốn bị ảnh hưởng và ép buộc định dạng theo ngôn ngữ/vùng của Hệ điều hành, gây ra lỗi hiển thị SA/CH) bằng component `<DatePicker>` của thư viện `react-datepicker` với thuộc tính `showTimeSelectOnly`. Đảm bảo hiển thị chuẩn xác định dạng 24h (`HH:mm`) cho mọi hệ điều hành và thiết bị.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-08 16:32
 * **Tên Plan / Yêu cầu**: Cải thiện UI Modal thông tin chủ xe và ẩn UserID.
 * **Chi tiết thay đổi**:
