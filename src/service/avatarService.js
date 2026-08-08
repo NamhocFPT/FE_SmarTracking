@@ -1,10 +1,10 @@
 import { get, post } from '../utils/request';
 
-/** GET /api/v1/me/avatar-status — AvatarController.getAvatarStatus (avatar.controller.ts:55) */
+/** GET /api/v1/me/biometric-status */
 export const getBiometricStatus = async () => get('/me/biometric-status');
 
 /**
- * POST /api/v1/me/avatar-submission (multipart/form-data) — AvatarController.submitAvatar (avatar.controller.ts:80)
+ * POST /api/v1/me/biometric-submission (multipart/form-data)
  * @param {File} file
  * @param {boolean} consentAccepted
  */
@@ -16,13 +16,16 @@ export const submitBiometric = async (file, consentAccepted) => {
 };
 
 /**
- * Cập nhật lại avatar — BE không có route /me/avatar riêng, dùng chung
- * POST /me/avatar-submission (đây cũng là route duy nhất để nộp/nộp lại ảnh khuôn mặt).
+ * Cập nhật avatar hiển thị (đổi ảnh hồ sơ) - không qua duyệt.
+ * BE có 2 route tách biệt:
+ * 1. POST /me/avatar: Đổi ảnh đại diện, tự do.
+ * 2. POST /me/biometric-submission: Nộp ảnh sinh trắc học FaceID (bắt buộc admin duyệt).
+ * 
  * @param {File} file
  */
 export const updateSelfAvatar = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('consentAccepted', 'true');
-    return post('/me/avatar-submission', formData);
+    
+    return post('/me/avatar', formData);
 };

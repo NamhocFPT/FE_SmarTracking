@@ -5,6 +5,15 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-09 01:10
+* **Tên Plan / Yêu cầu**: Cập nhật endpoint API Đổi ảnh đại diện (Đồng bộ với thay đổi Refactor từ Backend).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/avatarService.js`:
+    * Đổi endpoint của hàm `updateSelfAvatar` từ `/me/avatar-submission` (đã bị xóa trên BE gây lỗi 404) sang `/me/avatar` chuẩn xác theo kiến trúc mới.
+    * Gỡ bỏ field `consentAccepted` khỏi payload vì route đổi ảnh đại diện không yêu cầu xác nhận quy định sinh trắc học.
+    * Viết lại Document/Comment mô tả rõ ràng phân biệt 2 luồng: Đổi avatar hồ sơ (`/me/avatar`) và Nộp ảnh FaceID (`/me/biometric-submission`).
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-09 00:52
 * **Tên Plan / Yêu cầu**: Nâng cấp UI/UX màn hình phòng họp (Layout Header & Thanh công cụ).
 * **Chi tiết thay đổi**:
