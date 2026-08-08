@@ -1,5 +1,6 @@
-import { Car, Image as ImageIcon, Search, Calendar as CalendarIcon } from 'lucide-react';
+import { Car, Image as ImageIcon, Search, Calendar as CalendarIcon, UserX, X, Mail, Phone, Briefcase } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -12,6 +13,8 @@ import {
 import { getUsers } from '../../service/employeeServices'; // Để lấy danh sách nhân viên
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
+import UserAvatar from '../../components/common/UserAvatar';
+import Pagination from '../../components/common/Pagination';
 
 const ANPRManagement = () => {
     const [activeTab, setActiveTab] = useState('history'); // 'history', 'register', 'unknown'
@@ -20,6 +23,10 @@ const ANPRManagement = () => {
     // Snapshot Modal
     const [snapshotEventId, setSnapshotEventId] = useState(null);
     const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+
+    // Inline Owner Modal
+    const [selectedOwner, setSelectedOwner] = useState(null);
+    const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
 
     // ============================================
     // TAB 1: LỊCH SỬ QUÉT BIỂN
@@ -57,6 +64,7 @@ const ANPRManagement = () => {
             }
             if (debouncedSearch) {
                 params.plateNumber = debouncedSearch;
+                params.ownerName = debouncedSearch; // Hỗ trợ BE filter theo Tên Chủ xe
             }
             if (startDate) {
                 params.from = startDate.toISOString();
@@ -252,13 +260,13 @@ const ANPRManagement = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-cloud-mist border-b border-platinum-tint">
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Ngày</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase whitespace-nowrap">Thời gian</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Camera / Làn</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Biển số nhận diện</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Trạng thái (Khớp)</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase">Chủ xe</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-right">Xem ảnh</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase whitespace-nowrap text-left">Ngày</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase whitespace-nowrap text-left">Thời gian</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Camera / Làn</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Biển số nhận diện</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Trạng thái (Khớp)</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-left">Chủ xe</th>
+                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Xem ảnh</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-platinum-tint">
@@ -269,15 +277,15 @@ const ANPRManagement = () => {
                                 ) : (
                                     historyList.map((item, idx) => (
                                         <tr key={item.id || idx} className="hover:bg-cloud-mist/30">
-                                            <td className="py-3 px-4 text-sm font-semibold text-midnight-indigo whitespace-nowrap">
+                                            <td className="py-3 px-4 text-sm font-semibold text-midnight-indigo whitespace-nowrap text-left">
                                                 {new Date(item.eventTime).toLocaleDateString('vi-VN')}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-slate-blue font-medium whitespace-nowrap">
+                                            <td className="py-3 px-4 text-sm text-slate-blue font-medium whitespace-nowrap text-left">
                                                 {new Date(item.eventTime).toLocaleTimeString('vi-VN')}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-slate-blue">{item.channelId || 'Main Gate'}</td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex flex-col gap-1.5 items-start">
+                                            <td className="py-3 px-4 text-sm text-slate-blue text-center">{item.channelId || 'Main Gate'}</td>
+                                            <td className="py-3 px-4 text-center">
+                                                <div className="flex flex-col gap-1.5 items-center justify-center">
                                                     <span className="font-bold text-midnight-indigo border border-steel-gray px-2 py-1 rounded bg-white shadow-sm font-mono text-sm">{item.plateNumber}</span>
                                                     {item.isBlacklisted && (
                                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200" title="Chỉ hiện cho lượt đầu tiên trong 5 phút">
@@ -286,24 +294,52 @@ const ANPRManagement = () => {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4">
+                                            <td className="py-3 px-4 text-center">
                                                 {item.matchState === 'matched' ? (
                                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-700">Khớp dữ liệu</span>
                                                 ) : (
                                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-100 text-orange-700">Biển lạ</span>
                                                 )}
                                             </td>
-                                            <td className="py-3 px-4 text-sm font-semibold text-action-blue">
-                                                {item.userId ? `User #${item.userId}` : '-'}
+                                            <td className="py-3 px-4 text-left">
+                                                {item.owner ? (
+                                                    <div 
+                                                        className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors group w-fit"
+                                                        onClick={() => {
+                                                            setSelectedOwner(item.owner);
+                                                            setIsOwnerModalOpen(true);
+                                                        }}
+                                                    >
+                                                        <UserAvatar 
+                                                            user={item.owner} 
+                                                            name={item.owner.fullName}
+                                                            className="w-7 h-7 rounded-full text-xs shadow-sm border border-platinum-tint group-hover:border-action-blue" 
+                                                        />
+                                                        <span className="text-sm font-semibold text-action-blue group-hover:text-blue-700 truncate max-w-[150px]" title={item.owner.fullName}>
+                                                            {item.owner.fullName}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 p-1.5 w-fit">
+                                                        <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-100 shadow-sm">
+                                                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-[110%] h-[110%] text-white mt-3">
+                                                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                                            </svg>
+                                                        </div>
+                                                        <span className="text-sm font-medium text-slate-400">Không xác định</span>
+                                                    </div>
+                                                )}
                                             </td>
-                                            <td className="py-3 px-4 text-right">
-                                                <ThumbnailImage
-                                                    eventId={item.id}
-                                                    onClick={() => {
-                                                        setSnapshotEventId(item.id);
-                                                        setIsSnapshotOpen(true);
-                                                    }}
-                                                />
+                                            <td className="py-3 px-4">
+                                                <div className="flex justify-center">
+                                                    <ThumbnailImage
+                                                        eventId={item.id}
+                                                        onClick={() => {
+                                                            setSnapshotEventId(item.id);
+                                                            setIsSnapshotOpen(true);
+                                                        }}
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -314,38 +350,15 @@ const ANPRManagement = () => {
 
                     {/* Pagination History */}
                     {!loading && Math.ceil(historyTotal / itemsPerPage) > 1 && (
-                        <div className="flex justify-between items-center pt-4">
+                        <div className="flex justify-between items-center pt-4 mt-2 border-t border-platinum-tint/50">
                             <span className="text-[11px] text-slate-blue">
                                 Hiển thị {(historyPage - 1) * itemsPerPage + 1} - {Math.min(historyPage * itemsPerPage, historyTotal)} trong tổng số {historyTotal} lượt quét
                             </span>
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={() => setHistoryPage(prev => Math.max(1, prev - 1))}
-                                    disabled={historyPage === 1}
-                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
-                                >
-                                    Trước
-                                </button>
-                                {[...Array(Math.ceil(historyTotal / itemsPerPage))].map((_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setHistoryPage(i + 1)}
-                                        className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${historyPage === i + 1
-                                                ? 'bg-action-blue text-white border-action-blue'
-                                                : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
-                                            }`}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={() => setHistoryPage(prev => Math.min(Math.ceil(historyTotal / itemsPerPage), prev + 1))}
-                                    disabled={historyPage === Math.ceil(historyTotal / itemsPerPage)}
-                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
-                                >
-                                    Sau
-                                </button>
-                            </div>
+                            <Pagination 
+                                currentPage={historyPage} 
+                                totalPages={Math.ceil(historyTotal / itemsPerPage)} 
+                                onPageChange={setHistoryPage} 
+                            />
                         </div>
                     )}
                 </div>
@@ -404,34 +417,11 @@ const ANPRManagement = () => {
                             <span className="text-[11px] text-slate-blue">
                                 Hiển thị {(unknownPage - 1) * itemsPerPage + 1} - {Math.min(unknownPage * itemsPerPage, unknownTotal)} trong tổng số {unknownTotal} biển lạ
                             </span>
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={() => setUnknownPage(prev => Math.max(1, prev - 1))}
-                                    disabled={unknownPage === 1}
-                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
-                                >
-                                    Trước
-                                </button>
-                                {[...Array(Math.ceil(unknownTotal / itemsPerPage))].map((_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setUnknownPage(i + 1)}
-                                        className={`w-7 h-7 rounded-lg text-[10.5px] font-bold transition-all border ${unknownPage === i + 1
-                                                ? 'bg-action-blue text-white border-action-blue'
-                                                : 'border-platinum-tint hover:bg-cloud-mist text-slate-blue'
-                                            }`}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={() => setUnknownPage(prev => Math.min(Math.ceil(unknownTotal / itemsPerPage), prev + 1))}
-                                    disabled={unknownPage === Math.ceil(unknownTotal / itemsPerPage)}
-                                    className="px-2.5 py-1.5 border border-platinum-tint rounded-lg text-[10.5px] font-bold hover:bg-cloud-mist disabled:opacity-50 disabled:hover:bg-transparent"
-                                >
-                                    Sau
-                                </button>
-                            </div>
+                            <Pagination 
+                                currentPage={unknownPage} 
+                                totalPages={Math.ceil(unknownTotal / itemsPerPage)} 
+                                onPageChange={setUnknownPage} 
+                            />
                         </div>
                     )}
                 </div>
@@ -512,11 +502,75 @@ const ANPRManagement = () => {
                 </div>
             )}
 
-            <EventSnapshotModal
-                isOpen={isSnapshotOpen}
-                onClose={() => setIsSnapshotOpen(false)}
-                eventId={snapshotEventId}
+            <EventSnapshotModal 
+                isOpen={isSnapshotOpen} 
+                eventId={snapshotEventId} 
+                onClose={() => {
+                    setIsSnapshotOpen(false);
+                    setSnapshotEventId(null);
+                }} 
             />
+
+            {/* Inline Owner Profile Modal */}
+            {isOwnerModalOpen && selectedOwner && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-slide-up relative">
+                        <div className="flex items-center justify-between p-5 border-b border-platinum-tint bg-cloud-mist">
+                            <h3 className="text-lg font-bold text-midnight-indigo">Thông tin Chủ xe</h3>
+                            <button
+                                onClick={() => {
+                                    setIsOwnerModalOpen(false);
+                                    setSelectedOwner(null);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-midnight-indigo hover:bg-slate-200 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto">
+                            <div className="flex flex-col items-center">
+                                <UserAvatar 
+                                    user={selectedOwner} 
+                                    className="w-24 h-24 rounded-full text-3xl mb-4 border-4 border-cloud-mist shadow-sm"
+                                />
+                                <h4 className="text-xl font-bold text-midnight-indigo text-center">{selectedOwner.fullName || 'Không có tên'}</h4>
+                                
+                                <div className="w-full mt-6 space-y-4">
+                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-action-blue shadow-sm">
+                                            <Briefcase className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-blue">Phòng ban</p>
+                                            <p className="text-sm font-bold text-midnight-indigo">{selectedOwner.department || 'Chưa cập nhật'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-action-blue shadow-sm">
+                                            <Mail className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-blue">Email</p>
+                                            <p className="text-sm font-bold text-midnight-indigo">{selectedOwner.email || 'Chưa cập nhật'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-action-blue shadow-sm">
+                                            <Phone className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-blue">Số điện thoại</p>
+                                            <p className="text-sm font-bold text-midnight-indigo">{selectedOwner.phoneNumber || 'Chưa cập nhật'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };
