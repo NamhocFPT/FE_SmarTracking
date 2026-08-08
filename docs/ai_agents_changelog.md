@@ -5,11 +5,100 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-08 15:05
+* **Tên Plan / Yêu cầu**: Ẩn các trang không dùng đến và đổi tên "Hệ thống ANPR".
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/layout/SystemAdminLayout.jsx`: Xóa/ẩn các menu item "Danh sách giám sát" (Đối tượng theo dõi) và "Kiểm soát cổng" khỏi Sidebar. Đổi tên menu "Hệ thống ANPR" thành "Kiểm Soát Ra Vào Cổng".
+  * `[Cập nhật] src/pages/bussinessAdmin/ANPRManagement.jsx`: Đổi tiêu đề thẻ `<h1>` từ "Quản lý nhận diện biển số (ANPR)" thành "Kiểm soát ra vào cổng".
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 14:44
+* **Tên Plan / Yêu cầu**: Hiển thị trực tiếp Avatar, Tên chủ xe và Modal chi tiết Chủ xe (Sử dụng dữ liệu Users nội bộ thay vì đợi BE).
+* **Chi tiết thay đổi**:
+  * Đã rollback (hoàn tác) các thay đổi UI liên quan đến Avatar và Modal chủ xe.
+  * Quyết định theo sát tài liệu `BE_REQ_ANPR_Owner_Info.md` đã gửi cho BE để đảm bảo tính đồng bộ của toàn bộ chức năng (giao diện, phân trang và tìm kiếm). Frontend sẽ hiển thị dạng "User #ID" cho đến khi BE trả về object `owner`.
+* **Trạng thái**: Đã hoàn tác (Reverted)
+
+### 2026-08-08 14:39
+* **Tên Plan / Yêu cầu**: Tách riêng yêu cầu Backend về việc trả thông tin Chủ xe (Avatar, Tên) ở màn ANPR thành file markdown độc lập.
+* **Chi tiết thay đổi**:
+  * `[Tạo mới] docs/BE_REQ_ANPR_Owner_Info.md`: Tạo file markdown mới chứa toàn bộ nội dung yêu cầu gửi cho BE (bao gồm việc thêm object `owner` và bổ sung param `ownerName`).
+  * `[Cập nhật] docs/be-action-items.md`: Xóa đoạn yêu cầu liên quan đến ANPR ra khỏi file tổng hợp để chuẩn bị gửi file rời cho team BE.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 14:25
+* **Tên Plan / Yêu cầu**: Tách cột thời gian thành Ngày & Giờ, thêm filter khoảng ngày và thanh tìm kiếm ở màn ANPR.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/ANPRManagement.jsx`:
+    * Tách cột "Thời gian" thành 2 cột "Ngày" và "Thời gian".
+    * Thêm thanh tìm kiếm (truyền xuống API qua tham số `plateNumber`). **Lưu ý**: Hiện tại API GET `/anpr/admin/vehicle-history` (`ListVehicleHistoryQueryDto`) chưa hỗ trợ query theo tên chủ xe, nên thanh search tạm thời chỉ hỗ trợ tìm theo Biển số nhận diện.
+    * Thêm DatePicker (chọn theo khoảng ngày) sử dụng `react-datepicker`, map vào tham số `from` và `to` gửi lên API.
+    * Gộp các công cụ lọc (Search, DatePicker, Trạng thái) lên một hàng ngang linh hoạt và dễ nhìn.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 14:15
+* **Tên Plan / Yêu cầu**: 
+  1. Cải thiện UI hiển thị ảnh xem trước (ThumbnailImage) đúng tỉ lệ 16:9 thay vì hình vuông bị cắt xén.
+  2. PLAN FE-Z — Hiện trạng thái "Trong danh sách đen" trên màn ANPR.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/common/ThumbnailImage.jsx`: Đổi class container từ hình vuông sang hình chữ nhật tỉ lệ video (`w-28 aspect-video`) và đổi `object-cover` thành `object-contain` để không bị cắt mép ảnh.
+  * `[Cập nhật] src/pages/bussinessAdmin/ANPRManagement.jsx`: Bổ sung badge cảnh báo "⚠ Danh sách đen" dưới biển số ở 2 tab Lịch sử và Biển lạ dựa trên field `isBlacklisted=true`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 04:20
+* **Tên Plan / Yêu cầu**: Nhóm D + E (kế hoạch tổng `KE_HOACH_XU_LY_XUNG_DOT_PHONG_GIO_HOP_2026-08-08.md` ở root repo) — Nhóm D: cảnh báo mềm khi có request PENDING khác đang xin cùng phòng/giờ (không chặn). Nhóm E: hiển thị chi tiết xung đột phòng thật (tên phòng/cuộc họp/host) cho Manager khi duyệt, và đính kèm chi tiết xung đột + gợi ý phòng thay thế vào notification khi reject.
+* **Chi tiết thay đổi**:
+  * `[Tạo mới] src/docs/FE_PLAN_Conflict_Details_And_Pending_Warning.md`: tài liệu kế hoạch chi tiết trước khi code (theo quy ước FE_PLAN_*.md).
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`: thêm dòng cảnh báo hổ phách trên room card khi `room.pendingConflicts?.length > 0` ("N yêu cầu khác đang chờ duyệt cùng giờ"), không loại phòng khỏi danh sách.
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`, `src/pages/manager/MeetingDetail.jsx`: thêm `selectedRoomPendingConflicts` (tra theo phòng đang chọn sau khi bấm "Kiểm tra trùng lịch & phòng" của Nhóm C) + dòng cảnh báo hổ phách độc lập với banner ok/conflict hiện có.
+  * `[Cập nhật] src/pages/manager/MeetingApprovals.jsx`: thay text tĩnh bằng banner chi tiết thật (`conflictDetails`: tên cuộc họp/phòng/giờ/host đang giữ chỗ) trong modal "Xem chi tiết". **Bug tự phát hiện khi verify E2E và đã sửa trong cùng phiên**: bản đầu lồng `conflictDetails` bên trong điều kiện `conflictCheckStatus === 'warning'/'blocked'`, khiến banner/badge không bao giờ hiện cho xung đột phòng (field `conflictCheckStatus` luôn `'clear'` với xung đột phòng — xem lý do BE ở spec `feat-review-meeting-request/spec.md`). Đã sửa thành `hasRoomConflict = conflictDetails?.length > 0` là điều kiện chính (OR với `conflictCheckStatus` để giữ tương thích xung đột participant), áp dụng đồng bộ ở cả banner chi tiết và 2 vị trí badge "Bị trùng lịch" (Grid view + Danh sách/bảng view).
+  * `[Cập nhật] src/components/common/NotificationBell.jsx`: thêm `payloadJson` vào mapping (trước đó bị lọc bỏ), render thêm ` — trùng với "<meetingTitle>"` khi có `payloadJson.conflictDetails[0]`.
+  * `[Cập nhật] src/pages/systemAdmin/Notifications.jsx`: thêm khối hiển thị `payloadJson.conflictDetails` (danh sách) + `payloadJson.suggestedAlternatives` (tên phòng gợi ý) dưới nội dung notification.
+  * Phát hiện phụ quan trọng (môi trường, không phải bug code): `.env.development`/`.env.production`/fallback mặc định trong `src/utils/request.js` đều trỏ `REACT_APP_API_BASE_URL` về server REMOTE `https://api.smartracking.io.vn/api/v1`, không phải `localhost:3000` — `npm start` dev mặc định KHÔNG gọi backend local dù đang chạy song song. Đã tạo tạm `.env.local` (không commit, CRA ưu tiên cao nhất) để verify với BE local, xoá ngay sau khi xong. Ghi chú chi tiết tại mục 3 của FE_PLAN mới.
+* **Kiểm thử đã thực hiện**: Verify E2E thật qua `.env.local` tạm trỏ BE local (port 3000) + FE dev (port 3001), tài khoản demo `emp.it1@meetingsys.vn`/`manager.it@meetingsys.vn`. Tạo 2 cặp cuộc họp trùng phòng/giờ qua API thật, approve 1 cái → xác nhận badge "Bị trùng lịch" + banner chi tiết đúng tên cuộc họp/phòng/host trên `MeetingApprovals.jsx`; reject cái còn lại → xác nhận notification trong `NotificationBell` có dòng " — trùng với ..." đúng tên cuộc họp đang giữ chỗ. Đã dọn toàn bộ dữ liệu test (cancel/reject) và xoá `.env.local` sau khi verify xong, khôi phục cấu hình mặc định của repo.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 03:10
+* **Tên Plan / Yêu cầu**: Nhóm C (kế hoạch tổng `KE_HOACH_XU_LY_XUNG_DOT_PHONG_GIO_HOP_2026-08-08.md` ở root repo) — Thay auto-check trùng phòng/giờ (chạy ngầm mỗi khi đổi giờ, tự động khoá dropdown) bằng nút thủ công "Kiểm tra trùng lịch & phòng" khi sửa cuộc họp, không còn tự động xoá/khoá lựa chọn phòng của người dùng, không chặn nút Lưu.
+* **Chi tiết thay đổi**:
+  * `[Tạo mới] src/docs/FE_PLAN_Meeting_Room_Conflict_Manual_Check.md`: tài liệu kế hoạch chi tiết trước khi code (theo quy ước FE_PLAN_*.md).
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`, `src/pages/manager/MeetingDetail.jsx`: bỏ `useEffect` debounce tự-check theo `editStart`/`editEnd`; thêm effect fetch danh sách phòng 1 lần khi mở modal (dùng giờ gốc); thêm state `checkStatus`/`selectedRoomInfo`; thêm hàm `handleCheckAvailability` gọi thủ công API `getAvailableRoomsForMeeting` có sẵn (không tạo API mới); thêm nút "Kiểm tra trùng lịch & phòng" + banner xanh/vàng + chip gợi ý phòng thay thế; đảm bảo phòng đang chọn luôn còn trong dropdown (không disabled/hidden) kể cả khi bị báo trùng; bỏ `roomWarning` khỏi điều kiện `isSubmitDisabled` (chỉ còn `!isFormChanged()`); dọn state `roomWarning` không còn dùng (dead code).
+  * Phát hiện phụ: `react-datepicker` được khai báo trong `package.json` nhưng KHÔNG có trong `node_modules` (dev server lỗi `MODULE_NOT_FOUND` khi mở app) — đã chạy `npm install react-datepicker` để môi trường dev chạy được, phục vụ verify trực tiếp trên browser.
+* **Kiểm thử đã thực hiện**: chạy `npx eslint` trên cả 2 file (0 error, chỉ còn warning có sẵn từ trước). Verify E2E thật trên `npm run start` (port 3001) + backend thật (port 3000): tạo 2 cuộc họp test qua API (dùng tài khoản demo `emp.it1@meetingsys.vn`/`manager.it@meetingsys.vn`, mật khẩu demo `Abcd1234@` đã ghi trong migration `20260720000003-SeedDemoUsers.ts`), approve 1 cuộc để tạo booking `approved` thật, sau đó mở modal sửa cuộc họp thứ 2, đổi giờ/phòng trùng — xác nhận đúng: banner "còn trống"/"không còn trống", chip gợi ý phòng hiện đúng, phòng đang chọn (trùng) vẫn còn trong dropdown, nút Lưu không bị khoá (`disabled:false` xác nhận qua DOM). Đã dọn 2 cuộc họp test (cancel/reject) sau khi verify xong.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 02:24
+* **Tên Plan / Yêu cầu**: Cho phép đổi tên trực tiếp Tệp đa phương tiện (Bản ghi âm/Ghi hình)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Bổ sung tính năng đổi tên (rename) inline cho các file media hiển thị ở Sidebar.
+    * Khi di chuột (hover) vào tên bản ghi (dành cho Host), hệ thống sẽ hiện biểu tượng cây bút (`Edit2`).
+    * Người dùng có thể click vào để nhập tên mới, nhấn Enter hoặc nút Dấu tích để lưu.
+    * Tích hợp gọi API cập nhật tên file bằng phương thức `PATCH /media-files/:fileId`. Sử dụng cơ chế Optimistic Update: tạm thời đổi tên trực quan ngay lập tức trên UI để người dùng thấy mượt mà, đồng thời nếu BE chưa hỗ trợ API, hệ thống sẽ trả lại tên cũ và hiện Toast thông báo chờ BE hỗ trợ.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 02:46
+* **Tên Plan / Yêu cầu**: Phân trang danh sách Bản ghi âm tại màn hình Chi tiết cuộc họp
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`: Bổ sung tính năng phân trang (Client-side Pagination) cho danh sách "Bản ghi âm cuộc họp" (giới hạn 5 bản ghi mỗi trang).
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx`: Áp dụng logic phân trang tương tự để giúp giao diện không bị kéo dài khi một cuộc họp có quá nhiều file ghi âm nhỏ lẻ.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 02:22
+* **Tên Plan / Yêu cầu**: Cải thiện trải nghiệm Ghi âm & Tệp đa phương tiện
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Sửa đổi tiêu đề hiển thị từ "Video ghi hình" thành "Tệp đa phương tiện" và thay đổi icon `VideoIcon` thành `FileText` để mang tính bao quát và phản ánh chính xác cả file ghi âm (bản ghi audio) do BE trả về.
+    * Sửa lỗi giao diện không tự cập nhật (hot reload) sau khi upload ghi âm: Bổ sung gọi hàm `fetchMediaFiles()` trực tiếp trong callback `onUploadSuccess` của Component `StationRecorder`. Nhờ vậy, ngay sau khi tải ghi âm lên, danh sách "Tệp đa phương tiện" sẽ được làm mới và hiển thị bản ghi mới tức thì.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-08 02:02
-* **Tên Plan / Yêu cầu**: Cải thiện tính năng Ghi âm phiên họp (Giữ tiến trình ghi âm chạy nền và làm gọn UI)
+* **Tên Plan / Yêu cầu**: Cải thiện tính năng Ghi âm phiên họp & Cập nhật chức năng Điểm danh
 * **Chi tiết thay đổi**:
   * `[Cập nhật] src/hooks/useStationRecording.js`: Bổ sung cơ chế tự động gọi hàm `stopAndUpload` để lưu lại và gửi API file ghi âm nếu Component bị unmount (khi cuộc họp kết thúc hoặc người dùng rời phòng), giúp không bao giờ bị mất file ghi âm.
-  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`: Thay đổi logic render các Tab ở Sidebar (từ việc xóa bỏ Component sang dùng CSS `display: hidden`). Việc này giúp Component `StationRecorder` luôn sống ở chế độ nền khi người dùng chuyển qua lại các Tab khác (Chat, Điểm danh...), đảm bảo tiến trình ghi âm liên tục và ổn định.
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`: 
+    * Thay đổi logic render các Tab ở Sidebar (từ việc xóa bỏ Component sang dùng CSS `display: hidden`). Việc này giúp Component `StationRecorder` luôn sống ở chế độ nền khi người dùng chuyển qua lại các Tab khác (Chat, Điểm danh...), đảm bảo tiến trình ghi âm liên tục và ổn định.
+    * Thêm nút chức năng (Mũi tên lên/xuống) ở mục **Điểm danh thủ công**, cho phép người dùng chủ động thu gọn hoặc mở rộng danh sách những người chưa điểm danh để tiết kiệm không gian sidebar.
   * `[Cập nhật] src/components/transcription/StationRecorder.jsx`: Tối ưu hóa UI, giảm padding, thu nhỏ các nút bấm và dropdown chọn người nói. Giao diện trở nên gọn gàng, không bị kéo dài chiếm diện tích, phù hợp hơn với không gian hẹp của Sidebar.
 * **Trạng thái**: Hoàn thành
 
