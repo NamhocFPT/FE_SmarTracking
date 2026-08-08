@@ -1,5 +1,6 @@
 import { Settings, Camera, Plus, Trash2, Pencil } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+import Pagination from '../../components/common/Pagination';
 
 import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getZones, getNoShowConfig, updateNoShowConfig, getSecurityAlertsConfig, updateSecurityAlertsConfig } from '../../service/sysAdminServices';
 
@@ -1083,22 +1084,22 @@ const SystemSettings = () => {
                                             <table className="w-full text-left text-sm">
                                                 <thead className="bg-cloud-mist/50 border-b border-platinum-tint">
                                                     <tr>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-24">ID Kênh</th>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-52">Vai trò</th>
-                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider">Chi tiết</th>
-                                                        <th className="px-3 py-2.5 w-20"></th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-24 text-center">ID Kênh</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider w-52 text-center">Vai trò</th>
+                                                        <th className="px-3 py-2.5 font-bold text-[11px] text-slate-blue uppercase tracking-wider text-left">Chi tiết</th>
+                                                        <th className="px-3 py-2.5 w-20 text-right"></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-platinum-tint">
                                                     {paginatedChannelRows.map((row) => (
                                                         <tr key={row.id} className="hover:bg-cloud-mist/30 transition-colors">
-                                                            <td className="px-3 py-2.5 font-mono text-xs font-semibold text-midnight-indigo">{row.id}</td>
-                                                            <td className="px-3 py-2.5">
+                                                            <td className="px-3 py-2.5 font-mono text-xs font-semibold text-midnight-indigo text-center">{row.id}</td>
+                                                            <td className="px-3 py-2.5 text-center">
                                                                 <span className="inline-flex px-2 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue">
                                                                     {ROLE_LABELS[row.role]}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-3 py-2.5 text-slate-blue">{row.detail}</td>
+                                                            <td className="px-3 py-2.5 text-slate-blue text-left">{row.detail}</td>
                                                             <td className="px-3 py-2.5 text-right whitespace-nowrap">
                                                                 <button
                                                                     type="button"
@@ -1129,24 +1130,11 @@ const SystemSettings = () => {
                                                 <span className="text-xs font-medium text-slate-blue">
                                                     Trang {safeChannelPage} / {totalChannelPages} (Tổng {channelRows.length} kênh)
                                                 </span>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setChannelPage(Math.max(1, safeChannelPage - 1))}
-                                                        disabled={safeChannelPage === 1}
-                                                        className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
-                                                    >
-                                                        Trước
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setChannelPage(Math.min(totalChannelPages, safeChannelPage + 1))}
-                                                        disabled={safeChannelPage === totalChannelPages}
-                                                        className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
-                                                    >
-                                                        Sau
-                                                    </button>
-                                                </div>
+                                                <Pagination 
+                                                    currentPage={safeChannelPage} 
+                                                    totalPages={totalChannelPages} 
+                                                    onPageChange={setChannelPage} 
+                                                />
                                             </div>
                                         )}
                                     </div>

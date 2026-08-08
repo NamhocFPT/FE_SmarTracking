@@ -6,6 +6,7 @@ import {
     getAdminVehicleRegistrations
 } from '../../service/sysAdminServices';
 import { motion, AnimatePresence } from 'framer-motion';
+import Pagination from '../../components/common/Pagination';
 
 const VehicleRegistrations = () => {
     const [registrations, setRegistrations] = useState([]);
@@ -138,24 +139,24 @@ const VehicleRegistrations = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-cloud-mist/50 border-b border-platinum-tint">
                             <tr>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Chủ xe</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Biển số</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Loại xe</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Ghi chú</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Trạng thái</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Thời gian ĐK</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-left">Chủ xe</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Biển số</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Loại xe</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-left">Ghi chú</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Trạng thái</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-left">Thời gian ĐK</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-platinum-tint">
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, idx) => (
                                     <tr key={idx} className="animate-pulse">
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-16"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-48"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                                        <td className="px-6 py-4 text-left"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-16"></div></td>
+                                        <td className="px-6 py-4 text-left"><div className="h-4 bg-gray-200 rounded w-48"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
+                                        <td className="px-6 py-4 text-left"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
                                     </tr>
                                 ))
                             ) : registrations.length === 0 ? (
@@ -173,8 +174,8 @@ const VehicleRegistrations = () => {
                             ) : (
                                 registrations.map((reg) => (
                                     <tr key={reg.id} className="hover:bg-cloud-mist/30 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
+                                        <td className="px-6 py-4 text-left">
+                                            <div className="flex items-center gap-3 w-fit">
                                                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 flex-shrink-0">
                                                     <User className="w-4 h-4" />
                                                 </div>
@@ -184,19 +185,19 @@ const VehicleRegistrations = () => {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 text-center">
                                             <div className="font-extrabold font-mono tracking-wider text-midnight-indigo text-base">{reg.plate_number}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-xs font-semibold text-slate-blue">
+                                        <td className="px-6 py-4 text-xs font-semibold text-slate-blue text-center">
                                             {getVehicleTypeDisplay(reg.vehicle_type)}
                                         </td>
-                                        <td className="px-6 py-4 text-xs text-slate-blue max-w-xs truncate" title={reg.note}>
+                                        <td className="px-6 py-4 text-xs text-slate-blue max-w-xs truncate text-left" title={reg.note}>
                                             {reg.note || '-'}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            {getStatusDisplay(reg.status)}
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex justify-center">{getStatusDisplay(reg.status)}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-[11px] text-slate-blue whitespace-nowrap">
+                                        <td className="px-6 py-4 text-[11px] text-slate-blue whitespace-nowrap text-left">
                                             {formatDate(reg.created_at)}
                                         </td>
                                     </tr>
@@ -212,22 +213,11 @@ const VehicleRegistrations = () => {
                         <span className="text-xs font-medium text-slate-blue">
                             Hiển thị trang {meta.page} / {meta.totalPages} (Tổng {meta.total} bản ghi)
                         </span>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => handleFilterChange('page', Math.max(1, filters.page - 1))}
-                                disabled={filters.page === 1}
-                                className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
-                            >
-                                Trước
-                            </button>
-                            <button
-                                onClick={() => handleFilterChange('page', Math.min(meta.totalPages, filters.page + 1))}
-                                disabled={filters.page === meta.totalPages}
-                                className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
-                            >
-                                Sau
-                            </button>
-                        </div>
+                        <Pagination 
+                            currentPage={filters.page} 
+                            totalPages={meta.totalPages} 
+                            onPageChange={(p) => handleFilterChange('page', p)} 
+                        />
                     </div>
                 )}
             </div>

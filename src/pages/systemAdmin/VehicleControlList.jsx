@@ -10,6 +10,7 @@ import {
     deleteVehicleControl
 } from '../../service/sysAdminServices';
 import { motion, AnimatePresence } from 'framer-motion';
+import Pagination from '../../components/common/Pagination';
 
 const VehicleControlList = () => {
     const [vehicles, setVehicles] = useState([]);
@@ -287,11 +288,11 @@ const VehicleControlList = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-cloud-mist/50 border-b border-platinum-tint">
                             <tr>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Biển số (Gốc)</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Biển số (Chuẩn hóa)</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Phân loại</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Lý do</th>
-                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider">Trạng thái</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Biển số (Gốc)</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Biển số (Chuẩn hóa)</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Phân loại</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-left">Lý do</th>
+                                <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-center">Trạng thái</th>
                                 <th className="px-6 py-4 font-extrabold text-xs text-slate-blue uppercase tracking-wider text-right">Hành động</th>
                             </tr>
                         </thead>
@@ -299,12 +300,12 @@ const VehicleControlList = () => {
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, idx) => (
                                     <tr key={idx} className="animate-pulse">
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-48"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-16 ml-auto"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
+                                        <td className="px-6 py-4 text-left"><div className="h-4 bg-gray-200 rounded w-48"></div></td>
+                                        <td className="px-6 py-4 text-center flex justify-center"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
+                                        <td className="px-6 py-4 text-right"><div className="h-4 bg-gray-200 rounded w-16 ml-auto"></div></td>
                                     </tr>
                                 ))
                             ) : vehicles.length === 0 ? (
@@ -324,31 +325,33 @@ const VehicleControlList = () => {
                                     const listType = getListTypeDisplay(vehicle.list_type);
                                     return (
                                         <tr key={vehicle.id} className="hover:bg-cloud-mist/30 transition-colors">
-                                            <td className="px-6 py-4 font-mono font-medium text-slate-blue">
+                                            <td className="px-6 py-4 font-mono font-medium text-slate-blue text-center">
                                                 {vehicle.plate_raw || '-'}
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 text-center">
                                                 <div className="font-extrabold font-mono tracking-wider text-midnight-indigo text-base">{vehicle.plate_number}</div>
                                                 <div className="text-[11px] text-slate-blue mt-0.5">Cập nhật: {formatDate(vehicle.updated_at)}</div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 text-center">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${listType.color}`}>
                                                     {listType.label}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-xs text-slate-blue max-w-xs truncate" title={vehicle.reason}>
+                                            <td className="px-6 py-4 text-xs text-slate-blue max-w-xs truncate text-left" title={vehicle.reason}>
                                                 {vehicle.reason || '-'}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                {vehicle.active ? (
-                                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> Hoạt động
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-blue">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-blue"></div> Vô hiệu
-                                                    </span>
-                                                )}
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex justify-center">
+                                                    {vehicle.active ? (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> Hoạt động
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-blue">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-blue"></div> Vô hiệu
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
@@ -374,22 +377,11 @@ const VehicleControlList = () => {
                         <span className="text-xs font-medium text-slate-blue">
                             Hiển thị trang {meta.page} / {meta.totalPages} (Tổng {meta.total} bản ghi)
                         </span>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => handleFilterChange('page', Math.max(1, filters.page - 1))}
-                                disabled={filters.page === 1}
-                                className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
-                            >
-                                Trước
-                            </button>
-                            <button
-                                onClick={() => handleFilterChange('page', Math.min(meta.totalPages, filters.page + 1))}
-                                disabled={filters.page === meta.totalPages}
-                                className="px-3 py-1.5 text-xs font-bold bg-white border border-platinum-tint rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist disabled:opacity-50 transition-colors"
-                            >
-                                Sau
-                            </button>
-                        </div>
+                        <Pagination 
+                            currentPage={filters.page} 
+                            totalPages={meta.totalPages} 
+                            onPageChange={(p) => handleFilterChange('page', p)} 
+                        />
                     </div>
                 )}
             </div>

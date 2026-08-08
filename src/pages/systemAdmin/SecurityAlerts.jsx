@@ -10,6 +10,7 @@ import {
 import { getZones } from '../../service/zoneServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
+import Pagination from '../../components/common/Pagination';
 
 const SecurityAlerts = () => {
     const [alerts, setAlerts] = useState([]);
@@ -320,11 +321,11 @@ const SecurityAlerts = () => {
                                         disabled={alerts.filter(a => a.status === 'new').length === 0}
                                     />
                                 </th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Thời gian</th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Loại & Mức độ</th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Vị trí</th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider">Trạng thái</th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-right">Thao tác</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Thời gian</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Loại & Mức độ</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Vị trí</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Trạng thái</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-platinum-tint">
@@ -355,7 +356,7 @@ const SecurityAlerts = () => {
                                                 disabled={alert.status !== 'new'}
                                             />
                                         </td>
-                                        <td className="p-4">
+                                        <td className="p-4 text-center">
                                             <p className="text-sm font-bold text-midnight-indigo" title="Gần nhất">
                                                 {formatDateTime(alert.updated_at || alert.triggered_at)}
                                             </p>
@@ -364,9 +365,9 @@ const SecurityAlerts = () => {
                                             </p>
                                             <p className="text-xs text-slate-blue/60 mt-0.5">ID: {alert.id.substring(0,8)}...</p>
                                         </td>
-                                        <td className="p-4">
+                                        <td className="p-4 text-center">
                                             <p className="text-sm font-bold text-midnight-indigo uppercase">{alert.alert_type.replace(/_/g, ' ')}</p>
-                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
                                                 <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityStyle(alert.severity)}`}>
                                                     {alert.severity?.toUpperCase() || 'NORMAL'}
                                                 </span>
@@ -377,13 +378,13 @@ const SecurityAlerts = () => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="p-4 text-sm text-midnight-indigo">
+                                        <td className="p-4 text-sm text-midnight-indigo text-center">
                                             {zones.find(z => z.id === alert.zone_id)?.zone_name || 'Hệ thống'}
                                         </td>
-                                        <td className="p-4">
+                                        <td className="p-4 text-center">
                                             {getStatusBadge(alert.status)}
                                         </td>
-                                        <td className="p-4 text-right flex items-start justify-end gap-2">
+                                        <td className="p-4 text-center flex items-center justify-center gap-2">
                                             {alert.status === 'new' && (
                                                 <button 
                                                     onClick={() => handleAcknowledge(alert.id)}
@@ -405,7 +406,7 @@ const SecurityAlerts = () => {
                                                 </button>
                                             )}
                                             {alert.status === 'resolved' && (
-                                                <div className="flex flex-col items-end">
+                                                <div className="flex flex-col items-center">
                                                     <button 
                                                         className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-xs"
                                                     >
@@ -440,23 +441,11 @@ const SecurityAlerts = () => {
                 {meta && meta.totalPages > 1 && (
                     <div className="p-4 border-t border-platinum-tint bg-cloud-mist/30 flex items-center justify-between text-sm">
                         <span className="text-slate-blue font-medium">Hiển thị {alerts.length} / {meta.total} cảnh báo</span>
-                        <div className="flex gap-2">
-                            <button 
-                                disabled={filters.page <= 1} 
-                                onClick={() => handleFilterChange('page', filters.page - 1)}
-                                className="px-3 py-1.5 bg-white border border-platinum-tint rounded-lg font-medium text-slate-blue hover:bg-cloud-mist disabled:opacity-50"
-                            >
-                                Trước
-                            </button>
-                            <span className="px-3 py-1.5 font-bold text-midnight-indigo">Trang {filters.page} / {meta.totalPages}</span>
-                            <button 
-                                disabled={filters.page >= meta.totalPages} 
-                                onClick={() => handleFilterChange('page', filters.page + 1)}
-                                className="px-3 py-1.5 bg-white border border-platinum-tint rounded-lg font-medium text-slate-blue hover:bg-cloud-mist disabled:opacity-50"
-                            >
-                                Sau
-                            </button>
-                        </div>
+                        <Pagination 
+                            currentPage={filters.page} 
+                            totalPages={meta.totalPages} 
+                            onPageChange={(p) => handleFilterChange('page', p)} 
+                        />
                     </div>
                 )}
             </div>

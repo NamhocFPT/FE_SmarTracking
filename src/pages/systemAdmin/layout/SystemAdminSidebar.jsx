@@ -182,7 +182,16 @@ const SystemAdminSidebar = ({
                             {/* Section header */}
                             <button
                                 type="button"
-                                onClick={() => { if (!isMini) toggleSection(item.label); }}
+                                onClick={() => { 
+                                    if (isMini) {
+                                        if (onToggle) onToggle();
+                                        if (!openSections.includes(item.label)) {
+                                            setOpenSections(prev => [...prev, item.label]);
+                                        }
+                                    } else {
+                                        toggleSection(item.label); 
+                                    }
+                                }}
                                 title={isMini ? item.label : undefined}
                                 className={`
                                     relative flex items-center gap-3 w-full px-3.5 py-3
