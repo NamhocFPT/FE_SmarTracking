@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, Building, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, ChevronDown, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X, Edit2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, ChevronDown, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X, Edit2, GripVertical } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 
 import ReactDOM from 'react-dom';
@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { vi } from 'date-fns/locale/vi';
+import TimePicker from '../../components/common/TimePicker';
 
 const getInitialTimes = () => {
     const now = new Date();
@@ -81,6 +82,7 @@ const BookMeeting = () => {
     const [newAgendaDuration, setNewAgendaDuration] = useState('15');
     const [newAgendaFile, setNewAgendaFile] = useState(null);
     const [agendaInputError, setAgendaInputError] = useState('');
+    const [draggedAgendaIndex, setDraggedAgendaIndex] = useState(null);
 
     // Data lists
     const [departments, setDepartments] = useState([]);
@@ -1030,28 +1032,24 @@ const BookMeeting = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Giờ bắt đầu *</label>
-                                    <input
-                                        type="time" lang="en-GB"
+                                    <TimePicker
                                         value={startTime}
-                                        onChange={(e) => {
-                                            setStartTime(e.target.value);
+                                        onChange={(newTime) => {
+                                            setStartTime(newTime);
                                             setSelectedRoomId('');
                                         }}
-                                        className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
-                                        required
+                                        placeholder="Giờ bắt đầu"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Giờ kết thúc *</label>
-                                    <input
-                                        type="time" lang="en-GB"
+                                    <TimePicker
                                         value={endTime}
-                                        onChange={(e) => {
-                                            setEndTime(e.target.value);
+                                        onChange={(newTime) => {
+                                            setEndTime(newTime);
                                             setSelectedRoomId('');
                                         }}
-                                        className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
-                                        required
+                                        placeholder="Giờ kết thúc"
                                     />
                                 </div>
                                 <div>
@@ -1661,8 +1659,30 @@ const BookMeeting = () => {
                                     {agendaList.length > 0 ? (
                                         <div className="space-y-2 pt-2">
                                             {agendaList.map((item, index) => (
-                                                <div key={index} className="flex items-center justify-between p-3 bg-cloud-mist/30 rounded-xl border border-platinum-tint/40 text-sm">
-                                                    <div className="flex items-center gap-3">
+                                                <div 
+                                                    key={index} 
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                        e.dataTransfer.effectAllowed = 'move';
+                                                        setDraggedAgendaIndex(index);
+                                                    }}
+                                                    onDragOver={(e) => e.preventDefault()}
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        if (draggedAgendaIndex === null || draggedAgendaIndex === index) return;
+                                                        const newList = [...agendaList];
+                                                        const draggedItem = newList.splice(draggedAgendaIndex, 1)[0];
+                                                        newList.splice(index, 0, draggedItem);
+                                                        setAgendaList(newList);
+                                                        setDraggedAgendaIndex(null);
+                                                    }}
+                                                    onDragEnd={() => setDraggedAgendaIndex(null)}
+                                                    className={`flex items-center justify-between p-3 rounded-xl border text-sm transition-all cursor-move ${
+                                                        draggedAgendaIndex === index ? 'opacity-50 border-action-blue bg-blue-50' : 'bg-cloud-mist/30 border-platinum-tint/40 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                                                        <GripVertical className="w-4 h-4 text-slate-400 shrink-0 cursor-grab" />
                                                         <span className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 font-bold text-xs flex items-center justify-center border border-emerald-100 shrink-0">
                                                             {index + 1}
                                                         </span>

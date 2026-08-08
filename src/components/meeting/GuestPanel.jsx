@@ -12,7 +12,7 @@ const STATUS_LABEL = {
     revoked:     { text: 'Đã thu hồi', cls: 'text-red-600 bg-red-50' },
 };
 
-const GuestPanel = ({ meetingId, onGuestCountChange }) => {
+const GuestPanel = ({ meetingId, onGuestsUpdate }) => {
     const [guests, setGuests] = useState([]);
     const [lobby, setLobby] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -31,14 +31,14 @@ const GuestPanel = ({ meetingId, onGuestCountChange }) => {
             const guestList = gRes?.success ? (gRes.data || []) : [];
             setGuests(guestList);
             setLobby(guestList.filter(g => g.lobbyStatus === 'waiting'));
-            const admittedCount = guestList.filter(g => g.inviteStatus === 'used').length;
-            onGuestCountChange?.(admittedCount);
+            const admittedGuests = guestList.filter(g => g.inviteStatus === 'used');
+            onGuestsUpdate?.(admittedGuests);
         } catch {
             /* bỏ qua lỗi mạng tạm thời */
         } finally {
             setLoading(false);
         }
-    }, [meetingId, onGuestCountChange]);
+    }, [meetingId, onGuestsUpdate]);
 
     // Poll 10 giây/lần khi panel đang mở
     useEffect(() => {
