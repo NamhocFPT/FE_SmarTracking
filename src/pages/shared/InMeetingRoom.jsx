@@ -5,9 +5,11 @@ import {
     Sparkles, StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
     Volume2, VolumeX, X, Edit2
 } from 'lucide-react';
+import { IoMic, IoMicOff, IoHandLeft, IoVolumeHigh, IoHappy, IoTime, IoCall, IoArrowBack } from 'react-icons/io5';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from '../../assets/images/SmarTracking.png';
 
 import { getSocket, subscribeToMeeting } from '../../utils/socket';
 import { request } from '../../utils/request';
@@ -230,7 +232,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [agendaDocView, setAgendaDocView] = useState(null);
     const [agendaDocUrl, setAgendaDocUrl] = useState(null);
     const [agendaDocLoading, setAgendaDocLoading] = useState(false);
-    const [admittedGuestCount, setAdmittedGuestCount] = useState(0);
+    const [admittedGuests, setAdmittedGuests] = useState([]);
+    const admittedGuestCount = admittedGuests.length;
     // agendaDocView: { agendaItem, selectedAttachmentIdx }
 
     // Fetch download URL whenever the viewed attachment changes
@@ -297,10 +300,16 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const myParticipantId = myParticipantIdRef.current;
 
     const showToast = (message, type = 'info') => {
-        const toastId = Date.now() + Math.random();
+        const toastId = `toast-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
         setToasts(prev => [...prev, { id: toastId, message, type }]);
-        const timerId = setTimeout(() => setToasts(prev => prev.filter(t => t.id !== toastId)), 3500);
+        const timerId = setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== toastId));
+        }, 3500);
         toastTimersRef.current.push(timerId);
+    };
+
+    const removeToast = (id) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
     };
 
     // ─── Data Loading ──────────────────────────────────────────────────
@@ -345,19 +354,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
         if (savedStateStr) {
             const savedState = JSON.parse(savedStateStr);
             if (baseMeeting) {
+                // Luôn cập nhật status từ API để tránh cache cũ giữ 'scheduled'
+                // khi host đã bắt đầu họp sớm — không cập nhật thì participant bị kẹt ở lobby
+                if (baseMeeting.status) savedState.status = baseMeeting.status;
                 savedState.title = baseMeeting.title || savedState.title;
                 savedState.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || savedState.roomName;
                 savedState.room = baseMeeting.room || savedState.room || null;
-                if (baseMeeting.agendas?.length > 0) {
-                    savedState.agenda = baseMeeting.agendas.map((a, idx) => ({
-                        id: a.id,
-                        title: a.title,
-                        description: a.description || '',
-                        durationMin: a.plannedDurationMinutes,
-                        orderIndex: a.agendaOrder ?? idx,
-                        attachments: a.attachments || [],
-                    }));
-                }
+                // Fix: Luôn sử dụng danh sách agenda mới nhất từ API, không gộp với cache localStorage
+                // để tránh tình trạng dữ liệu của tài khoản khác bị rò rỉ nếu dùng chung trình duyệt
+                savedState.agenda = (baseMeeting.agendas || []).map((a, idx) => ({
+                    id: a.id,
+                    title: a.title,
+                    description: a.description || '',
+                    durationMin: a.plannedDurationMinutes,
+                    orderIndex: a.agendaOrder ?? idx,
+                    attachments: a.attachments || [],
+                }));
                 savedState.participants = savedState.participants?.map((savedP) => {
                     const apiP = baseMeeting.participants?.find(p => (p.userId || p.user_id || p.user?.id || p.id) === savedP.id);
                     return apiP ? { ...savedP, avatarUrl: resolveAvatarUrl(apiP) || savedP.avatarUrl } : savedP;
@@ -556,31 +568,55 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
 
     useEffect(() => {
-        if (meetingState?.status === 'in_progress') {
-            const cleanup = subscribeToMeeting(id);
-            const s = getSocket();
-            const onSessionStarted = () => setMeetingState(prev => ({ ...prev, status: 'in_progress' }));
-            const onSessionEnded = () => setMeetingState(prev => ({ ...prev, status: 'completed' }));
-            const onAgendaPresented = (payload) => setPresentedFile(payload);
-            const onAgendaPresentStopped = () => setPresentedFile(null);
-            const onExtensionCreated = (payload) => {
-                setPendingExtensions(prev => [...prev, payload]);
-                showToast(`Yêu cầu gia hạn ${payload.requestedExtensionMinutes || '?'} phút từ ${payload.requesterName || 'thành viên'}.`, 'warning');
-            };
-            s.on('meeting.session.started', onSessionStarted);
-            s.on('meeting.session.ended', onSessionEnded);
-            s.on('agenda:presented', onAgendaPresented);
-            s.on('agenda:present_stopped', onAgendaPresentStopped);
-            s.on('meeting.extension_request.created', onExtensionCreated);
-            return () => {
-                s.off('meeting.session.started', onSessionStarted);
-                s.off('meeting.session.ended', onSessionEnded);
-                s.off('agenda:presented', onAgendaPresented);
-                s.off('agenda:present_stopped', onAgendaPresentStopped);
-                s.off('meeting.extension_request.created', onExtensionCreated);
-                cleanup();
-            };
-        }
+        // Subscribe khi cả 'scheduled' lẫn 'in_progress' để participant nhận được
+        // sự kiện meeting.session.started dù đang ở trang chờ (waiting lobby).
+        // Trước đây chỉ subscribe khi 'in_progress' → participant bị kẹt ở lobby mãi
+        // vì không nhận được real-time event khi host bắt đầu họp sớm.
+        if (!meetingState?.status || ['completed', 'cancelled'].includes(meetingState.status)) return;
+
+        const cleanup = subscribeToMeeting(id);
+        const s = getSocket();
+
+        const onSessionStarted = () => setMeetingState(prev => {
+            const next = { ...prev, status: 'in_progress' };
+            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+            return next;
+        });
+        const onSessionEnded = () => setMeetingState(prev => ({ ...prev, status: 'completed' }));
+        const onAgendaPresented = (payload) => setPresentedFile(payload);
+        const onAgendaPresentStopped = () => setPresentedFile(null);
+        const onExtensionCreated = (payload) => {
+            setPendingExtensions(prev => [...prev, payload]);
+            showToast(`Yêu cầu gia hạn ${payload.requestedExtensionMinutes || '?'} phút từ ${payload.requesterName || 'thành viên'}.`, 'warning');
+        };
+        const onAgendaChanged = (payload) => {
+            if (payload?.currentAgendaIndex !== undefined) {
+                setMeetingState(prev => {
+                    const nextIdx = payload.currentAgendaIndex;
+                    if (!prev.agenda || nextIdx >= prev.agenda.length || nextIdx === prev.currentAgendaIndex) return prev;
+                    const next = { ...prev, currentAgendaIndex: nextIdx, agendaTimeLeft: (prev.agenda[nextIdx].durationMin || 10) * 60 };
+                    localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+                    return next;
+                });
+            }
+        };
+
+        s.on('meeting.session.started', onSessionStarted);
+        s.on('meeting.session.ended', onSessionEnded);
+        s.on('agenda:presented', onAgendaPresented);
+        s.on('agenda:present_stopped', onAgendaPresentStopped);
+        s.on('meeting.extension_request.created', onExtensionCreated);
+        s.on('agenda:changed', onAgendaChanged);
+
+        return () => {
+            s.off('meeting.session.started', onSessionStarted);
+            s.off('meeting.session.ended', onSessionEnded);
+            s.off('agenda:presented', onAgendaPresented);
+            s.off('agenda:present_stopped', onAgendaPresentStopped);
+            s.off('meeting.extension_request.created', onExtensionCreated);
+            s.off('agenda:changed', onAgendaChanged);
+            cleanup();
+        };
     }, [meetingState?.status, id]);
 
     useEffect(() => {
@@ -911,12 +947,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const handleNextAgenda = () => {
         if (!isHost) return;
         if (meetingState.currentAgendaIndex + 1 < (meetingState.agenda?.length || 0)) {
+            const nextIdx = meetingState.currentAgendaIndex + 1;
             setMeetingState(prev => {
-                const nextIdx = prev.currentAgendaIndex + 1;
                 const next = { ...prev, currentAgendaIndex: nextIdx, agendaTimeLeft: (prev.agenda[nextIdx].durationMin || 10) * 60 };
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
                 return next;
             });
+            try {
+                getSocket().emit('agenda:changed', { meetingId: id, currentAgendaIndex: nextIdx });
+            } catch (e) {}
             showToast('Đã chuyển sang mục tiếp theo trong chương trình.', 'success');
         } else {
             showToast('Chương trình đã kết thúc.', 'warning');
@@ -1033,7 +1072,16 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     // ─── Computed ─────────────────────────────────────────────────────
     // Show ALL participants (internal + external guests) regardless of attendance status
-    const activeGridParticipants = meetingState.participants || [];
+    const activeGridParticipants = [
+        ...(meetingState.participants || []),
+        ...admittedGuests.map(g => ({
+            id: g.externalParticipantId,
+            fullName: g.fullName || g.externalName || 'Khách ngoài',
+            role: 'Khách mời',
+            isSpeaking: false,
+            isMuted: true
+        }))
+    ];
     const uncheckedParticipants = (meetingState.participants || []).filter(p => !isCheckedIn(p.id));
 
     const tabs = [
@@ -1051,19 +1099,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
             {/* HEADER */}
             <header className="h-14 border-b border-platinum-tint bg-white px-5 flex items-center justify-between z-10 shadow-sm">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={handleLeaveRoom}
-                        className="p-1.5 bg-cloud-mist hover:bg-pale-gray text-slate-blue hover:text-midnight-indigo rounded-lg transition-all"
+                        className="w-10 h-10 rounded-full border border-platinum-tint/70 bg-white hover:bg-slate-50 hover:shadow-sm text-slate-500 hover:text-midnight-indigo flex items-center justify-center transition-all duration-200 group mr-2"
+                        title="Quay lại"
                     >
-                        <ChevronRight className="w-4 h-4 rotate-180" />
+                        <IoArrowBack className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
                     </button>
-                    <div>
-                        <h1 className="text-sm font-extrabold text-midnight-indigo flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-action-blue shrink-0" />
-                            {meetingState.title}
-                        </h1>
-                        <span className="text-[11px] text-slate-blue">{meetingState.roomName}</span>
+                    <div className="flex items-center gap-3.5 border-l border-platinum-tint/50 pl-4">
+                        <img src={logo} alt="Logo" className="h-9 w-auto object-contain shrink-0 drop-shadow-sm" />
+                        <div className="flex flex-col justify-center">
+                            <h1 className="text-[17px] font-extrabold text-midnight-indigo leading-tight tracking-tight">
+                                {meetingState.title}
+                            </h1>
+                            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{meetingState.roomName}</span>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1093,12 +1144,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
             {!isLobbyReady && meetingState.status === 'scheduled' && (
                 <div className="flex-1 flex items-center justify-center p-6 z-10">
                     <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-platinum-tint shadow-sm-2 space-y-6">
-                        <div className="text-center space-y-1">
-                            <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Sparkles className="w-7 h-7 text-action-blue" />
+                        <div className="text-center space-y-2">
+                            <div className="w-20 h-20 bg-blue-50/50 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm border border-blue-100">
+                                <img src={logo} alt="Logo" className="w-12 h-12 object-contain drop-shadow-sm" />
                             </div>
-                            <h2 className="text-xl font-extrabold text-midnight-indigo">{meetingState.title}</h2>
-                            <p className="text-xs text-slate-blue">{meetingState.roomName}</p>
+                            <h2 className="text-2xl font-extrabold text-midnight-indigo leading-tight">{meetingState.title}</h2>
+                            <p className="text-sm text-slate-blue">{meetingState.roomName}</p>
                         </div>
 
                         <div className="bg-cloud-mist rounded-2xl p-4 border border-platinum-tint space-y-2 text-xs">
@@ -1414,52 +1465,52 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             {/* Mic */}
                             <button
                                 onClick={handleMicToggle}
-                                className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all text-white ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-600/80 hover:bg-red-600'}`}
+                                className={`flex flex-col items-center gap-1 px-4 py-2.5 rounded-2xl transition-all text-white shadow-sm ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-600/90 hover:bg-red-600 shadow-red-900/20'}`}
                                 title={isMicOn ? 'Tắt mic' : 'Bật mic'}
                             >
-                                {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                                <span className="text-[9px] font-bold uppercase tracking-wide">{isMicOn ? 'Mic bật' : 'Mic tắt'}</span>
+                                {isMicOn ? <IoMic className="w-5 h-5" /> : <IoMicOff className="w-5 h-5" />}
+                                <span className="text-[9px] font-extrabold uppercase tracking-widest">{isMicOn ? 'Mic bật' : 'Mic tắt'}</span>
                             </button>
 
-                            <div className="w-px h-8 bg-white/10" />
+                            <div className="w-px h-10 bg-white/10 mx-1" />
 
                             {/* Interactions */}
-                            <div className="flex items-center gap-1.5 relative">
+                            <div className="flex items-center gap-2 relative">
                                 <button
                                     onClick={handleToggleRaiseHand}
-                                    className={`p-2.5 rounded-xl transition-all text-white ${isHandRaised ? 'bg-amber-500/80' : 'bg-white/10 hover:bg-white/20'}`}
+                                    className={`p-3 rounded-2xl transition-all text-white shadow-sm ${isHandRaised ? 'bg-amber-500/90 shadow-amber-900/20' : 'bg-white/10 hover:bg-white/20'}`}
                                     title="Giơ tay"
                                 >
-                                    <Hand className="w-4 h-4" />
+                                    <IoHandLeft className="w-5 h-5" />
                                 </button>
                                 <button
                                     onClick={handleSelfSpeak}
-                                    className="p-2.5 rounded-xl text-white bg-white/10 hover:bg-white/20 transition-all"
+                                    className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm"
                                     title="Phát biểu"
                                 >
-                                    <Volume2 className="w-4 h-4" />
+                                    <IoVolumeHigh className="w-5 h-5" />
                                 </button>
                                 <button
                                     onClick={() => setShowReactionPicker(v => !v)}
                                     disabled={meetingState.reactionsLocked && !isHost}
-                                    className="p-2.5 rounded-xl text-white bg-white/10 hover:bg-white/20 transition-all disabled:opacity-30"
+                                    className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm disabled:opacity-30"
                                     title="Cảm xúc"
                                 >
-                                    <Smile className="w-4 h-4" />
+                                    <IoHappy className="w-5 h-5" />
                                 </button>
                                 {!isHost && (
                                     <button
                                         onClick={() => setExtensionModal({ isOpen: true, minutes: 15, reason: '' })}
-                                        className="p-2.5 rounded-xl text-white bg-white/10 hover:bg-white/20 transition-all"
+                                        className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm"
                                         title="Yêu cầu gia hạn"
                                     >
-                                        <Timer className="w-4 h-4" />
+                                        <IoTime className="w-5 h-5" />
                                     </button>
                                 )}
                                 {showReactionPicker && (
-                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex gap-1 bg-midnight-indigo border border-white/10 p-2 rounded-xl shadow-xl z-20">
+                                    <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex gap-1.5 bg-midnight-indigo border border-white/10 p-2.5 rounded-2xl shadow-2xl z-20">
                                         {['👏', '❤️', '👍', '🎉', '😂', '🔥'].map(emoji => (
-                                            <button key={emoji} onClick={() => sendReaction(emoji)} className="text-lg hover:scale-125 transition-transform px-0.5">
+                                            <button key={emoji} onClick={() => sendReaction(emoji)} className="text-xl hover:scale-125 transition-transform px-1">
                                                 {emoji}
                                             </button>
                                         ))}
@@ -1470,9 +1521,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             {/* Leave */}
                             <button
                                 onClick={handleLeaveRoom}
-                                className="ml-auto px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-red-900/40"
+                                className="ml-auto px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-2.5 shadow-lg shadow-red-900/30"
                             >
-                                <PhoneOff className="w-4 h-4" /> Rời khỏi
+                                <IoCall className="w-4 h-4" /> Rời khỏi
                             </button>
                         </div>
                     </div>
@@ -1936,7 +1987,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             {mediaFiles.length > 0 && (
                                                 <div className="space-y-1.5">
                                                     <h4 className="text-[10px] font-bold text-slate-blue uppercase tracking-wider flex items-center gap-1.5">
-                                                        <FileText className="w-3 h-3" /> Tệp đa phương tiện ({mediaFiles.length})
+                                                        <FileText className="w-3 h-3" /> Bản ghi cuộc họp ({mediaFiles.length})
                                                     </h4>
                                                     {mediaFiles.map((file, idx) => (
                                                         <div key={file.id || idx} className="p-2.5 bg-cloud-mist border border-platinum-tint rounded-xl flex items-center justify-between group">
@@ -2155,7 +2206,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             {activeChatTab === 'guests' && isHost && (
                                 <GuestPanel
                                     meetingId={id}
-                                    onGuestCountChange={setAdmittedGuestCount}
+                                    onGuestsUpdate={setAdmittedGuests}
                                 />
                             )}
                         </div>
@@ -2273,7 +2324,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
             )}
 
             {/* TOAST OVERLAY */}
-            <div className="fixed bottom-24 right-5 z-[9998] flex flex-col gap-2 pointer-events-none">
+            <div className="fixed bottom-24 right-5 z-[9998] flex flex-col gap-2 pointer-events-auto">
                 <AnimatePresence>
                     {toasts.map(t => (
                         <motion.div
@@ -2281,17 +2332,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             initial={{ opacity: 0, x: 30 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 30 }}
-                            className={`px-4 py-3 rounded-xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 text-white max-w-[260px] ${
+                            className={`px-4 py-3 rounded-xl shadow-2xl border text-xs font-bold flex items-center justify-between gap-3 text-white max-w-[320px] ${
                                 t.type === 'error' ? 'bg-red-600 border-red-500' :
                                 t.type === 'warning' ? 'bg-amber-500 border-amber-400' :
                                 t.type === 'success' ? 'bg-emerald-600 border-emerald-500' :
                                 'bg-midnight-indigo border-indigo-800'
                             }`}
                         >
-                            {t.type === 'error' && <VolumeX className="w-3.5 h-3.5 shrink-0" />}
-                            {t.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
-                            {t.type === 'success' && <Check className="w-3.5 h-3.5 shrink-0" />}
-                            <span className="leading-snug">{t.message}</span>
+                            <div className="flex items-center gap-2.5 flex-1 pr-2">
+                                {t.type === 'error' && <VolumeX className="w-3.5 h-3.5 shrink-0" />}
+                                {t.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                                {t.type === 'success' && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                <span className="leading-snug">{t.message}</span>
+                            </div>
+                            <button onClick={() => removeToast(t.id)} className="p-1.5 hover:bg-white/25 rounded-md transition-colors shrink-0 opacity-80 hover:opacity-100">
+                                <X className="w-3.5 h-3.5" />
+                            </button>
                         </motion.div>
                     ))}
                 </AnimatePresence>
