@@ -5,6 +5,28 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-08 16:32
+* **Tên Plan / Yêu cầu**: Cải thiện UI Modal thông tin chủ xe và ẩn UserID.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/ANPRManagement.jsx`:
+    * Di chuyển Inline Modal ra khỏi stacking context bằng `createPortal` (React Portal) để đảm bảo hiệu ứng `backdrop-blur` phủ mờ toàn màn hình 100%. Tăng độ mờ nền và đẩy `z-index` lên cao nhất (`z-[9999]`).
+    * Gỡ bỏ hoàn toàn việc hiển thị `userId` thô trong bảng. Tất cả những lượt quét không có dữ liệu chủ xe (`owner`) đều sẽ hiển thị một Logo Ảnh Đại Diện xám mặc định (không kèm văn bản) thay vì chữ "Người lạ" để giao diện gọn gàng và tương đồng với hình ảnh cung cấp.
+
+### 2026-08-08 16:29
+* **Tên Plan / Yêu cầu**: Mở rộng sidebar và section khi click vào icon lúc sidebar đang thu gọn.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/layout/SystemAdminSidebar.jsx`: Chỉnh sửa logic `onClick` của Section Header. Nếu sidebar đang ở chế độ mini (`isMini === true`), click vào icon sẽ tự động gọi hàm mở rộng sidebar (`onToggle`) đồng thời mở luôn section đó ra để người dùng dễ dàng chọn các item con bên trong.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-08 16:22
+* **Tên Plan / Yêu cầu**: Tích hợp dữ liệu Owner từ Backend vào bảng ANPR và tạo Modal nội trú (Inline Modal).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/ANPRManagement.jsx`:
+    * Thay đổi logic hiển thị cột "Chủ xe": Kiểm tra nếu API trả về object `owner` thì sẽ hiển thị Avatar và Tên chủ xe, click vào sẽ mở popup Modal nội trú (không cần tách file riêng).
+    * Bổ sung hiển thị Icon riêng biệt (màu cam nổi bật có icon Khách/Biển lạ) cho những lượt xe có `matchState === 'unknown'`.
+    * Truyền thêm tham số `ownerName` vào API query khi user gõ vào thanh Search để hỗ trợ BE tìm kiếm theo Tên.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-08 15:05
 * **Tên Plan / Yêu cầu**: Ẩn các trang không dùng đến và đổi tên "Hệ thống ANPR".
 * **Chi tiết thay đổi**:
