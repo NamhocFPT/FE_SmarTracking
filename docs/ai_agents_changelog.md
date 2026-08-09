@@ -5,6 +5,47 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-09 12:55
+* **Tên Plan / Yêu cầu**: Tối ưu UI/UX - Xử lý lỗi spam API trong phòng họp (InMeetingRoom).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Sửa logic hàm `callWithFallback`: Ngăn chặn việc tự động gọi API dự phòng (manager scope) nếu API chính (employee scope) đã trả về các lỗi phần quyền cứng (HTTP 403, 404, 409) nhằm tránh request bị gọi 2 lần vô ích.
+    * Thêm cờ `attendanceErrorRef` và `devicesErrorRef` vào các hàm `loadAttendance` và `loadRoomDevices`. Nếu API gặp lỗi 403 hoặc 409 (do user không có quyền quản lý thiết bị, hoặc endpoint điểm danh bị conflict), hệ thống sẽ ngưng polling gọi lại định kỳ mỗi 15s để tránh spam console.
+    * Tích hợp thêm trình xem trước (Preview) cho định dạng file PowerPoint (`.ppt`, `.pptx`) bằng cách sử dụng Iframe nhúng qua dịch vụ Microsoft Office Viewer (`view.officeapps.live.com`). Giờ đây khi bấm vào file slide, người dùng có thể xem trực tiếp nội dung thay vì chỉ có nút Tải xuống.
+    * Thiết kế lại UI hiển thị Tài liệu đính kèm ở mục Chương trình (Agenda):
+      * Xóa bỏ dải hiển thị file đính kèm bị trùng lặp bên ngoài nhằm làm gọn giao diện thẻ chương trình.
+      * Tích hợp toàn bộ nút Xem tài liệu, Tải xuống, và Chiếu/Dừng chiếu (Host) vào thẳng từng dòng tài liệu trong mục `Tài liệu đính kèm` ở trạng thái mở rộng (Expanded Detail) để người dùng dễ thao tác.
+      * Thêm class `whitespace-nowrap` và tinh chỉnh padding, size của nút "Chuyển mục tiếp theo" để tránh tình trạng tràn/xuống dòng chữ trên các màn hình hẹp.
+    * Tinh chỉnh giao diện thẻ trạng thái (badge): Đổi màu trạng thái `Đang diễn ra` (`in_progress`) từ xanh ngọc (`emerald`) sang màu tím (`purple`) trên bảng Lịch và Dashboard để dễ dàng phân biệt rõ ràng với trạng thái `Đã kết thúc` (`completed` - giữ màu xanh ngọc).
+    * Tối ưu hiển thị danh sách **Thiết bị phòng** trong Giao diện cuộc họp (`InMeetingRoom.jsx`):
+      * Chuyển từ dạng danh sách trải dài sang dạng **Accordion (Thu gọn/Mở rộng)**.
+      * Mặc định danh sách sẽ được thu gọn để tiết kiệm không gian màn hình, đặc biệt hữu ích khi phòng có quá nhiều thiết bị (ví dụ 16 thiết bị).
+      * Khi mở rộng, danh sách sẽ có thanh cuộn dọc (scroll) giới hạn chiều cao (`max-h-[200px]`), giúp giao diện tổng thể không bị đẩy xuống quá sâu.
+    * Cải tiến giao diện hiển thị người tham gia (MeetingGrid):
+      * Sửa hình đại diện (Avatar) từ dạng hình vuông chiếm toàn bộ ô thành hình tròn (Circular) nằm ở giữa, giúp giao diện thanh lịch và chuyên nghiệp hơn.
+      * Thiết kế lại hiệu ứng khi phát biểu (Speaking Animation): Loại bỏ viền vuông cứng ngắc và thay bằng hiệu ứng sóng âm (Ripple effect) - gồm các vòng tròn đồng tâm khuếch đại theo tần số âm thanh mô phỏng ngay xung quanh Avatar.
+    * Sửa lỗi Lịch cá nhân (`PersonalCalendar.jsx`) và Trang chủ (`homePage.jsx`) không hiển thị cuộc họp đang diễn ra: Bổ sung thêm trạng thái `'in_progress'` vào bộ lọc mặc định khi gọi API `getMySchedule`. Điều này giúp người dùng (kể cả host hay khách) khi lỡ đóng tab phòng họp (InMeetingRoom) vẫn thấy thẻ cuộc họp trên giao diện để bấm nút vào lại. Việc đóng tab ở FE sẽ không tự động stop cuộc họp trên BE.
+    * Sửa lỗi **API điểm danh thủ công** (Manual Check-In) trên giao diện `InMeetingRoom`: Đã thay đổi payload gọi API từ `participant.id` (ID bản ghi thành viên) sang `userId` (ID thực sự của User) để đồng bộ với spec mới nhất của Backend `POST /meetings/:meetingId/attendance`. Đồng thời sửa lại logic helper `isCheckedIn` và `getAttendanceRecord` để ánh xạ chính xác trạng thái điểm danh của thành viên trên danh sách tham gia.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 11:41
+* **Tên Plan / Yêu cầu**: Cải thiện trải nghiệm nhìn - Tăng kích thước hình ảnh từ Camera.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/common/ThumbnailImage.jsx`:
+    * Tăng kích thước hiển thị mặc định của `ThumbnailImage` từ `w-28` lên `w-32 md:w-40` để người dùng dễ nhìn hơn trong các bảng dữ liệu.
+  * `[Cập nhật] src/pages/systemAdmin/SecurityAlerts.jsx`:
+    * Cập nhật kích thước box placeholder "Không ảnh" đồng bộ với kích thước mới của `ThumbnailImage`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 11:35
+* **Tên Plan / Yêu cầu**: Tái cấu trúc (Refactor) giao diện bảng Cảnh báo An ninh.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/SecurityAlerts.jsx`:
+    * Tách riêng cột **Ngày** và **Giờ** để tăng cường tính trực quan, dễ dàng theo dõi thời gian xảy ra vi phạm.
+    * Tách riêng cột **Hình ảnh** (ảnh chụp từ camera) và cột **Thao tác** thành 2 cột riêng biệt, tránh tình trạng dồn ứ thông tin trong cùng một cột gây khó nhìn.
+    * Tối ưu hiển thị placeholder "Không ảnh" bằng layout box chuyên biệt.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-09 11:27
 * **Tên Plan / Yêu cầu**: Sửa form Device Management cho ip_camera + RTSP (Ưu tiên cao).
 * **Chi tiết thay đổi**:
@@ -424,3 +465,21 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
   * `[Cập nhật] .agents/AGENTS.md`: Thêm rule bắt buộc ghi log vào cuối file.
   * `[Cập nhật] src/docs/AGENTS.md`: Thêm chi tiết cấu trúc bắt buộc và định dạng của việc ghi log (phần AI ACTION LOGGING RULES).
 * **Trạng thái**: Hoàn thành
+
+ # #   [ 2 0 2 6 - 0 8 - 0 9 ]   -   R e s p o n s i v e   U I   O p t i m i z a t i o n s 
+ 
+ * * P l a n : * *   R e s p o n s i v e   U I   F i x e s 
+ 
+ # # #   C h a n g e s   M a d e : 
+ -   * * E m p l o y e e   L a y o u t : * *   A d d e d   M o b i l e   H a m b u r g e r   M e n u   a n d   D r a w e r   f o r   n a v i g a t i o n   o n   <   m d   s c r e e n s . 
+ -   * * S y s t e m A d m i n   L a y o u t : * *   A d d e d   M o b i l e   T o p B a r   w i t h   H a m b u r g e r   M e n u   a n d   s l i d i n g   D r a w e r   f o r   s i d e b a r   o n   <   l g   s c r e e n s . 
+ -   * * I n M e e t i n g R o o m : * *   O p t i m i z e d   r i g h t   p a n e l   f o r   m o b i l e   b y   e n f o r c i n g   a   m a x - h - [ 5 0 v h ]   r e s t r i c t i o n   a n d   e n a b l i n g   h o r i z o n t a l   s c r o l l i n g   f o r   c h a t / a t t e n d a n c e   t a b s . 
+ -   * * R e s p o n s i v e   G r i d s   i n   M o d a l s : * *   U p d a t e d   E x p o r t R e p o r t M o d a l   a n d   E x p o r t M i n u t e s M o d a l   t o   t r a n s i t i o n   f r o m   g r i d - c o l s - 1   t o   g r i d - c o l s - 2   b a s e d   o n   s c r e e n   s i z e . 
+  
+ 
+ -   * * S y s t e m A d m i n   D a s h b o a r d : * *   E n l a r g e d   R e c h a r t s   P i e C h a r t   r a d i i   ( i n n e r   5 8 - > 7 0 ,   o u t e r   8 8 - > 9 5 )   a n d   s h i f t e d   c x   t o   4 0 %   t o   p r e v e n t   c e n t e r   t e x t   f r o m   b e i n g   c r o p p e d   b y   t h e   a c t i v e   s l i c e   s t r o k e .   I n c r e a s e d   f o n t   s i z e   o f   c e n t e r   t e x t   f o r   b e t t e r   c l a r i t y . 
+  
+ 
+ -   * * I n M e e t i n g : * *   T h a y   t h �  t h �  v i �n   \ d o c x - p r e v i e w \   b �n g   M i c r o s o f t   O f f i c e   V i e w e r   i f r a m e   ( \ i s M s O f f i c e \ )   �  h i �n   t h �  c � c   f i l e   W o r d   ( \ . d o c \ ,   \ . d o c x \ )   v �   P o w e r P o i n t   n h �m   g i �i   q u y �t   l �i   v �  g i a o   d i �n / h i �n   t h �  s a i   n �i   d u n g ,   m a n g   l �i   t r �i   n g h i �m   x e m   t � i   l i �u   n h �t   q u � n   v �   �n   �n h   h �n . 
+  
+ 
