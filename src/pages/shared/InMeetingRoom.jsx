@@ -55,6 +55,59 @@ import UserAvatar, { resolveAvatarUrl } from '../../components/common/UserAvatar
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
 import GuestPanel from '../../components/meeting/GuestPanel';
+import * as docx from 'docx-preview';
+
+const DocxViewer = ({ fileUrl }) => {
+    const containerRef = useRef(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        setLoading(true);
+        setError(false);
+        fetch(fileUrl)
+            .then(res => res.blob())
+            .then(blob => {
+                if (!isMounted) return;
+                docx.renderAsync(blob, containerRef.current, null, {
+                    className: 'docx-preview-container',
+                    inWrapper: true,
+                    ignoreWidth: false,
+                    ignoreHeight: false,
+                    ignoreFonts: false,
+                    breakPages: true,
+                    useBase64URL: true
+                }).then(() => {
+                    if (isMounted) setLoading(false);
+                }).catch(err => {
+                    console.error('Docx preview error:', err);
+                    if (isMounted) { setError(true); setLoading(false); }
+                });
+            })
+            .catch(err => {
+                console.error('Docx fetch error:', err);
+                if (isMounted) { setError(true); setLoading(false); }
+            });
+        return () => { isMounted = false; };
+    }, [fileUrl]);
+
+    return (
+        <div className="flex-1 overflow-auto bg-white relative">
+            {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                    <Loader className="w-8 h-8 animate-spin text-action-blue" />
+                </div>
+            )}
+            {error && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white z-10 text-red-500 text-sm">
+                    Lỗi hiển thị tài liệu Word. Vui lòng tải xuống để xem.
+                </div>
+            )}
+            <div ref={containerRef} className="max-w-[800px] mx-auto min-h-full p-4" />
+        </div>
+    );
+};
 
 const customStyles = `
 @keyframes floatUp {
@@ -1306,8 +1359,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             try {
                                                 const res = await request(`/media-files/${presentedFile.fileId}`, { method: 'GET' });
                                                 const url = res.data?.data?.downloadUrl || res.data?.downloadUrl;
-                                                if (url) window.open(url, '_blank');
-                                                else showToast('Không tìm thấy link tài liệu', 'error');
+                                                if (url) {
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = presentedFile.fileName || '';
+                                                    a.style.display = 'none';
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    document.body.removeChild(a);
+                                                } else showToast('Không tìm thấy link tài liệu', 'error');
                                             } catch (e) { showToast('Lỗi khi mở tài liệu', 'error'); }
                                         }}
                                         className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[10px] font-bold flex items-center gap-1"
@@ -1374,6 +1434,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext);
                                         const isPdf = ext === 'pdf';
                                         const isVideo = ['mp4', 'webm', 'mov'].includes(ext);
+                                        const isWord = ['doc', 'docx'].includes(ext);
+                                        const isPptx = ['ppt', 'pptx'].includes(ext);
 
                                         return (
                                             <div className="flex-1 overflow-hidden flex flex-col">
@@ -1393,6 +1455,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                             title={att.fileName}
                                                             className="flex-1 w-full border-0"
                                                         />
+                                                    ) : isWord ? (
+                                                        <DocxViewer fileUrl={agendaDocUrl} />
                                                     ) : isVideo ? (
                                                         <div className="flex-1 flex items-center justify-center p-4">
                                                             <video src={agendaDocUrl} controls className="max-w-full max-h-full rounded-xl" />
@@ -1890,8 +1954,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                                                 try {
                                                                                     const res = await callWithFallback(getEmployeeMediaFile, getManagerMediaFile, att.id);
                                                                                     const url = res?.data?.downloadUrl;
-                                                                                    if (url) window.open(url, '_blank');
-                                                                                    else showToast('Không lấy được link tải', 'error');
+                                                                                    if (url) {
+                                                                                        const a = document.createElement('a');
+                                                                                        a.href = url;
+                                                                                        a.download = att.fileName || '';
+                                                                                        a.style.display = 'none';
+                                                                                        document.body.appendChild(a);
+                                                                                        a.click();
+                                                                                        document.body.removeChild(a);
+                                                                                    } else showToast('Không lấy được link tải', 'error');
                                                                                 } catch { showToast('Lỗi tải tài liệu', 'error'); }
                                                                             }}
                                                                             className="p-0.5 rounded hover:bg-slate-blue/10 text-slate-blue transition-colors shrink-0"
@@ -1956,8 +2027,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                                                             try {
                                                                                                 const res = await request(`/media-files/${att.id}`, { method: 'GET' });
                                                                                                 const url = res.data?.data?.downloadUrl || res.data?.downloadUrl;
-                                                                                                if (url) window.open(url, '_blank');
-                                                                                                else showToast('Không có link tải', 'error');
+                                                                                                if (url) {
+                                                                                                    const a = document.createElement('a');
+                                                                                                    a.href = url;
+                                                                                                    a.download = att.fileName || '';
+                                                                                                    a.style.display = 'none';
+                                                                                                    document.body.appendChild(a);
+                                                                                                    a.click();
+                                                                                                    document.body.removeChild(a);
+                                                                                                } else showToast('Không có link tải', 'error');
                                                                                             } catch { showToast('Lỗi mở tài liệu', 'error'); }
                                                                                         }}
                                                                                         className="p-1 text-slate-blue hover:text-action-blue transition-colors"

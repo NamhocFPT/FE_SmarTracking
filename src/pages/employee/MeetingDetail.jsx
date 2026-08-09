@@ -579,7 +579,13 @@ const EmployeeMeetingDetail = () => {
         try {
             const res = await getMediaFile(fileId);
             if (res?.success && res.data?.downloadUrl) {
-                window.open(res.data.downloadUrl, '_blank');
+                const a = document.createElement('a');
+                a.href = res.data.downloadUrl;
+                a.download = res.data.fileName || '';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             } else {
                 alert('Không thể lấy link tải file.');
             }
