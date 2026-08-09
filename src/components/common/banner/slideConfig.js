@@ -1,69 +1,82 @@
 /**
- * slideConfig.js — Cấu hình nội dung và màu sắc cho từng slide của DashboardBanner.
+ * slideConfig.js — Cấu hình nội dung, màu sắc và ảnh cho từng slide.
  *
- * ─── HƯỚNG DẪN THAY THẾ MÔ HÌNH 3D ────────────────────────────────────────
- * 1. Đặt file .glb vào thư mục:  public/models/
- * 2. Mở file scene tương ứng trong  src/components/common/banner/scenes/
- *    - Slide 0 (Camera AI)   →  TrackingScene.jsx
- *    - Slide 1 (ANPR)        →  FleetScene.jsx
- *    - Slide 2 (Phòng họp)   →  SecurityScene.jsx
- * 3. Làm theo hướng dẫn "SWAP TO GLB" trong file scene đó.
+ * ─── THÊM / CHỈNH SLIDE ──────────────────────────────────────────────────────
+ *  Chỉnh mảng SLIDES bên dưới. Banner tự nhận số lượng slide.
+ *
+ * ─── LOẠI SLIDE ──────────────────────────────────────────────────────────────
+ *  fullImage: true  → ảnh phủ toàn bộ banner, không hiện text
+ *  fullImage: false → ảnh bên phải, text bên trái (mặc định)
+ *
+ * ─── THAY ẢNH ────────────────────────────────────────────────────────────────
+ *  Đặt file ảnh vào: public/images/banner/
+ *  Cập nhật trường `image` bên dưới.
+ *  blendMode: 'multiply' → ảnh nền TRẮNG  | 'screen' → nền ĐEN | 'normal' → giữ nguyên
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Video, Car, ShieldAlert } from 'lucide-react';
+import { MapPin, Car, ShieldCheck } from 'lucide-react';
 
 const SLIDES = [
     {
         id: 0,
-        // ── Nội dung văn bản ──────────────────────────────────────────────
-        tag: 'AI Security Monitoring',
-        title: 'Giám Sát An Ninh Camera AI 24/7',
-        description:
-            'Camera AI giám sát toàn bộ khuôn viên theo thời gian thực, tự động nhận diện khuôn mặt và phát hiện xâm nhập bất thường để cảnh báo tức thời.',
-        Icon: Video,
-
-        // ── Màu sắc ───────────────────────────────────────────────────────
-        accent: '#006BFF',       // màu highlight chính (rings, dots, pointLight)
-        emissive: '#003380',     // màu phát sáng nội tại của mesh
-        meshColor: '#0B2A50',    // màu bề mặt mesh
-
-        // ── Style badge & background ──────────────────────────────────────
-        badgeClass: 'bg-blue-500/20 text-blue-100 border-blue-400/30',
-        bgFrom: '#02091c',
-        bgTo: '#061535',
+        // ── Lưu ảnh SmarTracking brand tại: public/images/banner/brand-hero.png ──
+        image: '/images/banner/brand-hero.png',
+        fullImage: true,   // ← phủ toàn banner, không hiện text
+        accent: '#3A8DFF',
+        bgFrom: '#020b1e',
+        bgTo: '#04183d',
     },
     {
         id: 1,
+        // ── Lưu ảnh terrain GPS map tại: public/images/banner/tracking-map.png ──
+        image: '/images/banner/tracking-map.png',
+        fullImage: false,
+        blendMode: 'normal',
+
+        tag: 'GPS Real-time Tracking',
+        title: 'Giám Sát & Theo Dõi Thực Địa GPS',
+        description:
+            'Theo dõi vị trí phương tiện và nhân sự theo thời gian thực trên bản đồ số hóa — tự động cảnh báo khi ra ngoài vùng cho phép.',
+        Icon: MapPin,
+        accent: '#00AAFF',
+        badgeClass: 'bg-blue-500/20 text-blue-100 border-blue-400/30',
+        bgFrom: '#010c1f',
+        bgTo: '#03214d',
+    },
+    {
+        id: 2,
+        // ── Lưu ảnh fleet analytics tại: public/images/banner/fleet-analytics.png ──
+        image: '/images/banner/fleet-analytics.png',
+        fullImage: false,
+        blendMode: 'screen',
+
         tag: 'Vehicle Access Control',
         title: 'Kiểm Soát Phương Tiện ANPR Thông Minh',
         description:
             'Camera ANPR tự động đọc biển số xe, đối chiếu danh sách kiểm soát và điều khiển barrier tức thì — không cần thao tác thủ công.',
         Icon: Car,
-
-        accent: '#00D8FF',
-        emissive: '#006688',
-        meshColor: '#003A72',
-
-        badgeClass: 'bg-cyan-500/20 text-cyan-100 border-cyan-400/30',
-        bgFrom: '#02111e',
-        bgTo: '#03303d',
+        accent: '#7B5FFF',
+        badgeClass: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/30',
+        bgFrom: '#080220',
+        bgTo: '#120845',
     },
     {
-        id: 2,
-        tag: 'Smart Meeting Room',
-        title: 'Phòng Họp Thông Minh & Điểm Danh Tự Động',
+        id: 3,
+        // ── Lưu ảnh security shield tại: public/images/banner/security-shield.png ──
+        image: '/images/banner/security-shield.png',
+        fullImage: false,
+        blendMode: 'screen',
+
+        tag: 'Smart Security',
+        title: 'An Ninh Thông Minh & Bảo Vệ Tài Sản',
         description:
-            'Điểm danh qua nhận diện khuôn mặt, phát hiện no-show, tự động giải phóng phòng và gửi thông báo tức thì khi cuộc họp kết thúc.',
-        Icon: ShieldAlert,
-
-        accent: '#E55CFF',
-        emissive: '#5a0099',
-        meshColor: '#6218c4',
-
+            'Hệ thống an ninh AI giám sát 24/7, phát hiện xâm nhập và nhận diện phương tiện trái phép — phản ứng tức thì, không bỏ sót.',
+        Icon: ShieldCheck,
+        accent: '#CC44FF',
         badgeClass: 'bg-purple-500/20 text-purple-100 border-purple-400/30',
-        bgFrom: '#0e0420',
-        bgTo: '#220850',
+        bgFrom: '#0d0118',
+        bgTo: '#1f0040',
     },
 ];
 
