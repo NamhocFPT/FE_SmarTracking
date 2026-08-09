@@ -46,7 +46,14 @@ const DeviceManagement = () => {
     // FE-5: RTSP Config Modal
     const [isRtspModalOpen, setIsRtspModalOpen] = useState(false);
     const [rtspDeviceId, setRtspDeviceId] = useState(null);
-    const [rtspUrl, setRtspUrl] = useState('');
+    const [rtspConfig, setRtspConfig] = useState({
+        rtsp_protocol: 'rtsp',
+        rtsp_host: '',
+        rtsp_port: '',
+        rtsp_path: '/',
+        rtsp_username: '',
+        rtsp_password: ''
+    });
 
     // FE-5: Token Display Modal (chỉ hiện 1 lần)
     const [tokenModalData, setTokenModalData] = useState(null); // { token, deviceName }
@@ -67,11 +74,10 @@ const DeviceManagement = () => {
     const [formData, setFormData] = useState({
         deviceCode: '',
         deviceName: '',
-        deviceType: 'camera',
+        deviceType: 'ip_camera',
         roomId: '',
         ipAddress: '',
         macAddress: '',
-        streamUrl: '',
         agentVersion: 'v1.0.0'
     });
 
@@ -129,11 +135,10 @@ const DeviceManagement = () => {
         setFormData({
             deviceCode: '',
             deviceName: '',
-            deviceType: 'camera',
+            deviceType: 'ip_camera',
             roomId: '',
             ipAddress: '',
             macAddress: '',
-            streamUrl: '',
             agentVersion: 'v1.0.0'
         });
         setIsRegisterModalOpen(true);
@@ -144,11 +149,10 @@ const DeviceManagement = () => {
         setFormData({
             deviceCode: device.device_code || '',
             deviceName: device.device_name || '',
-            deviceType: device.device_type || 'camera',
+            deviceType: device.device_type || 'ip_camera',
             roomId: device.room_id || '',
             ipAddress: device.ip_address || '',
             macAddress: device.mac_address || '',
-            streamUrl: device.stream_url || '',
             agentVersion: device.agent_version || 'v1.0.0'
         });
         setIsEditModalOpen(true);
@@ -178,7 +182,6 @@ const DeviceManagement = () => {
                 ip_address: formData.ipAddress || undefined,
                 mac_address: formData.macAddress || undefined,
                 metadata_json: {
-                    stream_url: formData.streamUrl || '',
                     agent_version: formData.agentVersion || 'v1.0.0'
                 }
             };
@@ -377,10 +380,19 @@ const DeviceManagement = () => {
     // FE-5: RTSP Config handler
     const handleRtspConfig = async (e) => {
         e.preventDefault();
-        if (!rtspDeviceId || !rtspUrl.trim()) return;
+        if (!rtspDeviceId || !rtspConfig.rtsp_host.trim() || !rtspConfig.rtsp_path.trim()) return;
         setSubmitting(true);
         try {
-            const res = await configDeviceRtsp(rtspDeviceId, { rtsp_url: rtspUrl });
+            const payload = {
+                rtsp_protocol: rtspConfig.rtsp_protocol,
+                rtsp_host: rtspConfig.rtsp_host.trim(),
+                rtsp_path: rtspConfig.rtsp_path.trim()
+            };
+            if (rtspConfig.rtsp_port) payload.rtsp_port = parseInt(rtspConfig.rtsp_port, 10);
+            if (rtspConfig.rtsp_username) payload.rtsp_username = rtspConfig.rtsp_username;
+            if (rtspConfig.rtsp_password) payload.rtsp_password = rtspConfig.rtsp_password;
+
+            const res = await configDeviceRtsp(rtspDeviceId, payload);
             if (res?.success) {
                 setSuccessMessage('Đã cập nhật cấu hình RTSP thành công.');
                 setIsRtspModalOpen(false);
@@ -418,9 +430,15 @@ const DeviceManagement = () => {
 
     // Helper translation dicts
     const TYPE_MAP = {
-        'camera': 'Camera AI',
+        'ip_camera': 'Camera AI',
+        'door_camera': 'Door Camera',
+        'room_camera': 'Room Camera',
+        'face_server': 'Face Server',
         'face_terminal': 'Face Terminal',
-        'face_server': 'Face Server'
+        'microphone': 'Microphone',
+        'capture_agent': 'Capture Agent',
+        'occupancy_sensor': 'Occupancy Sensor',
+        'display': 'Display'
     };
 
     // Filtered list
@@ -528,9 +546,15 @@ const DeviceManagement = () => {
                                 className="px-3 py-2 border border-platinum-tint rounded-xl text-sm text-slate-blue focus:outline-none focus:border-action-blue bg-white"
                             >
                                 <option value="">Tất cả loại thiết bị</option>
-                                <option value="camera">Camera AI</option>
-                                <option value="face_terminal">Face Terminal</option>
+                                <option value="ip_camera">Camera AI</option>
+                                <option value="door_camera">Door Camera</option>
+                                <option value="room_camera">Room Camera</option>
                                 <option value="face_server">Face Server</option>
+                                <option value="face_terminal">Face Terminal</option>
+                                <option value="microphone">Microphone</option>
+                                <option value="capture_agent">Capture Agent</option>
+                                <option value="occupancy_sensor">Occupancy Sensor</option>
+                                <option value="display">Display</option>
                             </select>
 
                             {/* Status Filter */}
@@ -662,9 +686,21 @@ const DeviceManagement = () => {
                                                             </button>
                                                             </>
                                                         )}
-                                                        {device.device_type === 'camera' && (
+                                                        {['ip_camera', 'door_camera', 'room_camera'].includes(device.device_type) && (
                                                             <button
-                                                                onClick={() => { setRtspDeviceId(device.id); setRtspUrl(device.stream_url || ''); setIsRtspModalOpen(true); }}
+                                                                onClick={() => {
+                                                                    const saved = device.metadata_json?.rtsp_config || {};
+                                                                    setRtspDeviceId(device.id);
+                                                                    setRtspConfig({
+                                                                        rtsp_protocol: saved.rtsp_protocol || 'rtsp',
+                                                                        rtsp_host: saved.rtsp_host || '',
+                                                                        rtsp_port: saved.rtsp_port ? String(saved.rtsp_port) : '',
+                                                                        rtsp_path: saved.rtsp_path || '/',
+                                                                        rtsp_username: saved.rtsp_username || '',
+                                                                        rtsp_password: ''
+                                                                    });
+                                                                    setIsRtspModalOpen(true);
+                                                                }}
                                                                 title="Cấu hình RTSP"
                                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-purple-600 hover:bg-purple-50 transition-colors"
                                                             >
@@ -801,6 +837,7 @@ const DeviceManagement = () => {
                                     className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                                 />
                             </div>
+                            <p className="text-[10px] text-slate-blue">Sau khi đăng ký, dùng nút bút chì tím để cấu hình RTSP cho camera.</p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại thiết bị</label>
@@ -809,9 +846,15 @@ const DeviceManagement = () => {
                                         onChange={(e) => setFormData({...formData, deviceType: e.target.value})}
                                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                                     >
-                                        <option value="camera">Camera AI</option>
-                                        <option value="face_terminal">Face Terminal</option>
+                                        <option value="ip_camera">Camera AI</option>
+                                        <option value="door_camera">Door Camera</option>
+                                        <option value="room_camera">Room Camera</option>
                                         <option value="face_server">Face Server</option>
+                                        <option value="face_terminal">Face Terminal</option>
+                                        <option value="microphone">Microphone</option>
+                                        <option value="capture_agent">Capture Agent</option>
+                                        <option value="occupancy_sensor">Occupancy Sensor</option>
+                                        <option value="display">Display</option>
                                     </select>
                                 </div>
                                 <div>
@@ -852,19 +895,6 @@ const DeviceManagement = () => {
                                     />
                                 </div>
                             </div>
-                            {formData.deviceType === 'camera' && (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Đường dẫn luồng video (RTSP URL)</label>
-                                    <input
-                                        type="text"
-                                        value={formData.streamUrl}
-                                        onChange={(e) => setFormData({...formData, streamUrl: e.target.value})}
-                                        placeholder="rtsp://192.168.1.50/live/main"
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                    />
-                                </div>
-                            )}
-
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
                                 <button
                                     type="button"
@@ -912,9 +942,15 @@ const DeviceManagement = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại thiết bị</label>
                                     <select value={formData.deviceType} onChange={(e) => setFormData({...formData, deviceType: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
-                                        <option value="camera">Camera AI</option>
-                                        <option value="face_terminal">Face Terminal</option>
+                                        <option value="ip_camera">Camera AI</option>
+                                        <option value="door_camera">Door Camera</option>
+                                        <option value="room_camera">Room Camera</option>
                                         <option value="face_server">Face Server</option>
+                                        <option value="face_terminal">Face Terminal</option>
+                                        <option value="microphone">Microphone</option>
+                                        <option value="capture_agent">Capture Agent</option>
+                                        <option value="occupancy_sensor">Occupancy Sensor</option>
+                                        <option value="display">Display</option>
                                     </select>
                                 </div>
                                 <div>
@@ -935,12 +971,6 @@ const DeviceManagement = () => {
                                     <input type="text" required value={formData.macAddress} onChange={(e) => setFormData({...formData, macAddress: e.target.value})} placeholder="AA:BB:CC:DD:EE:FF" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                                 </div>
                             </div>
-                            {formData.deviceType === 'camera' && (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Đường dẫn luồng video (RTSP URL)</label>
-                                    <input type="text" value={formData.streamUrl} onChange={(e) => setFormData({...formData, streamUrl: e.target.value})} placeholder="rtsp://192.168.1.50/live/main" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
-                                </div>
-                            )}
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
                                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors">Hủy</button>
                                 <button type="submit" disabled={submitting} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-colors">{submitting ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
@@ -982,7 +1012,7 @@ const DeviceManagement = () => {
             {/* FE-5: RTSP CONFIG MODAL */}
             {isRtspModalOpen && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-sm w-full overflow-hidden animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình RTSP Stream</h3>
                             <button onClick={() => setIsRtspModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
@@ -990,14 +1020,44 @@ const DeviceManagement = () => {
                             </button>
                         </div>
                         <form onSubmit={handleRtspConfig} className="p-6 space-y-4">
-                            <div>
-                                <label htmlFor="rtsp-url-input" className="block text-xs font-bold text-slate-blue uppercase mb-1">RTSP URL</label>
-                                <input id="rtsp-url-input" type="text" required value={rtspUrl} onChange={(e) => setRtspUrl(e.target.value)} placeholder="rtsp://192.168.1.50/live/main" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue" />
-                                <p className="text-[10px] text-slate-blue mt-1">Nhập đường dẫn RTSP stream. Mật khẩu sẽ được BE tự mask.</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Protocol</label>
+                                    <select value={rtspConfig.rtsp_protocol} onChange={(e) => setRtspConfig({...rtspConfig, rtsp_protocol: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
+                                        <option value="rtsp">rtsp://</option>
+                                        <option value="rtsps">rtsps://</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Host <span className="text-red-500">*</span></label>
+                                    <input type="text" required value={rtspConfig.rtsp_host} onChange={(e) => setRtspConfig({...rtspConfig, rtsp_host: e.target.value})} placeholder="192.168.1.50" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Port</label>
+                                    <input type="number" min="1" max="65535" value={rtspConfig.rtsp_port} onChange={(e) => setRtspConfig({...rtspConfig, rtsp_port: e.target.value})} placeholder="554" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue" />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Path <span className="text-red-500">*</span></label>
+                                    <input type="text" required value={rtspConfig.rtsp_path} onChange={(e) => setRtspConfig({...rtspConfig, rtsp_path: e.target.value})} placeholder="/live/main" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue" />
+                                    <p className="text-[10px] text-slate-blue mt-1">Bắt đầu bằng /</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Username</label>
+                                    <input type="text" value={rtspConfig.rtsp_username} onChange={(e) => setRtspConfig({...rtspConfig, rtsp_username: e.target.value})} placeholder="admin" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Password</label>
+                                    <input type="password" value={rtspConfig.rtsp_password} onChange={(e) => setRtspConfig({...rtspConfig, rtsp_password: e.target.value})} placeholder="••••••••" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
+                                    <p className="text-[10px] text-slate-blue mt-1">Bỏ trống nếu không đổi mật khẩu.</p>
+                                </div>
                             </div>
                             <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
                                 <button type="button" onClick={() => setIsRtspModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
-                                <button type="submit" disabled={submitting || !rtspUrl.trim()} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold disabled:opacity-50">{submitting ? 'Đang lưu...' : 'Lưu cấu hình'}</button>
+                                <button type="submit" disabled={submitting || !rtspConfig.rtsp_host.trim() || !rtspConfig.rtsp_path.trim()} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold disabled:opacity-50">{submitting ? 'Đang lưu...' : 'Lưu cấu hình'}</button>
                             </div>
                         </form>
                     </div>

@@ -5,6 +5,25 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-09 11:27
+* **Tên Plan / Yêu cầu**: Sửa form Device Management cho ip_camera + RTSP (Ưu tiên cao).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Sửa giá trị dropdown Loại thiết bị từ `camera` thành chuẩn BE `ip_camera`.
+    * Cải tiến Modal Cấu hình RTSP: Tách trường nhập liệu `rtsp_url` đơn lẻ thành các trường riêng biệt (`Protocol`, `Host`, `Port`, `Path`, `Username`, `Password`) theo đúng DTO của Backend.
+    * Đổi logic hiển thị RTSP: Đọc dữ liệu đúng từ `metadata_json.rtsp_config` thay vì top-level `stream_url`.
+    * Sửa logic bộ lọc trên bảng danh sách để lọc chuẩn xác loại thiết bị `ip_camera`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-09 11:15
+* **Tên Plan / Yêu cầu**: Hoàn thiện Frontend theo báo cáo sửa lỗi hiển thị tài liệu đính kèm Agenda (Live Meeting) - Phần 2.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Tích hợp thư viện `docx-preview` để hiển thị trước tài liệu Word (.docx, .doc) trực tiếp trên trình duyệt bằng cách đọc blob từ API.
+    * Sửa triệt để lỗi bị trình duyệt chặn pop-up khi tải tài liệu đính kèm. Thay thế toàn bộ `window.open` bằng kỹ thuật tạo thẻ `<a>` ẩn (`document.createElement('a')`) kèm thuộc tính `download` để kích hoạt trình tải xuống mặc định của trình duyệt.
+    * Xác minh các thay đổi trước đó (Đổi tên "Tệp đa phương tiện" thành "Bản ghi cuộc họp", nạp agenda trực tiếp từ API, đồng bộ qua WebSocket `agenda:changed`) đều đã được tích hợp thành công.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-09 01:10
 * **Tên Plan / Yêu cầu**: Cập nhật endpoint API Đổi ảnh đại diện (Đồng bộ với thay đổi Refactor từ Backend).
 * **Chi tiết thay đổi**:
