@@ -7,7 +7,7 @@ import {
     RiLoginBoxLine, RiCameraLine, RiCarLine, RiMapPinLine,
     RiAlertLine, RiEqualizerLine,
     RiCalendarLine, RiBuilding2Line, RiFileTextLine,
-    RiBarChart2Line, RiPieChart2Line, RiTimerLine,
+    RiBarChart2Line, RiPieChart2Line, RiTimerLine, RiMenuLine
 } from 'react-icons/ri';
 
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -73,6 +73,7 @@ const STATIC_NAVIGATION_ITEMS = [
 
 const SystemAdminLayout = () => {
     const [isSidebarMini, setIsSidebarMini]               = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen]   = useState(false);
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
     const [currentUser, setCurrentUser]                   = useState(null);
 
@@ -129,6 +130,8 @@ const SystemAdminLayout = () => {
                 navigationItems={navigationItems}
                 isMini={isSidebarMini}
                 onToggle={() => setIsSidebarMini(v => !v)}
+                isMobileOpen={isMobileSidebarOpen}
+                onMobileClose={() => setIsMobileSidebarOpen(false)}
                 logo={logo}
                 currentUser={currentUser}
                 displayName={displayName}
@@ -138,17 +141,34 @@ const SystemAdminLayout = () => {
                 onLogout={handleLogout}
             />
 
-            {/* ══ MAIN AREA ══ */}
-            <main className="flex-1 min-w-0 overflow-y-auto">
-                <div className="p-6">
-                    <Outlet />
-                </div>
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* ══ MOBILE TOPBAR ══ */}
+                <header className="lg:hidden flex items-center justify-between bg-white border-b border-platinum-tint px-4 py-3 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <img src={logo} alt="Logo" className="w-8 h-8 object-contain" />
+                        <span className="font-bold text-midnight-indigo tracking-tight">SmarTracking</span>
+                    </div>
+                    <button 
+                        onClick={() => setIsMobileSidebarOpen(true)} 
+                        className="p-2 -mr-2 text-slate-blue hover:text-midnight-indigo rounded-lg hover:bg-cloud-mist transition-colors"
+                        aria-label="Mở menu"
+                    >
+                        <RiMenuLine className="w-6 h-6" />
+                    </button>
+                </header>
+
+                {/* ══ MAIN AREA ══ */}
+                <main className="flex-1 min-w-0 overflow-y-auto">
+                    <div className="p-4 md:p-6">
+                        <Outlet />
+                    </div>
                 <BiometricReminderModal />
                 <ChangePasswordModal
                     isOpen={isChangePasswordOpen}
                     onClose={() => setIsChangePasswordOpen(false)}
                 />
-            </main>
+                </main>
+            </div>
         </div>
     );
 };

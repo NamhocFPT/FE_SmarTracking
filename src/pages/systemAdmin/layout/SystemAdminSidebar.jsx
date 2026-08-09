@@ -8,6 +8,8 @@ const SystemAdminSidebar = ({
     navigationItems = [],
     isMini,
     onToggle,
+    isMobileOpen,
+    onMobileClose,
     logo,
     currentUser,
     displayName,
@@ -70,14 +72,24 @@ const SystemAdminSidebar = ({
     };
 
     return (
-        <aside
-            className={`
-                relative flex flex-col shrink-0 h-screen sticky top-0
-                bg-midnight-indigo border-r border-white/[0.08]
-                transition-all duration-200 ease-in-out overflow-visible z-20
-                ${isMini ? 'w-[72px]' : 'w-[280px]'}
-            `}
-        >
+        <>
+            {/* ══ MOBILE OVERLAY ══ */}
+            <div 
+                className={`lg:hidden fixed inset-0 z-40 bg-midnight-indigo/20 backdrop-blur-sm transition-opacity duration-300 ${isMobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={onMobileClose}
+                aria-hidden="true"
+            />
+
+            <aside
+                className={`
+                    fixed lg:sticky top-0 inset-y-0 left-0 flex flex-col shrink-0 h-screen
+                    bg-midnight-indigo border-r border-white/[0.08]
+                    transition-all duration-300 ease-in-out z-50
+                    ${isMini ? 'lg:w-[72px]' : 'lg:w-[280px]'}
+                    w-[280px]
+                    ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                `}
+            >
             {/* ══ LOGO ROW ══ */}
             <div className="flex items-center h-[68px] border-b border-white/[0.08] shrink-0 px-3 gap-2.5">
 
@@ -373,7 +385,8 @@ const SystemAdminSidebar = ({
                     )}
                 </button>
             </div>
-        </aside>
+            </aside>
+        </>
     );
 };
 
