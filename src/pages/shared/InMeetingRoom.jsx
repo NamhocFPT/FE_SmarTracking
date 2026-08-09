@@ -569,7 +569,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         const newStatus = res.data?.status?.toLowerCase() || 'inactive';
                         if (newStatus !== recordingStatus) {
                             setRecordingStatus(newStatus);
-                            if (newStatus === 'completed') {
+                            if (newStatus === 'stopped') {
                                 showToast('Ghi hình đã hoàn tất, đang xử lý video.', 'success');
                                 fetchMediaFiles();
                             }
