@@ -63,7 +63,7 @@ const BiometricReminderModal = () => {
                     // Dùng `user` (đọc từ localStorage) thay vì `userProfile` state
                     // vì setState là async — userProfile vẫn là null tại thời điểm này
                     const userRoles = user.roles?.map(r => r.roleCode || r.role_code || r) || [];
-                    const isAdmin = userRoles.some(r => ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes(r));
+                    const isAdmin = userRoles.some(r => ['SYSTEM_ADMIN', 'BUSINESS_ADMIN'].includes(r));
 
                     if (isAdmin) {
                         setLoading(false);
@@ -72,14 +72,14 @@ const BiometricReminderModal = () => {
 
                     // Sử dụng chính xác cờ biometricRequired do BE trả về trong login-response
                     // kết hợp với trạng thái lấy từ API getBiometricStatus
-                    const needsUpload = data.avatarReviewStatus === 'not_uploaded' || data.avatarReviewStatus === 'rejected';
+                    const needsUpload = data.biometricReviewStatus === 'not_uploaded' || data.biometricReviewStatus === 'rejected';
                     // Đã bật lại bắt buộc đối với tất cả người dùng (trừ Admin đã chặn ở trên) nếu chưa nộp
                     const isForced = needsUpload;
 
                     const dismissed = sessionStorage.getItem('avatarPopupDismissed_' + userId);
                     if (!isForced && dismissed === 'true') { setLoading(false); return; }
 
-                    if (data.shouldShowAvatarPopup === true || isForced) {
+                    if (data.shouldShowBiometricPopup === true || isForced) {
                         // Luôn mở màn hình options để user chọn phương thức (webcam/upload/avatar)
                         // Không force thẳng vào webcam — tránh kẹt khi camera unavailable
                         setView('options');
@@ -114,7 +114,7 @@ const BiometricReminderModal = () => {
 
     const handleDismiss = () => {
         // Defense-in-depth: không cho đóng khi trạng thái bắt buộc nộp
-        const status = biometricData?.avatarReviewStatus;
+        const status = biometricData?.biometricReviewStatus;
         if (status === 'not_uploaded' || status === 'rejected') return;
         try {
             if (userProfile) {
@@ -128,8 +128,8 @@ const BiometricReminderModal = () => {
     const handleUploadSuccess = () => {
         try {
             if (userProfile) {
-                userProfile.avatarReviewStatus = 'pending_review';
-                userProfile.shouldShowAvatarPopup = false;
+                userProfile.biometricReviewStatus = 'pending_review';
+                userProfile.shouldShowBiometricPopup = false;
                 userProfile.biometricRequired = false; // Xoá cờ bắt buộc sau khi đã upload
                 localStorage.setItem('user', JSON.stringify(userProfile));
                 window.dispatchEvent(new Event('storage'));
@@ -332,7 +332,7 @@ const BiometricReminderModal = () => {
     // Chặn Escape và tất cả phím tắt có thể thoát khi modal bắt buộc
     useEffect(() => {
         if (!open) return;
-        const needsUploadNow = biometricData?.avatarReviewStatus === 'not_uploaded' || biometricData?.avatarReviewStatus === 'rejected';
+        const needsUploadNow = biometricData?.biometricReviewStatus === 'not_uploaded' || biometricData?.biometricReviewStatus === 'rejected';
         if (!needsUploadNow) return;
         const handler = (e) => {
             if (e.key === 'Escape') e.preventDefault();
@@ -343,7 +343,7 @@ const BiometricReminderModal = () => {
 
     if (!open || loading) return null;
 
-    const status = biometricData?.avatarReviewStatus || 'not_uploaded';
+    const status = biometricData?.biometricReviewStatus || 'not_uploaded';
     const statusInfo = STATUS_LABEL[status] || STATUS_LABEL.not_uploaded;
 
     const hasAvatar = !!userProfile?.avatarUrl;
@@ -386,7 +386,7 @@ const BiometricReminderModal = () => {
         return 'border-dashed border-red-500 scale-95 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
     };
 
-    const needsUpload = biometricData?.avatarReviewStatus === 'not_uploaded' || biometricData?.avatarReviewStatus === 'rejected';
+    const needsUpload = biometricData?.biometricReviewStatus === 'not_uploaded' || biometricData?.biometricReviewStatus === 'rejected';
     const isForced = needsUpload;
 
     return createPortal(

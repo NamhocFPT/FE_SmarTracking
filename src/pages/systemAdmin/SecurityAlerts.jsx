@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, CheckSquare, Clock, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CheckSquare, Clock, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert, Image as ImageIcon, Users } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -39,6 +39,9 @@ const SecurityAlerts = () => {
 
     const [snapshotEventId, setSnapshotEventId] = useState(null);
     const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+
+    // FE-AC: Occurrences detail modal
+    const [occurrencesModal, setOccurrencesModal] = useState({ open: false, alert: null });
 
     const fetchZones = async () => {
         try {
@@ -372,9 +375,14 @@ const SecurityAlerts = () => {
                                                     {alert.severity?.toUpperCase() || 'NORMAL'}
                                                 </span>
                                                 {(alert.occurrence_count > 1 || alert.occurrenceCount > 1) && (
-                                                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200" title={`Cảnh báo này đã lặp lại ${(alert.occurrence_count || alert.occurrenceCount)} lần`}>
+                                                    <button
+                                                        onClick={() => setOccurrencesModal({ open: true, alert })}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer transition-colors"
+                                                        title="Bấm để xem tất cả lượt vi phạm"
+                                                    >
+                                                        <Users className="w-3 h-3" />
                                                         Đã xảy ra: {alert.occurrence_count || alert.occurrenceCount} lần
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                         </td>
@@ -493,7 +501,76 @@ const SecurityAlerts = () => {
                 document.body
             )}
 
-            <EventSnapshotModal 
+            {/* FE-AC: OCCURRENCES DETAIL MODAL */}
+            {occurrencesModal.open && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full border border-platinum-tint flex flex-col max-h-[80vh]">
+                        <div className="px-6 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-amber-600" />
+                                    Chi tiết lượt vi phạm
+                                </h3>
+                                <p className="text-xs text-slate-blue mt-0.5">
+                                    {occurrencesModal.alert?.alert_type?.replace(/_/g, ' ').toUpperCase()} — {zones.find(z => z.id === occurrencesModal.alert?.zone_id)?.zone_name || 'Hệ thống'}
+                                    {' · '}Tổng: {occurrencesModal.alert?.occurrence_count || occurrencesModal.alert?.occurrenceCount} lượt
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setOccurrencesModal({ open: false, alert: null })}
+                                className="text-slate-blue hover:text-red-500 transition-colors text-xl leading-none"
+                            >✕</button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+                            {(occurrencesModal.alert?.payload_json?.occurrences || []).length === 0 ? (
+                                <p className="text-center text-slate-blue py-8 text-sm">Không có dữ liệu occurrence.</p>
+                            ) : (
+                                (occurrencesModal.alert.payload_json.occurrences).map((occ, idx) => (
+                                    <div key={idx} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border border-platinum-tint">
+                                        <div className="w-16 h-16 flex-shrink-0">
+                                            {occ.sourceEventId ? (
+                                                <ThumbnailImage
+                                                    eventId={occ.sourceEventId}
+                                                    onClick={() => {
+                                                        setSnapshotEventId(occ.sourceEventId);
+                                                        setIsSnapshotOpen(true);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="w-16 h-16 bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200">
+                                                    <ImageIcon className="w-5 h-5 text-slate-400" />
+                                                    <p className="text-[9px] text-slate-400 mt-1 text-center leading-tight">Không<br/>có ảnh</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-midnight-indigo">{formatDateTime(occ.occurredAt)}</p>
+                                            {occurrencesModal.alert?.alert_type === 'intrusion' && (
+                                                <span className={`inline-flex items-center mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold border ${occ.userId ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                                    {occ.userId ? '👤 Người quen' : '❓ Người lạ'}
+                                                </span>
+                                            )}
+                                            {occ.userId && occurrencesModal.alert?.alert_type !== 'intrusion' && (
+                                                <p className="text-[10px] text-slate-blue mt-1 font-mono truncate">UID: {occ.userId}</p>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-slate-400 font-mono shrink-0">#{idx + 1}</span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 text-right shrink-0">
+                            <button
+                                onClick={() => setOccurrencesModal({ open: false, alert: null })}
+                                className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-platinum-tint rounded-xl hover:bg-slate-50 transition-colors"
+                            >Đóng</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            <EventSnapshotModal
                 isOpen={isSnapshotOpen}
                 onClose={() => setIsSnapshotOpen(false)}
                 eventId={snapshotEventId}

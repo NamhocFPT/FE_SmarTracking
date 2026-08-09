@@ -125,15 +125,6 @@ const Login = () => {
                 // Store tokens in localStorage for request header injection and rotation
                 setTokens(accessToken, refreshToken);
 
-                // Check if user is MANAGER, if so auto set biometricRequired = true
-                const isManager = user?.roles?.some(r => {
-                    const roleCode = typeof r === 'string' ? r : (r.roleCode || r.role_code || '');
-                    return roleCode.toUpperCase() === 'MANAGER';
-                });
-                if (isManager) {
-                    user.biometricRequired = true;
-                }
-
                 // Store user information if needed
                 localStorage.setItem("user", JSON.stringify(user));
                 if (rememberLogin) {

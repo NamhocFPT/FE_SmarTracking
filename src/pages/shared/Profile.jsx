@@ -342,17 +342,17 @@ const Profile = () => {
                         <div className="w-full mt-3">
                             <div className="w-full flex flex-col p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
                                 <span className="block text-[10px] font-bold text-slate-blue uppercase text-left">Trạng thái duyệt ảnh FaceID</span>
-                                <span className={"inline-flex self-start mt-1.5 text-[10px] px-2 py-0.5 rounded-full font-semibold " + ((STATUS_LABEL[biometricStatus.avatarReviewStatus] || STATUS_LABEL.not_uploaded).badge)}>
-                                    {(STATUS_LABEL[biometricStatus.avatarReviewStatus] || STATUS_LABEL.not_uploaded).label}
+                                <span className={"inline-flex self-start mt-1.5 text-[10px] px-2 py-0.5 rounded-full font-semibold " + ((STATUS_LABEL[biometricStatus.biometricReviewStatus] || STATUS_LABEL.not_uploaded).badge)}>
+                                    {(STATUS_LABEL[biometricStatus.biometricReviewStatus] || STATUS_LABEL.not_uploaded).label}
                                 </span>
-                                {biometricStatus.avatarReviewStatus === "rejected" && biometricStatus.message && (
+                                {biometricStatus.biometricReviewStatus === "rejected" && biometricStatus.message && (
                                     <p className="text-[10px] text-red-600 mt-1.5 text-left leading-relaxed">{biometricStatus.message}</p>
                                 )}
-                                {biometricStatus.avatarReviewStatus === "approved" && (
+                                {biometricStatus.biometricReviewStatus === "approved" && (
                                     <p className="text-[10px] text-green-600 mt-1.5 text-left">Ảnh sinh trắc học đã được duyệt.</p>
                                 )}
                                 
-                                {(biometricStatus.avatarReviewStatus === "rejected" || biometricStatus.avatarReviewStatus === "not_uploaded") && (
+                                {(biometricStatus.biometricReviewStatus === "rejected" || biometricStatus.biometricReviewStatus === "not_uploaded") && (
                                     <button
                                         type="button"
                                         onClick={() => setBiometricModalOpen(true)}
