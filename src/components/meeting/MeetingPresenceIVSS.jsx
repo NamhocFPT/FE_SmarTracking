@@ -613,7 +613,7 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                                                         {/* Tooltip */}
                                                         <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 p-1.5 bg-slate-900 text-white text-[9.5px] rounded-lg shadow-md whitespace-nowrap z-30">
                                                             {isEnter ? 'VÀO CỬA' : 'RA CỬA'}: {formatVietnameseTime(ev.at)}
-                                                            {ev.similarity ? ` (Độ khớp: ${(ev.similarity * 100).toFixed(0)}%)` : ''}
+                                                            {ev.similarity ? ` (Độ khớp: ${(ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity).toFixed(0)}%)` : ''}
                                                         </div>
                                                     </div>
                                                 );
@@ -672,7 +672,7 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                                                             </td>
                                                             <td className="p-2.5 font-mono text-slate-600 font-medium">
                                                                 {ev.similarity !== null && ev.similarity !== undefined 
-                                                                    ? `${(ev.similarity * 100).toFixed(0)}%` 
+                                                                    ? `${(ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity).toFixed(0)}%` 
                                                                     : '—'}
                                                             </td>
                                                         </tr>

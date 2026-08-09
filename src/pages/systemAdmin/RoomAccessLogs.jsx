@@ -658,7 +658,7 @@ const RoomAccessLogs = () => {
                                             <th className="p-3.5">Trạng thái đối soát</th>
                                             <th className="p-3.5 text-center">Xem ảnh</th>
                                             <th className="p-3.5">Độ tin cậy</th>
-                                            <th className="p-3.5">Gắn cuộc họp</th>
+                                            <th className="p-3.5">Cuộc họp</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -755,22 +755,31 @@ const RoomAccessLogs = () => {
 
                                                     {/* Similarity confidence */}
                                                     <td className="p-3.5 font-mono font-bold text-slate-500">
-                                                        {ev.similarity !== null && ev.similarity !== undefined
-                                                            ? `${(ev.similarity * 100).toFixed(0)}%`
-                                                            : ev.reliability !== null && ev.reliability !== undefined
-                                                                ? `${(ev.reliability * 100).toFixed(0)}%`
-                                                                : '—'}
+                                                        {(() => {
+                                                            let conf = ev.similarity ?? ev.reliability ?? ev.confidence;
+                                                            if (conf === null || conf === undefined) return '—';
+                                                            if (conf <= 1) conf = conf * 100;
+                                                            return `${conf.toFixed(0)}%`;
+                                                        })()}
                                                     </td>
 
-                                                    {/* Meeting Code */}
-                                                    <td className="p-3.5 font-mono text-slate-600 font-semibold">
-                                                        {ev.meetingId ? (
-                                                            <span className="text-action-blue cursor-pointer hover:underline" title="ID cuộc họp">
-                                                                {ev.meetingId.substring(0, 8)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-400">—</span>
-                                                        )}
+                                                    {/* Meeting */}
+                                                    <td className="p-3.5 font-medium text-slate-700">
+                                                        {(() => {
+                                                            if (!ev.meetingId) return <span className="text-slate-400">—</span>;
+                                                            let meetingName = ev.meetingTitle || ev.meetingName || ev.meeting_title || ev.meeting?.title;
+                                                            if (!meetingName) {
+                                                                const m = meetings.find(x => (x.meetingId || x.meeting_id || x.id) === ev.meetingId);
+                                                                if (m) meetingName = m.meeting?.title || m.title;
+                                                            }
+                                                            return meetingName ? (
+                                                                <span className="text-midnight-indigo font-semibold" title={`ID: ${ev.meetingId}`}>{meetingName}</span>
+                                                            ) : (
+                                                                <span className="text-action-blue cursor-pointer hover:underline" title="ID cuộc họp">
+                                                                    {ev.meetingId.substring(0, 8)}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                     </td>
                                                 </tr>
                                             );
