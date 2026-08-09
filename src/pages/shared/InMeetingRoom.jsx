@@ -1,9 +1,9 @@
 import {
     AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-    Clock, Cpu, Download, ExternalLink, Eye, FileText, Hand, Loader, Mic, MicOff,
-    MonitorUp, PhoneOff, Play, Plus, RefreshCw, Shield, Smile,
-    Sparkles, StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
-    Volume2, VolumeX, X, Edit2
+    Clock, Cpu, Download, ExternalLink, Eye, FileText, Loader, Mic, MicOff,
+    MonitorUp, Play, Plus, RefreshCw, Shield, Smile,
+    StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
+    VolumeX, X, Edit2
 } from 'lucide-react';
 import { IoMic, IoMicOff, IoHandLeft, IoVolumeHigh, IoHappy, IoTime, IoCall, IoArrowBack } from 'react-icons/io5';
 import React, { useState, useEffect, useRef } from 'react';
@@ -55,6 +55,7 @@ import UserAvatar, { resolveAvatarUrl } from '../../components/common/UserAvatar
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
 import GuestPanel from '../../components/meeting/GuestPanel';
+import { startRecordingMarker, createLiveSpeakerTag } from '../../service/transcriptionServices';
 
 const customStyles = `
 @keyframes floatUp {
@@ -212,6 +213,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [recordingStatus, setRecordingStatus] = useState('inactive');
     const [recordingSessionId, setRecordingSessionId] = useState(null);
     const [recordingStartedAt, setRecordingStartedAt] = useState(null);
+    // GA-32: Live Speaker Tag states
+    const [liveTagSelected, setLiveTagSelected] = useState('');
+    const [liveTagSubmitting, setLiveTagSubmitting] = useState(false);
     const [mediaFiles, setMediaFiles] = useState([]);
     const [editingMediaId, setEditingMediaId] = useState(null);
     const [editingMediaTitle, setEditingMediaTitle] = useState('');
@@ -841,14 +845,25 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const handleStartRecording = async () => {
         if (!isHost) return;
+
+        const camera = roomDevices.find(d => d.device_type === 'ip_camera');
+        if (!camera) {
+            showToast('Phòng chưa có camera ghi hình được cấu hình', 'error');
+            return;
+        }
+
         setActionLoading(true);
         try {
-            const res = await callWithFallback(startEmployeeVideoRecording, startManagerVideoRecording, id, { deviceId: 'default' });
+            const res = await callWithFallback(startEmployeeVideoRecording, startManagerVideoRecording, id, { cameraDeviceId: camera.id });
             if (res?.success) {
                 setRecordingStatus('starting');
                 setRecordingSessionId(res.data?.sessionId || res.data?.id || `rec-${Date.now()}`);
                 setRecordingStartedAt(new Date());
                 showToast('Đang khởi động ghi hình...', 'info');
+                // GA-30: Đóng dấu mốc t=0 cho live speaker tag — không await để không chặn UI
+                startRecordingMarker(id).catch(err =>
+                    console.error('[LiveTag] Không ghi được mốc bắt đầu, live speaker tag sẽ không hoạt động:', err)
+                );
             } else {
                 showToast('Lỗi khi bắt đầu ghi hình', 'error');
             }
@@ -856,6 +871,31 @@ const InMeetingRoom = ({ isPublic = false }) => {
             showToast('Lỗi kết nối server camera', 'error');
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    // GA-32: Handler gắn thẻ người đang nói
+    const handleLiveSpeakerTag = async () => {
+        const p = (meetingState.participants || []).find(x => x.id === liveTagSelected);
+        if (!p) return;
+        setLiveTagSubmitting(true);
+        try {
+            const isExternal = p.isExternal === true;
+            const payload = {
+                ...(isExternal ? { externalParticipantId: p.id } : { speakerUserId: p.id }),
+                displayName: p.fullName,
+            };
+            const res = await createLiveSpeakerTag(id, payload);
+            if (res?.success) {
+                showToast(`Đã gắn: ${p.fullName}`, 'success');
+                setLiveTagSelected('');
+            } else {
+                showToast(res?.message || 'Gắn thẻ thất bại', 'error');
+            }
+        } catch (err) {
+            showToast(err?.error?.message || err?.message || 'Có lỗi khi gắn thẻ người nói', 'error');
+        } finally {
+            setLiveTagSubmitting(false);
         }
     };
 
@@ -1772,6 +1812,37 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                     {recordingStatus === 'paused' && (
                                                         <button onClick={handleResumeRecording} className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold">Tiếp tục</button>
                                                     )}
+                                                </div>
+                                            )}
+
+                                            {/* GA-32: Live Speaker Tag — chỉ hiện với Host khi đang ghi hình */}
+                                            {isHost && ['recording', 'paused'].includes(recordingStatus) && (
+                                                <div className="flex flex-col gap-2 border-t border-platinum-tint/60 pt-3 mt-1">
+                                                    <div className="text-[10px] font-bold text-slate-blue uppercase tracking-wider flex items-center gap-1">
+                                                        <Mic className="w-3 h-3 text-action-blue" />
+                                                        Người đang nói
+                                                    </div>
+                                                    <select
+                                                        value={liveTagSelected}
+                                                        onChange={(e) => setLiveTagSelected(e.target.value)}
+                                                        className="w-full text-xs font-semibold border border-platinum-tint focus:border-action-blue focus:ring-1 focus:ring-action-blue rounded-lg py-1.5 pl-2 pr-6 bg-white text-midnight-indigo"
+                                                    >
+                                                        <option value="">-- Chọn người đang nói --</option>
+                                                        {(meetingState.participants || []).filter(p => !p.isBot).map(p => (
+                                                            <option key={p.id} value={p.id}>{p.fullName}{p.isExternal ? ' (Khách)' : ''}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        onClick={handleLiveSpeakerTag}
+                                                        disabled={!liveTagSelected || liveTagSubmitting}
+                                                        className="w-full py-1.5 bg-action-blue text-white rounded-lg text-[10px] font-extrabold hover:bg-glacier-blue disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                                                    >
+                                                        {liveTagSubmitting ? (
+                                                            <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Đang gắn...</>
+                                                        ) : (
+                                                            <><UserCheck className="w-3 h-3" /> Gắn thẻ người nói</>
+                                                        )}
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>

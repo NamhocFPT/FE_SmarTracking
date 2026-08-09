@@ -483,3 +483,17 @@ Quy táº¯c báº¯t buá»™c: AI Agent pháº£i luÃ´n ghi log vÃ o cuá»‘i má»—i láº§n th
  -   * * I n M e e t i n g : * *   T h a y   t h ¿  t h °  v i Çn   \ d o c x - p r e v i e w \   b ±n g   M i c r o s o f t   O f f i c e   V i e w e r   i f r a m e   ( \ i s M s O f f i c e \ )   Ã  h i Ãn   t h Ë  c á c   f i l e   W o r d   ( \ . d o c \ ,   \ . d o c x \ )   v à   P o w e r P o i n t   n h ±m   g i £i   q u y ¿t   l ×i   v á  g i a o   d i Çn / h i Ãn   t h Ë  s a i   n Ùi   d u n g ,   m a n g   l ¡i   t r £i   n g h i Çm   x e m   t à i   l i Çu   n h ¥t   q u á n   v à   Õn   Ën h   h ¡n . 
   
  
+## [2026-08-09] Tách c?t Ngày và Gi?
+
+- **Thay d?i**: Tách c?t 'Th?i di?m' (ho?c 'Th?i gian') thành 2 c?t 'Ngày' và 'Gi?' trong các danh sách.
+- **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/pages/systemAdmin/GateAccessManagement.jsx, src/pages/systemAdmin/AuditLogs.jsx.
+- **Tr?ng thái**: Ðã commit và push (35c4f8d).
+
+## [2026-08-09] C?p nh?t Nh?t ký ra/vào phòng h?p (Room Access Logs)
+
+- **Thay d?i**: 
+  - C?p nh?t d?nh d?ng hi?n th? Ð? tin c?y (ki?m tra similarity, eliability, confidence). Nhân v?i 100 n?u giá tr? <= 1 d? luôn hi?n th? dúng % (ví d?:  .85 -> 85%).
+  - Ð?i tên c?t 'G?n cu?c h?p' thành 'Cu?c h?p'.
+  - Hi?n th? Tên cu?c h?p thay vì ID cu?c h?p n?u có th? l?y du?c d? li?u.
+- **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/components/meeting/MeetingPresenceIVSS.jsx.
+- **Tr?ng thái**: Ðã commit và push (d41a0fe).

@@ -1,352 +1,327 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
-import { Sparkles, Video, ShieldAlert, Cpu, Car, CheckCircle, Wifi } from 'lucide-react';
+/**
+ * DashboardBanner — SmarTracking Slide Banner
+ *
+ * Cấu hình slide:  src/components/common/banner/slideConfig.js
+ * Ảnh slide:       public/images/banner/
+ */
+import { useRef, useState, useEffect, useCallback } from 'react';
+import gsap from 'gsap';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import SLIDES from './banner/slideConfig';
+import websiteLogo from '../../assets/images/logo.png';
 
-const slideVariants = {
-    enter: (direction) => ({
-        x: direction > 0 ? '100%' : '-100%',
-        opacity: 0,
-        rotateY: direction > 0 ? 45 : -45,
-        scale: 0.8,
-        z: -200
-    }),
-    center: {
-        x: 0,
-        opacity: 1,
-        rotateY: 0,
-        scale: 1,
-        z: 0,
-        transition: {
-            type: 'spring',
-            stiffness: 250,
-            damping: 25,
-            mass: 0.5
-        }
-    },
-    exit: (direction) => ({
-        x: direction < 0 ? '100%' : '-100%',
-        opacity: 0,
-        rotateY: direction < 0 ? 45 : -45,
-        scale: 0.8,
-        z: -200,
-        transition: {
-            type: 'spring',
-            stiffness: 250,
-            damping: 25,
-            mass: 0.5
-        }
-    })
+// ── Fade transition hook ───────────────────────────────────────────────────────
+const useContentTransition = (slideIndex) => {
+    const [animating, setAnimating] = useState(false);
+    const prev = useRef(slideIndex);
+    useEffect(() => {
+        if (prev.current === slideIndex) return;
+        setAnimating(true);
+        const t = setTimeout(() => setAnimating(false), 400);
+        prev.current = slideIndex;
+        return () => clearTimeout(t);
+    }, [slideIndex]);
+    return animating;
 };
 
-const TiltCard = ({ children, className }) => {
-    const x = useMotionValue(0);
-    const y = useMotionValue(0);
-    const mouseXSpring = useSpring(x, { stiffness: 150, damping: 15 });
-    const mouseYSpring = useSpring(y, { stiffness: 150, damping: 15 });
-    const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ['15deg', '-15deg']);
-    const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ['-15deg', '15deg']);
-
-    const handleMouseMove = (e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const width = rect.width;
-        const height = rect.height;
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const xPct = mouseX / width - 0.5;
-        const yPct = mouseY / height - 0.5;
-        x.set(xPct);
-        y.set(yPct);
-    };
-
-    const handleMouseLeave = () => {
-        x.set(0);
-        y.set(0);
-    };
-
-    return (
-        <motion.div
-            style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            className={`relative ${className}`}
+// ── Navigation pill — dùng chung cho TẤT CẢ slide ────────────────────────────
+const BottomNav = ({ slideIndex, paused, accent, goTo }) => (
+    <div className="absolute bottom-4 left-0 right-0 flex justify-center" style={{ zIndex: 10 }}>
+        <div
+            className="flex items-center gap-2.5 px-4 py-2 rounded-full"
+            style={{
+                background: 'rgba(0,0,0,0.32)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.13)',
+            }}
         >
-            <div style={{ transform: "translateZ(30px)" }} className="w-full h-full">
-                {children}
-            </div>
-        </motion.div>
-    );
-};
+            <button
+                onClick={() => goTo(slideIndex - 1)}
+                className="w-6 h-6 rounded-full flex items-center justify-center border border-white/20 bg-white/10 hover:bg-white/22 transition-colors"
+            >
+                <ChevronLeft className="w-3.5 h-3.5 text-white" />
+            </button>
 
-const DashboardBanner = ({ roleName = 'bạn' }) => {
-    const [[page, direction], setPage] = useState([0, 0]);
-    const [isHovered, setIsHovered] = useState(false);
-    const [userName, setUserName] = useState('');
-
-    // Lấy tên thật của user đang đăng nhập (đã lưu ở localStorage lúc login) thay vì chỉ hiện tên role chung chung
-    useEffect(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem('user') || 'null');
-            if (stored?.fullName) setUserName(stored.fullName);
-        } catch {
-            // silent — fallback dùng roleName bên dưới
-        }
-    }, []);
-
-    const slides = [
-        {
-            tag: 'AI Security Monitoring',
-            title: 'Giám Sát An Ninh Camera AI 24/7',
-            description: 'Camera AI giám sát toàn bộ khuôn viên theo thời gian thực, tự động nhận diện khuôn mặt và phát hiện xâm nhập bất thường để cảnh báo tức thời cho đội an ninh.',
-            badgeColor: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40',
-            gradient: 'from-midnight-indigo via-[#152a55] to-emerald-950',
-            icon: <Video className="w-5 h-5 text-emerald-400 drop-shadow-md" />,
-            interactiveElement: (
-                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex items-center justify-center cursor-pointer">
-                    <div className="grid grid-cols-4 gap-2.5 p-4 w-full h-full relative">
-                        {Array.from({ length: 8 }).map((_, i) => {
-                            const active = [1, 3, 4, 6].includes(i);
-                            return (
-                                <motion.div
-                                    key={i}
-                                    className={`relative rounded-xl flex items-center justify-center border transition-all ${
-                                        active 
-                                            ? 'bg-emerald-500/30 border-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                                            : 'bg-white/5 border-white/10'
-                                    }`}
-                                    whileHover={{ scale: 1.15, z: 20 }}
-                                    style={{ transform: "translateZ(10px)" }}
-                                >
-                                    {active ? (
-                                        <span className="relative flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-[0_0_8px_#10b981]"></span>
-                                        </span>
-                                    ) : (
-                                        <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                                    )}
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                    {/* Overlay Scanning Animation */}
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse shadow-[0_0_10px_#34d399] blur-[1px]" style={{ transform: "translateZ(20px)" }} />
-                </TiltCard>
-            )
-        },
-        {
-            tag: 'Vehicle Access Control',
-            title: 'Kiểm Soát Ra Vào Bằng Nhận Diện Biển Số (ANPR)',
-            description: 'Camera ANPR tự động đọc biển số xe ra/vào cổng, đối chiếu danh sách kiểm soát và tự động mở barrier — không cần bảo vệ kiểm tra thủ công từng lượt xe.',
-            badgeColor: 'bg-royal-amethyst/25 text-purple-200 border-royal-amethyst/40',
-            gradient: 'from-[#1c1440] via-[#2a1a52] to-purple-950',
-            icon: <Car className="w-5 h-5 text-purple-300 drop-shadow-md" />,
-            interactiveElement: (
-                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center gap-4 p-4 cursor-pointer select-none">
-                    {/* Gate barrier */}
-                    <div className="relative w-full h-8 flex items-center justify-start" style={{ transform: "translateZ(15px)" }}>
-                        <div className="absolute left-1 w-2 h-9 bg-white/20 rounded-sm" />
-                        <motion.div
-                            className="absolute left-2 w-24 h-1.5 rounded-full origin-left bg-gradient-to-r from-red-400 via-white to-white shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-                            animate={{ rotate: [0, 0, -65, -65, 0] }}
-                            transition={{ duration: 5, repeat: Infinity, times: [0, 0.15, 0.35, 0.75, 1], ease: 'easeInOut' }}
-                        />
-                        <motion.div
-                            className="absolute left-16 w-5 h-3 rounded-sm bg-white/70"
-                            animate={{ x: [0, 90, 90, 0], opacity: [1, 1, 0, 0] }}
-                            transition={{ duration: 5, repeat: Infinity, times: [0, 0.3, 0.5, 1], ease: 'easeInOut' }}
-                        />
-                    </div>
-                    {/* Plate recognition reveal */}
-                    <motion.div
-                        className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-lg"
-                        style={{ transform: "translateZ(25px)" }}
-                        animate={{ opacity: [0, 0, 1, 1, 0], y: [8, 8, 0, 0, 8] }}
-                        transition={{ duration: 5, repeat: Infinity, times: [0, 0.35, 0.5, 0.85, 1] }}
-                    >
-                        <span className="text-sm font-black text-blue-950 tracking-wider font-mono">30A-123.45</span>
-                        <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    </motion.div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-purple-200/80">Đã nhận diện — Cho phép qua</span>
-                </TiltCard>
-            )
-        },
-        {
-            tag: 'Automated Optimization',
-            title: 'Giải Phóng Phòng Trực Quan (No-Show)',
-            description: 'Tối ưu hóa tài nguyên phòng họp. Nếu không phát hiện hiện diện sau 10 phút so với lịch trình, hệ thống sẽ tự động hủy lịch giữ phòng và gửi thông báo giải phóng không gian.',
-            badgeColor: 'bg-sunset-gold/25 text-amber-300 border-sunset-gold/40',
-            gradient: 'from-[#1a1c3d] via-[#232042] to-amber-950',
-            icon: <ShieldAlert className="w-5 h-5 text-amber-400 drop-shadow-md" />,
-            interactiveElement: (
-                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex flex-col items-center justify-center p-4 cursor-pointer select-none">
-                    <motion.div 
-                        className="text-center space-y-2 w-full"
-                        style={{ transform: "translateZ(20px)" }}
-                    >
-                        <span className="text-[11px] uppercase font-bold tracking-wider text-amber-300/90 block">Trạng thái giải phóng</span>
-                        <div className="flex items-center justify-center gap-2 bg-black/40 px-4 py-2.5 rounded-xl border border-white/10 shadow-inner">
-                            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
-                            <span className="font-mono text-base text-white font-bold tracking-wider">09:59s</span>
-                        </div>
-                    </motion.div>
-                    {/* Progress Bar Animation */}
-                    <div className="absolute bottom-0 left-0 w-full bg-white/10 h-1.5" style={{ transform: "translateZ(5px)" }}>
-                        <motion.div 
-                            className="bg-amber-500 h-full shadow-[0_0_10px_#f59e0b]" 
-                            animate={{ width: ['0%', '100%'] }} 
-                            transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
-                        />
-                    </div>
-                </TiltCard>
-            )
-        },
-        {
-            tag: 'IoT Device Health',
-            title: 'Giám Sát Thiết Bị IoT Toàn Khuôn Viên',
-            description: 'Theo dõi tình trạng hoạt động của toàn bộ camera, cảm biến và thiết bị IoT theo thời gian thực trên một sơ đồ mạng lưới duy nhất — phát hiện mất kết nối ngay lập tức.',
-            badgeColor: 'bg-sky-500/25 text-sky-300 border-sky-500/40',
-            gradient: 'from-[#0b172a] via-[#10203a] to-blue-950',
-            icon: <Cpu className="w-5 h-5 text-sky-400 drop-shadow-md" />,
-            interactiveElement: (
-                <TiltCard className="w-56 h-40 border border-white/20 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl shadow-2xl flex items-center justify-center cursor-pointer">
-                    <div className="relative w-full h-full" style={{ transform: "translateZ(20px)" }}>
-                        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 224 160">
-                            <line x1="112" y1="80" x2="40" y2="24" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
-                            <line x1="112" y1="80" x2="184" y2="24" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
-                            <line x1="112" y1="80" x2="34" y2="132" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
-                            <line x1="112" y1="80" x2="188" y2="128" stroke="rgba(125,211,252,0.35)" strokeWidth="1.5" />
-                        </svg>
-
-                        {/* Center hub */}
-                        <div
-                            className="absolute w-11 h-11 rounded-full bg-sky-500/30 border border-sky-400/60 flex items-center justify-center shadow-[0_0_20px_rgba(56,189,248,0.5)]"
-                            style={{ top: 80, left: 112, transform: 'translate(-50%, -50%)' }}
-                        >
-                            <Wifi className="w-5 h-5 text-sky-200" />
-                        </div>
-
-                        {/* Orbiting devices */}
-                        {[
-                            { top: 24, left: 40, status: 'online' },
-                            { top: 24, left: 184, status: 'online' },
-                            { top: 132, left: 34, status: 'offline' },
-                            { top: 128, left: 188, status: 'online' },
-                        ].map((d, i) => (
-                            <div
-                                key={i}
-                                className="absolute w-6 h-6 rounded-lg bg-black/30 border border-white/10 flex items-center justify-center"
-                                style={{ top: d.top, left: d.left, transform: 'translate(-50%, -50%)' }}
-                            >
-                                {d.status === 'online' ? (
-                                    <span className="relative flex h-2.5 w-2.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                                    </span>
-                                ) : (
-                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </TiltCard>
-            )
-        }
-    ];
-
-    const currentSlide = Math.abs(page % slides.length);
-    const activeSlide = slides[currentSlide];
-
-    const paginate = (newDirection) => {
-        setPage([page + newDirection, newDirection]);
-    };
-
-    // Auto-advance
-    useEffect(() => {
-        if (isHovered) return;
-        const interval = setInterval(() => {
-            paginate(1);
-        }, 7000);
-        return () => clearInterval(interval);
-    }, [isHovered, page]);
-
-    return (
-        <div 
-            className="relative overflow-hidden rounded-2xl shadow-2xl border border-white/10 transition-all duration-700"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            style={{ perspective: 1200 }}
-        >
-            {/* Dynamic Background Gradient */}
-            <div className={`absolute inset-0 bg-gradient-to-r ${activeSlide.gradient} transition-all duration-1000 ease-in-out`} />
-            
-            {/* Ambient glowing circles with 3D feel */}
-            <div className="absolute -top-12 -left-12 w-64 h-64 rounded-full bg-action-blue/20 blur-3xl mix-blend-screen" style={{ transform: "translateZ(-100px)" }} />
-            <div className="absolute -bottom-12 -right-12 w-72 h-72 rounded-full bg-royal-amethyst/20 blur-3xl mix-blend-screen" style={{ transform: "translateZ(-50px)" }} />
-
-            <div className="relative z-10 p-6 md:p-10 text-white h-[300px] flex items-center overflow-hidden">
-                <AnimatePresence initial={false} custom={direction} mode="popLayout">
-                    <motion.div
-                        key={page}
-                        custom={direction}
-                        variants={slideVariants}
-                        initial="enter"
-                        animate="center"
-                        exit="exit"
-                        className="!w-full flex flex-col md:flex-row items-center justify-between gap-10"
-                        style={{ transformStyle: "preserve-3d" }}
-                    >
-                        {/* Left Side: Copy/Content */}
-                        <div className="flex-1 space-y-4 max-w-2xl text-center md:text-left" style={{ transform: "translateZ(30px)" }}>
-                            <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <Sparkles className="w-5 h-5 animate-pulse text-amber-300 drop-shadow-md flex-shrink-0" />
-                                    <span className="text-xl md:text-2xl font-extrabold text-white drop-shadow-sm truncate">
-                                        Xin chào, {userName || roleName}!
-                                    </span>
-                                </div>
-
-                                <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold border ${activeSlide.badgeColor} uppercase tracking-wider shadow-lg backdrop-blur-md flex-shrink-0`}>
-                                    {activeSlide.icon}
-                                    {activeSlide.tag}
-                                </span>
-                            </div>
-
-                            <div className="space-y-3">
-                                <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-50 to-white/70 drop-shadow-sm line-clamp-2">
-                                    {activeSlide.title}
-                                </h2>
-                                <p className="text-white/85 text-sm md:text-base leading-relaxed font-medium max-w-xl line-clamp-2">
-                                    {activeSlide.description}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Right Side: Interactive Hover Demo Element */}
-                        <div className="flex-shrink-0 relative group select-none hidden md:block">
-                            {activeSlide.interactiveElement}
-                        </div>
-                    </motion.div>
-                </AnimatePresence>
-            </div>
-
-            {/* Bottom Controls / Indicators */}
-            <div className="absolute bottom-5 left-6 md:left-10 z-20 flex items-center gap-2.5">
-                {slides.map((_, index) => (
+            <div className="flex items-center gap-1.5">
+                {SLIDES.map((_, i) => (
                     <button
-                        key={index}
-                        onClick={() => {
-                            const newDirection = index > currentSlide ? 1 : -1;
-                            setPage([page + (index - currentSlide), newDirection]);
+                        key={i}
+                        onClick={() => goTo(i)}
+                        aria-label={`Slide ${i + 1}`}
+                        style={{
+                            height: 6,
+                            width: i === slideIndex ? 26 : 7,
+                            borderRadius: 99,
+                            background: i === slideIndex ? '#fff' : 'rgba(255,255,255,0.30)',
+                            boxShadow: i === slideIndex ? '0 0 7px rgba(255,255,255,0.85)' : 'none',
+                            transition: 'all 0.42s cubic-bezier(0.34,1.56,0.64,1)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
                         }}
-                        className={`h-1.5 rounded-full transition-all duration-500 ease-out shadow-sm ${
-                            currentSlide === index 
-                                ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' 
-                                : 'w-2 bg-white/30 hover:bg-white/60'
-                        }`}
-                        aria-label={`Go to slide ${index + 1}`}
                     />
                 ))}
             </div>
+
+            <button
+                onClick={() => goTo(slideIndex + 1)}
+                className="w-6 h-6 rounded-full flex items-center justify-center border border-white/20 bg-white/10 hover:bg-white/22 transition-colors"
+            >
+                <ChevronRight className="w-3.5 h-3.5 text-white" />
+            </button>
+
+            {/* Progress bar */}
+            <div className="w-20 h-0.5 bg-white/15 rounded-full overflow-hidden">
+                <div
+                    key={`prog-${slideIndex}-${paused}`}
+                    className="h-full rounded-full"
+                    style={{
+                        background: accent,
+                        opacity: 0.85,
+                        animation: paused ? 'none' : 'banner-progress 7s linear forwards',
+                    }}
+                />
+            </div>
+        </div>
+    </div>
+);
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+const DashboardBanner = ({ roleName = 'bạn' }) => {
+    const [slideIndex, setSlideIndex] = useState(0);
+    const [paused, setPaused]         = useState(false);
+    const [userName, setUserName]     = useState('');
+    const [mx, setMx]                 = useState(0);
+    const [my, setMy]                 = useState(0);
+    const animating = useContentTransition(slideIndex);
+    const bgRef     = useRef();
+    const wrapRef   = useRef();
+
+    useEffect(() => {
+        try {
+            const s = JSON.parse(localStorage.getItem('user') || 'null');
+            if (s?.fullName) setUserName(s.fullName);
+        } catch { /* silent */ }
+    }, []);
+
+    // GSAP: gradient background khi đổi slide
+    useEffect(() => {
+        const sl = SLIDES[slideIndex];
+        if (!bgRef.current) return;
+        gsap.to(bgRef.current, {
+            background: `linear-gradient(135deg, ${sl.bgFrom} 0%, ${sl.bgTo} 100%)`,
+            duration: 0.9, ease: 'power2.inOut',
+        });
+    }, [slideIndex]);
+
+    // Auto-advance 7s
+    useEffect(() => {
+        if (paused) return;
+        const id = setInterval(() => setSlideIndex(i => (i + 1) % SLIDES.length), 7000);
+        return () => clearInterval(id);
+    }, [paused]);
+
+    // Mouse parallax
+    const handleMouseMove = useCallback((e) => {
+        const rect = wrapRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setMx((e.clientX - rect.left) / rect.width - 0.5);
+        setMy((e.clientY - rect.top)  / rect.height - 0.5);
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
+        setPaused(false);
+        setMx(0);
+        setMy(0);
+    }, []);
+
+    const goTo = useCallback((idx) => {
+        setSlideIndex(((idx % SLIDES.length) + SLIDES.length) % SLIDES.length);
+    }, []);
+
+    const slide   = SLIDES[slideIndex];
+    const Icon    = slide.Icon;
+    const visible = !animating;
+
+    return (
+        <div
+            ref={wrapRef}
+            className="relative overflow-hidden rounded-2xl border border-white/10 shadow-2xl select-none"
+            style={{ height: 320 }}
+            onMouseEnter={() => setPaused(true)}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+        >
+            {/* Background gradient */}
+            <div
+                ref={bgRef}
+                className="absolute inset-0"
+                style={{ borderRadius: 'inherit', background: `linear-gradient(135deg, ${slide.bgFrom} 0%, ${slide.bgTo} 100%)` }}
+            />
+
+            {/* ══ fullImage: ảnh phủ full banner ═══════════════════════════ */}
+            {slide.fullImage && (
+                <div
+                    key={`fi-${slideIndex}`}
+                    className="absolute inset-0"
+                    style={{ zIndex: 1, opacity: visible ? 1 : 0, transition: 'opacity 0.45s ease' }}
+                >
+                    <img
+                        src={slide.image}
+                        alt="SmarTracking"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+                    />
+                </div>
+            )}
+
+            {/* ══ Slide thường: ảnh phải + text trái ════════════════════════ */}
+            {!slide.fullImage && (
+                <>
+                    {/* Ảnh bên phải — bounded, không tràn */}
+                    <div
+                        className="absolute top-0 right-0 bottom-0 pointer-events-none"
+                        style={{ zIndex: 1, width: '52%', overflow: 'hidden' }}
+                    >
+                        {/* float wrapper */}
+                        <div
+                            key={`img-${slideIndex}`}
+                            style={{
+                                position: 'absolute',
+                                top: '50%',
+                                right: '-2%',
+                                transform: 'translateY(-50%)',
+                                animation: 'banner-float 6s ease-in-out infinite',
+                                opacity: visible ? 1 : 0,
+                                transition: 'opacity 0.42s ease',
+                            }}
+                        >
+                            {/* parallax wrapper */}
+                            <div style={{ transform: `translate(${-mx * 20}px, ${-my * 12}px)`, transition: 'transform 0.14s ease-out' }}>
+                                <img
+                                    src={slide.image}
+                                    alt=""
+                                    style={{
+                                        display: 'block',
+                                        height: 270,
+                                        width: 'auto',
+                                        maxWidth: 460,
+                                        objectFit: 'contain',
+                                        mixBlendMode: slide.blendMode || 'normal',
+                                        filter: `drop-shadow(0 0 26px ${slide.accent}65) drop-shadow(0 0 65px ${slide.accent}20)`,
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* glow blob */}
+                        <div style={{
+                            position: 'absolute', right: '8%', bottom: '-35%',
+                            width: 240, height: 240, borderRadius: '50%',
+                            background: slide.accent, opacity: 0.10,
+                            filter: 'blur(50px)', transition: 'background 0.9s ease',
+                        }} />
+                    </div>
+
+                    {/* Text panel trái — CHỈ text, không có controls */}
+                    <div
+                        className="absolute left-0 top-0 bottom-0 flex flex-col justify-center py-7 pl-8 pr-4"
+                        style={{ zIndex: 2, width: '52%', pointerEvents: 'none' }}
+                    >
+                        <div
+                            className="space-y-3"
+                            style={{
+                                opacity: visible ? 1 : 0,
+                                transform: visible ? 'translateY(0)' : 'translateY(10px)',
+                                transition: 'opacity 0.42s ease, transform 0.42s ease',
+                            }}
+                        >
+                            {/* Greeting row: logo + tên */}
+                            <div className="flex items-center gap-2.5">
+                                <img
+                                    src={websiteLogo}
+                                    alt="SmarTracking"
+                                    style={{
+                                        height: 28,
+                                        width: 'auto',
+                                        objectFit: 'contain',
+                                        filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.45))',
+                                        flexShrink: 0,
+                                    }}
+                                />
+                                <span
+                                    className="text-white font-bold leading-tight"
+                                    style={{ fontSize: '1.15rem', textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}
+                                >
+                                    Xin chào,&nbsp;
+                                    <span style={{ color: slide.accent, filter: `drop-shadow(0 0 8px ${slide.accent})` }}>
+                                        {userName || roleName}
+                                    </span>!
+                                </span>
+                            </div>
+
+                            {/* Badge tag */}
+                            <span
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold border uppercase tracking-widest backdrop-blur-md ${slide.badgeClass}`}
+                                style={{ pointerEvents: 'auto' }}
+                            >
+                                {Icon && <Icon className="w-3.5 h-3.5 flex-shrink-0" />}
+                                {slide.tag}
+                            </span>
+
+                            {/* Title */}
+                            <h2
+                                className="text-white font-extrabold leading-tight tracking-tight"
+                                style={{
+                                    fontSize: '1.5rem',
+                                    textShadow: `0 0 32px ${slide.accent}80, 0 2px 16px rgba(0,0,0,0.7)`,
+                                }}
+                            >
+                                {slide.title}
+                            </h2>
+
+                            {/* Description */}
+                            <p className="text-white/75 leading-relaxed line-clamp-2 max-w-xs" style={{ fontSize: '0.82rem' }}>
+                                {slide.description}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Vignette trái */}
+                    <div
+                        className="absolute inset-y-0 left-0 pointer-events-none"
+                        style={{
+                            zIndex: 3, width: '56%',
+                            background: 'linear-gradient(to right, rgba(0,0,0,0.44) 0%, rgba(0,0,0,0.06) 75%, transparent 100%)',
+                        }}
+                    />
+                </>
+            )}
+
+            {/* ══ Gradient đáy + BottomNav — CHUNG cho mọi slide ════════════ */}
+            <div
+                className="absolute inset-x-0 bottom-0 pointer-events-none"
+                style={{ zIndex: 8, height: 70, background: 'linear-gradient(to top, rgba(0,0,0,0.50) 0%, transparent 100%)' }}
+            />
+            <BottomNav slideIndex={slideIndex} paused={paused} accent={slide.accent} goTo={goTo} />
+
+            {/* Ambient glow */}
+            <div className="absolute pointer-events-none" style={{
+                top: -50, left: -50, width: 200, height: 200,
+                borderRadius: '50%', opacity: 0.08,
+                background: slide.accent, filter: 'blur(55px)',
+                zIndex: 0, transition: 'background 0.9s ease',
+            }} />
+
+            <style>{`
+                @keyframes banner-float {
+                    0%, 100% { transform: translateY(-50%); }
+                    50%       { transform: translateY(calc(-50% - 10px)); }
+                }
+                @keyframes banner-progress {
+                    from { width: 0%; }
+                    to   { width: 100%; }
+                }
+            `}</style>
         </div>
     );
 };

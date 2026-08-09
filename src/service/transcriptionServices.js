@@ -83,12 +83,22 @@ export const updateTranscriptStatus = async (transcriptId, status, note) => {
 };
 
 /**
- * B1: Đóng dấu mốc bắt đầu ghi âm
+ * B1: Đóng dấu mốc bắt đầu ghi âm (t=0 cho live speaker tag - GA-30)
  * @param {string} meetingId
  * @param {string} note (tuỳ chọn)
  */
 export const startRecordingMarker = async (meetingId, note) => {
     return await post(`/meetings/${meetingId}/recording/start-marker`, { note });
+};
+
+/**
+ * GA-32: Gán "người này đang nói ngay bây giờ" trong lúc họp trực tiếp
+ * Gọi mỗi lần host xác nhận người đang nói - chỉ gán đúng 1 trong 2 field speakerUserId / externalParticipantId
+ * @param {string} meetingId
+ * @param {{ speakerUserId?: string, externalParticipantId?: string, displayName: string }} payload
+ */
+export const createLiveSpeakerTag = async (meetingId, payload) => {
+    return await post(`/meetings/${meetingId}/recording/live-speaker-tag`, payload);
 };
 
 /**

@@ -19,27 +19,30 @@ import {
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getBusinessAdminSummary } from '../../service/campusService';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── Design tokens (DESIGN.md — Sky Blueprint / Light Theme) ─────────────────
 
 const D = {
-    pageBg:   '#06101e',
-    cardBg:   'linear-gradient(145deg, #0b1829 0%, #0e2040 100%)',
-    cardBg2:  'linear-gradient(145deg, #071220 0%, #0c1a32 100%)',
-    border:   '#182d4a',
-    text:     '#f0f6ff',
-    muted:    '#5c82a8',
-    muted2:   '#3a5c82',
-    cyan:     '#00c8e8',
-    blue:     '#0075ff',
-    purple:   '#7b2fff',
+    pageBg:   '#F8F9FB',                // Cloud Mist
+    cardBg:   '#ffffff',                // Snow White
+    cardBg2:  '#F8F9FB',                // Cloud Mist
+    border:   '#D4E0ED',                // Platinum Tint
+    borderSub:'#E7EDF6',                // Pale Gray
+    text:     '#0B3558',                // Midnight Indigo
+    muted:    '#476788',                // Slate Blue
+    muted2:   '#A6BBD1',                // Steel Gray
+    cyan:     '#0099ff',                // Skybound Blue
+    blue:     '#006BFF',                // Action Blue
+    purple:   '#8247f5',                // Royal Amethyst
     green:    '#10b981',
-    amber:    '#f59e0b',
+    amber:    '#ffa600',                // Sunset Gold
     red:      '#ef4444',
-    grid:     '#12253a',
-    axisText: '#4a7096',
+    grid:     '#E7EDF6',                // Pale Gray
+    axisText: '#476788',                // Slate Blue
+    shadow:   'rgba(71,103,136,0.04) 0px 4px 5px 0px, rgba(71,103,136,0.03) 0px 8px 15px 0px, rgba(71,103,136,0.08) 0px 30px 50px 0px',
+    shadowSm: 'rgba(71,103,136,0.04) 0px 4px 5px 0px, rgba(71,103,136,0.03) 0px 4px 10px 0px, rgba(71,103,136,0.05) 0px 10px 20px 0px',
 };
 
-// ─── Google Charts dark theme base options ────────────────────────────────────
+// ─── Google Charts light theme base options ───────────────────────────────────
 
 const GC_BASE = {
     backgroundColor: 'transparent',
@@ -57,7 +60,7 @@ const GC_BASE = {
         minValue: 0,
     },
     tooltip: {
-        textStyle: { color: '#0b1829', fontSize: 12 },
+        textStyle: { color: D.text, fontSize: 12 },
         showColorCode: true,
     },
     legend: {
@@ -70,8 +73,8 @@ const GC_BASE = {
 const SEVERITY_COLORS = {
     critical: '#ef4444',
     high:     '#f97316',
-    medium:   '#f59e0b',
-    low:      '#0075ff',
+    medium:   '#ffa600',
+    low:      '#006BFF',
 };
 
 const SEVERITY_LABEL = {
@@ -83,7 +86,7 @@ const SEVERITY_LABEL = {
 
 const ALERT_TYPE_KEYS   = ['intrusion', 'stranger', 'crowd', 'vehicle_control_match'];
 const ALERT_TYPE_LABELS = ['Xâm nhập', 'Khuôn mặt lạ', 'Tụ tập', 'Xe kiểm soát'];
-const ALERT_TYPE_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#0075ff'];
+const ALERT_TYPE_COLORS = ['#ef4444', '#f97316', '#ffa600', '#006BFF'];
 
 const DEVICE_TYPE_LABEL = {
     ip_camera:        'Camera AI',
@@ -100,13 +103,13 @@ const DEVICE_TYPE_LABEL = {
 const DEVICE_STATUS_CONFIG = [
     { key: 'online',      label: 'Online',   color: '#10b981' },
     { key: 'offline',     label: 'Offline',  color: '#ef4444' },
-    { key: 'disabled',    label: 'Vô hiệu',  color: '#3a5c82' },
-    { key: 'maintenance', label: 'Bảo trì',  color: '#f59e0b' },
+    { key: 'disabled',    label: 'Vô hiệu',  color: '#A6BBD1' },
+    { key: 'maintenance', label: 'Bảo trì',  color: '#ffa600' },
 ];
 
 const CHART_COLORS = [
-    '#00c8e8', '#0075ff', '#7b2fff', '#10b981', '#f59e0b',
-    '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899', '#14b8a6',
+    '#0099ff', '#006BFF', '#8247f5', '#10b981', '#ffa600',
+    '#ef4444', '#BB32D5', '#e55cff', '#EC4899', '#14b8a6',
 ];
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -168,11 +171,12 @@ const BarTooltip = ({ active, payload, label, unit = '' }) => {
     if (!active || !payload?.length) return null;
     return (
         <div style={{
-            background: '#0a1828', border: `1px solid ${D.border}`,
+            background: '#ffffff',
+            border: `1px solid ${D.border}`,
             borderRadius: 12, padding: '10px 14px', minWidth: 130, pointerEvents: 'none',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            boxShadow: D.shadowSm,
         }}>
-            {label && <p style={{ fontSize: 11, fontWeight: 700, color: '#c0d8f0', marginBottom: 6 }}>{label}</p>}
+            {label && <p style={{ fontSize: 11, fontWeight: 700, color: D.text, marginBottom: 6 }}>{label}</p>}
             {payload.map((p, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color || p.fill, flexShrink: 0 }} />
@@ -189,9 +193,10 @@ const DonutTooltip = ({ active, payload }) => {
     const d = payload[0];
     return (
         <div style={{
-            background: '#0a1828', border: `1px solid ${D.border}`,
+            background: '#ffffff',
+            border: `1px solid ${D.border}`,
             borderRadius: 12, padding: '10px 14px', pointerEvents: 'none',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            boxShadow: D.shadowSm,
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.payload?.color || d.fill, flexShrink: 0 }} />
@@ -214,7 +219,7 @@ const ActiveSlice = (props) => {
             startAngle={startAngle}
             endAngle={endAngle}
             fill={fill}
-            style={{ filter: `drop-shadow(0 0 10px ${fill}99)` }}
+            style={{ filter: `drop-shadow(0 0 8px ${fill}80)` }}
         />
     );
 };
@@ -222,16 +227,15 @@ const ActiveSlice = (props) => {
 const EmptyState = ({ message = 'Không có dữ liệu' }) => (
     <div className="h-full flex flex-col items-center justify-center gap-2 py-6"
          style={{ color: D.muted2 }}>
-        <ShieldAlert className="w-8 h-8 opacity-20" />
+        <ShieldAlert className="w-8 h-8 opacity-30" />
         <p className="text-xs">{message}</p>
     </div>
 );
 
 const PulseSkeleton = ({ height = 220 }) => (
-    <div className="animate-pulse rounded-xl" style={{ background: '#0c1e35', minHeight: height }} />
+    <div className="animate-pulse rounded-xl" style={{ background: D.borderSub, minHeight: height }} />
 );
 
-// Custom donut legend rendered below chart — avoids Recharts legend overlap bug
 const DonutLegend = ({ data }) => (
     <div style={{
         display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 14px',
@@ -240,7 +244,7 @@ const DonutLegend = ({ data }) => (
         {data.map(d => (
             <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#8fb8d8' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: D.text }}>
                     {d.name}&nbsp;
                     <span style={{ fontWeight: 400, color: D.muted }}>({d.value})</span>
                 </span>
@@ -259,25 +263,27 @@ const ChartCard = ({ title, sub, delay = 0, renderChart, accent = D.cyan }) => {
             style={{
                 background: D.cardBg,
                 border: `1px solid ${D.border}`,
-                borderRadius: 20,
+                borderRadius: 16,
                 padding: '20px 20px 16px',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
+                boxShadow: D.shadow,
                 position: 'relative',
                 overflow: 'hidden',
                 transitionDelay: inView ? `${delay}ms` : '0ms',
             }}
             className={`transition-all duration-700 ease-out ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
         >
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+            {/* Top accent stripe */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3,
                 background: `linear-gradient(90deg, ${accent} 0%, ${accent}44 50%, transparent 100%)` }} />
+            {/* Ambient glow */}
             <div style={{ position: 'absolute', top: -60, left: -30, width: 160, height: 160,
-                borderRadius: '50%', opacity: 0.05, background: accent,
+                borderRadius: '50%', opacity: 0.04, background: accent,
                 filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ marginBottom: 14, flexShrink: 0, position: 'relative' }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, color: D.text, letterSpacing: '-0.1px' }}>{title}</h3>
-                {sub && <p style={{ fontSize: 11, color: D.muted, marginTop: 2 }}>{sub}</p>}
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, letterSpacing: '-0.1px' }}>{title}</h3>
+                {sub && <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>{sub}</p>}
             </div>
             <div style={{ flex: 1 }}>
                 {renderChart(inView)}
@@ -286,7 +292,6 @@ const ChartCard = ({ title, sub, delay = 0, renderChart, accent = D.cyan }) => {
     );
 };
 
-// Card wrapper for react-google-charts — renders chart only when in viewport
 const GChartCard = ({ title, sub, delay = 0, accent = D.cyan, loading, empty, emptyMsg, children }) => {
     const [ref, inView] = useInView(0.1);
     return (
@@ -295,25 +300,25 @@ const GChartCard = ({ title, sub, delay = 0, accent = D.cyan, loading, empty, em
             style={{
                 background: D.cardBg,
                 border: `1px solid ${D.border}`,
-                borderRadius: 20,
+                borderRadius: 16,
                 padding: '20px 20px 16px',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
+                boxShadow: D.shadow,
                 position: 'relative',
                 overflow: 'hidden',
                 transitionDelay: inView ? `${delay}ms` : '0ms',
             }}
             className={`transition-all duration-700 ease-out ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
         >
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3,
                 background: `linear-gradient(90deg, ${accent} 0%, ${accent}44 50%, transparent 100%)` }} />
             <div style={{ position: 'absolute', top: -60, left: -30, width: 160, height: 160,
-                borderRadius: '50%', opacity: 0.05, background: accent,
+                borderRadius: '50%', opacity: 0.04, background: accent,
                 filter: 'blur(40px)', pointerEvents: 'none' }} />
             <div style={{ marginBottom: 14, flexShrink: 0, position: 'relative' }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, color: D.text }}>{title}</h3>
-                {sub && <p style={{ fontSize: 11, color: D.muted, marginTop: 2 }}>{sub}</p>}
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>{title}</h3>
+                {sub && <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>{sub}</p>}
             </div>
             <div style={{ flex: 1, minHeight: 220 }}>
                 {!inView || loading ? (
@@ -338,13 +343,13 @@ const KpiTile = ({ icon: Icon, label, value, sub, subColor, iconColor = D.cyan, 
         <div
             ref={ref}
             style={{
-                background: D.cardBg2,
+                background: D.cardBg,
                 border: `1px solid ${D.border}`,
-                borderRadius: 18,
+                borderRadius: 16,
                 padding: '16px 16px 14px',
                 position: 'relative',
                 overflow: 'hidden',
-                boxShadow: '0 4px 28px rgba(0,0,0,0.35)',
+                boxShadow: D.shadowSm,
                 transitionDelay: inView ? `${delay}ms` : '0ms',
             }}
             className={`transition-all duration-600 ease-out cursor-default hover:scale-[1.025]
@@ -352,16 +357,16 @@ const KpiTile = ({ icon: Icon, label, value, sub, subColor, iconColor = D.cyan, 
         >
             <div style={{
                 position: 'absolute', top: -24, right: -24, width: 90, height: 90,
-                borderRadius: '50%', opacity: 0.13,
+                borderRadius: '50%', opacity: 0.07,
                 background: iconColor, filter: 'blur(24px)', pointerEvents: 'none',
             }} />
 
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-                <p style={{ fontSize: 11, fontWeight: 500, color: D.muted, lineHeight: 1.45, paddingRight: 8 }}>{label}</p>
+                <p style={{ fontSize: 11, fontWeight: 600, color: D.muted, lineHeight: 1.45, paddingRight: 8 }}>{label}</p>
                 <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: `${iconColor}1c`, border: `1px solid ${iconColor}44`,
+                    background: `${iconColor}15`, border: `1px solid ${iconColor}35`,
                 }}>
                     <Icon style={{ width: 17, height: 17, color: iconColor }} />
                 </div>
@@ -373,11 +378,11 @@ const KpiTile = ({ icon: Icon, label, value, sub, subColor, iconColor = D.cyan, 
             </p>
 
             {progress !== undefined && (
-                <div style={{ marginTop: 10, height: 3, borderRadius: 99, background: '#0f2235' }}>
+                <div style={{ marginTop: 10, height: 3, borderRadius: 99, background: D.borderSub }}>
                     <div style={{
                         height: 3, borderRadius: 99,
                         width: inView ? `${Math.min(progress, 100)}%` : '0%',
-                        background: `linear-gradient(90deg, ${iconColor}, ${iconColor}60)`,
+                        background: `linear-gradient(90deg, ${iconColor}, ${iconColor}70)`,
                         transition: 'width 1.1s cubic-bezier(.22,1,.36,1)',
                     }} />
                 </div>
@@ -413,7 +418,6 @@ const DashBoard = () => {
     const [deviceStatusData, setDeviceStatusData] = useState([]);
     const [recentAlerts,     setRecentAlerts]     = useState([]);
 
-    // react-google-charts data (arrays formatted per GC spec)
     const [alertTrendGCData,  setAlertTrendGCData]  = useState(null);
     const [auditHourlyGCData, setAuditHourlyGCData] = useState(null);
     const [alertTrendTotal,   setAlertTrendTotal]   = useState(0);
@@ -565,19 +569,18 @@ const DashBoard = () => {
             setAttendanceData(
                 [
                     { name: 'Đúng giờ', value: onTime, color: '#10b981' },
-                    { name: 'Đến muộn', value: late,   color: '#f59e0b' },
+                    { name: 'Đến muộn', value: late,   color: '#ffa600' },
                     { name: 'Vắng mặt', value: absent, color: '#ef4444' },
                 ].filter(d => d.value > 0)
             );
         }
 
-        // ── Security alert daily trend (react-google-charts) ─────────────────
+        // ── Security alert daily trend ────────────────────────────────────────
         if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
             const series = trendRes.value.data?.series || [];
             if (series.length > 0) {
                 const header = ['Ngày', ...ALERT_TYPE_LABELS];
                 const rows = series.map(s => [
-                    // Format date MM/DD for compact label
                     s.date ? s.date.slice(5).replace('-', '/') : '',
                     ...ALERT_TYPE_KEYS.map(k => (s.byType?.[k] || 0)),
                 ]);
@@ -586,7 +589,7 @@ const DashBoard = () => {
             }
         }
 
-        // ── Audit activity hourly (react-google-charts) ───────────────────────
+        // ── Audit activity hourly ─────────────────────────────────────────────
         if (auditRes.status === 'fulfilled' && auditRes.value?.success) {
             const buckets = auditRes.value.data?.buckets || [];
             if (buckets.length > 0) {
@@ -610,12 +613,11 @@ const DashBoard = () => {
     const onlinePct  = kpi.devicesTotal > 0 ? (kpi.devicesOnline / kpi.devicesTotal) * 100 : 0;
     const zonePct    = kpi.zonesTotal   > 0 ? (kpi.zonesActive   / kpi.zonesTotal)   * 100 : 0;
 
-    // Google Charts options
     const alertTrendOptions = {
         ...GC_BASE,
         isStacked: true,
         colors: ALERT_TYPE_COLORS,
-        areaOpacity: 0.25,
+        areaOpacity: 0.18,
         lineWidth: 2,
         pointSize: 5,
         pointShape: 'circle',
@@ -630,7 +632,7 @@ const DashBoard = () => {
     const auditHourlyOptions = {
         ...GC_BASE,
         legend: { position: 'none' },
-        colors: [D.cyan],
+        colors: [D.blue],
         bar: { groupWidth: '72%' },
         animation: { startup: true, duration: 800, easing: 'out' },
         chartArea: { ...GC_BASE.chartArea, width: '92%', height: '72%' },
@@ -643,9 +645,9 @@ const DashBoard = () => {
             {/* ── Header ──────────────────────────────────────────────────── */}
             <ScrollReveal delay={0} fromBelow={false}>
                 <div style={{
-                    background: 'linear-gradient(135deg, #06101e 0%, #0b1e3c 60%, #091629 100%)',
+                    background: '#ffffff',
                     border: `1px solid ${D.border}`,
-                    borderRadius: 20,
+                    borderRadius: 16,
                     padding: '20px 24px',
                     display: 'flex',
                     alignItems: 'center',
@@ -653,17 +655,22 @@ const DashBoard = () => {
                     gap: 16,
                     position: 'relative',
                     overflow: 'hidden',
-                    boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
+                    boxShadow: D.shadow,
                 }}>
+                    {/* Decorative accent top */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                        background: `linear-gradient(90deg, ${D.blue} 0%, ${D.cyan}80 50%, transparent 100%)` }} />
+                    {/* Soft glow */}
                     <div style={{ position: 'absolute', top: -60, right: 80, width: 200, height: 200,
-                        borderRadius: '50%', opacity: 0.06, background: D.cyan,
+                        borderRadius: '50%', opacity: 0.05, background: D.blue,
                         filter: 'blur(50px)', pointerEvents: 'none' }} />
+
                     <div style={{ position: 'relative' }}>
                         <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 6,
-                            padding: '4px 12px', borderRadius: 99, fontSize: 11, fontWeight: 700,
-                            background: `${D.cyan}18`, color: D.cyan,
-                            border: `1px solid ${D.cyan}40`, marginBottom: 8,
+                            padding: '4px 12px', borderRadius: 50, fontSize: 11, fontWeight: 700,
+                            background: `${D.blue}12`, color: D.blue,
+                            border: `1px solid ${D.blue}30`, marginBottom: 8,
                         }}>
                             <Activity style={{ width: 13, height: 13 }} />
                             Tổng quan hệ thống
@@ -676,7 +683,7 @@ const DashBoard = () => {
                                 <>
                                     <span style={{
                                         width: 7, height: 7, borderRadius: '50%',
-                                        background: D.green, boxShadow: `0 0 6px ${D.green}`,
+                                        background: D.green, boxShadow: `0 0 5px ${D.green}`,
                                         display: 'inline-block', flexShrink: 0,
                                     }} />
                                     Cập nhật lúc {lastUpdated.toLocaleTimeString('vi-VN')}
@@ -684,15 +691,18 @@ const DashBoard = () => {
                             ) : 'Đang tải dữ liệu...'}
                         </p>
                     </div>
+
                     <button
                         onClick={fetchAll}
                         disabled={loading}
                         style={{
                             display: 'inline-flex', alignItems: 'center', gap: 8,
-                            padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 600,
-                            background: `${D.blue}1a`, border: `1px solid ${D.blue}44`, color: '#6eadff',
+                            padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                            background: D.blue, color: '#ffffff',
+                            border: 'none',
                             cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1,
                             transition: 'all 0.2s', flexShrink: 0,
+                            boxShadow: `0 2px 8px ${D.blue}40`,
                         }}
                     >
                         <RefreshCw style={{ width: 15, height: 15 }}
@@ -707,8 +717,8 @@ const DashBoard = () => {
                 <ScrollReveal delay={0}>
                     <div style={{
                         padding: '14px 18px',
-                        background: `${D.red}15`, border: `1px solid ${D.red}40`,
-                        borderRadius: 14, color: '#ff8080', fontSize: 13,
+                        background: '#FFF5F5', border: `1px solid #FECACA`,
+                        borderRadius: 12, color: '#DC2626', fontSize: 13,
                         display: 'flex', alignItems: 'center', gap: 10,
                     }}>
                         <AlertTriangle style={{ width: 18, height: 18, flexShrink: 0 }} />
@@ -727,12 +737,12 @@ const DashBoard = () => {
                     value={loading ? '—' : kpi.devicesOffline}
                     sub={loading ? '' : kpi.devicesOffline > 0 ? 'Cần kiểm tra' : 'Ổn định'}
                     iconColor={kpi.devicesOffline > 0 ? D.red : D.green}
-                    subColor={kpi.devicesOffline > 0 ? '#ff8080' : '#4ade80'} />
+                    subColor={kpi.devicesOffline > 0 ? '#DC2626' : '#059669'} />
                 <KpiTile delay={120} icon={ShieldAlert}  label="Cảnh báo chưa xử lý"
                     value={loading ? '—' : kpi.alertsNew}
                     sub={loading ? '' : kpi.alertsNew > 0 ? 'Cần xử lý ngay' : 'Không có mới'}
                     iconColor={kpi.alertsNew > 0 ? D.red : D.green}
-                    subColor={kpi.alertsNew > 0 ? '#ff8080' : '#4ade80'} />
+                    subColor={kpi.alertsNew > 0 ? '#DC2626' : '#059669'} />
                 <KpiTile delay={180} icon={LogIn}        label="Lượt ra/vào hôm nay"
                     value={loading ? '—' : kpi.gateTrafficToday}
                     sub="Qua tất cả cổng" iconColor={D.cyan} />
@@ -743,8 +753,8 @@ const DashBoard = () => {
                 <KpiTile delay={300} icon={Car}          label="Xe khớp kiểm soát"
                     value={loading ? '—' : kpi.vehicleHitsToday}
                     sub={kpi.vehicleHitsToday > 0 ? 'Blocklist / Watchlist' : 'Không có khớp'}
-                    iconColor={kpi.vehicleHitsToday > 0 ? D.amber : D.muted}
-                    subColor={kpi.vehicleHitsToday > 0 ? '#fbbf24' : D.muted} />
+                    iconColor={kpi.vehicleHitsToday > 0 ? D.amber : D.muted2}
+                    subColor={kpi.vehicleHitsToday > 0 ? '#B45309' : D.muted} />
             </div>
 
             {/* ── Row 1: Severity donut + Traffic area ──────────────────────── */}
@@ -799,11 +809,11 @@ const DashBoard = () => {
                                 <AreaChart data={trafficData} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="gVao" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%"  stopColor={D.cyan}   stopOpacity={0.35} />
+                                            <stop offset="5%"  stopColor={D.cyan}   stopOpacity={0.25} />
                                             <stop offset="95%" stopColor={D.cyan}   stopOpacity={0} />
                                         </linearGradient>
                                         <linearGradient id="gRa" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%"  stopColor={D.purple} stopOpacity={0.35} />
+                                            <stop offset="5%"  stopColor={D.purple} stopOpacity={0.25} />
                                             <stop offset="95%" stopColor={D.purple} stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
@@ -814,7 +824,7 @@ const DashBoard = () => {
                                            tickLine={false} axisLine={false} allowDecimals={false} />
                                     <Tooltip content={<BarTooltip />} />
                                     <Legend iconType="circle" iconSize={8}
-                                            formatter={v => <span style={{ fontSize: 11, fontWeight: 600, color: '#8fb8d8' }}>{v}</span>} />
+                                            formatter={v => <span style={{ fontSize: 11, fontWeight: 600, color: D.muted }}>{v}</span>} />
                                     <Area type="monotone" dataKey="Vào" stroke={D.cyan}   strokeWidth={2} fill="url(#gVao)" dot={false}
                                           activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: D.cyan }}
                                           animationDuration={1000} animationEasing="ease-out" />
@@ -828,7 +838,7 @@ const DashBoard = () => {
                 />
             </div>
 
-            {/* ── Row 2: Alert trend (7d) + Audit hourly — react-google-charts ── */}
+            {/* ── Row 2: Alert trend (7d) + Audit hourly ────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <GChartCard
                     accent={D.red} delay={0}
@@ -849,7 +859,7 @@ const DashBoard = () => {
                 </GChartCard>
 
                 <GChartCard
-                    accent={D.cyan} delay={100}
+                    accent={D.blue} delay={100}
                     title="Hoạt động hệ thống theo giờ"
                     sub={`Hôm nay · ${auditTotal} thao tác audit log (24 khung giờ)`}
                     loading={loading}
@@ -1012,24 +1022,25 @@ const DashBoard = () => {
                 <div style={{
                     background: D.cardBg,
                     border: `1px solid ${D.border}`,
-                    borderRadius: 20,
+                    borderRadius: 16,
                     padding: '20px 20px 16px',
-                    boxShadow: '0 4px 40px rgba(0,0,0,0.4)',
+                    boxShadow: D.shadow,
                     position: 'relative',
                     overflow: 'hidden',
                 }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3,
                         background: `linear-gradient(90deg, ${D.red} 0%, ${D.red}44 50%, transparent 100%)` }} />
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                         <div>
-                            <h3 style={{ fontSize: 13, fontWeight: 700, color: D.text }}>Cảnh báo an ninh gần đây</h3>
-                            <p style={{ fontSize: 11, color: D.muted, marginTop: 2 }}>5 sự kiện chưa xử lý mới nhất</p>
+                            <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Cảnh báo an ninh gần đây</h3>
+                            <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>5 sự kiện chưa xử lý mới nhất</p>
                         </div>
                         <Link to="/system-admin/security-alerts" style={{
-                            fontSize: 12, fontWeight: 600, color: D.cyan, textDecoration: 'none',
-                            padding: '6px 12px', background: `${D.cyan}14`,
-                            border: `1px solid ${D.cyan}30`, borderRadius: 8,
+                            fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none',
+                            padding: '6px 14px', background: `${D.blue}10`,
+                            border: `1px solid ${D.blue}28`, borderRadius: 8,
+                            transition: 'all 0.2s',
                         }}>
                             Xem tất cả →
                         </Link>
@@ -1038,7 +1049,7 @@ const DashBoard = () => {
                     {loading ? (
                         <div className="space-y-2">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="animate-pulse h-14 rounded-xl" style={{ background: '#0c1e35' }} />
+                                <div key={i} className="animate-pulse h-14 rounded-xl" style={{ background: D.borderSub }} />
                             ))}
                         </div>
                     ) : recentAlerts.length === 0 ? (
@@ -1061,17 +1072,18 @@ const DashBoard = () => {
                                             style={{
                                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                 padding: '10px 14px',
-                                                background: '#0a1626', border: `1px solid ${D.border}`,
+                                                background: '#ffffff',
+                                                border: `1px solid ${D.border}`,
                                                 borderRadius: 12, transition: 'border-color 0.2s, background 0.2s',
                                             }}
-                                            onMouseEnter={e => { e.currentTarget.style.borderColor = `${sevColor}40`; e.currentTarget.style.background = '#0c1c30'; }}
-                                            onMouseLeave={e => { e.currentTarget.style.borderColor = D.border; e.currentTarget.style.background = '#0a1626'; }}
+                                            onMouseEnter={e => { e.currentTarget.style.borderColor = `${sevColor}40`; e.currentTarget.style.background = D.cardBg2; }}
+                                            onMouseLeave={e => { e.currentTarget.style.borderColor = D.border; e.currentTarget.style.background = '#ffffff'; }}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                                                 <div style={{
                                                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    background: `${sevColor}18`, border: `1px solid ${sevColor}40`,
+                                                    background: `${sevColor}12`, border: `1px solid ${sevColor}30`,
                                                 }}>
                                                     <ShieldAlert style={{ width: 16, height: 16, color: sevColor }} />
                                                 </div>
@@ -1086,8 +1098,8 @@ const DashBoard = () => {
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
                                                 <span style={{
-                                                    padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700,
-                                                    background: `${sevColor}1c`, color: sevColor, border: `1px solid ${sevColor}40`,
+                                                    padding: '3px 10px', borderRadius: 50, fontSize: 10, fontWeight: 700,
+                                                    background: `${sevColor}12`, color: sevColor, border: `1px solid ${sevColor}30`,
                                                 }}>
                                                     {SEVERITY_LABEL[alert.severity] || alert.severity}
                                                 </span>
