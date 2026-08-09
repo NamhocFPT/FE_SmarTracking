@@ -335,8 +335,9 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                                 ) : (
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold text-midnight-indigo">
-                                            {segment.speakerLabel === 'unknown' ? 'Chưa xác định' : 
-                                             segment.speakerLabel?.startsWith('Speaker_') ? segment.speakerLabel.replace('Speaker_', 'Người nói ') : 
+                                            {segment.displayName ? segment.displayName :
+                                             segment.speakerLabel === 'unknown' ? 'Chưa xác định' :
+                                             segment.speakerLabel?.startsWith('Speaker_') ? segment.speakerLabel.replace('Speaker_', 'Người nói ') :
                                              segment.speakerLabel}
                                         </span>
                                         {isLowConfidence && !isEditing && (
