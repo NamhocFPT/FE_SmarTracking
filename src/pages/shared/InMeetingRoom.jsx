@@ -845,9 +845,16 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const handleStartRecording = async () => {
         if (!isHost) return;
+
+        const camera = roomDevices.find(d => d.device_type === 'ip_camera');
+        if (!camera) {
+            showToast('Phòng chưa có camera ghi hình được cấu hình', 'error');
+            return;
+        }
+
         setActionLoading(true);
         try {
-            const res = await callWithFallback(startEmployeeVideoRecording, startManagerVideoRecording, id, { deviceId: 'default' });
+            const res = await callWithFallback(startEmployeeVideoRecording, startManagerVideoRecording, id, { cameraDeviceId: camera.id });
             if (res?.success) {
                 setRecordingStatus('starting');
                 setRecordingSessionId(res.data?.sessionId || res.data?.id || `rec-${Date.now()}`);
