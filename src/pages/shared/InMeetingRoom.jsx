@@ -55,59 +55,6 @@ import UserAvatar, { resolveAvatarUrl } from '../../components/common/UserAvatar
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
 import GuestPanel from '../../components/meeting/GuestPanel';
-import * as docx from 'docx-preview';
-
-const DocxViewer = ({ fileUrl }) => {
-    const containerRef = useRef(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        let isMounted = true;
-        setLoading(true);
-        setError(false);
-        fetch(fileUrl)
-            .then(res => res.blob())
-            .then(blob => {
-                if (!isMounted) return;
-                docx.renderAsync(blob, containerRef.current, null, {
-                    className: 'docx-preview-container',
-                    inWrapper: true,
-                    ignoreWidth: false,
-                    ignoreHeight: false,
-                    ignoreFonts: false,
-                    breakPages: true,
-                    useBase64URL: true
-                }).then(() => {
-                    if (isMounted) setLoading(false);
-                }).catch(err => {
-                    console.error('Docx preview error:', err);
-                    if (isMounted) { setError(true); setLoading(false); }
-                });
-            })
-            .catch(err => {
-                console.error('Docx fetch error:', err);
-                if (isMounted) { setError(true); setLoading(false); }
-            });
-        return () => { isMounted = false; };
-    }, [fileUrl]);
-
-    return (
-        <div className="flex-1 overflow-auto bg-white relative">
-            {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                    <Loader className="w-8 h-8 animate-spin text-action-blue" />
-                </div>
-            )}
-            {error && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white z-10 text-red-500 text-sm">
-                    Lỗi hiển thị tài liệu Word. Vui lòng tải xuống để xem.
-                </div>
-            )}
-            <div ref={containerRef} className="max-w-[800px] mx-auto min-h-full p-4" />
-        </div>
-    );
-};
 
 const customStyles = `
 @keyframes floatUp {
@@ -158,6 +105,9 @@ const callWithFallback = async (employeeFn, managerFn, ...args) => {
         if (res?.success) return res;
         throw new Error('Employee scope failed');
     } catch (e) {
+        if (e && (e.status === 403 || e.status === 409 || e.status === 404)) {
+            throw e;
+        }
         console.warn(`[InMeetingRoom] ${employeeFn.name || 'employeeFn'} thất bại, fallback sang ${managerFn.name || 'managerFn'}.`);
         return await managerFn(...args);
     }
@@ -277,6 +227,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     // New features
     const [expandedAgendaIdx, setExpandedAgendaIdx] = useState(null);
     const [roomDevices, setRoomDevices] = useState([]);
+    const [isRoomDevicesExpanded, setIsRoomDevicesExpanded] = useState(false);
     const [extensionModal, setExtensionModal] = useState({ isOpen: false, minutes: 15, reason: '' });
     const [pendingExtensions, setPendingExtensions] = useState([]);
     const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
@@ -322,6 +273,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const toastTimersRef = useRef([]);
     const reactionTimersRef = useRef([]);
     const participantsRef = useRef(null);
+    const attendanceErrorRef = useRef(false);
+    const devicesErrorRef = useRef(false);
 
     // Clear all pending timers on unmount
     useEffect(() => {
@@ -538,23 +491,32 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     const loadAttendance = async () => {
+        if (attendanceErrorRef.current) return;
         try {
             const res = await callWithFallback(getEmployeeAttendance, getManagerAttendance, id);
             if (res?.success) {
                 const dataItems = res.data?.items || res.data?.records || (Array.isArray(res.data) ? res.data : []);
                 setAttendance(dataItems);
             }
-        } catch (err) { }
+        } catch (err) {
+            if (err?.status === 403 || err?.status === 409 || err?.status === 404) {
+                attendanceErrorRef.current = true;
+            }
+        }
     };
 
     const loadRoomDevices = async (roomId) => {
-        if (!roomId) return;
+        if (!roomId || devicesErrorRef.current) return;
         try {
             const res = await callWithFallback(getEmployeeRoomDevices, getManagerRoomDevices, roomId);
             if (res?.success) {
                 setRoomDevices(Array.isArray(res.data) ? res.data : (res.data?.items || []));
             }
-        } catch (err) { }
+        } catch (err) {
+            if (err?.status === 403 || err?.status === 409 || err?.status === 404) {
+                devicesErrorRef.current = true;
+            }
+        }
     };
 
     const fetchMediaFiles = async () => {
@@ -674,6 +636,11 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     useEffect(() => {
         let attendanceInterval;
+        // Reset stop-flags whenever the meeting enters (or re-enters) in_progress so that
+        // a fresh session gets a clean chance — previous 403/409 flags are stale.
+        attendanceErrorRef.current = false;
+        devicesErrorRef.current   = false;
+
         if (meetingState?.status === 'in_progress') {
             loadNotes();
             loadAttendance();
@@ -767,22 +734,28 @@ const InMeetingRoom = ({ isPublic = false }) => {
     }, [meetingState?.status, isHost, id]);
 
     // ─── Helpers ──────────────────────────────────────────────────────
-    const getAttendanceRecord = (participantId) =>
-        attendance.find(a => (a.userId || a.user_id || a.id) === participantId);
+    const getActualUserId = (p) => {
+        if (!p) return null;
+        if (typeof p === 'string') return p;
+        return p.userId || p.user_id || p.user?.id || p.id;
+    };
 
-    const isCheckedIn = (participantId) => {
-        const record = getAttendanceRecord(participantId);
+    const getAttendanceRecord = (p) =>
+        attendance.find(a => (a.userId || a.user_id || a.id) === getActualUserId(p));
+
+    const isCheckedIn = (p) => {
+        const record = getAttendanceRecord(p);
         if (!record) return false;
         const status = record.presenceStatus || record.attendanceStatus || '';
         return ['present', 'late', 'checked_in', 'maybe_present'].includes(status);
     };
 
-    const getPresenceStatus = (participantId) => {
-        const record = getAttendanceRecord(participantId);
+    const getPresenceStatus = (p) => {
+        const record = getAttendanceRecord(p);
         return record ? (record.presenceStatus || record.attendanceStatus || 'unknown') : 'unknown';
     };
 
-    const checkedInCount = meetingState?.participants?.filter(p => isCheckedIn(p.id)).length || 0;
+    const checkedInCount = meetingState?.participants?.filter(p => isCheckedIn(p)).length || 0;
 
     if (loading || !meetingState) {
         return (
@@ -1018,7 +991,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const handleManualCheckIn = async (participant) => {
         setManualCheckInLoading(participant.id);
         try {
-            const res = await manualAttendanceCheckIn(id, { userId: participant.id, checkInMethod: 'manual' });
+            const actualUserId = participant.userId || participant.user_id || participant.user?.id || participant.id;
+            const res = await manualAttendanceCheckIn(id, { userId: actualUserId });
             if (res?.success) {
                 showToast(`Đã điểm danh thủ công cho ${participant.fullName}`, 'success');
                 await loadAttendance();
@@ -1033,7 +1007,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     const handleInvalidateAttendance = async (participant) => {
-        const record = getAttendanceRecord(participant.id);
+        const actualUserId = participant.userId || participant.user_id || participant.user?.id || participant.id;
+        const record = getAttendanceRecord(actualUserId);
         if (!record?.id) return;
         setManualCheckInLoading(participant.id);
         try {
@@ -1135,7 +1110,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
             isMuted: true
         }))
     ];
-    const uncheckedParticipants = (meetingState.participants || []).filter(p => !isCheckedIn(p.id));
+    const uncheckedParticipants = (meetingState.participants || []).filter(p => !isCheckedIn(p));
 
     const tabs = [
         ...(isHost ? [{ id: 'host', label: 'Quản lý', icon: Shield }] : []),
@@ -1437,6 +1412,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         const isWord = ['doc', 'docx'].includes(ext);
                                         const isPptx = ['ppt', 'pptx'].includes(ext);
 
+                                        const isMsOffice = isWord || isPptx;
+
                                         return (
                                             <div className="flex-1 overflow-hidden flex flex-col">
                                                 {agendaDocLoading ? (
@@ -1455,8 +1432,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                             title={att.fileName}
                                                             className="flex-1 w-full border-0"
                                                         />
-                                                    ) : isWord ? (
-                                                        <DocxViewer fileUrl={agendaDocUrl} />
+                                                    ) : isMsOffice ? (
+                                                        <iframe
+                                                            src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(agendaDocUrl)}`}
+                                                            title={att.fileName}
+                                                            className="flex-1 w-full border-0"
+                                                        />
                                                     ) : isVideo ? (
                                                         <div className="flex-1 flex items-center justify-center p-4">
                                                             <video src={agendaDocUrl} controls className="max-w-full max-h-full rounded-xl" />
@@ -1602,22 +1583,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     </button>
 
                     {/* Right: Room Panel */}
-                    <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full lg:w-[320px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0'}`}>
+                    <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full h-[50vh] lg:h-auto lg:w-[320px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0 h-0 lg:h-auto'}`}>
 
                         {/* Tabs */}
-                        <nav className="flex border-b border-platinum-tint shrink-0">
+                        <nav className="flex overflow-x-auto border-b border-platinum-tint shrink-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                             {tabs.map(tab => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveChatTab(tab.id)}
-                                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 text-[10px] font-bold transition-all border-b-2 ${
+                                    className={`relative flex-1 min-w-0 flex flex-col items-center justify-center gap-1 py-2 px-0.5 text-[9px] sm:text-[10px] font-bold transition-all border-b-2 ${
                                         activeChatTab === tab.id
                                             ? 'border-action-blue text-action-blue bg-blue-50/50'
                                             : 'border-transparent text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
                                     }`}
                                 >
                                     <tab.icon className="w-4 h-4" />
-                                    <span className="uppercase tracking-wide">{tab.label}</span>
+                                    <span className="uppercase tracking-wide text-center leading-tight whitespace-normal break-words">{tab.label}</span>
                                     {tab.id === 'attendance' && (
                                         <span className="text-[9px] text-emerald-600 font-extrabold">{checkedInCount}/{meetingState.participants?.length}</span>
                                     )}
@@ -1825,25 +1806,31 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     {/* Thiết bị phòng */}
                                     {roomDevices.length > 0 && (
                                         <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
-                                            <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
+                                            <button
+                                                onClick={() => setIsRoomDevicesExpanded(!isRoomDevicesExpanded)}
+                                                className="w-full px-3 py-2.5 bg-cloud-mist hover:bg-slate-50 flex items-center justify-between transition-colors border-b border-platinum-tint"
+                                            >
                                                 <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
                                                     <Cpu className="w-3.5 h-3.5 text-action-blue" /> Thiết bị phòng ({roomDevices.length})
                                                 </h4>
-                                            </div>
-                                            <div className="divide-y divide-platinum-tint">
-                                                {roomDevices.map((device, idx) => (
-                                                    <div key={device.id || idx} className="flex items-center justify-between px-3 py-2">
-                                                        <span className="text-xs text-midnight-indigo font-semibold truncate">{device.name || device.deviceName || `Thiết bị ${idx + 1}`}</span>
-                                                        <span className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
-                                                            device.status === 'online' || device.isOnline
-                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                                : 'bg-red-50 text-red-600 border-red-200'
-                                                        }`}>
-                                                            {device.status === 'online' || device.isOnline ? 'Online' : 'Offline'}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                {isRoomDevicesExpanded ? <ChevronUp className="w-4 h-4 text-slate-blue" /> : <ChevronDown className="w-4 h-4 text-slate-blue" />}
+                                            </button>
+                                            {isRoomDevicesExpanded && (
+                                                <div className="divide-y divide-platinum-tint max-h-[200px] overflow-y-auto">
+                                                    {roomDevices.map((device, idx) => (
+                                                        <div key={device.id || idx} className="flex items-center justify-between px-3 py-2 hover:bg-cloud-mist/30 transition-colors">
+                                                            <span className="text-xs text-midnight-indigo font-semibold truncate pr-2">{device.name || device.deviceName || `Thiết bị ${idx + 1}`}</span>
+                                                            <span className={`text-[9px] px-2 py-0.5 rounded font-bold border shrink-0 ${
+                                                                device.status === 'online' || device.isOnline
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                    : 'bg-red-50 text-red-600 border-red-200'
+                                                            }`}>
+                                                                {device.status === 'online' || device.isOnline ? 'Online' : 'Offline'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -1934,46 +1921,6 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                             </div>
                                                         </button>
 
-                                                        {/* Attachment strip — always visible, no expand needed */}
-                                                        {item.attachments?.length > 0 && (
-                                                            <div className={`px-3 py-2 border-t border-platinum-tint flex flex-wrap gap-1.5 ${isCurrent ? 'bg-blue-50/60' : 'bg-cloud-mist/50'}`}>
-                                                                {item.attachments.map((att, attIdx) => (
-                                                                    <div key={att.id} className="flex items-center gap-1 bg-white border border-platinum-tint rounded-lg px-2 py-1 max-w-full">
-                                                                        <FileText className="w-2.5 h-2.5 text-slate-blue shrink-0" />
-                                                                        <span className="text-[10px] font-medium text-midnight-indigo truncate max-w-[110px]">{att.fileName}</span>
-                                                                        <button
-                                                                            title="Xem trong phòng họp"
-                                                                            onClick={() => setAgendaDocView({ agendaItem: item, selectedAttachmentIdx: attIdx })}
-                                                                            className="ml-0.5 p-0.5 rounded hover:bg-action-blue/10 text-action-blue transition-colors shrink-0"
-                                                                        >
-                                                                            <Eye className="w-3 h-3" />
-                                                                        </button>
-                                                                        <button
-                                                                            title="Tải xuống"
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    const res = await callWithFallback(getEmployeeMediaFile, getManagerMediaFile, att.id);
-                                                                                    const url = res?.data?.downloadUrl;
-                                                                                    if (url) {
-                                                                                        const a = document.createElement('a');
-                                                                                        a.href = url;
-                                                                                        a.download = att.fileName || '';
-                                                                                        a.style.display = 'none';
-                                                                                        document.body.appendChild(a);
-                                                                                        a.click();
-                                                                                        document.body.removeChild(a);
-                                                                                    } else showToast('Không lấy được link tải', 'error');
-                                                                                } catch { showToast('Lỗi tải tài liệu', 'error'); }
-                                                                            }}
-                                                                            className="p-0.5 rounded hover:bg-slate-blue/10 text-slate-blue transition-colors shrink-0"
-                                                                        >
-                                                                            <Download className="w-3 h-3" />
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
                                                         {/* Expanded Detail */}
                                                         {isExpanded && (
                                                             <div className="px-3 pb-3 pt-0 bg-white border-t border-platinum-tint space-y-2">
@@ -1981,23 +1928,45 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                                     <p className="text-[11px] text-slate-blue leading-relaxed pt-2">{item.description}</p>
                                                                 )}
                                                                 {item.attachments?.length > 0 && (
-                                                                    <div className="space-y-1.5">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span className="text-[9px] font-bold text-slate-blue uppercase tracking-wider">Tài liệu đính kèm</span>
-                                                                            <button
-                                                                                onClick={() => setAgendaDocView({ agendaItem: item, selectedAttachmentIdx: 0 })}
-                                                                                className="px-2 py-1 bg-action-blue text-white rounded-lg text-[9px] font-bold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
-                                                                            >
-                                                                                <FileText className="w-3 h-3" /> Xem tài liệu
-                                                                            </button>
+                                                                    <div className="space-y-1.5 mt-2">
+                                                                        <div className="flex items-center justify-between mb-1">
+                                                                            <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Tài liệu đính kèm</span>
                                                                         </div>
-                                                                        {item.attachments.map(att => (
-                                                                            <div key={att.id} className="flex items-center justify-between bg-cloud-mist p-2 rounded-lg border border-platinum-tint">
+                                                                        {item.attachments.map((att, attIdx) => (
+                                                                            <div key={att.id} className="flex items-center justify-between bg-cloud-mist p-2 rounded-lg border border-platinum-tint gap-2">
                                                                                 <div className="flex items-center gap-1.5 min-w-0">
-                                                                                    <FileText className="w-3.5 h-3.5 text-slate-blue shrink-0" />
+                                                                                    <FileText className="w-4 h-4 text-slate-blue shrink-0" />
                                                                                     <span className="text-[11px] font-medium text-midnight-indigo truncate">{att.fileName}</span>
                                                                                 </div>
-                                                                                <div className="flex items-center gap-1 ml-2 shrink-0">
+                                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                                    <button
+                                                                                        title="Xem trong phòng họp"
+                                                                                        onClick={() => setAgendaDocView({ agendaItem: item, selectedAttachmentIdx: attIdx })}
+                                                                                        className="p-1 rounded hover:bg-action-blue/10 text-action-blue transition-colors"
+                                                                                    >
+                                                                                        <Eye className="w-4 h-4" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        title="Tải xuống"
+                                                                                        onClick={async () => {
+                                                                                            try {
+                                                                                                const res = await callWithFallback(getEmployeeMediaFile, getManagerMediaFile, att.id);
+                                                                                                const url = res?.data?.downloadUrl;
+                                                                                                if (url) {
+                                                                                                    const a = document.createElement('a');
+                                                                                                    a.href = url;
+                                                                                                    a.download = att.fileName || '';
+                                                                                                    a.style.display = 'none';
+                                                                                                    document.body.appendChild(a);
+                                                                                                    a.click();
+                                                                                                    document.body.removeChild(a);
+                                                                                                } else showToast('Không có link tải', 'error');
+                                                                                            } catch { showToast('Lỗi tải tài liệu', 'error'); }
+                                                                                        }}
+                                                                                        className="p-1 rounded hover:bg-slate-blue/10 text-slate-blue transition-colors"
+                                                                                    >
+                                                                                        <Download className="w-4 h-4" />
+                                                                                    </button>
                                                                                     {isHost && isCurrent && (
                                                                                         <button
                                                                                             onClick={() => {
@@ -2013,35 +1982,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                                                                     });
                                                                                                 }
                                                                                             }}
-                                                                                            className={`px-2 py-1 rounded text-[9px] font-bold ${
+                                                                                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shadow-sm ${
                                                                                                 presentedFile?.fileId === att.id
-                                                                                                    ? 'bg-red-50 text-red-600'
-                                                                                                    : 'bg-action-blue text-white'
+                                                                                                    ? 'bg-red-50 text-red-600 border border-red-200'
+                                                                                                    : 'bg-white text-action-blue border border-action-blue hover:bg-blue-50'
                                                                                             }`}
                                                                                         >
-                                                                                            {presentedFile?.fileId === att.id ? 'Dừng' : 'Chiếu'}
+                                                                                            {presentedFile?.fileId === att.id ? 'Dừng chiếu' : 'Chiếu'}
                                                                                         </button>
                                                                                     )}
-                                                                                    <button
-                                                                                        onClick={async () => {
-                                                                                            try {
-                                                                                                const res = await request(`/media-files/${att.id}`, { method: 'GET' });
-                                                                                                const url = res.data?.data?.downloadUrl || res.data?.downloadUrl;
-                                                                                                if (url) {
-                                                                                                    const a = document.createElement('a');
-                                                                                                    a.href = url;
-                                                                                                    a.download = att.fileName || '';
-                                                                                                    a.style.display = 'none';
-                                                                                                    document.body.appendChild(a);
-                                                                                                    a.click();
-                                                                                                    document.body.removeChild(a);
-                                                                                                } else showToast('Không có link tải', 'error');
-                                                                                            } catch { showToast('Lỗi mở tài liệu', 'error'); }
-                                                                                        }}
-                                                                                        className="p-1 text-slate-blue hover:text-action-blue transition-colors"
-                                                                                    >
-                                                                                        <ExternalLink className="w-3.5 h-3.5" />
-                                                                                    </button>
                                                                                 </div>
                                                                             </div>
                                                                         ))}
@@ -2050,9 +1999,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                                 {isHost && isCurrent && meetingState.currentAgendaIndex + 1 < meetingState.agenda.length && (
                                                                     <button
                                                                         onClick={handleNextAgenda}
-                                                                        className="w-full py-1.5 bg-action-blue hover:bg-glacier-blue text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
+                                                                        className="w-full py-2 mt-1 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm"
                                                                     >
-                                                                        Chuyển mục tiếp theo <ChevronRight className="w-3 h-3" />
+                                                                        Chuyển mục tiếp theo <ChevronRight className="w-3.5 h-3.5" />
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -2211,10 +2160,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             const timeStr = checkedInTime ? new Date(checkedInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
 
                                             return (
-                                                <div key={p.id} className={`bg-white border rounded-xl p-3 flex items-center gap-3 ${isCheckedIn(p.id) ? 'border-emerald-100' : 'border-platinum-tint'}`}>
+                                                <div key={p.id} className={`bg-white border rounded-xl p-3 flex items-center gap-3 ${isCheckedIn(p) ? 'border-emerald-100' : 'border-platinum-tint'}`}>
                                                     <div className="relative shrink-0">
                                                         <UserAvatar user={p} className="w-8 h-8 rounded-full text-xs font-bold" />
-                                                        {isCheckedIn(p.id) && (
+                                                        {isCheckedIn(p) && (
                                                             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
                                                                 <Check className="w-2 h-2 text-white" />
                                                             </div>
@@ -2240,7 +2189,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
                                                     {isHost && !p.isExternal && (
                                                         <div className="shrink-0">
-                                                            {isCheckedIn(p.id) ? (
+                                                            {isCheckedIn(p) ? (
                                                                 <button
                                                                     onClick={() => handleInvalidateAttendance(p)}
                                                                     disabled={manualCheckInLoading === p.id}
