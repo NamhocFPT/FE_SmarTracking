@@ -1775,7 +1775,7 @@ const ManagerMeetingDetail = () => {
 
             {/* Participant Conflict Confirmation Modal (409 PARTICIPANT_TIME_CONFLICT_WARNING) */}
             {participantConflictModal.isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1829,7 +1829,7 @@ const ManagerMeetingDetail = () => {
 
             {/* Room Capacity Warning Modal (422 ROOM_CAPACITY_WARNING) */}
             {roomCapacityModal.isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
