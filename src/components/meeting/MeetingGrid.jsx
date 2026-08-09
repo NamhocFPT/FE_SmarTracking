@@ -146,49 +146,65 @@ const MeetingTile = ({
     useEffect(() => {
         let interval;
         if (isActuallySpeaking) {
-            setAudioLevel(Math.floor(Math.random() * 50) + 50);
+            setAudioLevel(Math.floor(Math.random() * 40) + 60);
             interval = setInterval(() => {
                 setAudioLevel(Math.floor(Math.random() * 80) + 20); // 20 to 100
-            }, 150);
+            }, 100); // Tăng tốc độ update để mượt hơn
         } else {
             setAudioLevel(0);
         }
         return () => clearInterval(interval);
     }, [isActuallySpeaking]);
 
-    const speakingOpacity = audioLevel ? 0.3 + (audioLevel / 100) * 0.7 : 0;
-    const shadowSize = audioLevel ? (audioLevel / 100) * 15 : 0;
+    // Kích thước avatar
+    const avatarSize = large ? 'w-32 h-32 text-4xl' : 'w-20 h-20 text-2xl';
+    
+    // Tính toán vòng hiệu ứng âm thanh (2 vòng)
+    const ring1Scale = audioLevel ? 1 + (audioLevel / 100) * 0.3 : 1;
+    const ring1Opacity = audioLevel ? 0.4 + (audioLevel / 100) * 0.4 : 0;
+    
+    const ring2Scale = audioLevel ? 1 + (audioLevel / 100) * 0.6 : 1;
+    const ring2Opacity = audioLevel ? 0.2 + (audioLevel / 100) * 0.3 : 0;
 
     return (
         <div
-            className={`relative w-full h-full rounded-2xl overflow-hidden transition-all duration-300 ${
-                isActuallySpeaking
-                    ? 'border-2 border-red-500'
-                    : 'border border-white/10'
+            className={`relative w-full h-full rounded-2xl overflow-hidden bg-slate-900 transition-all duration-300 ${
+                isActuallySpeaking ? 'border border-emerald-500/50' : 'border border-white/5'
             }`}
-            style={{
-                boxShadow: isActuallySpeaking ? `0 0 ${shadowSize}px rgba(239, 68, 68, 0.5)` : 'none'
-            }}
         >
-            {/* Avatar / Background */}
-            <div className="absolute inset-0 bg-slate-800">
+            {/* Background & Avatar Container */}
+            <div className="absolute inset-0 flex items-center justify-center">
+                
+                {/* Hiệu ứng âm thanh bao quanh Avatar */}
+                {isActuallySpeaking && (
+                    <>
+                        <div 
+                            className="absolute rounded-full bg-emerald-500 pointer-events-none transition-all duration-100 ease-linear z-0"
+                            style={{
+                                width: large ? 128 : 80,
+                                height: large ? 128 : 80,
+                                opacity: ring2Opacity,
+                                transform: `scale(${ring2Scale})`
+                            }}
+                        />
+                        <div 
+                            className="absolute rounded-full bg-emerald-500 pointer-events-none transition-all duration-100 ease-linear z-0"
+                            style={{
+                                width: large ? 128 : 80,
+                                height: large ? 128 : 80,
+                                opacity: ring1Opacity,
+                                transform: `scale(${ring1Scale})`
+                            }}
+                        />
+                    </>
+                )}
+
                 <UserAvatar
                     user={p}
-                    imageClassName="object-cover"
-                    className={`w-full h-full font-bold ${large ? 'text-5xl' : 'text-3xl'}`}
+                    imageClassName="object-cover rounded-full"
+                    className={`rounded-full shadow-xl border-4 ${isActuallySpeaking ? 'border-emerald-500' : 'border-slate-800'} z-10 transition-colors duration-200 ${avatarSize}`}
                 />
             </div>
-
-            {/* Speaking volume overlay */}
-            {isActuallySpeaking && (
-                <div 
-                    className="absolute inset-0 border-[4px] border-red-500 rounded-2xl pointer-events-none transition-all duration-150 ease-out z-10" 
-                    style={{
-                        opacity: speakingOpacity,
-                        transform: `scale(${1 + (audioLevel / 100) * 0.02})`
-                    }}
-                />
-            )}
 
             {/* Mic badge */}
             {showMicBadge && (
