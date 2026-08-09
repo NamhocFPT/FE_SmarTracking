@@ -139,7 +139,7 @@ const EmployeeHomePage = () => {
             from: formatFullTimestamp(now, false),      // "2026-08-03T00:00:00+07:00"
             to: formatFullTimestamp(nextWeek, true),     // "2026-08-10T23:59:59+07:00"
             view: 'month',
-            status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'scheduled']
+            status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'in_progress']
         })
             .then(res => {
                 if (isMounted && res?.success && res.data) {
@@ -454,7 +454,7 @@ const EmployeeHomePage = () => {
                                                             </span>
                                                         )}
                                                         {meet.status === 'in_progress' && (
-                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
                                                                 Đang diễn ra
                                                             </span>
                                                         )}

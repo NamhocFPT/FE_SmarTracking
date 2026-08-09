@@ -9,8 +9,8 @@ const STATUS_CONFIG = {
     draft: { label: 'Bản nháp', bg: 'bg-slate-50 text-slate-600 border-slate-200', dot: 'bg-slate-400', icon: Clock },
     pending_approval: { label: 'Chờ duyệt', bg: 'bg-amber-50 text-amber-600 border-amber-200', dot: 'bg-amber-500', icon: Clock },
     scheduled: { label: 'Đã lên lịch', bg: 'bg-blue-50 text-action-blue border-blue-150', dot: 'bg-blue-500', icon: Clock },
-    in_progress: { label: 'Đang diễn ra', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle },
-    completed: { label: 'Đã kết thúc', bg: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500', icon: CheckCircle },
+    in_progress: { label: 'Đang diễn ra', bg: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500', icon: CheckCircle },
+    completed: { label: 'Đã kết thúc', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle },
     cancelled: { label: 'Đã huỷ', bg: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500', icon: XCircle }
 };
 
@@ -54,7 +54,7 @@ const PersonalCalendar = () => {
                 from: fromStr,
                 to: toStr,
                 view: 'month',
-                status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'completed', 'pending_approval']
+                status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'in_progress', 'completed', 'pending_approval']
             });
 
             if (res?.success) {
@@ -399,7 +399,7 @@ const PersonalCalendar = () => {
                                                                     className={`rounded-lg p-1.5 text-[10px] font-semibold border leading-tight ${slotMeeting.status === 'cancelled'
                                                                         ? 'bg-red-50/80 text-red-700 border-red-200'
                                                                         : slotMeeting.status === 'in_progress'
-                                                                            ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200'
+                                                                            ? 'bg-purple-50/80 text-purple-800 border-purple-200'
                                                                             : 'bg-blue-50/80 text-action-blue border-blue-200'
                                                                         }`}
                                                                 >
