@@ -1,9 +1,9 @@
 import {
     AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-    Clock, Cpu, Download, ExternalLink, Eye, FileText, Hand, Loader, Mic, MicOff,
-    MonitorUp, PhoneOff, Play, Plus, RefreshCw, Shield, Smile,
-    Sparkles, StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
-    Volume2, VolumeX, X, Edit2
+    Clock, Cpu, Download, ExternalLink, Eye, FileText, Loader, Mic, MicOff,
+    MonitorUp, Play, Plus, RefreshCw, Shield, Smile,
+    StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
+    VolumeX, X, Edit2
 } from 'lucide-react';
 import { IoMic, IoMicOff, IoHandLeft, IoVolumeHigh, IoHappy, IoTime, IoCall, IoArrowBack } from 'react-icons/io5';
 import React, { useState, useEffect, useRef } from 'react';
@@ -213,6 +213,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [recordingStatus, setRecordingStatus] = useState('inactive');
     const [recordingSessionId, setRecordingSessionId] = useState(null);
     const [recordingStartedAt, setRecordingStartedAt] = useState(null);
+    // GA-32: Live Speaker Tag states
+    const [liveTagSelected, setLiveTagSelected] = useState('');
+    const [liveTagSubmitting, setLiveTagSubmitting] = useState(false);
     const [mediaFiles, setMediaFiles] = useState([]);
     const [editingMediaId, setEditingMediaId] = useState(null);
     const [editingMediaTitle, setEditingMediaTitle] = useState('');
@@ -839,10 +842,6 @@ const InMeetingRoom = ({ isPublic = false }) => {
             setConfirmLeaveModal(false);
         }
     };
-
-    // GA-32: Live Speaker Tag states
-    const [liveTagSelected, setLiveTagSelected] = useState('');
-    const [liveTagSubmitting, setLiveTagSubmitting] = useState(false);
 
     const handleStartRecording = async () => {
         if (!isHost) return;
