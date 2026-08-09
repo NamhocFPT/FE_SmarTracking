@@ -190,7 +190,8 @@ export default function GateAccessManagement() {
                                 <table className="w-full text-left border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold">
-                                            <th className="px-4 py-3 border-b border-platinum-tint">Thời gian</th>
+                                            <th className="px-4 py-3 border-b border-platinum-tint">Ngày</th>
+                                            <th className="px-4 py-3 border-b border-platinum-tint">Giờ</th>
                                             <th className="px-4 py-3 border-b border-platinum-tint">Khu vực</th>
                                             <th className="px-4 py-3 border-b border-platinum-tint">Hướng</th>
                                             <th className="px-4 py-3 border-b border-platinum-tint">Biển số</th>
@@ -200,7 +201,8 @@ export default function GateAccessManagement() {
                                     <tbody className="text-xs">
                                         {currentLogs.length > 0 ? currentLogs.map(log => (
                                             <tr key={log.id} className="hover:bg-cloud-mist/30 border-b border-platinum-tint/50 last:border-0">
-                                                <td className="px-4 py-3 font-medium text-midnight-indigo">{formatDateTime(log.access_time)}</td>
+                                                <td className="px-4 py-3 font-medium text-midnight-indigo">{formatDateTime(log.access_time).split(' ')[1]}</td>
+                                                <td className="px-4 py-3 font-medium text-midnight-indigo">{formatDateTime(log.access_time).split(' ')[0]}</td>
                                                 <td className="px-4 py-3">{log.zone_name || '-'}</td>
                                                 <td className="px-4 py-3">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.direction === 'enter' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>

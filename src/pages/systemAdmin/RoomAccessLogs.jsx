@@ -650,7 +650,8 @@ const RoomAccessLogs = () => {
                                 <table className="w-full text-left border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold">
-                                            <th className="p-3.5">Thời điểm (Giờ VN)</th>
+                                            <th className="p-3.5">Ngày</th>
+                                            <th className="p-3.5">Giờ</th>
                                             <th className="p-3.5">Người</th>
                                             {showRoomColumn && <th className="p-3.5">Phòng họp</th>}
                                             <th className="p-3.5">Hướng</th>
@@ -680,9 +681,12 @@ const RoomAccessLogs = () => {
                                                                 : ''
                                                         }`}
                                                 >
-                                                    {/* Event Time */}
+                                                    {/* Event Time Split */}
                                                     <td className="p-3.5 font-semibold text-midnight-indigo whitespace-nowrap">
-                                                        {formatVietnameseDateTime(ev.eventTime || ev.timestamp)}
+                                                        {formatVietnameseDateTime(ev.eventTime || ev.timestamp).split(' ').slice(1).join(' ')}
+                                                    </td>
+                                                    <td className="p-3.5 font-semibold text-midnight-indigo whitespace-nowrap">
+                                                        {formatVietnameseDateTime(ev.eventTime || ev.timestamp).split(' ')[0]}
                                                     </td>
 
                                                     {/* Person info */}

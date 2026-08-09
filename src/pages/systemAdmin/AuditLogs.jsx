@@ -513,7 +513,8 @@ const AuditLogs = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-cloud-mist/55 text-slate-blue text-xs font-bold uppercase border-b border-platinum-tint/70">
-                                    <th className="py-4 px-6">Thời gian</th>
+                                    <th className="py-4 px-6">Ngày</th>
+                                    <th className="py-4 px-6">Giờ</th>
                                     <th className="py-4 px-6">Tài khoản</th>
                                     <th className="py-4 px-6">Hành động</th>
                                     <th className="py-4 px-6">Phân hệ</th>
@@ -533,7 +534,10 @@ const AuditLogs = () => {
                                     logsList.map(log => (
                                         <tr key={log.id} className="hover:bg-cloud-mist/30 transition-colors">
                                             <td className="py-4 px-6 font-medium text-midnight-indigo whitespace-nowrap font-mono text-xs">
-                                                {formatTimestamp(log.createdAt || log.timestamp)}
+                                                {formatTimestamp(log.createdAt || log.timestamp).split(' ')[1]}
+                                            </td>
+                                            <td className="py-4 px-6 font-medium text-midnight-indigo whitespace-nowrap font-mono text-xs">
+                                                {formatTimestamp(log.createdAt || log.timestamp).split(' ')[0]}
                                             </td>
                                             <td className="py-4 px-6">
                                                 <div className="font-semibold text-midnight-indigo">{log.actorName}</div>
