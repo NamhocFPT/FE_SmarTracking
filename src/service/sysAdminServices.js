@@ -619,3 +619,24 @@ export const getEventSnapshot = async (eventId) => {
         return { success: false, message: 'Lỗi kết nối' };
     }
 };
+
+// ── Analytics endpoints (Dashboard charts) ────────────────────────────────────
+
+/**
+ * Xu hướng cảnh báo an ninh theo ngày (7-30 ngày gần nhất).
+ * Response: { data: { series: [{date, total, byType}], totalInPeriod } }
+ * Note: byType chỉ chứa loại có count > 0, key vắng mặt = 0 — FE tự xử lý.
+ */
+export const getSecurityAlertsDailyTrend = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/analytics/security-alerts/daily-trend${query}`);
+};
+
+/**
+ * Hoạt động hệ thống theo giờ (audit log, 24 bucket).
+ * Response: { data: { date, buckets: [{hour, count}], totalToday } }
+ */
+export const getAuditActivityHourly = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/analytics/audit-activity/hourly${query}`);
+};

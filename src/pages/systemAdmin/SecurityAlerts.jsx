@@ -189,6 +189,18 @@ const SecurityAlerts = () => {
         });
     };
 
+    const formatDate = (isoString) => {
+        if (!isoString) return 'N/A';
+        const d = new Date(isoString);
+        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const formatTime = (isoString) => {
+        if (!isoString) return 'N/A';
+        const d = new Date(isoString);
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+
     const getSeverityStyle = (severity) => {
         switch (severity?.toLowerCase()) {
             case 'high': case 'urgent': return 'bg-red-50 text-red-700 border-red-200';
@@ -324,24 +336,26 @@ const SecurityAlerts = () => {
                                         disabled={alerts.filter(a => a.status === 'new').length === 0}
                                     />
                                 </th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Thời gian</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Ngày</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Giờ</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Hình ảnh</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Loại & Mức độ</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Vị trí</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Trạng thái</th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Thao tác</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-right">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-platinum-tint">
                             {loading && alerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="p-8 text-center text-slate-blue">
+                                    <td colSpan="8" className="p-8 text-center text-slate-blue">
                                         <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3" />
                                         Đang tải dữ liệu...
                                     </td>
                                 </tr>
                             ) : alerts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="p-12 text-center text-slate-blue">
+                                    <td colSpan="8" className="p-12 text-center text-slate-blue">
                                         <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
                                         <p className="text-lg font-medium text-midnight-indigo">Không có cảnh báo nào</p>
                                         <p className="text-sm mt-1">Hệ thống đang an toàn hoặc không có dữ liệu khớp với bộ lọc.</p>
@@ -359,14 +373,37 @@ const SecurityAlerts = () => {
                                                 disabled={alert.status !== 'new'}
                                             />
                                         </td>
+                                        <td className="p-4 text-center whitespace-nowrap">
+                                            <p className="text-sm font-bold text-midnight-indigo">
+                                                {formatDate(alert.updated_at || alert.triggered_at)}
+                                            </p>
+                                            <p className="text-[10px] text-slate-blue/60 mt-1 font-mono">ID: {alert.id.substring(0,8)}</p>
+                                        </td>
+                                        <td className="p-4 text-center whitespace-nowrap">
+                                            <p className="text-sm font-bold text-midnight-indigo" title="Cập nhật gần nhất">
+                                                {formatTime(alert.updated_at || alert.triggered_at)}
+                                            </p>
+                                            <p className="text-[10px] text-slate-blue mt-1" title="Xảy ra lần đầu">
+                                                Lần đầu: {formatTime(alert.created_at || alert.triggered_at)}
+                                            </p>
+                                        </td>
                                         <td className="p-4 text-center">
-                                            <p className="text-sm font-bold text-midnight-indigo" title="Gần nhất">
-                                                {formatDateTime(alert.updated_at || alert.triggered_at)}
-                                            </p>
-                                            <p className="text-xs text-slate-blue mt-1" title="Lần đầu">
-                                                Lần đầu: {formatDateTime(alert.created_at || alert.triggered_at)}
-                                            </p>
-                                            <p className="text-xs text-slate-blue/60 mt-0.5">ID: {alert.id.substring(0,8)}...</p>
+                                            {alert.source_event_id ? (
+                                                <div className="inline-flex justify-center items-center">
+                                                    <ThumbnailImage 
+                                                        eventId={alert.source_event_id}
+                                                        onClick={() => {
+                                                            setSnapshotEventId(alert.source_event_id);
+                                                            setIsSnapshotOpen(true);
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="w-32 md:w-40 aspect-video bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200 mx-auto">
+                                                    <ImageIcon className="w-4 h-4 text-slate-400" />
+                                                    <span className="text-[8px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Không ảnh</span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-4 text-center">
                                             <p className="text-sm font-bold text-midnight-indigo uppercase">{alert.alert_type.replace(/_/g, ' ')}</p>
@@ -392,51 +429,42 @@ const SecurityAlerts = () => {
                                         <td className="p-4 text-center">
                                             {getStatusBadge(alert.status)}
                                         </td>
-                                        <td className="p-4 text-center flex items-center justify-center gap-2">
-                                            {alert.status === 'new' && (
-                                                <button 
-                                                    onClick={() => handleAcknowledge(alert.id)}
-                                                    disabled={actionLoading}
-                                                    className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-semibold rounded-lg text-xs transition-colors"
-                                                >
-                                                    <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
-                                                    Tiếp nhận
-                                                </button>
-                                            )}
-                                            {alert.status === 'acknowledged' && (
-                                                <button 
-                                                    onClick={() => openResolveModal(alert)}
-                                                    disabled={actionLoading}
-                                                    className="inline-flex items-center px-3 py-1.5 bg-action-blue text-white hover:bg-glacier-blue font-semibold rounded-lg text-xs transition-colors"
-                                                >
-                                                    <Edit3 className="w-3.5 h-3.5 mr-1.5" />
-                                                    Xử lý ngay
-                                                </button>
-                                            )}
-                                            {alert.status === 'resolved' && (
-                                                <div className="flex flex-col items-center">
+                                        <td className="p-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                {alert.status === 'new' && (
                                                     <button 
-                                                        className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-xs"
+                                                        onClick={() => handleAcknowledge(alert.id)}
+                                                        disabled={actionLoading}
+                                                        className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shadow-sm"
                                                     >
-                                                        <Eye className="w-3.5 h-3.5 mr-1.5" />
-                                                        Đã xử lý
+                                                        <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                                                        Tiếp nhận
                                                     </button>
-                                                    <p className="text-[10px] text-slate-400 mt-1 truncate max-w-[150px]" title={alert.resolution_note}>
-                                                        Note: {alert.resolution_note}
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {alert.source_event_id && (
-                                                <div className="ml-2 inline-flex align-middle">
-                                                    <ThumbnailImage 
-                                                        eventId={alert.source_event_id}
-                                                        onClick={() => {
-                                                            setSnapshotEventId(alert.source_event_id);
-                                                            setIsSnapshotOpen(true);
-                                                        }}
-                                                    />
-                                                </div>
-                                            )}
+                                                )}
+                                                {alert.status === 'acknowledged' && (
+                                                    <button 
+                                                        onClick={() => openResolveModal(alert)}
+                                                        disabled={actionLoading}
+                                                        className="inline-flex items-center px-3 py-1.5 bg-action-blue text-white hover:bg-glacier-blue font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shadow-sm"
+                                                    >
+                                                        <Edit3 className="w-3.5 h-3.5 mr-1.5" />
+                                                        Xử lý ngay
+                                                    </button>
+                                                )}
+                                                {alert.status === 'resolved' && (
+                                                    <div className="flex flex-col items-end">
+                                                        <button 
+                                                            className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-xs border border-slate-200"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5 mr-1.5" />
+                                                            Đã xử lý
+                                                        </button>
+                                                        <p className="text-[10px] text-slate-400 mt-1 truncate max-w-[120px]" title={alert.resolution_note}>
+                                                            Note: {alert.resolution_note}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
