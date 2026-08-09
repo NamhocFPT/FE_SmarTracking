@@ -72,8 +72,14 @@ const SpeakerMappingModal = ({ isOpen, onClose, transcriptId, meetingId, onMappi
                 }
                 setAudioUrl(fetchedAudioUrl);
 
-                // Init empty mappings
-                setMappings({});
+                // Init mappings từ dữ liệu đã gán trước đó (nếu có)
+                const initialMappings = {};
+                (resSpeakers.data?.items || resSpeakers.data || []).forEach(spk => {
+                    if (spk.currentMapping?.mappedUserId) {
+                        initialMappings[spk.speakerLabel] = spk.currentMapping.mappedUserId;
+                    }
+                });
+                setMappings(initialMappings);
 
             } catch (err) {
                 setErrorMsg(err.message);
