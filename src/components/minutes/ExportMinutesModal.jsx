@@ -129,7 +129,7 @@ const ExportMinutesModal = ({ minutesId, open, onClose }) => {
                             {/* Format selector */}
                             <div className="space-y-1.5">
                                 <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider">Định dạng xuất <span className="text-red-500">*</span></label>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {Object.entries(formatConfig).map(([val, cfg]) => (
                                         <button
                                             key={val}

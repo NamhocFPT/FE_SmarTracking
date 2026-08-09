@@ -5,11 +5,11 @@ import {
     Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit,
     Share2, Download
 } from 'lucide-react';
-import { updateMeetingMinutes, issueMeetingMinutes } from '../../service/minutesServices';
+import { updateMeetingMinutes, issueMeetingMinutes, distributeMeetingMinutes } from '../../service/minutesServices';
 import ExportMinutesModal from './ExportMinutesModal';
 import ShareMinutesModal from './ShareMinutesModal';
 
-const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
+const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -19,6 +19,7 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
     const [isIssuing, setIsIssuing] = useState(false);
+    const [distributing, setDistributing] = useState(false);
 
     // Toast state
     const [toast, setToast] = useState(null);
@@ -72,6 +73,26 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
             }
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleDistribute = async () => {
+        setDistributing(true);
+        try {
+            const res = await distributeMeetingMinutes(meetingId, {
+                minutesId: minutes.id,
+                recipientScope: 'participants',
+                channels: ['email', 'in_app'],
+            });
+            if (res?.success) {
+                showToast(`Đã gửi biên bản tới ${res.data?.queuedRecipientCount ?? 0} người.`);
+            } else {
+                showToast(res?.message || 'Gửi biên bản thất bại.', 'error');
+            }
+        } catch (e) {
+            showToast(e?.error?.message || e?.message || 'Có lỗi khi gửi biên bản.', 'error');
+        } finally {
+            setDistributing(false);
         }
     };
 
@@ -188,14 +209,24 @@ const MinutesViewerEditor = ({ minutes, isHost, onRefresh }) => {
                             {minutes.status === 'published' && (
                                 <>
                                     {(isHost || minutes.permissions?.canShare !== false) && (
-                                        <button 
+                                        <button
                                             onClick={() => setShowShareModal(true)}
                                             className="px-3 py-1.5 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors flex items-center gap-1.5 shadow-sm"
                                         >
                                             <Share2 className="w-3.5 h-3.5 text-purple-600" /> Chia sẻ
                                         </button>
                                     )}
-                                    <button 
+                                    {isHost && (
+                                        <button
+                                            onClick={handleDistribute}
+                                            disabled={distributing}
+                                            className="px-3 py-1.5 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                                        >
+                                            <Send className="w-3.5 h-3.5 text-emerald-600" />
+                                            {distributing ? 'Đang gửi...' : 'Gửi thông báo'}
+                                        </button>
+                                    )}
+                                    <button
                                         onClick={() => setShowExportModal(true)}
                                         className="px-3 py-1.5 bg-action-blue text-white rounded-xl text-xs font-bold hover:bg-glacier-blue transition-colors flex items-center gap-1.5 shadow-sm"
                                     >

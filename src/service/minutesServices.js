@@ -69,8 +69,18 @@ export const issueMeetingMinutes = async (minutesId) => {
 
 /**
  * Theo dõi trạng thái background job (dùng chung cho AI & STT)
- * @param {string} jobId 
+ * @param {string} jobId
  */
 export const getBackgroundJob = async (jobId) => {
     return await get(`/background-jobs/${jobId}`);
+};
+
+/**
+ * Gửi/thông báo biên bản đã ban hành cho toàn bộ người tham dự.
+ * Participant nội bộ nhận in-app + email; khách ngoài công ty nhận email đính kèm PDF tự động.
+ * @param {string} meetingId  — path param (khác với minutesId trong body)
+ * @param {object} payload { minutesId, recipientScope, channels, message? }
+ */
+export const distributeMeetingMinutes = async (meetingId, payload) => {
+    return await post(`/meetings/${meetingId}/minutes/distributions`, payload);
 };

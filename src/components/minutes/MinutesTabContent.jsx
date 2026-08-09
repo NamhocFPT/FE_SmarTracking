@@ -172,9 +172,10 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
 
     if (status === 'has_minutes' && minutes) {
         return (
-            <MinutesViewerEditor 
-                minutes={minutes} 
-                isHost={isHost} 
+            <MinutesViewerEditor
+                minutes={minutes}
+                meetingId={meetingId}
+                isHost={isHost}
                 onRefresh={fetchState}
             />
         );

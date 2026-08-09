@@ -198,7 +198,7 @@ const ExportReportModal = ({ isOpen, onClose }) => {
                             </div>
 
                             {preset === 'custom' && (
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <label className="block text-[10px] font-bold text-slate-blue uppercase">Từ ngày</label>
                                         <input 
