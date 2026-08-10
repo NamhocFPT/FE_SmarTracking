@@ -550,7 +550,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 fetchMediaFiles();
             } else {
                 setMediaFiles(originalMedia);
-                showToast(res?.error?.message || res?.message || 'Lỗi: Backend chưa hỗ trợ đổi tên file này', 'error');
+                showToast(res?.error?.message || res?.message || 'Chức năng đổi tên chưa được hỗ trợ', 'error');
             }
         } catch (error) {
             setMediaFiles(originalMedia);

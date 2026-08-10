@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from '../../utils/toast';
 import { 
     CheckCircle, AlertTriangle, Edit3, Save, X, 
     Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit,
@@ -21,12 +22,8 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
     const [isIssuing, setIsIssuing] = useState(false);
     const [distributing, setDistributing] = useState(false);
 
-    // Toast state
-    const [toast, setToast] = useState(null);
-
     const showToast = (message, type = 'success') => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
+        toast[type]?.(message) ?? toast.info(message);
     };
 
     const handleStartEdit = () => {
@@ -128,23 +125,6 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
 
     return (
         <div className="bg-white rounded-3xl border border-platinum-tint shadow-sm-2 overflow-hidden relative">
-            {/* Toast Notification */}
-            <AnimatePresence>
-                {toast && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20, x: '-50%' }}
-                        animate={{ opacity: 1, y: 0, x: '-50%' }}
-                        exit={{ opacity: 0, y: -20, x: '-50%' }}
-                        className={`absolute top-4 left-1/2 z-50 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold ${
-                            toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
-                        }`}
-                    >
-                        {toast.type === 'error' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                        {toast.message}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* Header */}
             <div className="p-5 border-b border-platinum-tint flex flex-col sm:flex-row flex-wrap justify-between items-center gap-4 bg-cloud-mist/30">
                 <div className="flex items-center gap-3 w-full sm:w-auto">

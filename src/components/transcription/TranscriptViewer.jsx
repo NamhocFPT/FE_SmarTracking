@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    Search, FileText, CheckCircle, AlertTriangle, 
+import {
+    Search, FileText, CheckCircle, AlertTriangle,
     RefreshCw, Edit3, Save, X, Loader2, Users
 } from 'lucide-react';
+import toast from '../../utils/toast';
 import SpeakerMappingModal from './SpeakerMappingModal';
 import {
     getTranscriptionJobs,
@@ -28,7 +29,6 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     
     const [errorMsg, setErrorMsg] = useState('');
-    const [toast, setToast] = useState(null); // { message, type }
 
     const fetchJobs = useCallback(async () => {
         try {
@@ -103,15 +103,8 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     }, [fetchJobs, fetchTranscript]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Toast auto-hide
-    useEffect(() => {
-        if (toast) {
-            const timer = setTimeout(() => setToast(null), 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [toast]);
-
     const showToast = (message, type = 'success') => {
-        setToast({ message, type });
+        toast[type]?.(message) ?? toast.info(message);
     };
 
     const handleEditClick = (segment) => {
@@ -224,23 +217,6 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
 
     return (
         <div className="bg-white rounded-3xl border border-platinum-tint shadow-sm-2 flex flex-col h-[600px] overflow-hidden relative">
-            {/* Toast Notification */}
-            <AnimatePresence>
-                {toast && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20, x: '-50%' }}
-                        animate={{ opacity: 1, y: 0, x: '-50%' }}
-                        exit={{ opacity: 0, y: -20, x: '-50%' }}
-                        className={`absolute top-4 left-1/2 z-50 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold ${
-                            toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
-                        }`}
-                    >
-                        {toast.type === 'error' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                        {toast.message}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* Header */}
             <div className="p-5 border-b border-platinum-tint flex flex-col sm:flex-row justify-between items-center gap-4 bg-cloud-mist/30">
                 <div className="flex items-center gap-3">

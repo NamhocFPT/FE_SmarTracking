@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Users, RefreshCw, Check, X, Mail, Trash2, Loader2, Clock } from 'lucide-react';
+import toast from '../../utils/toast';
 import {
     listMeetingGuests,
     admitGuest, rejectGuest, resendGuestInvite, revokeGuestAccess
@@ -17,15 +18,13 @@ const GuestPanel = ({ meetingId, onGuestsUpdate }) => {
     const [lobby, setLobby] = useState([]);
     const [loading, setLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(null); // id đang xử lý
-    const [toast, setToast] = useState(null);
 
     const showToast = (msg, type = 'success') => {
-        setToast({ msg, type });
-        setTimeout(() => setToast(null), 3000);
+        toast[type]?.(msg) ?? toast.info(msg);
     };
 
-    const fetchAll = useCallback(async () => {
-        setLoading(true);
+    const fetchAll = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const gRes = await listMeetingGuests(meetingId);
             const guestList = gRes?.success ? (gRes.data || []) : [];
@@ -36,14 +35,14 @@ const GuestPanel = ({ meetingId, onGuestsUpdate }) => {
         } catch {
             /* bỏ qua lỗi mạng tạm thời */
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [meetingId, onGuestsUpdate]);
 
-    // Poll 10 giây/lần khi panel đang mở
+    // Poll 10 giây/lần — silent = true để không hiện loading giật giao diện
     useEffect(() => {
         fetchAll();
-        const interval = setInterval(fetchAll, 10000);
+        const interval = setInterval(() => fetchAll(true), 10000);
         return () => clearInterval(interval);
     }, [fetchAll]);
 
@@ -66,15 +65,6 @@ const GuestPanel = ({ meetingId, onGuestsUpdate }) => {
 
     return (
         <div className="p-4 space-y-4 relative">
-            {/* Toast */}
-            {toast && (
-                <div className={`fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg ${
-                    toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
-                }`}>
-                    {toast.msg}
-                </div>
-            )}
-
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
