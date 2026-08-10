@@ -1,4 +1,5 @@
 import { AlertCircle, Calendar, CheckCircle, Clock, Home, Plus, RefreshCw, Search, Users, XCircle } from 'lucide-react';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -28,6 +29,7 @@ const MeetingManagement = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [confirm, setConfirm] = useState(null);
 
     // Filters & Search
     const [search, setSearch] = useState('');
@@ -162,24 +164,35 @@ const MeetingManagement = () => {
         }
     };
 
-    const handleCancel = async (meetingId) => {
-        if (!window.confirm('Bạn có chắc chắn muốn huỷ cuộc họp này?')) return;
-        setError(null);
-        try {
-            const res = await cancelMeeting(meetingId);
-            if (res?.success) {
-                setSuccessMessage('Huỷ cuộc họp thành công!');
-                fetchMeetingsList();
-            } else {
-                setError(res?.message || 'Không thể huỷ cuộc họp.');
-            }
-        } catch (err) {
-            setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi huỷ cuộc họp. Vui lòng thử lại.');
-        }
+    const handleCancel = (meetingId) => {
+        setConfirm({
+            message: 'Bạn có chắc chắn muốn huỷ cuộc họp này? Thao tác không thể hoàn tác.',
+            onConfirm: async () => {
+                setError(null);
+                try {
+                    const res = await cancelMeeting(meetingId);
+                    if (res?.success) {
+                        setSuccessMessage('Huỷ cuộc họp thành công!');
+                        fetchMeetingsList();
+                    } else {
+                        setError(res?.message || 'Không thể huỷ cuộc họp.');
+                    }
+                } catch (err) {
+                    setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi huỷ cuộc họp. Vui lòng thử lại.');
+                }
+            },
+        });
     };
 
     return (
         <div className="space-y-6 animate-fade-in-up">
+            <ConfirmDialog
+                isOpen={!!confirm}
+                message={confirm?.message}
+                confirmLabel="Huỷ cuộc họp"
+                onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+                onCancel={() => setConfirm(null)}
+            />
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">

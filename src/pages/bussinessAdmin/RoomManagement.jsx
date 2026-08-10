@@ -1,4 +1,5 @@
 import { Activity, AlertCircle, CheckCircle, DoorOpen, Edit2, FileWarning, Home, List, Plus, RefreshCw, ShieldAlert, Trash2, UserCheck, Users } from 'lucide-react';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -19,6 +20,7 @@ const RoomManagement = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [confirm, setConfirm] = useState(null);
 
     // Filter and search
     const [search, setSearch] = useState('');
@@ -133,24 +135,35 @@ const RoomManagement = () => {
         }
     };
 
-    const handleDelete = async (roomId) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xoá phòng họp này?')) return;
-        setError(null);
-        try {
-            const res = await deleteRoom(roomId);
-            if (res?.success) {
-                setSuccessMessage('Đã xoá phòng họp thành công!');
-                fetchRoomsList();
-            } else {
-                setError(res?.message || 'Không thể xoá phòng họp.');
-            }
-        } catch (err) {
-            setError(err?.message || err?.error?.message || 'Không thể xoá phòng họp. Vui lòng thử lại.');
-        }
+    const handleDelete = (roomId) => {
+        setConfirm({
+            message: 'Bạn có chắc chắn muốn xoá phòng họp này? Thao tác không thể hoàn tác.',
+            onConfirm: async () => {
+                setError(null);
+                try {
+                    const res = await deleteRoom(roomId);
+                    if (res?.success) {
+                        setSuccessMessage('Đã xoá phòng họp thành công!');
+                        fetchRoomsList();
+                    } else {
+                        setError(res?.message || 'Không thể xoá phòng họp.');
+                    }
+                } catch (err) {
+                    setError(err?.message || err?.error?.message || 'Không thể xoá phòng họp. Vui lòng thử lại.');
+                }
+            },
+        });
     };
 
     return (
         <div className="space-y-6 animate-fade-in-up">
+            <ConfirmDialog
+                isOpen={!!confirm}
+                message={confirm?.message}
+                confirmLabel="Xoá phòng họp"
+                onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+                onCancel={() => setConfirm(null)}
+            />
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">

@@ -11,6 +11,7 @@ import {
 } from "../../service/avatarReviewService";
 import { getDepartments } from "../../service/sysAdminServices";
 import UserAvatar from "../../components/common/UserAvatar";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 
 const STATUS_MAP = {
     pending_review: { label: "Đang chờ duyệt", badge: "bg-blue-50 text-action-blue border border-blue-200" },
@@ -44,6 +45,7 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
     // Rejection UI state
     const [showRejectInput, setShowRejectInput] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
+    const [confirm, setConfirm] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -80,29 +82,33 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
         return () => { cancelled = true; };
     }, [faceProfileId]);
 
-    const handleApprove = async () => {
-        if (!window.confirm("Bạn có chắc chắn muốn duyệt ảnh sinh trắc học này?")) return;
-        setActionLoading(true);
-        setActionError(null);
-        try {
-            const res = await approveAvatarSubmission(faceProfileId);
-            if (res?.success) {
-                setTimeout(() => {
-                    onActionComplete?.();
-                    onClose();
-                }, 1000);
-            }
-        } catch (err) {
-            const code = err?.error?.code;
-            if (code === "BIOMETRIC_SUBMISSION_NOT_PENDING") {
-                setActionError("Yêu cầu này đã được xử lý bởi quản trị viên khác.");
-                setTimeout(() => { onActionComplete?.(); onClose(); }, 1500);
-            } else {
-                setActionError(ERROR_MAP[code] || err?.error?.message || "Không thể duyệt ảnh này.");
-            }
-        } finally {
-            setActionLoading(false);
-        }
+    const handleApprove = () => {
+        setConfirm({
+            message: "Bạn có chắc chắn muốn duyệt ảnh sinh trắc học này?",
+            onConfirm: async () => {
+                setActionLoading(true);
+                setActionError(null);
+                try {
+                    const res = await approveAvatarSubmission(faceProfileId);
+                    if (res?.success) {
+                        setTimeout(() => {
+                            onActionComplete?.();
+                            onClose();
+                        }, 1000);
+                    }
+                } catch (err) {
+                    const code = err?.error?.code;
+                    if (code === "BIOMETRIC_SUBMISSION_NOT_PENDING") {
+                        setActionError("Yêu cầu này đã được xử lý bởi quản trị viên khác.");
+                        setTimeout(() => { onActionComplete?.(); onClose(); }, 1500);
+                    } else {
+                        setActionError(ERROR_MAP[code] || err?.error?.message || "Không thể duyệt ảnh này.");
+                    }
+                } finally {
+                    setActionLoading(false);
+                }
+            },
+        });
     };
 
     const handleReject = async () => {
@@ -137,7 +143,15 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
         return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     };
 
-    return createPortal(
+    return (
+        <>
+        <ConfirmDialog
+            isOpen={!!confirm}
+            message={confirm?.message}
+            onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+            onCancel={() => setConfirm(null)}
+        />
+        {createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
             <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                 <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">
@@ -302,6 +316,8 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
             </div>
         </div>,
         document.body
+        )}
+        </>
     );
 };
 

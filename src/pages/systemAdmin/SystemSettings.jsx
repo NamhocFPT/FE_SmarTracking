@@ -1,6 +1,7 @@
 import { Settings, Camera, Plus, Trash2, Pencil } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import Pagination from '../../components/common/Pagination';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 import { getSystemConfigs, updateSystemConfig, getChannelMaps, updateChannelMap, getRooms, getZones, getNoShowConfig, updateNoShowConfig, getSecurityAlertsConfig, updateSecurityAlertsConfig } from '../../service/sysAdminServices';
 
@@ -31,6 +32,7 @@ const SystemSettings = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [confirm, setConfirm] = useState(null);
 
     // Cấu hình No-show (nguồn riêng: GET/PUT /no-show-config — KHÔNG dùng chung
     // với /system-configurations, đúng theo PLAN FE gửi Nam 2026-08-06)
@@ -543,9 +545,10 @@ const SystemSettings = () => {
         }
     };
 
-    const deleteChannelRow = async (channelId) => {
-        if (!window.confirm(`Xóa ánh xạ kênh ${channelId}? Thao tác áp dụng ngay lập tức.`)) return;
-
+    const deleteChannelRow = (channelId) => {
+        setConfirm({
+            message: `Bạn có chắc chắn muốn xóa ánh xạ kênh ${channelId}? Thao tác áp dụng ngay lập tức.`,
+            onConfirm: async () => {
         setError(null);
         setChannelActionSaving(true);
         try {
@@ -567,6 +570,8 @@ const SystemSettings = () => {
         } finally {
             setChannelActionSaving(false);
         }
+            },
+        });
     };
 
     if (loading) {
@@ -600,6 +605,13 @@ const SystemSettings = () => {
     }
 
     return (
+        <>
+        <ConfirmDialog
+            isOpen={!!confirm}
+            message={confirm?.message}
+            onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+            onCancel={() => setConfirm(null)}
+        />
         <div className="space-y-6 animate-fade-in-up max-w-5xl mx-auto">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1145,6 +1157,7 @@ const SystemSettings = () => {
                 </form>
             </div>
         </div>
+        </>
     );
 };
 

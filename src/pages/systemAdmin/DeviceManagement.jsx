@@ -293,7 +293,7 @@ const DeviceManagement = () => {
         try {
             const res = await checkDeviceAvailability(device.id);
             if (res?.success && res.data) {
-                setSuccessMessage(`Thiết bị ${device.device_name} phản hồi: ${res.data.isReachable ? 'Có thể kết nối (Reachable)' : 'Không thể kết nối (Unreachable)'}.`);
+                setSuccessMessage(`Thiết bị ${device.device_name} phản hồi: ${res.data.isReachable ? 'Có thể kết nối' : 'Không thể kết nối'}.`);
                 fetchData(); // refresh status
             } else {
                 throw new Error(res?.error?.message || res?.message || 'Không thể kiểm tra kết nối thiết bị.');

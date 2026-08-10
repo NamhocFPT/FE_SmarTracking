@@ -1,4 +1,5 @@
 import { Building } from 'lucide-react';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -29,6 +30,7 @@ const DepartmentManagement = () => {
     const [departmentsList, setDepartmentsList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [confirm, setConfirm] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
 
     // Search and filter states
@@ -393,22 +395,26 @@ const DepartmentManagement = () => {
         }
     };
 
-    const handleUserDelete = async (user) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản ${user.fullName}?`)) return;
-        setError(null);
-        setSuccessMessage(null);
-        try {
-            const res = await deleteUser(user.id);
-            if (res?.success) {
-                setSuccessMessage('Đã xóa người dùng khỏi hệ thống.');
-                fetchDepartmentMembers(selectedDept.id, membersPage);
-                fetchDepartments();
-            } else {
-                setError(res?.message || 'Không thể xóa tài khoản.');
-            }
-        } catch (err) {
-            setError(err?.message || err?.error?.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
-        }
+    const handleUserDelete = (user) => {
+        setConfirm({
+            message: `Bạn có chắc chắn muốn xóa tài khoản của ${user.fullName}? Thao tác không thể hoàn tác.`,
+            onConfirm: async () => {
+                setError(null);
+                setSuccessMessage(null);
+                try {
+                    const res = await deleteUser(user.id);
+                    if (res?.success) {
+                        setSuccessMessage('Đã xóa người dùng khỏi hệ thống.');
+                        fetchDepartmentMembers(selectedDept.id, membersPage);
+                        fetchDepartments();
+                    } else {
+                        setError(res?.message || 'Không thể xóa tài khoản.');
+                    }
+                } catch (err) {
+                    setError(err?.message || err?.error?.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
+                }
+            },
+        });
     };
 
     const handleUserViewLogs = async (user) => {
@@ -467,6 +473,14 @@ const DepartmentManagement = () => {
     };
 
     return (
+        <>
+        <ConfirmDialog
+            isOpen={!!confirm}
+            message={confirm?.message}
+            confirmLabel="Xóa tài khoản"
+            onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+            onCancel={() => setConfirm(null)}
+        />
         <div className="space-y-6 animate-fade-in-up">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1348,6 +1362,7 @@ const DepartmentManagement = () => {
                 document.body
             )}
         </div>
+        </>
     );
 };
 

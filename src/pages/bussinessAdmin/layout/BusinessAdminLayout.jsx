@@ -27,7 +27,8 @@ import {
     PieChart,
     Clock,
     ChevronDown,
-    Fingerprint
+    Fingerprint,
+    DoorOpen,
 } from 'lucide-react';
 
 const chunkArray = (arr, size) => {
@@ -50,20 +51,11 @@ const STATIC_NAVIGATION_ITEMS = [
     },
 
     {
-        label: 'Cuộc họp',
-        isDropdown: true,
-        icon: Calendar,
-        children: [
-
-            { label: 'Quản lý cuộc họp', to: '/business-admin/meetings', icon: Settings },
-        ],
-    },
-
-    {
         label: 'Quản lý',
         isDropdown: true,
         icon: Layers,
         children: [
+            { label: 'Cuộc họp', to: '/business-admin/meetings', icon: Calendar },
             { label: 'Phòng họp', to: '/business-admin/rooms', icon: Video },
             { label: 'Người dùng', to: '/business-admin/users', icon: Users },
             { label: 'Phòng ban', to: '/business-admin/departments', icon: Briefcase },
@@ -82,7 +74,6 @@ const STATIC_NAVIGATION_ITEMS = [
             { label: 'Hành trình khuôn viên', to: '/business-admin/user-journey', icon: MapPin },
             { label: 'Kiểm soát phương tiện', to: '/business-admin/anpr-management', icon: Car },
             { label: 'Danh sách biển số kiểm soát', to: '/business-admin/vehicle-control-list', icon: ClipboardList },
-            { label: 'Danh sách giám sát người', to: '/business-admin/person-control-list', icon: Users },
             { label: 'Cảnh báo an ninh', to: '/business-admin/security-alerts', icon: AlertTriangle },
         ],
     },
