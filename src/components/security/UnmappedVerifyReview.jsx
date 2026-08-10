@@ -6,13 +6,13 @@ import {
     UserX, CheckCircle, Search, Activity, AlertCircle, RefreshCw, FileX, UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from '../../utils/toast';
 
 const UnmappedVerifyReview = () => {
     const [verifies, setVerifies] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [successMsg, setSuccessMsg] = useState(null);
 
     // Filter
     const [searchQuery, setSearchQuery] = useState('');
@@ -56,12 +56,6 @@ const UnmappedVerifyReview = () => {
         fetchUsers();
     }, [fetchVerifies, fetchUsers]);
 
-    useEffect(() => {
-        if (successMsg) {
-            const timer = setTimeout(() => setSuccessMsg(null), 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [successMsg]);
 
     const handleOpenMap = (verify) => {
         setSelectedVerify(verify);
@@ -70,7 +64,7 @@ const UnmappedVerifyReview = () => {
 
     const handleMap = async () => {
         if (!mappedUserId) {
-            alert('Vui lòng chọn nhân viên để gán!');
+            toast.warning('Vui lòng chọn nhân viên để gán!');
             return;
         }
 
@@ -85,14 +79,14 @@ const UnmappedVerifyReview = () => {
             };
             const res = await mapUnmappedVerify(payload);
             if (res?.success) {
-                setSuccessMsg('Đã gán danh tính thành công!');
+                toast.success('Đã gán danh tính thành công!');
                 setVerifies(prev => prev.filter(v => v.id !== selectedVerify.id));
                 setSelectedVerify(null);
             } else {
                 throw new Error(res?.message || 'Gán danh tính thất bại.');
             }
         } catch (err) {
-            alert(err.message || 'Lỗi hệ thống khi gán danh tính.');
+            toast.error(err.message || 'Lỗi hệ thống khi gán danh tính.');
         } finally {
             setIsMapping(false);
         }
@@ -146,20 +140,6 @@ const UnmappedVerifyReview = () => {
                     </button>
                 </div>
             </div>
-
-            {/* Success message */}
-            <AnimatePresence>
-                {successMsg && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl flex items-center gap-2"
-                    >
-                        <CheckCircle className="w-4 h-4" /> {successMsg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Error state */}
             {error && (

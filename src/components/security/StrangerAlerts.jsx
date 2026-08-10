@@ -7,6 +7,7 @@ import {
     AlertCircle, RefreshCw, FileX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from '../../utils/toast';
 
 /**
  * FE-2: StrangerAlerts — CHỈ hiển thị cảnh báo khuôn mặt lạ (stranger alerts)
@@ -18,7 +19,6 @@ const StrangerAlerts = () => {
     const [alerts, setAlerts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [successMsg, setSuccessMsg] = useState(null);
 
     // Filter
     const [searchQuery, setSearchQuery] = useState('');
@@ -34,14 +34,14 @@ const StrangerAlerts = () => {
         try {
             const res = await acknowledgeSecurityAlert(selectedAlert.id);
             if (res?.success) {
-                setSuccessMsg('Đã xác nhận cảnh báo an ninh.');
+                toast.success('Đã xác nhận cảnh báo an ninh.');
                 setSelectedAlert(prev => ({ ...prev, status: 'acknowledged' }));
                 fetchAlerts();
             } else {
                 throw new Error(res?.message || 'Không thể xác nhận cảnh báo.');
             }
         } catch (err) {
-            alert(err.message || 'Lỗi khi xác nhận cảnh báo.');
+            toast.error(err.message || 'Lỗi khi xác nhận cảnh báo.');
         } finally {
             setIsSubmitting(false);
         }
@@ -50,14 +50,14 @@ const StrangerAlerts = () => {
     const handleResolve = async () => {
         if (!selectedAlert) return;
         if (!resolutionNote.trim()) {
-            alert('Vui lòng nhập ghi chú xử lý.');
+            toast.warning('Vui lòng nhập ghi chú xử lý.');
             return;
         }
         setIsSubmitting(true);
         try {
             const res = await resolveSecurityAlert(selectedAlert.id, { resolution_note: resolutionNote });
             if (res?.success) {
-                setSuccessMsg('Cảnh báo đã được giải quyết thành công.');
+                toast.success('Cảnh báo đã được giải quyết thành công.');
                 setSelectedAlert(null);
                 setResolutionNote('');
                 fetchAlerts();
@@ -65,7 +65,7 @@ const StrangerAlerts = () => {
                 throw new Error(res?.message || 'Không thể giải quyết cảnh báo.');
             }
         } catch (err) {
-            alert(err.message || 'Lỗi khi giải quyết cảnh báo.');
+            toast.error(err.message || 'Lỗi khi giải quyết cảnh báo.');
         } finally {
             setIsSubmitting(false);
         }
@@ -93,12 +93,6 @@ const StrangerAlerts = () => {
         fetchAlerts();
     }, [fetchAlerts]);
 
-    useEffect(() => {
-        if (successMsg) {
-            const timer = setTimeout(() => setSuccessMsg(null), 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [successMsg]);
 
     // Filter — dùng đúng field từ BE: deviceCode, roomName
     const filteredAlerts = alerts.filter(a => {
@@ -168,20 +162,6 @@ const StrangerAlerts = () => {
                     </button>
                 </div>
             </div>
-
-            {/* Success message */}
-            <AnimatePresence>
-                {successMsg && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl flex items-center gap-2"
-                    >
-                        <CheckCircle className="w-4 h-4" /> {successMsg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Error state */}
             {error && (

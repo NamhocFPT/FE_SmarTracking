@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { 
-    getSecurityAlerts, acknowledgeSecurityAlert, 
-    resolveSecurityAlert, bulkAcknowledgeSecurityAlerts 
+import {
+    getSecurityAlerts, acknowledgeSecurityAlert,
+    resolveSecurityAlert, bulkAcknowledgeSecurityAlerts
 } from '../../service/securityAlertService';
 import { getZones } from '../../service/zoneServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
@@ -19,11 +19,11 @@ const SecurityAlerts = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
-    
+
     // Pagination & Filters
     const [filters, setFilters] = useState({
         page: 1,
-        limit: 20,
+        limit: 10,
         status: '',
         alert_type: '',
         zone_id: ''
@@ -76,12 +76,12 @@ const SecurityAlerts = () => {
 
     useEffect(() => {
         fetchAlerts(filters);
-        
+
         // Polling every 10 seconds for new alerts
         const intervalId = setInterval(() => {
             fetchAlerts(filters);
         }, 10000);
-        
+
         return () => clearInterval(intervalId);
     }, [filters, fetchAlerts]);
 
@@ -166,7 +166,7 @@ const SecurityAlerts = () => {
 
     const toggleSelect = (id, status) => {
         if (status !== 'new') return; // Chỉ cho phép chọn status 'new'
-        setSelectedIds(prev => 
+        setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
         );
     };
@@ -183,7 +183,7 @@ const SecurityAlerts = () => {
     const formatDateTime = (isoString) => {
         if (!isoString) return 'N/A';
         const d = new Date(isoString);
-        return d.toLocaleString('vi-VN', { 
+        return d.toLocaleString('vi-VN', {
             hour: '2-digit', minute: '2-digit', second: '2-digit',
             day: '2-digit', month: '2-digit', year: 'numeric'
         });
@@ -201,14 +201,28 @@ const SecurityAlerts = () => {
         return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     };
 
-    const getSeverityStyle = (severity) => {
-        switch (severity?.toLowerCase()) {
-            case 'high': case 'urgent': return 'bg-red-50 text-red-700 border-red-200';
-            case 'medium': return 'bg-orange-50 text-orange-700 border-orange-200';
-            case 'low': return 'bg-blue-50 text-blue-700 border-blue-200';
-            default: return 'bg-slate-50 text-slate-700 border-slate-200';
-        }
+    const ALERT_TYPE_VI = {
+        stranger:                'Người lạ',
+        crowd:                   'Đám đông',
+        intrusion:               'Xâm nhập',
+        person_watchlist_match:  'Đối tượng theo dõi',
+        unknown_vehicle:         'Xe lạ',
+        vehicle_control_match:   'Biển số theo dõi',
+        device_error:            'Lỗi thiết bị',
     };
+
+    const SEVERITY_VI = {
+        high:   { label: 'Cao',       cls: 'bg-red-50 text-red-700 border-red-200' },
+        urgent: { label: 'Khẩn cấp',  cls: 'bg-red-50 text-red-700 border-red-200' },
+        medium: { label: 'Trung bình', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+        low:    { label: 'Thấp',      cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    };
+
+    const getAlertTypeLabel = (type) => ALERT_TYPE_VI[type] || type?.replace(/_/g, ' ') || '—';
+
+    const getSeverityMeta = (severity) => SEVERITY_VI[severity?.toLowerCase()] || { label: 'Bình thường', cls: 'bg-slate-50 text-slate-700 border-slate-200' };
+
+    const getSeverityStyle = (severity) => getSeverityMeta(severity).cls;
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -270,8 +284,8 @@ const SecurityAlerts = () => {
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-platinum-tint grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="relative">
                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Trạng thái</label>
-                    <select 
-                        value={filters.status} 
+                    <select
+                        value={filters.status}
                         onChange={(e) => handleFilterChange('status', e.target.value)}
                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                     >
@@ -283,8 +297,8 @@ const SecurityAlerts = () => {
                 </div>
                 <div className="relative">
                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại cảnh báo</label>
-                    <select 
-                        value={filters.alert_type} 
+                    <select
+                        value={filters.alert_type}
                         onChange={(e) => handleFilterChange('alert_type', e.target.value)}
                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                     >
@@ -300,8 +314,8 @@ const SecurityAlerts = () => {
                 </div>
                 <div className="relative">
                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Khu vực</label>
-                    <select 
-                        value={filters.zone_id} 
+                    <select
+                        value={filters.zone_id}
                         onChange={(e) => handleFilterChange('zone_id', e.target.value)}
                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                     >
@@ -312,7 +326,7 @@ const SecurityAlerts = () => {
                     </select>
                 </div>
                 <div className="relative flex items-end">
-                    <button 
+                    <button
                         onClick={() => setFilters({ page: 1, limit: 20, status: '', alert_type: '', zone_id: '' })}
                         className="w-full px-4 py-2 bg-cloud-mist/50 text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist border border-platinum-tint transition-colors"
                     >
@@ -327,19 +341,11 @@ const SecurityAlerts = () => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-cloud-mist/30 sticky top-0 z-10 border-b border-platinum-tint">
                             <tr>
-                                <th className="p-4 w-12 text-center">
-                                    <input 
-                                        type="checkbox" 
-                                        className="w-4 h-4 rounded border-slate-300 text-action-blue focus:ring-action-blue"
-                                        checked={alerts.filter(a => a.status === 'new').length > 0 && selectedIds.length === alerts.filter(a => a.status === 'new').length}
-                                        onChange={toggleSelectAll}
-                                        disabled={alerts.filter(a => a.status === 'new').length === 0}
-                                    />
-                                </th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Ngày</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Giờ</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Hình ảnh</th>
-                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Loại & Mức độ</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Loại</th>
+                                <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Mức độ</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Vị trí</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-center">Trạng thái</th>
                                 <th className="p-4 text-xs font-bold text-slate-blue uppercase tracking-wider text-right">Thao tác</th>
@@ -364,20 +370,11 @@ const SecurityAlerts = () => {
                             ) : (
                                 alerts.map(alert => (
                                     <tr key={alert.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="p-4 text-center">
-                                            <input 
-                                                type="checkbox"
-                                                className="w-4 h-4 rounded border-slate-300 text-action-blue focus:ring-action-blue cursor-pointer"
-                                                checked={selectedIds.includes(alert.id)}
-                                                onChange={() => toggleSelect(alert.id, alert.status)}
-                                                disabled={alert.status !== 'new'}
-                                            />
-                                        </td>
                                         <td className="p-4 text-center whitespace-nowrap">
                                             <p className="text-sm font-bold text-midnight-indigo">
                                                 {formatDate(alert.updated_at || alert.triggered_at)}
                                             </p>
-                                            <p className="text-[10px] text-slate-blue/60 mt-1 font-mono">ID: {alert.id.substring(0,8)}</p>
+                                            <p className="text-[10px] text-slate-blue/60 mt-1 font-mono">ID: {alert.id.substring(0, 8)}</p>
                                         </td>
                                         <td className="p-4 text-center whitespace-nowrap">
                                             <p className="text-sm font-bold text-midnight-indigo" title="Cập nhật gần nhất">
@@ -390,7 +387,7 @@ const SecurityAlerts = () => {
                                         <td className="p-4 text-center">
                                             {alert.source_event_id ? (
                                                 <div className="inline-flex justify-center items-center">
-                                                    <ThumbnailImage 
+                                                    <ThumbnailImage
                                                         eventId={alert.source_event_id}
                                                         onClick={() => {
                                                             setSnapshotEventId(alert.source_event_id);
@@ -405,23 +402,26 @@ const SecurityAlerts = () => {
                                                 </div>
                                             )}
                                         </td>
+                                        {/* Loại */}
                                         <td className="p-4 text-center">
-                                            <p className="text-sm font-bold text-midnight-indigo uppercase">{alert.alert_type.replace(/_/g, ' ')}</p>
-                                            <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
-                                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityStyle(alert.severity)}`}>
-                                                    {alert.severity?.toUpperCase() || 'NORMAL'}
-                                                </span>
-                                                {(alert.occurrence_count > 1 || alert.occurrenceCount > 1) && (
-                                                    <button
-                                                        onClick={() => setOccurrencesModal({ open: true, alert })}
-                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer transition-colors"
-                                                        title="Bấm để xem tất cả lượt vi phạm"
-                                                    >
-                                                        <Users className="w-3 h-3" />
-                                                        Đã xảy ra: {alert.occurrence_count || alert.occurrenceCount} lần
-                                                    </button>
-                                                )}
-                                            </div>
+                                            <p className="text-sm font-bold text-midnight-indigo">{getAlertTypeLabel(alert.alert_type)}</p>
+                                            {(alert.occurrence_count > 1 || alert.occurrenceCount > 1) && (
+                                                <button
+                                                    onClick={() => setOccurrencesModal({ open: true, alert })}
+                                                    className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors"
+                                                    title="Bấm để xem tất cả lượt vi phạm"
+                                                >
+                                                    <Users className="w-3 h-3" />
+                                                    {alert.occurrence_count || alert.occurrenceCount} lần
+                                                </button>
+                                            )}
+                                        </td>
+
+                                        {/* Mức độ */}
+                                        <td className="p-4 text-center">
+                                            <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${getSeverityStyle(alert.severity)}`}>
+                                                {getSeverityMeta(alert.severity).label}
+                                            </span>
                                         </td>
                                         <td className="p-4 text-sm text-midnight-indigo text-center">
                                             {zones.find(z => z.id === alert.zone_id)?.zone_name || 'Hệ thống'}
@@ -432,7 +432,7 @@ const SecurityAlerts = () => {
                                         <td className="p-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 {alert.status === 'new' && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleAcknowledge(alert.id)}
                                                         disabled={actionLoading}
                                                         className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shadow-sm"
@@ -442,7 +442,7 @@ const SecurityAlerts = () => {
                                                     </button>
                                                 )}
                                                 {alert.status === 'acknowledged' && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => openResolveModal(alert)}
                                                         disabled={actionLoading}
                                                         className="inline-flex items-center px-3 py-1.5 bg-action-blue text-white hover:bg-glacier-blue font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shadow-sm"
@@ -453,7 +453,7 @@ const SecurityAlerts = () => {
                                                 )}
                                                 {alert.status === 'resolved' && (
                                                     <div className="flex flex-col items-end">
-                                                        <button 
+                                                        <button
                                                             className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-xs border border-slate-200"
                                                         >
                                                             <Eye className="w-3.5 h-3.5 mr-1.5" />
@@ -477,10 +477,10 @@ const SecurityAlerts = () => {
                 {meta && meta.totalPages > 1 && (
                     <div className="p-4 border-t border-platinum-tint bg-cloud-mist/30 flex items-center justify-between text-sm">
                         <span className="text-slate-blue font-medium">Hiển thị {alerts.length} / {meta.total} cảnh báo</span>
-                        <Pagination 
-                            currentPage={filters.page} 
-                            totalPages={meta.totalPages} 
-                            onPageChange={(p) => handleFilterChange('page', p)} 
+                        <Pagination
+                            currentPage={filters.page}
+                            totalPages={meta.totalPages}
+                            onPageChange={(p) => handleFilterChange('page', p)}
                         />
                     </div>
                 )}
@@ -500,13 +500,13 @@ const SecurityAlerts = () => {
                         <form onSubmit={handleResolve} className="p-6">
                             <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
                                 <p className="text-xs text-slate-blue font-bold uppercase mb-1">Loại sự kiện</p>
-                                <p className="text-sm font-bold text-midnight-indigo uppercase">{resolveModal.alert?.alert_type}</p>
+                                <p className="text-sm font-bold text-midnight-indigo">{getAlertTypeLabel(resolveModal.alert?.alert_type)}</p>
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-bold text-midnight-indigo mb-2">
                                     Ghi chú kết quả xử lý <span className="text-red-500">*</span>
                                 </label>
-                                <textarea 
+                                <textarea
                                     required
                                     rows="4"
                                     value={resolutionNote}
@@ -540,7 +540,7 @@ const SecurityAlerts = () => {
                                     Chi tiết lượt vi phạm
                                 </h3>
                                 <p className="text-xs text-slate-blue mt-0.5">
-                                    {occurrencesModal.alert?.alert_type?.replace(/_/g, ' ').toUpperCase()} — {zones.find(z => z.id === occurrencesModal.alert?.zone_id)?.zone_name || 'Hệ thống'}
+                                    {getAlertTypeLabel(occurrencesModal.alert?.alert_type)} — {zones.find(z => z.id === occurrencesModal.alert?.zone_id)?.zone_name || 'Hệ thống'}
                                     {' · '}Tổng: {occurrencesModal.alert?.occurrence_count || occurrencesModal.alert?.occurrenceCount} lượt
                                 </p>
                             </div>
@@ -567,7 +567,7 @@ const SecurityAlerts = () => {
                                             ) : (
                                                 <div className="w-16 h-16 bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200">
                                                     <ImageIcon className="w-5 h-5 text-slate-400" />
-                                                    <p className="text-[9px] text-slate-400 mt-1 text-center leading-tight">Không<br/>có ảnh</p>
+                                                    <p className="text-[9px] text-slate-400 mt-1 text-center leading-tight">Không<br />có ảnh</p>
                                                 </div>
                                             )}
                                         </div>
