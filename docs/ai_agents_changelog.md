@@ -497,3 +497,53 @@ Quy táº¯c báº¯t buá»™c: AI Agent pháº£i luÃ´n ghi log vÃ o cuá»‘i má»—i láº§n th
   - Hi?n th? Tên cu?c h?p thay vì ID cu?c h?p n?u có th? l?y du?c d? li?u.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/components/meeting/MeetingPresenceIVSS.jsx.
 - **Tr?ng thái**: Ðã commit và push (d41a0fe).
+
+---
+
+## [2026-08-11] Fix: JSX fragment wrapping in UserJourney.jsx
+
+- **Yêu c?u**: S?a l?i build Adjacent JSX elements must be wrapped in an enclosing tag t?i UserJourney.jsx:589.
+- **Thay d?i**: B?c hai ph?n t? JSX ngang hàng (<div> chính và <EventSnapshotModal>) trong React fragment <>...</> trong hàm eturn c?a component UserJourney.
+- **T?p tin ?nh hu?ng**: src/pages/shared/UserJourney.jsx.
+- **Tr?ng thái**: Ðã hoàn thành.
+
+---
+
+## [2026-08-11] Fix: Avatar ngu?i tham d? hi?n th? sai trong tab Ngu?i tham d? (MeetingDetail)
+
+- **Nguyên nhân**: Hàm 
+ormalizeMeetingDetail trong c? manager/MeetingDetail.jsx và employee/MeetingDetail.jsx map danh sách participants nhung b? sót tru?ng vatarUrl/vatar_url. K?t qu? là m?i object participant sau normalize không có tru?ng avatar, khi?n component UserAvatar luôn hi?n th? ch? cái d?u tên thay vì ?nh th?t. Modal chi ti?t hi?n th? dúng vì nó g?i th?ng getUserById() và nh?n d?y d? d? li?u t? API.
+- **Thay d?i**: Thêm dòng vatarUrl: p.avatarUrl || p.avatar_url || p.user?.avatarUrl || p.user?.avatar_url || '' vào ph?n map participants trong 
+ormalizeMeetingDetail.
+- **T?p tin ?nh hu?ng**: src/pages/manager/MeetingDetail.jsx, src/pages/employee/MeetingDetail.jsx.
+- **Tr?ng thái**: Ðã hoàn thành.
+
+---
+
+## [2026-08-11] Feature: Avatar + Modal chi ti?t ch? xe trong L?ch s? Ðang ký Xe
+
+- **Yêu c?u**: Màn hình L?ch s? Ðang ký Xe c?n hi?n th? avatar th?c trong table và m? modal chi ti?t thông tin ngu?i dùng khi click vào ch? xe, tuong t? màn hình ANPR Management.
+- **Phân tích API**: API /anpr/admin/vehicle-registrations tr? v? eg.owner ch?a thông tin ch? xe (fullName/full_name, email, phoneNumber, avatarUrl, department). Không c?n g?i thêm API ph? khi m? modal.
+- **Thay d?i**:
+  - Thay icon User tinh b?ng UserAvatar component (resolve dúng avatar t? eg.owner).
+  - Tên ch? xe thành link màu xanh, click m? modal chi ti?t.
+  - Thêm 
+ormaliseOwner() d? map snake_case/camelCase v? cùng shape.
+  - Thêm modal chi ti?t (pattern createPortal gi?ng ANPRManagement.jsx) hi?n th? avatar l?n + phòng ban + email + SÐT.
+  - Import thêm UserAvatar, createPortal, icon Briefcase/Mail/Phone/X.
+- **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
+- **Tr?ng thái**: Ðã hoàn thành.
+
+---
+
+## [2026-08-11] Fix: Avatar ch? xe trong VehicleRegistrations — g?i getUserById d? l?y d? li?u d?y d?
+
+- **Phân tích**: Theo tài li?u YEU_CAU_BE_BOSUNG_THONG_TIN_USER_2026-08-09.md, API /anpr/admin/vehicle-registrations chua tr? v? vatarUrl trong object owner (BE chua implement). Do dó c?n g?i thêm getUserById d? l?y full user data có avatar.
+- **Thay d?i**:
+  - Import thêm getUserById t? sysAdminServices.
+  - Thêm state ownerDetail và ownerDetailLoading.
+  - handleOwnerClick m? modal ngay (v?i base info), r?i async fetch getUserById(userId) d? l?y avatar.
+  - Modal uu tiên ownerDetail (full, có avatar) khi có, fallback v? selectedOwner (base info t? API danh sách).
+  - Hi?n spinner loading trong avatar slot khi dang fetch.
+- **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
+- **Tr?ng thái**: Ðã hoàn thành.
