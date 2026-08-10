@@ -1,10 +1,12 @@
+import ToastContainer from "./components/common/ToastContainer";
 import AllRouter from "./routers/AllRouter";
 
 function App() {
   return (
-   <>
-   <AllRouter></AllRouter>
-   </>
+    <>
+      <AllRouter />
+      <ToastContainer />
+    </>
   );
 }
 

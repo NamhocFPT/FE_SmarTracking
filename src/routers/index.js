@@ -274,6 +274,10 @@ export const router = [
                 element: <GateAccessManagement />
             },
             {
+                path: 'room-access-logs',
+                element: <RoomAccessLogs />
+            },
+            {
                 path: 'user-journey',
                 element: <UserJourney />
             },
