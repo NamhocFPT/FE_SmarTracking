@@ -1,6 +1,8 @@
 import { Car } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import toast from '../../utils/toast';
 import { getMyVehicles, createMyVehicle, updateMyVehicle, toggleMyVehicleStatus, deleteMyVehicle } from '../../service/anprService';
 
 const MyVehicles = () => {
@@ -9,6 +11,7 @@ const MyVehicles = () => {
     const [error, setError] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentVehicle, setCurrentVehicle] = useState(null);
+    const [confirm, setConfirm] = useState(null);
 
     // Form state
     const [plateNumber, setPlateNumber] = useState('');
@@ -72,7 +75,7 @@ const MyVehicles = () => {
             handleCloseModal();
             fetchVehicles();
         } catch (err) {
-            alert('Có lỗi xảy ra: ' + (err.message || 'Vui lòng kiểm tra lại.'));
+            toast.error('Có lỗi xảy ra: ' + (err.message || 'Vui lòng kiểm tra lại.'));
         }
     };
 
@@ -82,23 +85,32 @@ const MyVehicles = () => {
             await toggleMyVehicleStatus(vehicle.id, { status: newStatus });
             fetchVehicles();
         } catch (err) {
-            alert('Lỗi thay đổi trạng thái');
+            toast.error('Lỗi thay đổi trạng thái phương tiện.');
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa phương tiện này?')) {
-            try {
-                await deleteMyVehicle(id);
-                fetchVehicles();
-            } catch (err) {
-                alert('Lỗi xóa phương tiện');
-            }
-        }
+    const handleDelete = (id) => {
+        setConfirm({
+            message: 'Bạn có chắc chắn muốn xóa phương tiện này?',
+            onConfirm: async () => {
+                try {
+                    await deleteMyVehicle(id);
+                    fetchVehicles();
+                } catch (err) {
+                    toast.error('Lỗi xóa phương tiện. Vui lòng thử lại.');
+                }
+            },
+        });
     };
 
     return (
         <>
+            <ConfirmDialog
+                isOpen={!!confirm}
+                message={confirm?.message}
+                onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+                onCancel={() => setConfirm(null)}
+            />
             <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up pb-8">
             <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-2">
                 <div>
