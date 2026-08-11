@@ -550,7 +550,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 fetchMediaFiles();
             } else {
                 setMediaFiles(originalMedia);
-                showToast(res?.error?.message || res?.message || 'Lỗi: Backend chưa hỗ trợ đổi tên file này', 'error');
+                showToast(res?.error?.message || res?.message || 'Chức năng đổi tên chưa được hỗ trợ', 'error');
             }
         } catch (error) {
             setMediaFiles(originalMedia);
@@ -569,7 +569,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         const newStatus = res.data?.status?.toLowerCase() || 'inactive';
                         if (newStatus !== recordingStatus) {
                             setRecordingStatus(newStatus);
-                            if (newStatus === 'completed') {
+                            if (newStatus === 'stopped') {
                                 showToast('Ghi hình đã hoàn tất, đang xử lý video.', 'success');
                                 fetchMediaFiles();
                             }

@@ -17,6 +17,8 @@ import AddExternalParticipantModal from '../../components/meeting/AddExternalPar
 import AddInternalParticipantModal from '../../components/meeting/AddInternalParticipantModal';
 import { removeInternalParticipant, removeExternalParticipant } from '../../service/businessAdminServices';
 import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import toast from '../../utils/toast';
 
 // BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval
 // khiến 2 trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã hủy".
@@ -40,6 +42,7 @@ const EmployeeMeetingDetail = () => {
     const [currentUser, setCurrentUser] = useState(null);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
+    const [confirm, setConfirm] = useState(null);
     const [mediaFiles, setMediaFiles] = useState([]);
     const [activeParticipantTab, setActiveParticipantTab] = useState('internal');
     const [internalPage, setInternalPage] = useState(1);
@@ -128,6 +131,7 @@ const EmployeeMeetingDetail = () => {
             id: p.userId || p.user_id || p.user?.id || p.id,
             fullName: p.fullName || p.full_name || p.user?.fullName || '',
             email: p.email || p.user?.email || '',
+            avatarUrl: p.avatarUrl || p.avatar_url || p.user?.avatarUrl || p.user?.avatar_url || '',
             participantRole: p.participantRole || p.participant_role || 'participant',
         }));
         const agenda = (dto.agendas || dto.agenda || []).map((a, idx) => ({
@@ -555,24 +559,28 @@ const EmployeeMeetingDetail = () => {
         setAgendaEditIndex(idx);
     };
 
-    const handleDeleteAttachment = async (agendaId, fileId) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa file đính kèm này?')) return;
-        try {
-            const res = await deleteAgendaAttachment(meeting.id, agendaId, fileId);
-            if (res?.success) {
-                setAgendaList(prev => prev.map(a => {
-                    if (a.id === agendaId && a.attachments) {
-                        return { ...a, attachments: a.attachments.filter(att => att.id !== fileId) };
+    const handleDeleteAttachment = (agendaId, fileId) => {
+        setConfirm({
+            message: 'Bạn có chắc chắn muốn xóa file đính kèm này?',
+            onConfirm: async () => {
+                try {
+                    const res = await deleteAgendaAttachment(meeting.id, agendaId, fileId);
+                    if (res?.success) {
+                        setAgendaList(prev => prev.map(a => {
+                            if (a.id === agendaId && a.attachments) {
+                                return { ...a, attachments: a.attachments.filter(att => att.id !== fileId) };
+                            }
+                            return a;
+                        }));
+                        fetchMeeting();
+                    } else {
+                        toast.error('Không thể xóa file.');
                     }
-                    return a;
-                }));
-                fetchMeeting();
-            } else {
-                alert('Không thể xóa file.');
-            }
-        } catch (e) {
-            alert('Lỗi khi xóa file.');
-        }
+                } catch (e) {
+                    toast.error('Lỗi khi xóa file.');
+                }
+            },
+        });
     };
 
     const handleDownloadFile = async (fileId) => {
@@ -587,11 +595,50 @@ const EmployeeMeetingDetail = () => {
                 a.click();
                 document.body.removeChild(a);
             } else {
-                alert('Không thể lấy link tải file.');
+                toast.error('Không thể lấy link tải file.');
             }
         } catch (e) {
-            alert('Lỗi khi lấy link tải file.');
+            toast.error('Lỗi khi lấy link tải file.');
         }
+    };
+
+    const handleRemoveInternalParticipant = (p) => {
+        setConfirm({
+            message: `Bạn có chắc chắn muốn xóa ${p.fullName || p.full_name} khỏi cuộc họp?`,
+            onConfirm: async () => {
+                try {
+                    const res = await removeInternalParticipant(meeting.id, p.id);
+                    if (res?.success) {
+                        setMeeting({ ...meeting, participants: meeting.participants.filter(pt => pt.id !== p.id) });
+                        setSuccessMsg('Đã xóa người tham dự.');
+                    } else {
+                        toast.error(res?.message || 'Xóa thất bại.');
+                    }
+                } catch (err) {
+                    toast.error('Lỗi hệ thống khi xóa.');
+                }
+            },
+        });
+    };
+
+    const handleRemoveExternalParticipant = (p) => {
+        setConfirm({
+            message: `Bạn có chắc chắn muốn xóa khách ${p.name || p.fullName || p.full_name} khỏi cuộc họp?`,
+            onConfirm: async () => {
+                try {
+                    const res = await removeExternalParticipant(meeting.id, p.id);
+                    if (res?.success) {
+                        const currentExternal = meeting.externalParticipants || meeting.external_participants || [];
+                        setMeeting({ ...meeting, externalParticipants: currentExternal.filter(pt => pt.id !== p.id), external_participants: currentExternal.filter(pt => pt.id !== p.id) });
+                        setSuccessMsg('Đã xóa khách ngoài.');
+                    } else {
+                        toast.error(res?.message || 'Xóa thất bại.');
+                    }
+                } catch (err) {
+                    toast.error('Lỗi hệ thống khi xóa khách.');
+                }
+            },
+        });
     };
 
     const handleSaveAgenda = async () => {
@@ -749,6 +796,12 @@ const EmployeeMeetingDetail = () => {
 
     return (
         <>
+            <ConfirmDialog
+                isOpen={!!confirm}
+                message={confirm?.message}
+                onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+                onCancel={() => setConfirm(null)}
+            />
             <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
                 {/* Header / Actions */}
                 <div className="flex justify-end gap-2 w-full">
@@ -1051,22 +1104,7 @@ const EmployeeMeetingDetail = () => {
                                                             </div>
                                                             {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                                                                 <button
-                                                                    onClick={async (e) => {
-                                                                        e.stopPropagation();
-                                                                        if (!window.confirm(`Bạn có chắc chắn muốn xóa ${p.fullName || p.full_name}?`)) return;
-                                                                        try {
-                                                                            const res = await removeInternalParticipant(meeting.id, p.id);
-                                                                            if (res?.success) {
-                                                                                setMeeting({ ...meeting, participants: meeting.participants.filter(pt => pt.id !== p.id) });
-                                                                                setSuccessMsg('Đã xóa người tham dự.');
-                                                                                setTimeout(() => setSuccessMsg(null), 3000);
-                                                                            } else {
-                                                                                alert(res?.message || 'Xóa thất bại');
-                                                                            }
-                                                                        } catch (err) {
-                                                                            alert('Lỗi hệ thống khi xóa');
-                                                                        }
-                                                                    }}
+                                                                    onClick={(e) => { e.stopPropagation(); handleRemoveInternalParticipant(p); }}
                                                                     className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
                                                                     title="Xóa người tham dự"
                                                                 >
@@ -1124,23 +1162,7 @@ const EmployeeMeetingDetail = () => {
                                                         </div>
                                                         {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
                                                             <button
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    if (!window.confirm(`Bạn có chắc chắn muốn xóa khách ${p.name || p.fullName || p.full_name}?`)) return;
-                                                                    try {
-                                                                        const res = await removeExternalParticipant(meeting.id, p.id);
-                                                                        if (res?.success) {
-                                                                            const currentExternal = meeting.externalParticipants || meeting.external_participants || [];
-                                                                            setMeeting({ ...meeting, externalParticipants: currentExternal.filter(pt => pt.id !== p.id), external_participants: currentExternal.filter(pt => pt.id !== p.id) });
-                                                                            setSuccessMsg('Đã xóa khách ngoài.');
-                                                                            setTimeout(() => setSuccessMsg(null), 3000);
-                                                                        } else {
-                                                                            alert(res?.message || 'Xóa thất bại');
-                                                                        }
-                                                                    } catch (err) {
-                                                                        alert('Lỗi hệ thống khi xóa khách');
-                                                                    }
-                                                                }}
+                                                                onClick={(e) => { e.stopPropagation(); handleRemoveExternalParticipant(p); }}
                                                                 className="p-1.5 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0"
                                                                 title="Xóa khách"
                                                             >
@@ -1744,7 +1766,7 @@ const EmployeeMeetingDetail = () => {
 
             {/* Participant Conflict Confirmation Modal */}
             {participantConflictModal.isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1798,7 +1820,7 @@ const EmployeeMeetingDetail = () => {
 
             {/* Room Capacity Warning Modal (422 ROOM_CAPACITY_WARNING) */}
             {roomCapacityModal.isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}

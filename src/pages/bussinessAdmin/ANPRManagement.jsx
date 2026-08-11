@@ -1,4 +1,5 @@
 import { Car, Image as ImageIcon, Search, Calendar as CalendarIcon, UserX, X, Mail, Phone, Briefcase } from 'lucide-react';
+import toast from '../../utils/toast';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import DatePicker from 'react-datepicker';
@@ -115,12 +116,12 @@ const ANPRManagement = () => {
                 vehicle_type: regType,
                 note: regNote
             });
-            alert('Đăng ký xe cho nhân viên thành công!');
+            toast.success('Đăng ký xe cho nhân viên thành công!');
             setRegPlate('');
             setRegNote('');
             setSelectedUser('');
         } catch (err) {
-            alert('Lỗi đăng ký xe: ' + (err.message || 'Thất bại'));
+            toast.error('Lỗi đăng ký xe: ' + (err.message || 'Thất bại'));
         }
     };
 

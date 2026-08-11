@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Sparkles, Plus, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileText, Sparkles, Plus, AlertTriangle, Loader2, Lock } from 'lucide-react';
 import { 
     getAiDraftConfig, 
     createAiDraftJob, 
@@ -23,26 +23,30 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
     const fetchState = useCallback(async () => {
         setStatus('loading');
         try {
-            // 1. Fetch AI config
-            const cfgRes = await getAiDraftConfig(meetingId);
-            if (cfgRes?.success) {
-                setConfig(cfgRes.data);
+            // 1. Fetch AI config — chỉ host mới có quyền truy cập endpoint này
+            if (isHost) {
+                const cfgRes = await getAiDraftConfig(meetingId);
+                if (cfgRes?.success) {
+                    setConfig(cfgRes.data);
+                }
             }
 
-            // 2. Fetch active AI jobs first to see if it's currently running
-            const jobsRes = await getAiDraftJobs(meetingId);
-            if (jobsRes?.success && jobsRes.data?.length > 0) {
-                const latestJob = jobsRes.data[0];
-                if (latestJob.status === 'queued' || latestJob.status === 'scheduled' || latestJob.status === 'running') {
-                    setActiveJobId(latestJob.jobId);
-                    setStatus('ai_running');
-                    return;
-                }
-                
-                // If completed, fetch the minutes
-                if (latestJob.status === 'completed' && latestJob.result?.minutesId) {
-                    await loadMinutesDetail(latestJob.result.minutesId);
-                    return;
+            // 2. Fetch active AI jobs — chỉ host mới có quyền
+            if (isHost) {
+                const jobsRes = await getAiDraftJobs(meetingId);
+                if (jobsRes?.success && jobsRes.data?.length > 0) {
+                    const latestJob = jobsRes.data[0];
+                    if (latestJob.status === 'queued' || latestJob.status === 'scheduled' || latestJob.status === 'running') {
+                        setActiveJobId(latestJob.jobId);
+                        setStatus('ai_running');
+                        return;
+                    }
+
+                    // If completed, fetch the minutes
+                    if (latestJob.status === 'completed' && latestJob.result?.minutesId) {
+                        await loadMinutesDetail(latestJob.result.minutesId);
+                        return;
+                    }
                 }
             }
 
@@ -68,7 +72,7 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
                 setStatus('error');
             }
         }
-    }, [meetingId]);
+    }, [meetingId, isHost]);
 
     const loadMinutesDetail = async (minutesId) => {
         try {
@@ -181,7 +185,22 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
         );
     }
 
-    // Empty state
+    // Empty state — non-host: hiển thị trạng thái khóa
+    if (!isHost) {
+        return (
+            <div className="bg-white rounded-3xl border border-platinum-tint shadow-sm-2 p-12 text-center flex flex-col items-center justify-center">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <Lock className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-base font-bold text-midnight-indigo mb-2">Chưa có Biên bản cuộc họp</h3>
+                <p className="text-xs text-slate-blue max-w-sm leading-relaxed">
+                    Host của cuộc họp chưa tạo biên bản. Chỉ Host mới có quyền tạo và chỉnh sửa biên bản.
+                </p>
+            </div>
+        );
+    }
+
+    // Empty state — host: hiển thị các tuỳ chọn tạo biên bản
     return (
         <div className="bg-white rounded-3xl border border-platinum-tint shadow-sm-2 p-12 text-center flex flex-col items-center justify-center">
             <div className="w-16 h-16 bg-cloud-mist rounded-full flex items-center justify-center mb-4">
@@ -192,27 +211,24 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
                 Cuộc họp này hiện chưa có biên bản chính thức nào được lưu. Bạn có thể tự soạn thảo thủ công hoặc để AI phân tích và tự động tạo.
             </p>
 
-            {isHost && (
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                    {config?.enabled !== false && (
-                        <button 
-                            onClick={handleCreateAiDraft}
-                            className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
-                        >
-                            <Sparkles className="w-4 h-4" /> Tóm tắt bằng AI
-                        </button>
-                    )}
-                    <button 
-                        onClick={handleCreateManual}
-                        className="px-5 py-2.5 border-2 border-platinum-tint text-slate-700 hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                {config?.enabled !== false && (
+                    <button
+                        onClick={handleCreateAiDraft}
+                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
                     >
-                        <Plus className="w-4 h-4" /> Tạo thủ công
+                        <Sparkles className="w-4 h-4" /> Tóm tắt bằng AI
                     </button>
-                </div>
-            )}
-            
-            {/* Cảnh báo cho Host nếu muốn tạo AI nhưng chưa có Transcript */}
-            {isHost && config?.enabled !== false && (transcriptStatus === 'empty' || transcriptStatus === 'loading') && (
+                )}
+                <button
+                    onClick={handleCreateManual}
+                    className="px-5 py-2.5 border-2 border-platinum-tint text-slate-700 hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                >
+                    <Plus className="w-4 h-4" /> Tạo thủ công
+                </button>
+            </div>
+
+            {config?.enabled !== false && (transcriptStatus === 'empty' || transcriptStatus === 'loading') && (
                 <p className="text-[10px] text-amber-600 mt-4 bg-amber-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" /> Tính năng AI yêu cầu phải có Bản ghi (Transcript) trước.
                 </p>

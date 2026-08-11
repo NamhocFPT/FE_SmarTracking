@@ -1,4 +1,5 @@
 import { Users, RefreshCw } from 'lucide-react';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -38,6 +39,7 @@ const UserManagement = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [confirm, setConfirm] = useState(null);
     const [isResyncing, setIsResyncing] = useState(false);
 
     // Global users map for avatars and phone numbers not returned by manage API
@@ -335,21 +337,25 @@ const UserManagement = () => {
         }
     };
 
-    const handleDeleteUser = async (user) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản ${user.fullName}?`)) return;
-        setError(null);
-        setSuccessMessage(null);
-        try {
-            const res = await deleteUser(user.id);
-            if (res?.success) {
-                setSuccessMessage('Đã xóa người dùng khỏi hệ thống.');
-                fetchUsers();
-            } else {
-                setError(res?.message || 'Không thể xóa tài khoản.');
-            }
-        } catch (err) {
-            setError(err?.message || err?.error?.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
-        }
+    const handleDeleteUser = (user) => {
+        setConfirm({
+            message: `Bạn có chắc chắn muốn xóa tài khoản của ${user.fullName}? Thao tác không thể hoàn tác.`,
+            onConfirm: async () => {
+                setError(null);
+                setSuccessMessage(null);
+                try {
+                    const res = await deleteUser(user.id);
+                    if (res?.success) {
+                        setSuccessMessage('Đã xóa người dùng khỏi hệ thống.');
+                        fetchUsers();
+                    } else {
+                        setError(res?.message || 'Không thể xóa tài khoản.');
+                    }
+                } catch (err) {
+                    setError(err?.message || err?.error?.message || 'Không thể xóa tài khoản. Vui lòng thử lại.');
+                }
+            },
+        });
     };
 
     // Open User logs modal (UC-ACC-07)
@@ -603,6 +609,13 @@ const UserManagement = () => {
 
     return (
         <div className="space-y-6 animate-fade-in-up">
+            <ConfirmDialog
+                isOpen={!!confirm}
+                message={confirm?.message}
+                confirmLabel="Xóa tài khoản"
+                onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
+                onCancel={() => setConfirm(null)}
+            />
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>

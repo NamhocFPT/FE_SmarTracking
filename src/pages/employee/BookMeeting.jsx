@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from '../../utils/toast';
 
 import { getAvailableRooms, createMeeting, addRecordingConfig, replaceAgendas, uploadAgendaAttachment, getUsers, getUserById, getUserPublicProfile } from '../../service/employeeServices';
 import { getDepartments, getDepartmentMembers } from '../../service/businessAdminServices';
@@ -582,7 +583,7 @@ const BookMeeting = () => {
                     .filter(r => r.email || r.employeeCode || r.fullName || r.organizationName || r.phoneNumber);
 
                 if (rawRows.length === 0) {
-                    alert('Tệp không có dữ liệu hoặc sai cấu trúc cột. Vui lòng tải lại file mẫu.');
+                    toast.error('Tệp không có dữ liệu hoặc sai cấu trúc cột. Vui lòng tải lại file mẫu.');
                     return;
                 }
 
@@ -636,7 +637,7 @@ const BookMeeting = () => {
                 setImportPreview(parsed);
             } catch (err) {
                 console.error('Failed to parse excel file', err);
-                alert('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
+                toast.error('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
             } finally {
                 setImportProcessing(false);
             }
@@ -685,7 +686,7 @@ const BookMeeting = () => {
     const handleConfirmImport = () => {
         const hasErrors = importPreview.some(item => item.error !== '');
         if (hasErrors) {
-            alert('Vui lòng loại bỏ hoặc sửa các dòng bị lỗi trước khi xác nhận.');
+            toast.warning('Vui lòng loại bỏ hoặc sửa các dòng bị lỗi trước khi xác nhận.');
             return;
         }
 

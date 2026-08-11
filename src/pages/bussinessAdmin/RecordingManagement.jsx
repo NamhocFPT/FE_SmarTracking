@@ -1,5 +1,6 @@
 import { AlertTriangle, Calendar, CheckCircle, Clock, Download, EyeOff, Film, HardDrive, Info, Play, RefreshCw, Search, Trash2, Video, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+import toast from '../../utils/toast';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -415,7 +416,7 @@ const RecordingManagement = () => {
                                                 )}
                                                 {(rec.status === 'failed' || rec.status === 'FAILED') && rec.errorMessage && (
                                                     <button
-                                                        onClick={() => alert(`Lỗi: ${rec.errorMessage}`)}
+                                                        onClick={() => toast.error(`Lỗi ghi hình: ${rec.errorMessage}`)}
                                                         className="p-1.5 hover:text-red-700 hover:bg-red-50 text-slate-blue rounded-lg transition-colors"
                                                         title="Xem chi tiết lỗi"
                                                     >
