@@ -650,3 +650,21 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - src/pages/shared/EmployeeOnTimeAnalytics.jsx
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Refactor: Di chuyển Room Detail thành Modal và đồng bộ API Schema
+
+- **Phân tích**: Thay đổi cách hiển thị chi tiết phòng từ dạng trang inline sang Modal có hiệu ứng làm mờ nền toàn màn hình (`backdrop-blur-xl`). Đồng bộ hóa việc sử dụng các trường thông tin realtime từ API mới (`occupancyStatus`, `upcomingBookings`).
+- **Thay đổi**:
+  - Cập nhật [RoomManagement.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/bussinessAdmin/RoomManagement.jsx):
+    - Tách logic hiển thị chi tiết phòng thành Modal sử dụng `createPortal` và `backdrop-blur-xl`.
+    - Gọi API `getRoomDetail(roomId)` thực tế để lấy dữ liệu tĩnh đầy đủ cùng với realtime `occupancyStatus` và danh sách 5 cuộc họp tiếp theo `upcomingBookings`.
+    - Định nghĩa các hằng số nhãn hiển thị trạng thái phòng `ADMIN_STATUS_LABELS` và No-show `getNoShowBadge`.
+  - Cập nhật [businessAdminServices.js](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/service/businessAdminServices.js):
+    - Thêm hàm `getRoomDetail` gọi tới `GET /rooms/:roomId`.
+- **Tập tin ảnh hưởng**:
+  - src/pages/bussinessAdmin/RoomManagement.jsx
+  - src/service/businessAdminServices.js
+- **Trạng thái**: Đã hoàn thành.
