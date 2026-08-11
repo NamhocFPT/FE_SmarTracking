@@ -605,3 +605,16 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - docs/be-zone-access-log-requirement.md
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Fix: Sửa lỗi backdrop blur không phủ toàn bộ màn hình khi hiện Modal Xác nhận ban hành biên bản
+
+- **Phân tích**: Lớp phủ nền (backdrop) của Modal "Xác nhận ban hành biên bản" trong `MinutesViewerEditor.jsx` bị giới hạn phạm vi hiển thị do bị ảnh hưởng bởi ngữ cảnh xếp chồng (stacking context) tạo ra bởi các component cha (ví dụ: transform chuyển trang).
+- **Thay đổi**:
+  - Nhập và tích hợp `createPortal` từ thư viện `react-dom`.
+  - Bọc phần render Modal vào `createPortal` để đưa nó ra gốc `document.body`, giúp lớp phủ `fixed inset-0` giãn ra toàn bộ viewport và hiển thị hiệu ứng blur chuẩn xác.
+- **Tập tin ảnh hưởng**:
+  - src/components/minutes/MinutesViewerEditor.jsx
+- **Trạng thái**: Đã hoàn thành.
