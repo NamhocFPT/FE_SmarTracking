@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from '../../utils/toast';
 import { 
@@ -445,47 +446,50 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
             </div>
 
             {/* Backdrop Blur Issue Modal */}
-            <AnimatePresence>
-                {showIssueModal && (
-                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-950/40 backdrop-blur-md"
-                            onClick={() => setShowIssueModal(false)}
-                        />
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative z-10"
-                        >
-                            <h3 className="text-base font-bold text-midnight-indigo mb-2">Xác nhận ban hành biên bản</h3>
-                            <p className="text-xs text-slate-blue leading-relaxed mb-6">
-                                Sau khi ban hành, biên bản sẽ chuyển sang trạng thái <strong>Published</strong> và hệ thống sẽ gửi thông báo đến tất cả thành viên trong cuộc họp. Bạn sẽ không thể sửa nội dung biên bản sau bước này.
-                            </p>
-                            <div className="flex justify-end gap-3">
-                                <button 
-                                    onClick={() => setShowIssueModal(false)}
-                                    disabled={isIssuing}
-                                    className="px-4 py-2 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors"
-                                >
-                                    Hủy
-                                </button>
-                                <button 
-                                    onClick={handleIssue}
-                                    disabled={isIssuing}
-                                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm"
-                                >
-                                    {isIssuing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                                    Ban hành
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {createPortal(
+                <AnimatePresence>
+                    {showIssueModal && (
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                            <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-slate-950/40 backdrop-blur-md"
+                                onClick={() => setShowIssueModal(false)}
+                            />
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative z-10"
+                            >
+                                <h3 className="text-base font-bold text-midnight-indigo mb-2">Xác nhận ban hành biên bản</h3>
+                                <p className="text-xs text-slate-blue leading-relaxed mb-6">
+                                    Sau khi ban hành, biên bản sẽ chuyển sang trạng thái <strong>Published</strong> và hệ thống sẽ gửi thông báo đến tất cả thành viên trong cuộc họp. Bạn sẽ không thể sửa nội dung biên bản sau bước này.
+                                </p>
+                                <div className="flex justify-end gap-3">
+                                    <button 
+                                        onClick={() => setShowIssueModal(false)}
+                                        disabled={isIssuing}
+                                        className="px-4 py-2 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button 
+                                        onClick={handleIssue}
+                                        disabled={isIssuing}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm"
+                                    >
+                                        {isIssuing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                        Ban hành
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* Export and Share Modals */}
             <ExportMinutesModal 
