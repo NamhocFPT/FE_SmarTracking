@@ -419,12 +419,18 @@ export const deleteAgendaAttachment = async (meetingId, agendaId, fileId) => {
 };
 
 /**
- * Get rooms available in a given time range
+ * Lấy danh sách phòng đủ sức chứa để hiển thị trong form đặt lịch.
+ * BE chưa có GET /rooms/available (lọc conflict theo khung giờ) — tạm dùng
+ * GET /rooms/search?minCapacity=X cho đến khi BE cung cấp endpoint chuyên trách.
+ * Conflict thật vẫn được kiểm tra server-side khi gọi POST /meetings.
  * @param {object} params - { startTime, endTime, minCapacity }
  */
 export const getAvailableRooms = async (params = {}) => {
-    const query = buildQuery(params);
-    return await get(`/rooms/available${query}`);
+    const { minCapacity } = params;
+    const searchParams = {};
+    if (minCapacity) searchParams.minCapacity = minCapacity;
+    const query = buildQuery(searchParams);
+    return await get(`/rooms/search${query}`);
 };
 
 /**
