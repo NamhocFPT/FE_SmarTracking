@@ -90,8 +90,7 @@ export const updateUserRoles = async (userId, data) => {
 
 export const lockUser = async (userId, data = {}) => {
     return await patch(`/users/${userId}/lock`, {
-        reason: data.reason || 'Vi phạm quy định bảo mật',
-        lockedUntil: data.lockedUntil || null
+        reason: data.reason || 'Vi phạm quy định bảo mật'
     });
 };
 

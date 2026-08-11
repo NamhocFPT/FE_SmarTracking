@@ -1,7 +1,8 @@
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Briefcase, Mail, Phone, X } from 'lucide-react';
 import { useState, useEffect, useCallback } from "react";
 
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     getAvatarSubmissions,
     getAvatarSubmissionDetail,
@@ -10,6 +11,7 @@ import {
     rejectAvatarSubmission,
 } from "../../service/avatarReviewService";
 import { getDepartments } from "../../service/sysAdminServices";
+import { getUserById } from "../../service/businessAdminServices";
 import UserAvatar from "../../components/common/UserAvatar";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 
@@ -342,6 +344,36 @@ const BiometricSubmissionsReview = () => {
     // Detail modal
     const [selectedId, setSelectedId] = useState(null);
 
+    // User profile detail modal state
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [userDetail, setUserDetail] = useState(null);
+    const [userDetailLoading, setUserDetailLoading] = useState(false);
+    const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+
+    const handleOpenUserDetail = async (userId, baseInfo) => {
+        if (!userId) return;
+        setSelectedUser(baseInfo);
+        setUserDetail(null);
+        setIsUserModalOpen(true);
+        setUserDetailLoading(true);
+        try {
+            const res = await getUserById(userId);
+            if (res?.success && res.data) {
+                setUserDetail(res.data);
+            }
+        } catch (err) {
+            console.error("Lỗi lấy chi tiết người dùng:", err);
+        } finally {
+            setUserDetailLoading(false);
+        }
+    };
+
+    const closeUserModal = () => {
+        setIsUserModalOpen(false);
+        setSelectedUser(null);
+        setUserDetail(null);
+    };
+
     // Debounce search
     const [debouncedSearch, setDebouncedSearch] = useState("");
     useEffect(() => {
@@ -511,13 +543,25 @@ const BiometricSubmissionsReview = () => {
                                 submissions.map((sub) => (
                                     <tr key={sub.id || sub.faceProfileId} className="border-b border-platinum-tint/50 hover:bg-cloud-mist/50 transition-colors">
                                         <td className="px-4 py-3">
-                                            <UserAvatar
-                                                user={sub.user || sub}
-                                                name={sub.fullName || sub.user?.fullName}
-                                                className="w-9 h-9 rounded-full shrink-0 font-bold text-sm"
-                                            />
+                                            <div
+                                                onClick={() => handleOpenUserDetail(sub.user?.id || sub.userId || sub.id, sub.user || sub)}
+                                                className="cursor-pointer transition-transform hover:scale-105 inline-block"
+                                            >
+                                                <UserAvatar
+                                                    user={sub.user || sub}
+                                                    name={sub.fullName || sub.user?.fullName}
+                                                    className="w-9 h-9 rounded-full shrink-0 font-bold text-sm"
+                                                />
+                                            </div>
                                         </td>
-                                        <td className="px-4 py-3 font-semibold text-midnight-indigo">{sub.fullName || sub.user?.fullName || ""}</td>
+                                        <td className="px-4 py-3">
+                                            <span
+                                                onClick={() => handleOpenUserDetail(sub.user?.id || sub.userId || sub.id, sub.user || sub)}
+                                                className="font-semibold text-midnight-indigo cursor-pointer hover:text-action-blue hover:underline transition-colors"
+                                            >
+                                                {sub.fullName || sub.user?.fullName || ""}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-3 text-slate-blue">{sub.email || sub.user?.email || ""}</td>
                                         <td className="px-4 py-3 text-slate-blue">{sub.employeeCode || ""}</td>
                                         <td className="px-4 py-3 text-slate-blue">{sub.department?.departmentName || sub.department?.name || sub.user?.department?.name || ""}</td>
@@ -574,6 +618,69 @@ const BiometricSubmissionsReview = () => {
                     onClose={() => setSelectedId(null)}
                     onActionComplete={handleActionComplete}
                 />
+            )}
+
+            {/* User detail modal */}
+            {isUserModalOpen && selectedUser && createPortal(
+                <AnimatePresence>
+                    <motion.div key="user-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/60 backdrop-blur-md"
+                        onClick={closeUserModal}>
+                        <motion.div key="user-modal" initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+                            onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-platinum-tint bg-cloud-mist">
+                                <h3 className="text-base font-extrabold text-midnight-indigo">Thông tin người dùng</h3>
+                                <button onClick={closeUserModal} className="p-1.5 rounded-lg text-slate-400 hover:text-midnight-indigo hover:bg-slate-200 transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            {(() => {
+                                const d    = userDetail || selectedUser;
+                                const name = d.fullName || d.full_name || 'Không có tên';
+                                const email = d.email || 'Chưa cập nhật';
+                                const phone = d.phoneNumber || d.phone_number || d.phone || 'Chưa cập nhật';
+                                const dept  = d.department?.departmentName || d.department || d.departmentName || d.department?.name || 'Chưa cập nhật';
+                                const code  = d.employeeCode || d.employee_code;
+                                return (
+                                    <div className="p-6 overflow-y-auto">
+                                        <div className="flex flex-col items-center mb-6">
+                                            {userDetailLoading ? (
+                                                <div className="w-24 h-24 rounded-full border-4 border-cloud-mist bg-slate-100 flex items-center justify-center mb-4">
+                                                    <div className="w-8 h-8 border-4 border-action-blue/20 border-t-action-blue rounded-full animate-spin" />
+                                                </div>
+                                            ) : (
+                                                <UserAvatar user={userDetail || selectedUser} name={name}
+                                                    className="w-24 h-24 rounded-full text-3xl mb-4 border-4 border-cloud-mist shadow-sm" />
+                                            )}
+                                            <h4 className="text-xl font-extrabold text-midnight-indigo text-center">{name}</h4>
+                                            {code && <span className="mt-1.5 text-[11px] font-mono text-slate-blue bg-cloud-mist px-2.5 py-0.5 rounded-full border border-platinum-tint">{code}</span>}
+                                        </div>
+                                        <div className="space-y-3">
+                                            {[
+                                                { icon: Briefcase, label: 'Phòng ban',     value: dept },
+                                                { icon: Mail,      label: 'Email',          value: email },
+                                                { icon: Phone,     label: 'Số điện thoại', value: phone },
+                                            ].map(({ icon: Icon, label, value }) => (
+                                                <div key={label} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-action-blue shadow-sm flex-shrink-0">
+                                                        <Icon className="w-5 h-5" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-[11px] font-semibold text-slate-blue">{label}</p>
+                                                        <p className="text-sm font-bold text-midnight-indigo truncate">{value}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </motion.div>
+                    </motion.div>
+                </AnimatePresence>,
+                document.body
             )}
         </div>
     );
