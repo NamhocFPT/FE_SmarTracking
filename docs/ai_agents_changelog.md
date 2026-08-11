@@ -547,3 +547,74 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
   - Hi?n spinner loading trong avatar slot khi dang fetch.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
 - **Tr?ng th�i**: �� ho�n th�nh.
+
+
+---
+
+## [2026-08-11] Fix: Sửa lỗi cảnh báo React key trong RoomManagement
+
+- **Phân tích**: Cảnh báo React "Each child in a list should have a unique 'key' prop" xuất hiện khi hiển thị danh sách phòng họp tại RoomManagement do trường `room.id` có thể không tồn tại hoặc bị undefined khi API trả về cấu trúc `roomId`.
+- **Thay đổi**:
+  - Cập nhật thuộc tính `key` của thẻ `tr` trong bảng danh sách phòng họp thành `room.id || room.roomId || idx` để đảm bảo luôn luôn có một key duy nhất.
+  - Cập nhật các lệnh gọi API `updateRoom` và `deleteRoom` để hỗ trợ cả `room.roomId` bằng cách sử dụng fallback `room.id || room.roomId`.
+- **Tập tin ảnh hưởng**: src/pages/bussinessAdmin/RoomManagement.jsx.
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Fix: Tích hợp Avatar và Modal Chi tiết Người dùng trong BiometricSubmissionsReview
+
+- **Phân tích**: Người dùng muốn khi nhấp vào một người dùng trên danh sách duyệt ảnh sinh trắc học thì hiển thị Modal thông tin chi tiết của người dùng đó (ảnh đại diện, họ tên, phòng ban, email, số điện thoại, mã nhân viên). Đồng thời, danh sách duyệt cần hiển thị ảnh đại diện của người dùng.
+- **Thay đổi**:
+  - Tạo mới tài liệu yêu cầu Backend: [be-biometric-submission-avatar-requirement.md](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/docs/be-biometric-submission-avatar-requirement.md) mô tả chi tiết yêu cầu bổ sung trường `avatarUrl` trong API danh sách và chi tiết duyệt.
+  - Cập nhật trang [BiometricSubmissionsReview.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/bussinessAdmin/BiometricSubmissionsReview.jsx):
+    - Thêm các imports cho `Briefcase`, `Mail`, `Phone`, `X`, `motion`, `AnimatePresence`, và API `getUserById`.
+    - Triển khai các state mới và hàm `handleOpenUserDetail` / `closeUserModal` để tải thông tin người dùng từ endpoint `/users/:id` thông qua service `getUserById`.
+    - Gán sự kiện `onClick` lên `UserAvatar` và Họ tên của người dùng trong bảng danh sách để mở Modal chi tiết.
+    - Render Modal chi tiết thông tin người dùng responsive và sử dụng hiệu ứng động từ `framer-motion`.
+- **Tập tin ảnh hưởng**:
+  - src/pages/bussinessAdmin/BiometricSubmissionsReview.jsx
+  - docs/be-biometric-submission-avatar-requirement.md
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Fix: Tìm kiếm Nhân viên theo Mã nhân viên (Employee Code) trong UserJourney
+
+- **Phân tích**: Người dùng muốn thanh tìm kiếm nhân viên trong màn hình Hành trình khuôn viên (User Journey) phải hỗ trợ tìm kiếm trên toàn hệ thống và cho phép tìm kiếm theo cả họ tên, email hoặc mã nhân viên. Dựa vào tài liệu API, tham số `search` của API `GET /users` hiện mới chỉ hỗ trợ tìm kiếm theo tên hoặc email. Do đó cần gửi yêu cầu cho Backend và cập nhật giao diện Frontend để tương thích và hiển thị mã nhân viên.
+- **Thay đổi**:
+  - Tạo mới tài liệu yêu cầu Backend: [be-users-search-by-employeecode-requirement.md](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/docs/be-users-search-by-employeecode-requirement.md) mô tả chi tiết yêu cầu Backend mở rộng bộ lọc so khớp trường `employeeCode` trong API `/users`.
+  - Cập nhật trang [UserJourney.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/shared/UserJourney.jsx):
+    - Sửa placeholder của ô tìm kiếm thành `"Nhập tên, email hoặc mã nhân viên..."`.
+    - Cập nhật giao diện dropdown Autocomplete để hiển thị thêm mã nhân viên (`employeeCode` hoặc `employee_code`) dạng huy hiệu (badge) nhỏ bên cạnh họ tên.
+- **Tập tin ảnh hưởng**:
+  - src/pages/shared/UserJourney.jsx
+  - docs/be-users-search-by-employeecode-requirement.md
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Document: Tài liệu yêu cầu Backend cho API Nhật ký ra/vào khu vực (Zone Access Log)
+
+- **Phân tích**: Giao diện Quản lý Khu vực (Zone Management) gọi API `GET /ivss/zones/:zoneId/access-log` để lấy nhật ký ra vào. Endpoint này hiện chưa được định nghĩa trên Backend, và việc truy cập vào tiền tố `/ivss/*` bị chặn bởi quyền `ivss.access_log.read` (chỉ cấp mặc định cho SYSTEM_ADMIN).
+- **Thay đổi**:
+  - Tạo mới tài liệu yêu cầu Backend: [be-zone-access-log-requirement.md](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/docs/be-zone-access-log-requirement.md) đặc tả chi tiết yêu cầu Backend bổ sung endpoint `GET /ivss/zones/:zoneId/access-log` và xử lý nghiệp vụ truy vấn từ bảng sự kiện hiện diện khu vực (`zone_presence_events`).
+- **Tập tin ảnh hưởng**:
+  - docs/be-zone-access-log-requirement.md
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Fix: Sửa lỗi backdrop blur không phủ toàn bộ màn hình khi hiện Modal Xác nhận ban hành biên bản
+
+- **Phân tích**: Lớp phủ nền (backdrop) của Modal "Xác nhận ban hành biên bản" trong `MinutesViewerEditor.jsx` bị giới hạn phạm vi hiển thị do bị ảnh hưởng bởi ngữ cảnh xếp chồng (stacking context) tạo ra bởi các component cha (ví dụ: transform chuyển trang).
+- **Thay đổi**:
+  - Nhập và tích hợp `createPortal` từ thư viện `react-dom`.
+  - Bọc phần render Modal vào `createPortal` để đưa nó ra gốc `document.body`, giúp lớp phủ `fixed inset-0` giãn ra toàn bộ viewport và hiển thị hiệu ứng blur chuẩn xác.
+- **Tập tin ảnh hưởng**:
+  - src/components/minutes/MinutesViewerEditor.jsx
+- **Trạng thái**: Đã hoàn thành.

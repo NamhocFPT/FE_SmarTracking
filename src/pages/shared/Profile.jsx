@@ -145,7 +145,7 @@ const Profile = () => {
     }, []);
 
     useEffect(() => { fetchProfileData(); }, [fetchProfileData]);
-    useEffect(() => { fetchBiometricStatus(); }, [fetchBiometricStatus]);
+    useEffect(() => { if (showFaceRegisterBtn) fetchBiometricStatus(); }, [fetchBiometricStatus, showFaceRegisterBtn]);
 
     useEffect(() => {
         if (profile && profile.hasFaceProfile === false) {
@@ -338,7 +338,7 @@ const Profile = () => {
                         <span className="inline-flex text-[10px] px-2.5 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">{roleLabel}</span>
                     </div>
 
-                    {!biometricStatusLoading && biometricStatus && (
+                    {showFaceRegisterBtn && !biometricStatusLoading && biometricStatus && (
                         <div className="w-full mt-3">
                             <div className="w-full flex flex-col p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
                                 <span className="block text-[10px] font-bold text-slate-blue uppercase text-left">Trạng thái duyệt ảnh FaceID</span>
@@ -365,6 +365,7 @@ const Profile = () => {
                         </div>
                     )}
 
+                    {showFaceRegisterBtn && (<>
                     <div className="w-full border-t border-platinum-tint/60 my-5" />
                     <div className="w-full flex flex-col gap-3.5 p-3.5 bg-cloud-mist rounded-xl border border-outline-gray/60">
                         <div className="flex items-center justify-between w-full">
@@ -376,15 +377,14 @@ const Profile = () => {
                                 {profile?.hasFaceProfile ? "Đã hợp lệ" : "Chưa đăng ký"}
                             </span>
                         </div>
-                        {showFaceRegisterBtn && (
-                            <button type="button" onClick={() => navigate(rolePath + "/face-register")} className="w-full py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-16v.01M4 12H2m2 0h2v-4m0 16v.01M8 12v.01M16 12v.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                                {profile?.hasFaceProfile ? "Cập nhật khuôn mặt" : "Đăng ký khuôn mặt ngay"}
-                            </button>
-                        )}
+                        <button type="button" onClick={() => navigate(rolePath + "/face-register")} className="w-full py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-16v.01M4 12H2m2 0h2v-4m0 16v.01M8 12v.01M16 12v.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            {profile?.hasFaceProfile ? "Cập nhật khuôn mặt" : "Đăng ký khuôn mặt ngay"}
+                        </button>
                     </div>
+                    </>)}
                 </div>
 
                 <div className="md:col-span-2 space-y-6">
@@ -605,8 +605,8 @@ const Profile = () => {
                 document.body
             )}
 
-            {/* Biometric FaceID Upload Modal */}
-            {createPortal(
+            {/* Biometric FaceID Upload Modal — chỉ hiển thị với employee/manager */}
+            {showFaceRegisterBtn && createPortal(
                 <AnimatePresence>
                     {biometricModalOpen && (
                         <motion.div

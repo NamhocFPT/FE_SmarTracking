@@ -70,9 +70,8 @@ const STATIC_NAVIGATION_ITEMS = [
         children: [
             { label: 'Ghi hình', to: '/business-admin/recordings', icon: Video },
             { label: 'Khu vực giám sát', to: '/business-admin/zones', icon: Map },
-            { label: 'Kiểm soát cổng', to: '/business-admin/gate-access', icon: Key },
             { label: 'Hành trình khuôn viên', to: '/business-admin/user-journey', icon: MapPin },
-            { label: 'Kiểm soát phương tiện', to: '/business-admin/anpr-management', icon: Car },
+            { label: 'Kiểm soát ra vào cổng', to: '/business-admin/anpr-management', icon: Car },
             { label: 'Danh sách biển số kiểm soát', to: '/business-admin/vehicle-control-list', icon: ClipboardList },
             { label: 'Cảnh báo an ninh', to: '/business-admin/security-alerts', icon: AlertTriangle },
         ],

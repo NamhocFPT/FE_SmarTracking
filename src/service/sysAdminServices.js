@@ -598,6 +598,12 @@ export const getRoomAccessLog = async (roomId, date, params = {}) => {
     return await get(`/ivss/rooms/${roomId}/access-log${query}`);
 };
 
+// UC-IVSS-ZONE — Nhật ký ra/vào khu vực (mirror getRoomAccessLog)
+export const getZoneAccessLog = async (zoneId, date, params = {}) => {
+    const query = buildQuery({ date, ...params });
+    return await get(`/ivss/zones/${zoneId}/access-log${query}`);
+};
+
 export const getEventSnapshot = async (eventId) => {
     const token = localStorage.getItem('token');
     try {

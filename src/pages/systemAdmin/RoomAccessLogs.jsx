@@ -590,7 +590,7 @@ const RoomAccessLogs = () => {
                                                         title={ev.userId ? 'Xem chi tiết người dùng' : undefined}
                                                     >
                                                         <UserAvatar
-                                                            user={ev.userId ? usersMap[ev.userId] : null}
+                                                            user={ev.user || (ev.userId ? usersMap[ev.userId] : null)}
                                                             name={name}
                                                             className={`w-8 h-8 rounded-full border flex-shrink-0 text-[10px] font-bold shadow-sm transition-all ${
                                                                 status === 'stranger' ? 'border-red-300' : status === 'unmatched' ? 'border-amber-300' : 'border-platinum-tint group-hover:border-action-blue'

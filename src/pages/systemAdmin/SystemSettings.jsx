@@ -38,13 +38,19 @@ const SystemSettings = () => {
     // với /system-configurations, đúng theo PLAN FE gửi Nam 2026-08-06)
     const [noShowConfig, setNoShowConfig] = useState({
         thresholdMinutes: 15,
+        warningGraceMinutes: 2,
         autoReleaseGraceMinutes: 5,
-        autoReleaseEnabled: true
+        autoReleaseEnabled: true,
+        presenceConfirmSeconds: 30,
+        presenceNoiseToleranceSeconds: 5
     });
     const [dbNoShowConfig, setDbNoShowConfig] = useState({
         thresholdMinutes: 15,
+        warningGraceMinutes: 2,
         autoReleaseGraceMinutes: 5,
-        autoReleaseEnabled: true
+        autoReleaseEnabled: true,
+        presenceConfirmSeconds: 30,
+        presenceNoiseToleranceSeconds: 5
     });
 
     // Cấu hình Security Alerts (nguồn riêng: GET/PUT /security-alerts-config)
@@ -92,7 +98,8 @@ const SystemSettings = () => {
         checkin_out: 'Check-in/out phòng họp',
         zone: 'Hiện diện khu vực (Zone)',
         headcount: 'Đếm người / Ghi hình',
-        gate: 'Cổng / ANPR'
+        gate: 'Cổng / ANPR',
+        conflict: 'Xung đột cấu hình'
     };
 
     const DIRECTION_LABELS = { enter: 'Vào', leave: 'Ra', seen: 'Hiện diện' };
@@ -141,8 +148,11 @@ const SystemSettings = () => {
             const nsData = noShowRes.data;
             const mergedNoShow = {
                 thresholdMinutes: nsData.thresholdMinutes?.value ?? noShowConfig.thresholdMinutes,
+                warningGraceMinutes: nsData.warningGraceMinutes?.value ?? noShowConfig.warningGraceMinutes,
                 autoReleaseGraceMinutes: nsData.autoReleaseGraceMinutes?.value ?? noShowConfig.autoReleaseGraceMinutes,
-                autoReleaseEnabled: nsData.autoReleaseEnabled?.value ?? noShowConfig.autoReleaseEnabled
+                autoReleaseEnabled: nsData.autoReleaseEnabled?.value ?? noShowConfig.autoReleaseEnabled,
+                presenceConfirmSeconds: nsData.presenceConfirmSeconds?.value ?? noShowConfig.presenceConfirmSeconds,
+                presenceNoiseToleranceSeconds: nsData.presenceNoiseToleranceSeconds?.value ?? noShowConfig.presenceNoiseToleranceSeconds
             };
             setNoShowConfig(mergedNoShow);
             setDbNoShowConfig(mergedNoShow);
@@ -261,8 +271,20 @@ const SystemSettings = () => {
             setError('Ngưỡng phát hiện vắng mặt phải là số nguyên dương.');
             return false;
         }
+        if (Number(noShow.warningGraceMinutes) <= 0) {
+            setError('Thời gian cảnh báo phải là số nguyên dương.');
+            return false;
+        }
         if (Number(noShow.autoReleaseGraceMinutes) <= 0) {
             setError('Thời gian chờ phản hồi phải là số nguyên dương.');
+            return false;
+        }
+        if (Number(noShow.presenceConfirmSeconds) <= 0) {
+            setError('Thời gian có mặt tối thiểu phải là số nguyên dương.');
+            return false;
+        }
+        if (Number(noShow.presenceNoiseToleranceSeconds) < 0) {
+            setError('Độ trễ chấp nhận nhiễu cảm biến không được âm.');
             return false;
         }
         if (Number(data.recording_retention_days) <= 0) {
@@ -313,14 +335,14 @@ const SystemSettings = () => {
                 return updateSystemConfig({ key, value: valueString });
             });
 
-            // PUT /no-show-config — luôn gửi đủ 4 field theo đúng payload PLAN FE gửi Nam
-            // 2026-08-06 (warningGraceMinutes ẩn khỏi UI nhưng vẫn gửi ngầm = 0).
             if (noShowChanged) {
                 updatePromises.push(updateNoShowConfig({
                     thresholdMinutes: Number(noShowConfig.thresholdMinutes),
-                    warningGraceMinutes: 0,
+                    warningGraceMinutes: Number(noShowConfig.warningGraceMinutes),
                     autoReleaseGraceMinutes: Number(noShowConfig.autoReleaseGraceMinutes),
-                    autoReleaseEnabled: Boolean(noShowConfig.autoReleaseEnabled)
+                    autoReleaseEnabled: Boolean(noShowConfig.autoReleaseEnabled),
+                    presenceConfirmSeconds: Number(noShowConfig.presenceConfirmSeconds),
+                    presenceNoiseToleranceSeconds: Number(noShowConfig.presenceNoiseToleranceSeconds)
                 }));
             }
 
@@ -379,11 +401,15 @@ const SystemSettings = () => {
         const pZoneMap = maps['ivss.channel_presence_zone_map'] || {};
         const zMap = maps['ivss.channel_zone_map'] || {};
 
-        if (pZoneMap[channelId] !== undefined) {
+        if (pZoneMap[channelId] !== undefined && roomMap[channelId] === undefined) {
             return { role: 'zone', roomId: '', direction: '', zoneId: pZoneMap[channelId] };
         }
+        // FE-AP: xung đột — channel xuất hiện đồng thời trong presence_zone_map và room_map
+        if (pZoneMap[channelId] !== undefined && roomMap[channelId] !== undefined) {
+            return { role: 'conflict', roomId: roomMap[channelId], direction: dirMap[channelId] || '', zoneId: pZoneMap[channelId] };
+        }
         if (zMap[channelId] !== undefined) {
-            return { role: 'gate', roomId: '', direction: '', zoneId: zMap[channelId] };
+            return { role: 'gate', roomId: '', direction: dirMap[channelId] || 'enter', zoneId: zMap[channelId] };
         }
         if (roomMap[channelId] !== undefined && dirMap[channelId] !== undefined) {
             return { role: 'checkin_out', roomId: roomMap[channelId], direction: dirMap[channelId], zoneId: '' };
@@ -404,7 +430,9 @@ const SystemSettings = () => {
             case 'headcount':
                 return getRoomName(inferred.roomId);
             case 'gate':
-                return getZoneName(inferred.zoneId);
+                return `${getZoneName(inferred.zoneId)} · ${DIRECTION_LABELS[inferred.direction] || inferred.direction}`;
+            case 'conflict':
+                return `${getRoomName(inferred.roomId)} ↔ ${getZoneName(inferred.zoneId)}`;
             default:
                 return '—';
         }
@@ -461,7 +489,7 @@ const SystemSettings = () => {
             ...prev,
             role,
             roomId: (role === 'checkin_out' || role === 'headcount') ? prev.roomId : '',
-            direction: role === 'checkin_out' ? (prev.direction || 'enter') : '',
+            direction: (role === 'checkin_out' || role === 'gate') ? (prev.direction || 'enter') : '',
             zoneId: (role === 'zone' || role === 'gate') ? prev.zoneId : ''
         }));
     };
@@ -504,7 +532,7 @@ const SystemSettings = () => {
             setError('Vui lòng chọn Phòng.');
             return;
         }
-        if (channelEditor.role === 'checkin_out' && !channelEditor.direction) {
+        if ((channelEditor.role === 'checkin_out' || channelEditor.role === 'gate') && !channelEditor.direction) {
             setError('Vui lòng chọn Hướng.');
             return;
         }
@@ -532,6 +560,7 @@ const SystemSettings = () => {
                 newMaps['ivss.channel_presence_zone_map'][channelId] = channelEditor.zoneId;
             } else if (channelEditor.role === 'gate') {
                 newMaps['ivss.channel_zone_map'][channelId] = channelEditor.zoneId;
+                newMaps['ivss.channel_direction_map'][channelId] = channelEditor.direction;
             }
 
             await patchChangedChannelMaps(freshMaps, newMaps);
@@ -750,10 +779,27 @@ const SystemSettings = () => {
                                         </div>
                                     </div>
 
-                                    {/* Warning countdown minutes */}
+                                    {/* Warning grace minutes */}
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian cảnh báo trước khi nhả phòng</label>
+                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian gửi cảnh báo đến Host trước khi phòng bị thu hồi do no-show (phút).</span>
+                                        <div className="mt-3 relative">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="60"
+                                                value={noShowConfig.warningGraceMinutes}
+                                                onChange={(e) => handleNoShowChange('warningGraceMinutes', Number(e.target.value))}
+                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                            />
+                                            <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Auto-release grace minutes */}
                                     <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian chờ phản hồi</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian cho phép Host xác nhận trước khi nhả phòng (phút).</span>
+                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian cho phép Host xác nhận trước khi nhả phòng (phút). <span className="italic">Cần đủ dài để người tổ chức có cơ hội thực sự phản hồi cảnh báo trước khi phòng bị thu hồi.</span></span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
@@ -764,6 +810,40 @@ const SystemSettings = () => {
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Presence confirm seconds */}
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian có mặt tối thiểu để xác nhận tham dự</label>
+                                        <span className="text-xs text-steel-gray mt-0.5 block">Số giây cảm biến phát hiện có mặt liên tục trước khi hệ thống xác nhận check-in.</span>
+                                        <div className="mt-3 relative">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="300"
+                                                value={noShowConfig.presenceConfirmSeconds}
+                                                onChange={(e) => handleNoShowChange('presenceConfirmSeconds', Number(e.target.value))}
+                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                            />
+                                            <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">giây</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Presence noise tolerance seconds */}
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">Độ trễ chấp nhận nhiễu cảm biến</label>
+                                        <span className="text-xs text-steel-gray mt-0.5 block">Khoảng thời gian cảm biến mất tín hiệu ngắn được coi là nhiễu và không làm gián đoạn xác nhận có mặt (giây).</span>
+                                        <div className="mt-3 relative">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="60"
+                                                value={noShowConfig.presenceNoiseToleranceSeconds}
+                                                onChange={(e) => handleNoShowChange('presenceNoiseToleranceSeconds', Number(e.target.value))}
+                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                            />
+                                            <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">giây</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1032,7 +1112,7 @@ const SystemSettings = () => {
                                                 </div>
                                             )}
 
-                                            {channelEditor.role === 'checkin_out' && (
+                                            {(channelEditor.role === 'checkin_out' || channelEditor.role === 'gate') && (
                                                 <div className="space-y-1.5">
                                                     <label className="block text-xs font-bold text-slate-blue uppercase">Hướng</label>
                                                     <select
@@ -1107,8 +1187,8 @@ const SystemSettings = () => {
                                                         <tr key={row.id} className="hover:bg-cloud-mist/30 transition-colors">
                                                             <td className="px-3 py-2.5 font-mono text-xs font-semibold text-midnight-indigo text-center">{row.id}</td>
                                                             <td className="px-3 py-2.5 text-center">
-                                                                <span className="inline-flex px-2 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue">
-                                                                    {ROLE_LABELS[row.role]}
+                                                                <span className={`inline-flex px-2 py-1 rounded-full text-[11px] font-bold ${row.role === 'conflict' ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-action-blue'}`}>
+                                                                    {ROLE_LABELS[row.role] || row.role}
                                                                 </span>
                                                             </td>
                                                             <td className="px-3 py-2.5 text-slate-blue text-left">{row.detail}</td>
