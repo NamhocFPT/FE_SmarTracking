@@ -1,13 +1,228 @@
-import { AlertTriangle, Camera, CheckCircle, Edit2, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, Trash2, Video } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Video } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 import {
     getZones, getZoneById, createZone, updateZone,
     deleteZone, assignDeviceToZone, removeDeviceFromZone
 } from '../../service/zoneServices';
-import { getDevices } from '../../service/sysAdminServices';
+import { getDevices, getZoneAccessLog } from '../../service/sysAdminServices';
+import EventSnapshotModal from '../../components/security/EventSnapshotModal';
+import ThumbnailImage from '../../components/common/ThumbnailImage';
 
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+const getTodayVN = () => {
+    const d = new Date();
+    const vn = new Date(d.getTime() + (7 * 60 + d.getTimezoneOffset()) * 60 * 1000);
+    return vn.toISOString().slice(0, 10);
+};
+
+const fmtEventTime = (iso) => {
+    if (!iso) return '—';
+    try {
+        return new Date(iso).toLocaleTimeString('vi-VN', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'
+        });
+    } catch { return '—'; }
+};
+
+// ─── inline badges ───────────────────────────────────────────────────────────
+
+const ZoneDirectionBadge = ({ direction }) => {
+    if (direction === 'enter')
+        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><LogIn className="w-2.5 h-2.5" />Vào</span>;
+    if (direction === 'leave')
+        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 whitespace-nowrap"><LogOut className="w-2.5 h-2.5" />Ra</span>;
+    return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 whitespace-nowrap"><Eye className="w-2.5 h-2.5" />Thấy</span>;
+};
+
+const ZoneStatusBadge = ({ isStranger, isUnmatched }) => {
+    if (isStranger)
+        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
+    if (isUnmatched)
+        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 whitespace-nowrap"><ShieldQuestion className="w-2.5 h-2.5" />Chưa khớp</span>;
+    return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><ShieldCheck className="w-2.5 h-2.5" />Khớp</span>;
+};
+
+// ─── ZoneAccessLogCard ───────────────────────────────────────────────────────
+
+const ZONE_LOG_LIMIT = 15;
+
+const ZoneAccessLogCard = ({ zoneId }) => {
+    const [date, setDate] = useState(getTodayVN);
+    const [page, setPage] = useState(1);
+    const [events, setEvents] = useState([]);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+
+    // reset page when zone or date changes
+    const prevZoneRef = useRef(zoneId);
+    useEffect(() => {
+        if (prevZoneRef.current !== zoneId) {
+            prevZoneRef.current = zoneId;
+            setPage(1);
+        }
+    }, [zoneId]);
+
+    useEffect(() => { setPage(1); }, [date]);
+
+    const fetchLog = useCallback(async () => {
+        if (!zoneId) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await getZoneAccessLog(zoneId, date, { page, limit: ZONE_LOG_LIMIT });
+            if (res?.success && res.data) {
+                const evList = res.data.events || res.data.items || [];
+                setEvents(evList);
+                const pag = res.data.pagination || {};
+                const tp = pag.totalPages ?? Math.max(1, Math.ceil((pag.total ?? evList.length) / ZONE_LOG_LIMIT));
+                setTotalPages(tp);
+                setTotal(pag.total ?? pag.totalItems ?? evList.length);
+            } else {
+                throw new Error(res?.message || 'Không thể tải nhật ký.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Lỗi khi tải nhật ký ra vào.');
+        } finally {
+            setLoading(false);
+        }
+    }, [zoneId, date, page]);
+
+    useEffect(() => { fetchLog(); }, [fetchLog]);
+
+    const openSnapshot = (eventId) => {
+        setSnapshotEventId(eventId);
+        setIsSnapshotOpen(true);
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden">
+            {/* Card header */}
+            <div className="px-5 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                    <History className="w-4 h-4 text-action-blue" />
+                    Nhật ký ra vào khu vực
+                    {!loading && total > 0 && (
+                        <span className="text-[10px] font-bold text-slate-400 normal-case tracking-normal">({total} sự kiện)</span>
+                    )}
+                </h3>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="px-2.5 py-1.5 border border-platinum-tint rounded-xl text-xs text-midnight-indigo bg-white focus:outline-none focus:border-action-blue"
+                    />
+                    <button
+                        onClick={fetchLog}
+                        className="p-1.5 text-slate-blue hover:text-action-blue hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Làm mới"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+                <div className="mx-5 mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    {error}
+                </div>
+            )}
+
+            {/* Event list */}
+            <div className="divide-y divide-platinum-tint">
+                {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 px-5 py-3 animate-pulse">
+                            <div className="w-16 h-9 bg-slate-100 rounded-lg flex-shrink-0" />
+                            <div className="flex-1 space-y-1.5">
+                                <div className="h-3 bg-slate-100 rounded w-32" />
+                                <div className="h-2.5 bg-slate-100 rounded w-20" />
+                            </div>
+                            <div className="h-5 w-12 bg-slate-100 rounded-full" />
+                        </div>
+                    ))
+                ) : events.length === 0 ? (
+                    <div className="py-10 text-center text-slate-400">
+                        <History className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-xs">Không có sự kiện nào trong ngày này</p>
+                    </div>
+                ) : (
+                    events.map((ev) => {
+                        const time = fmtEventTime(ev.eventTime || ev.timestamp);
+                        const name = ev.fullName || (ev.isStranger ? 'Người lạ' : 'Không nhận diện được');
+                        const rowBg = ev.isStranger
+                            ? 'bg-red-50/60 border-l-2 border-l-red-400'
+                            : ev.isUnmatched
+                                ? 'bg-amber-50/40 border-l-2 border-l-amber-300'
+                                : '';
+                        return (
+                            <div key={ev.id} className={`flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50/60 transition-colors ${rowBg}`}>
+                                {/* Thumbnail */}
+                                <ThumbnailImage
+                                    eventId={ev.id}
+                                    onClick={() => openSnapshot(ev.id)}
+                                    className="w-16 aspect-video rounded-lg flex-shrink-0"
+                                />
+                                {/* Identity */}
+                                <div className="flex-1 min-w-0">
+                                    <p className={`text-xs font-bold truncate ${ev.isStranger ? 'text-red-700' : 'text-midnight-indigo'}`}>{name}</p>
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{time}</p>
+                                </div>
+                                {/* Badges */}
+                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                    <ZoneDirectionBadge direction={ev.direction} />
+                                    <ZoneStatusBadge isStranger={ev.isStranger} isUnmatched={ev.isUnmatched} />
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="px-5 py-3 border-t border-platinum-tint flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">Trang {page}/{totalPages}</span>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1 || loading}
+                            className="p-1.5 rounded-lg text-slate-blue hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages || loading}
+                            className="p-1.5 rounded-lg text-slate-blue hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Snapshot modal */}
+            <EventSnapshotModal
+                isOpen={isSnapshotOpen}
+                onClose={() => { setIsSnapshotOpen(false); setSnapshotEventId(null); }}
+                eventId={snapshotEventId}
+            />
+        </div>
+    );
+};
+
+// ─── main component ───────────────────────────────────────────────────────────
 
 const ZoneManagement = () => {
     // Data states
@@ -346,6 +561,9 @@ const ZoneManagement = () => {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Card 3: Nhật ký ra vào */}
+                                        <ZoneAccessLogCard zoneId={selectedZone.id} />
                                     </div>
                                 )}
                             </div>
