@@ -700,3 +700,20 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - src/pages/bussinessAdmin/RoomManagement.jsx
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Feat: Hỗ trợ xóa biên bản họp nháp (Draft) và sửa backdrop blur
+
+- **Phân tích**: Tích hợp API xoá biên bản họp nháp `DELETE /api/v1/meeting-minutes/:id` (UC-MKM-05) của Backend. Chỉ cho phép các vai trò được phân quyền (người tạo, host cuộc họp, admin) thực hiện xóa, và chỉ áp dụng khi trạng thái là `draft`. Sửa lỗi làm mờ nền (backdrop blur) của Modal xác nhận ban hành và Modal xóa.
+- **Thay đổi**:
+  - Cập nhật [MinutesViewerEditor.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/components/minutes/MinutesViewerEditor.jsx):
+    - Nhập API `deleteMeetingMinutes` và icon `Trash2`.
+    - Tính toán quyền xóa `canDelete` dựa trên vai trò hiện tại của user lấy từ `localStorage` và `isHost` prop.
+    - Thêm nút **Xóa** ở thanh công cụ header, nút này sẽ bị disable nếu trạng thái biên bản không phải là `draft` (ví dụ đã published).
+    - Triển khai Modal xác nhận xóa nháp sử dụng `createPortal` có nền làm mờ đầy đủ.
+    - Sửa lớp phủ nền của Modal xác nhận ban hành từ `absolute` thành `fixed` để làm mờ toàn bộ màn hình một cách hoàn chỉnh.
+- **Tập tin ảnh hưởng**:
+  - src/components/minutes/MinutesViewerEditor.jsx
+- **Trạng thái**: Đã hoàn thành.

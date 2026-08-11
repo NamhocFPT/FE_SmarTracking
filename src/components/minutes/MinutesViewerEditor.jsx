@@ -5,9 +5,9 @@ import toast from '../../utils/toast';
 import { 
     CheckCircle, AlertTriangle, Edit3, Save, X, 
     Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit,
-    Share2, Download
+    Share2, Download, Trash2
 } from 'lucide-react';
-import { updateMeetingMinutes, issueMeetingMinutes, distributeMeetingMinutes } from '../../service/minutesServices';
+import { updateMeetingMinutes, issueMeetingMinutes, distributeMeetingMinutes, deleteMeetingMinutes } from '../../service/minutesServices';
 import ExportMinutesModal from './ExportMinutesModal';
 import ShareMinutesModal from './ShareMinutesModal';
 
@@ -16,11 +16,13 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
     const [editForm, setEditForm] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     
-    // Modal state for Issue, Export, Share
+    // Modal state for Issue, Export, Share, Delete
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isIssuing, setIsIssuing] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [distributing, setDistributing] = useState(false);
 
     const showToast = (message, type = 'success') => {
@@ -112,8 +114,45 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
         }
     };
 
+    const handleDeleteMinutes = async () => {
+        setIsDeleting(true);
+        try {
+            const res = await deleteMeetingMinutes(minutes.id);
+            if (res?.success) {
+                const attachmentMsg = res.data?.cascadedAttachmentCount > 0 
+                    ? ` (Đã xóa kèm theo ${res.data.cascadedAttachmentCount} file đính kèm)` 
+                    : '';
+                showToast(`Đã xóa biên bản họp nháp thành công${attachmentMsg}!`);
+                setShowDeleteModal(false);
+                if (onRefresh) onRefresh();
+            } else {
+                showToast(res?.message || 'Lỗi khi xóa biên bản', 'error');
+            }
+        } catch (err) {
+            showToast(err.error?.message || err.message || 'Lỗi hệ thống khi xóa biên bản', 'error');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    // Lấy thông tin user đăng nhập để kiểm tra quyền
+    const localUserStr = localStorage.getItem('user');
+    let currentUser = null;
+    try {
+        currentUser = localUserStr ? JSON.parse(localUserStr) : null;
+    } catch (e) {
+        console.error('Lỗi phân tích user từ localStorage:', e);
+    }
+    const isAdmin = currentUser?.roles?.some(r => ['BUSINESS_ADMIN', 'SYSTEM_ADMIN'].includes(r.roleCode || r.role_code));
+    const isOwner = currentUser && (
+        currentUser.id === minutes.preparedById || 
+        currentUser.id === minutes.preparedBy?.id ||
+        currentUser.id === minutes.preparedBy
+    );
+
     const canEdit = (isHost || minutes.permissions?.canEdit) && minutes.status === 'draft';
     const canIssue = (isHost || minutes.permissions?.canIssue) && minutes.status === 'draft';
+    const canDelete = isHost || isOwner || isAdmin || minutes.permissions?.canDelete;
 
     const getConfidenceBadge = (confidence) => {
         switch (confidence) {
@@ -177,6 +216,16 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                                     className="px-3 py-1.5 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors flex items-center gap-1"
                                 >
                                     <Edit3 className="w-3.5 h-3.5" /> Sửa
+                                </button>
+                            )}
+                            {canDelete && (
+                                <button 
+                                    onClick={() => setShowDeleteModal(true)}
+                                    disabled={minutes.status !== 'draft' || isDeleting}
+                                    className="px-3 py-1.5 border border-red-200 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                    title={minutes.status !== 'draft' ? "Chỉ có thể xoá biên bản ở trạng thái nháp (draft)" : "Xoá biên bản nháp"}
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" /> Xóa
                                 </button>
                             )}
                             {canIssue && (
@@ -454,7 +503,7 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="absolute inset-0 bg-slate-950/40 backdrop-blur-md"
+                                className="fixed inset-0 bg-slate-950/40 backdrop-blur-md"
                                 onClick={() => setShowIssueModal(false)}
                             />
                             <motion.div 
@@ -482,6 +531,52 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                                     >
                                         {isIssuing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                                         Ban hành
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
+
+            {/* Backdrop Blur Delete Modal */}
+            {createPortal(
+                <AnimatePresence>
+                    {showDeleteModal && (
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                            <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 bg-slate-950/40 backdrop-blur-md"
+                                onClick={() => setShowDeleteModal(false)}
+                            />
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative z-10"
+                            >
+                                <h3 className="text-base font-bold text-midnight-indigo mb-2">Xác nhận xoá biên bản họp nháp</h3>
+                                <p className="text-xs text-slate-blue leading-relaxed mb-6">
+                                    Bạn có chắc chắn muốn xóa bản nháp của biên bản cuộc họp này? Thao tác này sẽ xóa biên bản và các tài liệu đính kèm liên quan. Hành động này không thể khôi phục lại.
+                                </p>
+                                <div className="flex justify-end gap-3">
+                                    <button 
+                                        onClick={() => setShowDeleteModal(false)}
+                                        disabled={isDeleting}
+                                        className="px-4 py-2 border border-platinum-tint text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist transition-colors"
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button 
+                                        onClick={handleDeleteMinutes}
+                                        disabled={isDeleting}
+                                        className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                                    >
+                                        {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                        Xóa bản nháp
                                     </button>
                                 </div>
                             </motion.div>
