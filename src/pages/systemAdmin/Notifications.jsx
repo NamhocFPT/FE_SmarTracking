@@ -8,6 +8,13 @@ import {
 } from '../../service/sysAdminServices';
 
 
+// Render notification body as HTML (BE intentionally sends <b>, <br/> markup).
+// Strips any <script> tags as a basic safeguard.
+const sanitizeBody = (html) => {
+    if (!html) return '';
+    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+};
+
 const Notifications = () => {
     const [notificationsList, setNotificationsList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -281,7 +288,10 @@ const Notifications = () => {
                                                 <span className="w-2 h-2 rounded-full bg-red-500" />
                                             )}
                                         </div>
-                                        <p className="text-xs text-slate-blue leading-relaxed">{noti.body}</p>
+                                        <p
+                                            className="text-xs text-slate-blue leading-relaxed"
+                                            dangerouslySetInnerHTML={{ __html: sanitizeBody(noti.body) }}
+                                        />
                                         {noti.payloadJson?.conflictDetails?.length > 0 && (
                                             <div className="bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-2 text-[11px] text-rose-800 space-y-1 mt-1">
                                                 <p className="font-semibold">Xung đột với:</p>

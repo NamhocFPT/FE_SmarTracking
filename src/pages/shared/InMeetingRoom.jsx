@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import logo from '../../assets/images/SmarTracking.png';
 
 import { getSocket, subscribeToMeeting } from '../../utils/socket';
-import { request } from '../../utils/request';
+import { request, patch } from '../../utils/request';
 import {
     getMeetingById as getMeetingEmployee,
     startMeeting as startEmployee,
@@ -233,6 +233,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [isRoomDevicesExpanded, setIsRoomDevicesExpanded] = useState(false);
     const [extensionModal, setExtensionModal] = useState({ isOpen: false, minutes: 15, reason: '' });
     const [pendingExtensions, setPendingExtensions] = useState([]);
+    const [noShowWarning, setNoShowWarning] = useState(null);
     const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
     const [isManualAttendanceExpanded, setIsManualAttendanceExpanded] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -618,6 +619,13 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 });
             }
         };
+        const onNoShowAlert = (data) => {
+            if (data?.kind === 'warning') {
+                setNoShowWarning({ caseId: data.caseId, kind: 'warning' });
+            } else if (data?.kind === 'released') {
+                setNoShowWarning({ kind: 'released' });
+            }
+        };
 
         s.on('meeting.session.started', onSessionStarted);
         s.on('meeting.session.ended', onSessionEnded);
@@ -625,6 +633,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         s.on('agenda:present_stopped', onAgendaPresentStopped);
         s.on('meeting.extension_request.created', onExtensionCreated);
         s.on('agenda:changed', onAgendaChanged);
+        s.on('meeting.noshow.alert', onNoShowAlert);
 
         return () => {
             s.off('meeting.session.started', onSessionStarted);
@@ -633,6 +642,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
             s.off('agenda:present_stopped', onAgendaPresentStopped);
             s.off('meeting.extension_request.created', onExtensionCreated);
             s.off('agenda:changed', onAgendaChanged);
+            s.off('meeting.noshow.alert', onNoShowAlert);
             cleanup();
         };
     }, [meetingState?.status, id]);
@@ -1063,6 +1073,17 @@ const InMeetingRoom = ({ isPublic = false }) => {
         } finally {
             setManualCheckInLoading(null);
         }
+    };
+
+    const handleDismissNoShow = async () => {
+        const caseId = noShowWarning?.caseId;
+        if (!caseId) return;
+        try {
+            await patch(`/no-show-cases/${caseId}`, { detectionStatus: 'dismissed' });
+        } catch (err) {
+            // fire-and-forget — clear banner regardless
+        }
+        setNoShowWarning(null);
     };
 
     const handleRequestExtension = async () => {
@@ -2408,6 +2429,45 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     </div>
                 </div>
             )}
+
+            {/* NO-SHOW ALERT BANNER */}
+            <AnimatePresence>
+                {noShowWarning && (
+                    <motion.div
+                        key={noShowWarning.kind}
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border text-sm font-semibold max-w-[480px] w-[90vw] pointer-events-auto ${
+                            noShowWarning.kind === 'warning'
+                                ? 'bg-amber-500 border-amber-400 text-white'
+                                : 'bg-midnight-indigo border-indigo-700 text-white'
+                        }`}
+                    >
+                        <AlertTriangle className="w-5 h-5 shrink-0" />
+                        <span className="flex-1 leading-snug">
+                            {noShowWarning.kind === 'warning'
+                                ? 'Hệ thống phát hiện bạn không có mặt. Xác nhận để giữ phòng.'
+                                : 'Phòng họp đã được giải phóng do không có người tham dự.'}
+                        </span>
+                        {noShowWarning.kind === 'warning' ? (
+                            <button
+                                onClick={handleDismissNoShow}
+                                className="shrink-0 bg-white text-amber-600 font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+                            >
+                                Tôi vẫn đến
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setNoShowWarning(null)}
+                                className="p-1.5 hover:bg-white/20 rounded-md transition-colors shrink-0"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* TOAST OVERLAY */}
             <div className="fixed bottom-24 right-5 z-[9998] flex flex-col gap-2 pointer-events-auto">
