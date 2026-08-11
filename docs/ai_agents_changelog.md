@@ -634,3 +634,19 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
   - src/pages/systemAdmin/AuditLogs.jsx
   - docs/be-audit-log-export-requirement.md
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Refactor: Cập nhật trang Phân tích Đúng giờ Chuyên cần theo đúng API contract
+
+- **Phân tích**: Trang `EmployeeOnTimeAnalytics.jsx` trước đây đọc sai cấu trúc trường dữ liệu (`data.summary`, `data.users`) không tồn tại trong API thật. Đã tiến hành tái cấu trúc trang, sửa đổi các trường hiển thị Summary, thêm các biểu đồ phân tích xu hướng tuần, khung giờ và phòng ban, đồng thời thêm tính năng tìm kiếm nhân sự phục vụ drilldown lịch sử đi muộn.
+- **Thay đổi**:
+  - Cập nhật [EmployeeOnTimeAnalytics.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/shared/EmployeeOnTimeAnalytics.jsx):
+    - Ánh xạ lại Summary, PieChart, TrendChart và HourlyChart theo đúng DTO của Backend.
+    - Chuyển đổi input ID phòng ban thành Dropdown tải dữ liệu động thông qua API `/departments`.
+    - Bổ sung thanh tìm kiếm nhân sự có debounce gọi `/users` để tra cứu nhanh.
+    - Sửa đổi mảng duyệt Modal chi tiết thành `lateHistory.lateMeetings` và các trường `meetingTitle`, `scheduledStartTime`, `checkInTime`.
+- **Tập tin ảnh hưởng**:
+  - src/pages/shared/EmployeeOnTimeAnalytics.jsx
+- **Trạng thái**: Đã hoàn thành.
