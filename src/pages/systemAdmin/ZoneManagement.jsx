@@ -1,4 +1,4 @@
-import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Video } from 'lucide-react';
+import { AlertTriangle, Calendar, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Video } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -38,17 +38,17 @@ const ZoneDirectionBadge = ({ direction }) => {
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 whitespace-nowrap"><Eye className="w-2.5 h-2.5" />Thấy</span>;
 };
 
-const ZoneStatusBadge = ({ isStranger, isUnmatched }) => {
+const ZoneStatusBadge = ({ isStranger, matchState }) => {
     if (isStranger)
         return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
-    if (isUnmatched)
+    if (matchState && matchState !== 'matched')
         return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 whitespace-nowrap"><ShieldQuestion className="w-2.5 h-2.5" />Chưa khớp</span>;
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><ShieldCheck className="w-2.5 h-2.5" />Khớp</span>;
 };
 
 // ─── ZoneAccessLogCard ───────────────────────────────────────────────────────
 
-const ZONE_LOG_LIMIT = 15;
+const ZONE_LOG_LIMIT = 20;
 
 const ZoneAccessLogCard = ({ zoneId }) => {
     const [date, setDate] = useState(getTodayVN);
@@ -56,6 +56,8 @@ const ZoneAccessLogCard = ({ zoneId }) => {
     const [events, setEvents] = useState([]);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [matchedCount, setMatchedCount] = useState(0);
+    const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [snapshotEventId, setSnapshotEventId] = useState(null);
@@ -84,7 +86,9 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                 const pag = res.data.pagination || {};
                 const tp = pag.totalPages ?? Math.max(1, Math.ceil((pag.total ?? evList.length) / ZONE_LOG_LIMIT));
                 setTotalPages(tp);
-                setTotal(pag.total ?? pag.totalItems ?? evList.length);
+                setTotal(res.data.totalEvents ?? pag.total ?? pag.totalItems ?? evList.length);
+                setMatchedCount(res.data.matchedCount ?? 0);
+                setUnmatchedCount(res.data.unmatchedCount ?? 0);
             } else {
                 throw new Error(res?.message || 'Không thể tải nhật ký.');
             }
@@ -106,20 +110,30 @@ const ZoneAccessLogCard = ({ zoneId }) => {
         <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden">
             {/* Card header */}
             <div className="px-5 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex items-center justify-between gap-3 flex-wrap">
-                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
-                    <History className="w-4 h-4 text-action-blue" />
-                    Nhật ký ra vào khu vực
+                <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                        <History className="w-4 h-4 text-action-blue" />
+                        Nhật ký ra vào khu vực
+                    </h3>
                     {!loading && total > 0 && (
-                        <span className="text-[10px] font-bold text-slate-400 normal-case tracking-normal">({total} sự kiện)</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">{total} sự kiện</span>
+                            {matchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">{matchedCount} khớp</span>}
+                            {unmatchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">{unmatchedCount} chưa khớp</span>}
+                        </div>
                     )}
-                </h3>
+                </div>
                 <div className="flex items-center gap-2">
-                    <input
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="px-2.5 py-1.5 border border-platinum-tint rounded-xl text-xs text-midnight-indigo bg-white focus:outline-none focus:border-action-blue"
-                    />
+                    <div className="relative">
+                        <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-action-blue pointer-events-none" />
+                        <input
+                            type="date"
+                            value={date}
+                            max={getTodayVN()}
+                            onChange={(e) => setDate(e.target.value)}
+                            className="pl-8 pr-3 py-1.5 border border-platinum-tint rounded-xl text-xs font-semibold text-midnight-indigo bg-white hover:border-action-blue/50 focus:outline-none focus:border-action-blue focus:ring-2 focus:ring-action-blue/10 transition-all cursor-pointer"
+                        />
+                    </div>
                     <button
                         onClick={fetchLog}
                         className="p-1.5 text-slate-blue hover:text-action-blue hover:bg-blue-50 rounded-lg transition-colors"
@@ -160,9 +174,10 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                     events.map((ev) => {
                         const time = fmtEventTime(ev.eventTime || ev.timestamp);
                         const name = ev.fullName || (ev.isStranger ? 'Người lạ' : 'Không nhận diện được');
+                        const isUnmatched = !ev.isStranger && ev.matchState && ev.matchState !== 'matched';
                         const rowBg = ev.isStranger
                             ? 'bg-red-50/60 border-l-2 border-l-red-400'
-                            : ev.isUnmatched
+                            : isUnmatched
                                 ? 'bg-amber-50/40 border-l-2 border-l-amber-300'
                                 : '';
                         return (
@@ -181,7 +196,7 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                                 {/* Badges */}
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                     <ZoneDirectionBadge direction={ev.direction} />
-                                    <ZoneStatusBadge isStranger={ev.isStranger} isUnmatched={ev.isUnmatched} />
+                                    <ZoneStatusBadge isStranger={ev.isStranger} matchState={ev.matchState} />
                                 </div>
                             </div>
                         );
