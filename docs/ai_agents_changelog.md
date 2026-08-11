@@ -618,3 +618,19 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - src/components/minutes/MinutesViewerEditor.jsx
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Fix: Tích hợp API Xuất Nhật ký hệ thống (Export Audit Logs) và Bổ dung bộ lọc Mức độ
+
+- **Phân tích**: Tích hợp tính năng xuất tệp Excel lịch sử kiểm toán hệ thống thông qua API `GET /api/v1/audit-logs/export`. Khắc phục lỗi lệch tên tham số lọc giữa giao diện và Backend (`action` -> `actionType`, `entity` -> `entityType`, `startDate` -> `from`, `endDate` -> `to`). Bổ sung cấu hình chuẩn hóa tiếng Việt cho Backend.
+- **Thay đổi**:
+  - Tạo mới tài liệu yêu cầu Backend: [be-audit-log-export-requirement.md](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/docs/be-audit-log-export-requirement.md) mô tả chi tiết yêu cầu chuẩn hóa từ ngữ chuyên ngành tiếng Việt cho file Excel.
+  - Cập nhật [sysAdminServices.js](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/service/sysAdminServices.js): Ánh xạ tham số đúng định dạng Backend, thêm endpoint `exportAuditLogs`.
+  - Cập nhật [AuditLogs.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/systemAdmin/AuditLogs.jsx): Bổ sung bộ lọc Mức độ (Severity) trên UI, kiểm tra tính hợp lệ của khoảng thời gian bắt buộc, gọi API thực tế và tải tệp Excel xuống.
+- **Tập tin ảnh hưởng**:
+  - src/service/sysAdminServices.js
+  - src/pages/systemAdmin/AuditLogs.jsx
+  - docs/be-audit-log-export-requirement.md
+- **Trạng thái**: Đã hoàn thành.

@@ -217,14 +217,52 @@ export const updateDevice = async (deviceId, data) => {
 // AUDIT LOG APIs (UC-CFG-02)
 // ============================================================
 
+const mapAuditLogParams = (params) => {
+    const mapped = {};
+    if (params.page) mapped.page = params.page;
+    if (params.limit) mapped.limit = params.limit;
+    if (params.action) mapped.actionType = params.action;
+    if (params.entity) mapped.entityType = params.entity;
+    if (params.severity) mapped.severity = params.severity;
+
+    // Convert startDate and endDate to full ISO string to cover the entire day
+    if (params.startDate) {
+        mapped.from = `${params.startDate}T00:00:00.000Z`;
+    }
+    if (params.endDate) {
+        mapped.to = `${params.endDate}T23:59:59.999Z`;
+    }
+
+    // Support direct backend naming as fallback
+    if (params.from) mapped.from = params.from;
+    if (params.to) mapped.to = params.to;
+    if (params.actionType) mapped.actionType = params.actionType;
+    if (params.entityType) mapped.entityType = params.entityType;
+    if (params.userId) mapped.userId = params.userId;
+
+    return mapped;
+};
+
 /**
  * UC-CFG-02: Xem audit log hoạt động hệ thống
- * @param {object} params - { page, limit, action, actorId, entity, startDate, endDate }
+ * @param {object} params - { page, limit, action, actorId, entity, startDate, endDate, severity }
  * @returns {Promise<object>} { success, data: [...logs], meta }
  */
 export const getAuditLogs = async (params = {}) => {
-    const query = buildQuery(params);
+    const mappedParams = mapAuditLogParams(params);
+    const query = buildQuery(mappedParams);
     return await get(`/audit-logs${query}`);
+};
+
+/**
+ * Xuất tệp Excel nhật ký kiểm toán hệ thống
+ * @param {object} params - { action, entity, startDate, endDate, severity }
+ * @returns {Promise<object>} { success, isBlob: true, data: Blob }
+ */
+export const exportAuditLogs = async (params = {}) => {
+    const mappedParams = mapAuditLogParams(params);
+    const query = buildQuery(mappedParams);
+    return await get(`/audit-logs/export${query}`, { responseType: 'blob' });
 };
 
 // ============================================================
