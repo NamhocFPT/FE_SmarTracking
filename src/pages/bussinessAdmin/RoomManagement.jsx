@@ -374,12 +374,12 @@ const RoomManagement = () => {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-platinum-tint bg-cloud-mist/50">
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Phòng họp</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Vị trí</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Sức chứa</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Trang thiết bị</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Trạng thái</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide text-right">Hành động</th>
+                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Phòng họp</th>
+                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Vị trí</th>
+                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Sức chứa</th>
+                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Trang thiết bị</th>
+                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Trạng thái</th>
+                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide text-right whitespace-nowrap">Hành động</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -389,21 +389,21 @@ const RoomManagement = () => {
                                             return (
                                                 <tr key={room.id || room.roomId || idx} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
                                                     {/* Phòng họp */}
-                                                    <td className="py-3.5 px-5">
+                                                    <td className="py-3.5 px-5 whitespace-nowrap">
                                                         <div className="flex items-center gap-2.5">
-                                                            <div className="p-1.5 bg-blue-50 rounded-lg">
+                                                            <div className="p-1.5 bg-blue-50 rounded-lg shrink-0">
                                                                 <Home className="w-3.5 h-3.5 text-action-blue" />
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-bold text-midnight-indigo leading-tight">{room.roomName}</p>
-                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                <p className="text-sm font-bold text-midnight-indigo leading-tight whitespace-nowrap">{room.roomName}</p>
+                                                                <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
                                                                     {room.roomCode && (
-                                                                        <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint">
+                                                                        <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint shrink-0">
                                                                             {room.roomCode}
                                                                         </span>
                                                                     )}
                                                                     {room.roomType && (
-                                                                        <span className="text-[10px] text-steel-gray">
+                                                                        <span className="text-[10px] text-steel-gray shrink-0">
                                                                             {ROOM_TYPE_LABELS[room.roomType] || room.roomType}
                                                                         </span>
                                                                     )}
@@ -412,13 +412,13 @@ const RoomManagement = () => {
                                                         </div>
                                                     </td>
                                                     {/* Vị trí */}
-                                                    <td className="py-3.5 px-5">
+                                                    <td className="py-3.5 px-5 whitespace-nowrap">
                                                         {(room.siteName || room.areaName) ? (
                                                             <div className="flex items-start gap-1.5">
                                                                 <MapPin className="w-3.5 h-3.5 text-steel-gray mt-0.5 shrink-0" />
-                                                                <div>
-                                                                    {room.siteName && <p className="text-xs font-semibold text-midnight-indigo">{room.siteName}</p>}
-                                                                    {room.areaName && <p className="text-[11px] text-steel-gray">{room.areaName}</p>}
+                                                                <div className="whitespace-nowrap">
+                                                                    {room.siteName && <p className="text-xs font-semibold text-midnight-indigo whitespace-nowrap">{room.siteName}</p>}
+                                                                    {room.areaName && <p className="text-[11px] text-steel-gray whitespace-nowrap">{room.areaName}</p>}
                                                                 </div>
                                                             </div>
                                                         ) : (
@@ -426,29 +426,29 @@ const RoomManagement = () => {
                                                         )}
                                                     </td>
                                                     {/* Sức chứa */}
-                                                    <td className="py-3.5 px-5">
-                                                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-blue">
-                                                            <Users className="w-3.5 h-3.5" />
+                                                    <td className="py-3.5 px-5 whitespace-nowrap">
+                                                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-blue whitespace-nowrap">
+                                                            <Users className="w-3.5 h-3.5 shrink-0" />
                                                             {room.capacity} người
                                                         </span>
                                                     </td>
                                                     {/* Trang thiết bị */}
-                                                    <td className="py-3.5 px-5">
-                                                        <div className="flex flex-wrap gap-1">
+                                                    <td className="py-3.5 px-5 whitespace-nowrap">
+                                                        <div className="flex items-center gap-1 whitespace-nowrap">
                                                             <AmenityBadge active={room.hasCamera} icon={Video} label="Camera" />
                                                             <AmenityBadge active={room.hasMicrophone} icon={Mic} label="Mic" />
                                                             <AmenityBadge active={room.hasDisplay} icon={Monitor} label="Màn hình" />
                                                         </div>
                                                     </td>
                                                     {/* Trạng thái */}
-                                                    <td className="py-3.5 px-5">
-                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border ${sc.cls}`}>
+                                                    <td className="py-3.5 px-5 whitespace-nowrap">
+                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap ${sc.cls}`}>
                                                             {sc.label}
                                                         </span>
                                                     </td>
                                                     {/* Hành động */}
-                                                    <td className="py-3.5 px-5 text-right">
-                                                        <div className="flex items-center justify-end gap-1">
+                                                    <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                                                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                                                             <button
                                                                 onClick={() => openRoomDetail(room)}
                                                                 className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
@@ -671,15 +671,14 @@ const RoomManagement = () => {
                                     <DoorOpen className="w-5 h-5 text-action-blue" />
                                     {detailRoom.roomName}
                                 </h3>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                                    detailRoom.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
-                                }`}>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${detailRoom.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                                    }`}>
                                     {detailRoom.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
                                 </span>
                             </div>
-                            <button onClick={() => setDetailRoom(null)} className="text-slate-blue hover:text-midnight-indigo">
+                            {/* <button onClick={() => setDetailRoom(null)} className="text-slate-blue hover:text-midnight-indigo">
                                 <X className="w-5 h-5" />
-                            </button>
+                            </button> */}
                         </div>
 
                         {/* Modal Body */}
@@ -716,10 +715,10 @@ const RoomManagement = () => {
                                     <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Trang thiết bị khả dụng</h4>
                                     <div className="grid grid-cols-1 gap-3">
                                         {[
-                                            { key: 'hasCamera',      Icon: Video,    label: 'Cảm biến Camera ghi hình' },
-                                            { key: 'hasMicrophone',  Icon: Mic,      label: 'Hệ thống Microphone họp trực tuyến' },
-                                            { key: 'hasDisplay',     Icon: Monitor,  label: 'Màn hình chiếu/TV hiển thị' },
-                                            { key: 'allowRecording', Icon: Video,    label: 'Cho phép ghi hình cuộc họp' },
+                                            { key: 'hasCamera', Icon: Video, label: 'Cảm biến Camera ghi hình' },
+                                            { key: 'hasMicrophone', Icon: Mic, label: 'Hệ thống Microphone họp trực tuyến' },
+                                            { key: 'hasDisplay', Icon: Monitor, label: 'Màn hình chiếu/TV hiển thị' },
+                                            { key: 'allowRecording', Icon: Video, label: 'Cho phép ghi hình cuộc họp' },
                                         ].map(({ key, Icon, label }) => {
                                             const active = detailRoom[key];
                                             return (
@@ -739,16 +738,6 @@ const RoomManagement = () => {
 
                         {/* Footer */}
                         <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end gap-2 shrink-0">
-                            <button
-                                onClick={() => {
-                                    const roomToEdit = detailRoom;
-                                    setDetailRoom(null);
-                                    handleOpenModal('edit', roomToEdit);
-                                }}
-                                className="px-4 py-2 bg-white border border-platinum-tint hover:bg-slate-50 text-midnight-indigo rounded-xl text-xs font-semibold transition-colors"
-                            >
-                                Chỉnh sửa phòng
-                            </button>
                             <button
                                 onClick={() => setDetailRoom(null)}
                                 className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"

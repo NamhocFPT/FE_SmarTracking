@@ -668,3 +668,18 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
   - src/pages/bussinessAdmin/RoomManagement.jsx
   - src/service/businessAdminServices.js
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Style: Thêm whitespace-nowrap ngăn chặn xuống dòng dữ liệu bảng Phòng họp
+
+- **Phân tích**: Dữ liệu trong bảng phòng họp bị xuống dòng ngoài ý muốn khi chiều rộng màn hình thu hẹp. Thêm thuộc tính CSS `whitespace-nowrap` cho toàn bộ tiêu đề cột (`th`) và các ô dữ liệu (`td`), đồng thời thay thế `flex-wrap` bằng `flex items-center` đối với cột Trang thiết bị để giữ cho dữ liệu hiển thị thẳng trên cùng một hàng và kích hoạt thanh cuộn ngang khi cần.
+- **Thay đổi**:
+  - Cập nhật [RoomManagement.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/bussinessAdmin/RoomManagement.jsx):
+    - Thêm `whitespace-nowrap` vào 6 thẻ `th` trong `thead`.
+    - Thêm `whitespace-nowrap` và `shrink-0` cho các ô `td` trong danh sách.
+    - Sửa CSS Trang thiết bị của phòng từ `flex-wrap` thành `flex items-center`.
+- **Tập tin ảnh hưởng**:
+  - src/pages/bussinessAdmin/RoomManagement.jsx
+- **Trạng thái**: Đã hoàn thành.
