@@ -66,38 +66,46 @@ const UserJourney = () => {
 
     const dropdownRef = useRef(null);
     const urlUserId = searchParams.get('userId');
+    const autoLoadedRef = useRef(false);
 
-    /* fetch users */
+    /* fetch users for dropdown search — no auto-select logic here */
     const fetchUsers = useCallback(async (query = '') => {
         setUsersLoading(true);
         try {
             const res = await getUsers({ search: query || undefined, limit: 15 });
-            if (res?.success) {
-                setUsers(res.data || []);
-                if (urlUserId && !selectedUser) {
-                    const match = (res.data || []).find(u => u.id === urlUserId || u.uuid === urlUserId);
-                    if (match) {
-                        setSelectedUser(match);
-                        setSearchQuery(match.fullName);
-                    } else {
-                        try {
-                            const r2 = await getUsers({ id: urlUserId });
-                            if (r2?.success && r2.data?.length > 0) {
-                                setSelectedUser(r2.data[0]);
-                                setSearchQuery(r2.data[0].fullName);
-                            }
-                        } catch (_) { /* ignore */ }
-                    }
-                }
-            }
+            if (res?.success) setUsers(res.data || []);
         } catch (_) { /* ignore */ }
         finally { setUsersLoading(false); }
-    }, [urlUserId, selectedUser]);
+    }, []);
 
     useEffect(() => {
         const t = setTimeout(() => fetchUsers(searchQuery), 300);
         return () => clearTimeout(t);
     }, [searchQuery, fetchUsers]);
+
+    /* auto-select user from URL — runs once per urlUserId, never re-runs after clear */
+    useEffect(() => {
+        if (!urlUserId || autoLoadedRef.current) return;
+        autoLoadedRef.current = true;
+        (async () => {
+            try {
+                const res = await getUsers({ search: undefined, limit: 50 });
+                const list = res?.success ? (res.data || []) : [];
+                const match = list.find(u => u.id === urlUserId || u.uuid === urlUserId);
+                if (match) {
+                    setSelectedUser(match);
+                    setSearchQuery(match.fullName);
+                } else {
+                    const r2 = await getUsers({ id: urlUserId });
+                    if (r2?.success && r2.data?.length > 0) {
+                        setSelectedUser(r2.data[0]);
+                        setSearchQuery(r2.data[0].fullName);
+                    }
+                }
+            } catch (_) { /* ignore */ }
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [urlUserId]);
 
     useEffect(() => {
         const handler = (e) => {
@@ -323,7 +331,7 @@ const UserJourney = () => {
                             </div>
                             <input
                                 type="text"
-                                placeholder="Nhập tên hoặc email nhân viên..."
+                                placeholder="Nhập tên, email hoặc mã nhân viên..."
                                 value={searchQuery}
                                 onChange={(e) => {
                                     setSearchQuery(e.target.value);
@@ -336,7 +344,13 @@ const UserJourney = () => {
                             />
                             {searchQuery && (
                                 <button
-                                    onClick={() => { setSearchQuery(''); setSelectedUser(null); }}
+                                    onClick={() => {
+                                        setSearchQuery('');
+                                        setSelectedUser(null);
+                                        setJourneyData(null);
+                                        autoLoadedRef.current = false;
+                                        setSearchParams({});
+                                    }}
                                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-blue hover:text-midnight-indigo text-xs font-medium"
                                 >
                                     Xóa
@@ -362,8 +376,15 @@ const UserJourney = () => {
                                                 className={`px-4 py-2.5 hover:bg-cloud-mist cursor-pointer flex items-center justify-between transition-colors ${isSel ? 'bg-blue-50/50' : ''}`}
                                             >
                                                 <div>
-                                                    <div className="text-sm font-bold text-midnight-indigo">{u.fullName}</div>
-                                                    <div className="text-xs text-slate-blue">{u.email}</div>
+                                                    <div className="text-sm font-bold text-midnight-indigo flex items-center gap-2">
+                                                        {u.fullName}
+                                                        {(u.employeeCode || u.employee_code) && (
+                                                            <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint">
+                                                                {u.employeeCode || u.employee_code}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-slate-blue mt-0.5">{u.email}</div>
                                                 </div>
                                                 {isSel && <Check className="w-4 h-4 text-action-blue" />}
                                             </div>
