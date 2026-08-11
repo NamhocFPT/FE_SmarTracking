@@ -683,3 +683,20 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - src/pages/bussinessAdmin/RoomManagement.jsx
 - **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Refactor: Thiết kế bảng Phòng họp siêu gọn để tránh cuộn ngang (Scroll X)
+
+- **Phân tích**: Yêu cầu hiển thị ngang đầy đủ trên cùng một dòng nhưng không được xuất hiện thanh cuộn ngang (Scroll X) trên màn hình tiêu chuẩn. Thực hiện tối ưu hóa diện tích các cột và giảm padding.
+- **Thay đổi**:
+  - Cập nhật [RoomManagement.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/bussinessAdmin/RoomManagement.jsx):
+    - Đổi lớp bọc từ `overflow-x-auto` thành `w-full` để triệt tiêu thanh cuộn ngang.
+    - Giảm padding của tất cả các ô tiêu đề (`th`) và dữ liệu (`td`) từ `py-3.5 px-5` thành `py-3 px-3` cực kỳ gọn.
+    - Thay thế cột Trang thiết bị dạng chữ dài bằng **biểu tượng icon tối giản** (Video, Mic, Monitor) có kèm thuộc tính `title` để hiển thị tooltip.
+    - Định dạng cột Vị trí hiển thị inline gọn gàng dạng `Tòa nhà A (Khu vực B)` trên cùng một hàng.
+    - Đảm bảo giữ nguyên bộ phân trang đầy đủ (`totalPages > 1`).
+- **Tập tin ảnh hưởng**:
+  - src/pages/bussinessAdmin/RoomManagement.jsx
+- **Trạng thái**: Đã hoàn thành.

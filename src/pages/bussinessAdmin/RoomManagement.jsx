@@ -370,16 +370,16 @@ const RoomManagement = () => {
                                 <p className="text-xs text-slate-blue mt-1">Thử thay đổi bộ lọc hoặc thêm phòng mới.</p>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <div className="w-full">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-platinum-tint bg-cloud-mist/50">
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Phòng họp</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Vị trí</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Sức chứa</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Trang thiết bị</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Trạng thái</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide text-right whitespace-nowrap">Hành động</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Phòng họp</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Vị trí</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Sức chứa</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Thiết bị</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Trạng thái</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide text-right whitespace-nowrap">Hành động</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -389,21 +389,21 @@ const RoomManagement = () => {
                                             return (
                                                 <tr key={room.id || room.roomId || idx} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
                                                     {/* Phòng họp */}
-                                                    <td className="py-3.5 px-5 whitespace-nowrap">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="p-1.5 bg-blue-50 rounded-lg shrink-0">
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-1 bg-blue-50 rounded-lg shrink-0">
                                                                 <Home className="w-3.5 h-3.5 text-action-blue" />
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-bold text-midnight-indigo leading-tight whitespace-nowrap">{room.roomName}</p>
-                                                                <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                                                                <p className="text-xs font-bold text-midnight-indigo leading-tight whitespace-nowrap">{room.roomName}</p>
+                                                                <div className="flex items-center gap-1 mt-0.5 whitespace-nowrap">
                                                                     {room.roomCode && (
-                                                                        <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint shrink-0">
+                                                                        <span className="text-[9px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint shrink-0">
                                                                             {room.roomCode}
                                                                         </span>
                                                                     )}
                                                                     {room.roomType && (
-                                                                        <span className="text-[10px] text-steel-gray shrink-0">
+                                                                        <span className="text-[9px] text-steel-gray shrink-0">
                                                                             {ROOM_TYPE_LABELS[room.roomType] || room.roomType}
                                                                         </span>
                                                                     )}
@@ -412,60 +412,58 @@ const RoomManagement = () => {
                                                         </div>
                                                     </td>
                                                     {/* Vị trí */}
-                                                    <td className="py-3.5 px-5 whitespace-nowrap">
+                                                    <td className="py-3 px-3 whitespace-nowrap">
                                                         {(room.siteName || room.areaName) ? (
-                                                            <div className="flex items-start gap-1.5">
-                                                                <MapPin className="w-3.5 h-3.5 text-steel-gray mt-0.5 shrink-0" />
-                                                                <div className="whitespace-nowrap">
-                                                                    {room.siteName && <p className="text-xs font-semibold text-midnight-indigo whitespace-nowrap">{room.siteName}</p>}
-                                                                    {room.areaName && <p className="text-[11px] text-steel-gray whitespace-nowrap">{room.areaName}</p>}
-                                                                </div>
+                                                            <div className="flex items-center gap-1.5 text-xs text-midnight-indigo whitespace-nowrap">
+                                                                <MapPin className="w-3.5 h-3.5 text-steel-gray shrink-0" />
+                                                                <span className="font-semibold">{room.siteName || '—'}</span>
+                                                                {room.areaName && <span className="text-steel-gray text-[11px]">({room.areaName})</span>}
                                                             </div>
                                                         ) : (
                                                             <span className="text-xs text-steel-gray/50">—</span>
                                                         )}
                                                     </td>
                                                     {/* Sức chứa */}
-                                                    <td className="py-3.5 px-5 whitespace-nowrap">
-                                                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-blue whitespace-nowrap">
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-blue whitespace-nowrap">
                                                             <Users className="w-3.5 h-3.5 shrink-0" />
                                                             {room.capacity} người
                                                         </span>
                                                     </td>
                                                     {/* Trang thiết bị */}
-                                                    <td className="py-3.5 px-5 whitespace-nowrap">
-                                                        <div className="flex items-center gap-1 whitespace-nowrap">
-                                                            <AmenityBadge active={room.hasCamera} icon={Video} label="Camera" />
-                                                            <AmenityBadge active={room.hasMicrophone} icon={Mic} label="Mic" />
-                                                            <AmenityBadge active={room.hasDisplay} icon={Monitor} label="Màn hình" />
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <div className="flex items-center gap-2 whitespace-nowrap">
+                                                            <Video className={`w-3.5 h-3.5 shrink-0 ${room.hasCamera ? 'text-action-blue' : 'text-slate-300'}`} title={room.hasCamera ? "Có Camera" : "Không có Camera"} />
+                                                            <Mic className={`w-3.5 h-3.5 shrink-0 ${room.hasMicrophone ? 'text-action-blue' : 'text-slate-300'}`} title={room.hasMicrophone ? "Có Microphone" : "Không có Microphone"} />
+                                                            <Monitor className={`w-3.5 h-3.5 shrink-0 ${room.hasDisplay ? 'text-action-blue' : 'text-slate-300'}`} title={room.hasDisplay ? "Có Màn hình" : "Không có Màn hình"} />
                                                         </div>
                                                     </td>
                                                     {/* Trạng thái */}
-                                                    <td className="py-3.5 px-5 whitespace-nowrap">
-                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap ${sc.cls}`}>
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${sc.cls}`}>
                                                             {sc.label}
                                                         </span>
                                                     </td>
                                                     {/* Hành động */}
-                                                    <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                                                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                                                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                                                        <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
                                                             <button
                                                                 onClick={() => openRoomDetail(room)}
-                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
                                                                 title="Xem chi tiết"
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleOpenModal('edit', room)}
-                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
                                                                 title="Chỉnh sửa"
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDelete(room)}
-                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
                                                                 title="Xoá phòng"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
