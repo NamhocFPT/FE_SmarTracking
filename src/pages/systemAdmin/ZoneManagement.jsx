@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Video } from 'lucide-react';
+import { AlertTriangle, Calendar, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, Info, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Video, X } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -254,14 +254,34 @@ const ZoneManagement = () => {
 
     // Modal states
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [zoneToDelete, setZoneToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+    const [editForm, setEditForm] = useState({
+        zone_code: '',
+        zone_name: '',
+        zone_type: 'gate',
+        status: 'active',
+        building: '',
+        floor: '',
+        description: '',
+        metadata_json: ''
+    });
+
+    const ZONE_TYPE_LABELS = {
+        gate: 'Cổng ra vào',
+        corridor: 'Hành lang',
+        lobby: 'Sảnh lễ tân',
+        parking: 'Bãi đỗ xe',
+        room: 'Phòng họp'
+    };
 
     const [createForm, setCreateForm] = useState({
         zone_code: '',
         zone_name: '',
-        zone_type: 'room',
+        zone_type: 'gate',
         building: '',
         floor: '',
         description: ''
@@ -334,12 +354,35 @@ const ZoneManagement = () => {
         e.preventDefault();
         setError(null);
         setSuccessMessage(null);
+
+        // Client-side validations
+        if (createForm.zone_code.trim().length > 80) {
+            setError("Mã khu vực tối đa 80 ký tự.");
+            return;
+        }
+        if (createForm.zone_name.trim().length > 150) {
+            setError("Tên khu vực tối đa 150 ký tự.");
+            return;
+        }
+        if (createForm.building && createForm.building.trim().length > 100) {
+            setError("Tên tòa nhà tối đa 100 ký tự.");
+            return;
+        }
+        if (createForm.floor && createForm.floor.trim().length > 30) {
+            setError("Tầng tối đa 30 ký tự.");
+            return;
+        }
+        if (createForm.description && createForm.description.trim().length > 255) {
+            setError("Mô tả tối đa 255 ký tự.");
+            return;
+        }
+
         try {
             const res = await createZone(createForm);
             if (res?.success) {
                 setSuccessMessage('Tạo khu vực mới thành công!');
                 setIsCreateModalOpen(false);
-                setCreateForm({ zone_code: '', zone_name: '', zone_type: 'room', building: '', floor: '', description: '' });
+                setCreateForm({ zone_code: '', zone_name: '', zone_type: 'gate', building: '', floor: '', description: '' });
                 fetchZones();
             } else {
                 setError(res?.message || 'Tạo khu vực thất bại.');
@@ -378,297 +421,486 @@ const ZoneManagement = () => {
         }
     };
 
+    const handleEditClick = (zone, e) => {
+        if (e) e.stopPropagation();
+        setEditForm({
+            zone_code: zone.zone_code || '',
+            zone_name: zone.zone_name || '',
+            zone_type: zone.zone_type || 'gate',
+            status: zone.status || 'active',
+            building: zone.building || '',
+            floor: zone.floor || '',
+            description: zone.description || '',
+            metadata_json: zone.metadata_json ? JSON.stringify(zone.metadata_json, null, 2) : ''
+        });
+        setSelectedZone(zone);
+        setIsEditModalOpen(true);
+    };
 
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setSuccessMessage(null);
 
-    const handleRemoveDevice = async (deviceId) => {
-        if (!selectedZone) return;
+        // Client-side validations
+        if (editForm.zone_code.trim().length > 80) {
+            setError("Mã khu vực tối đa 80 ký tự.");
+            return;
+        }
+        if (editForm.zone_name.trim().length > 150) {
+            setError("Tên khu vực tối đa 150 ký tự.");
+            return;
+        }
+        if (editForm.building && editForm.building.trim().length > 100) {
+            setError("Tên tòa nhà tối đa 100 ký tự.");
+            return;
+        }
+        if (editForm.floor && editForm.floor.trim().length > 30) {
+            setError("Tầng tối đa 30 ký tự.");
+            return;
+        }
+        if (editForm.description && editForm.description.trim().length > 255) {
+            setError("Mô tả tối đa 255 ký tự.");
+            return;
+        }
+
+        const payload = {};
+        if (editForm.zone_code.trim() !== selectedZone.zone_code) {
+            payload.zone_code = editForm.zone_code.trim();
+        }
+        if (editForm.zone_name.trim() !== selectedZone.zone_name) {
+            payload.zone_name = editForm.zone_name.trim();
+        }
+        if (editForm.zone_type !== selectedZone.zone_type) {
+            payload.zone_type = editForm.zone_type;
+        }
+        if (editForm.status !== selectedZone.status) {
+            payload.status = editForm.status;
+        }
+
+        const oldBuilding = selectedZone.building || '';
+        if (editForm.building.trim() !== oldBuilding) {
+            payload.building = editForm.building.trim() === '' ? null : editForm.building.trim();
+        }
+
+        const oldFloor = selectedZone.floor || '';
+        if (editForm.floor.trim() !== oldFloor) {
+            payload.floor = editForm.floor.trim() === '' ? null : editForm.floor.trim();
+        }
+
+        const oldDesc = selectedZone.description || '';
+        if (editForm.description.trim() !== oldDesc) {
+            payload.description = editForm.description.trim() === '' ? null : editForm.description.trim();
+        }
+
+        let parsedMetadata = null;
+        if (editForm.metadata_json.trim()) {
+            try {
+                parsedMetadata = JSON.parse(editForm.metadata_json);
+            } catch (err) {
+                setError("Định dạng JSON của metadata không hợp lệ.");
+                return;
+            }
+        }
+        const oldMetadataStr = selectedZone.metadata_json ? JSON.stringify(selectedZone.metadata_json) : '';
+        const newMetadataStr = parsedMetadata ? JSON.stringify(parsedMetadata) : '';
+        if (newMetadataStr !== oldMetadataStr) {
+            payload.metadata_json = parsedMetadata;
+        }
+
+        if (Object.keys(payload).length === 0) {
+            setSuccessMessage("Không có thay đổi nào được thực hiện.");
+            setIsEditModalOpen(false);
+            return;
+        }
+
         try {
-            const res = await removeDeviceFromZone(selectedZone.id, deviceId);
+            const res = await updateZone(selectedZone.id, payload);
             if (res?.success) {
-                setSuccessMessage('Đã gỡ thiết bị khỏi khu vực.');
-
-                // Update state ở client thay vì fetch lại API do API ko trả về devices
-                setSelectedZone(prev => ({
-                    ...prev,
-                    devices: (prev.devices || []).filter(d => d.id !== deviceId)
-                }));
-
-                fetchAvailableDevices();
+                setSuccessMessage('Cập nhật khu vực thành công!');
+                setIsEditModalOpen(false);
+                setSelectedZone(res.data || { ...selectedZone, ...payload });
+                fetchZones();
             } else {
-                setError(res?.message || 'Lỗi khi gỡ thiết bị.');
+                setError(res?.message || 'Cập nhật khu vực thất bại.');
             }
         } catch (err) {
-            setError('Lỗi kết nối khi gỡ thiết bị.');
+            setError(err?.error?.message || err?.message || 'Lỗi khi gửi yêu cầu cập nhật.');
         }
     };
 
-    const filteredZones = zones.filter(z => {
-        const searchLower = searchTerm.toLowerCase();
-        const loc = [z.building, z.floor].filter(Boolean).join(' - ').toLowerCase();
-        return z.zone_name?.toLowerCase().includes(searchLower) || loc.includes(searchLower);
-    });
+    const handleRemoveDevice = async (deviceId) => {
+            if (!selectedZone) return;
+            try {
+                const res = await removeDeviceFromZone(selectedZone.id, deviceId);
+                if (res?.success) {
+                    setSuccessMessage('Đã gỡ thiết bị khỏi khu vực.');
 
-    return (
-        <div className="h-full flex flex-col space-y-4">
-            {/* HEADER */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm-1 border border-platinum-tint">
-                <div>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
-                        <MapPin className="w-3.5 h-3.5" />
-                        Khu vực
-                    </span>
-                    <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý khu vực (Zones)</h1>
-                    <p className="text-slate-blue text-sm mt-1">
-                        Thiết lập các khu vực giám sát và gán camera AI để quản lý hiện diện.
-                    </p>
+                    // Update state ở client thay vì fetch lại API do API ko trả về devices
+                    setSelectedZone(prev => ({
+                        ...prev,
+                        devices: (prev.devices || []).filter(d => d.id !== deviceId)
+                    }));
+
+                    fetchAvailableDevices();
+                } else {
+                    setError(res?.message || 'Lỗi khi gỡ thiết bị.');
+                }
+            } catch (err) {
+                setError('Lỗi kết nối khi gỡ thiết bị.');
+            }
+        };
+
+        const filteredZones = zones.filter(z => {
+            const searchLower = searchTerm.toLowerCase();
+            const loc = [z.building, z.floor].filter(Boolean).join(' - ').toLowerCase();
+            return z.zone_name?.toLowerCase().includes(searchLower) || loc.includes(searchLower);
+        });
+
+        return (
+            <div className="h-full flex flex-col space-y-4">
+                {/* HEADER */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm-1 border border-platinum-tint">
+                    <div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
+                            <MapPin className="w-3.5 h-3.5" />
+                            Khu vực
+                        </span>
+                        <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý khu vực</h1>
+                        <p className="text-slate-blue text-sm mt-1">
+                            Thiết lập các khu vực giám sát và gán camera AI để quản lý hiện diện.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="inline-flex items-center justify-center px-4 py-2 bg-action-blue text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-glacier-blue transition-all"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Tạo khu vực
+                    </button>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="inline-flex items-center justify-center px-4 py-2 bg-action-blue text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-glacier-blue transition-all"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Tạo khu vực
-                </button>
-            </div>
 
-            {/* MESSAGES */}
-            {(error || successMessage) && (
-                <div className={`p-4 rounded-xl border flex items-center ${error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
-                    {error ? <AlertTriangle className="w-5 h-5 mr-3 shrink-0" /> : <CheckCircle className="w-5 h-5 mr-3 shrink-0" />}
-                    <p className="text-sm font-medium">{error || successMessage}</p>
-                </div>
-            )}
+                {/* MESSAGES */}
+                {(error || successMessage) && (
+                    <div className={`p-4 rounded-xl border flex items-center ${error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                        {error ? <AlertTriangle className="w-5 h-5 mr-3 shrink-0" /> : <CheckCircle className="w-5 h-5 mr-3 shrink-0" />}
+                        <p className="text-sm font-medium">{error || successMessage}</p>
+                    </div>
+                )}
 
-            {/* MAIN CONTENT PANES */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
-                {/* ZONES LIST PANE */}
-                <div className="w-full lg:w-1/3 flex flex-col bg-white rounded-2xl shadow-sm-1 border border-platinum-tint overflow-hidden">
-                    <div className="p-4 border-b border-platinum-tint bg-cloud-mist/30">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-blue" />
-                            <input
-                                type="text"
-                                placeholder="Tìm kiếm khu vực..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
-                            />
+                {/* MAIN CONTENT PANES */}
+                <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+                    {/* ZONES LIST PANE */}
+                    <div className="w-full lg:w-1/3 flex flex-col bg-white rounded-2xl shadow-sm-1 border border-platinum-tint overflow-hidden">
+                        <div className="p-4 border-b border-platinum-tint bg-cloud-mist/30">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-blue" />
+                                <input
+                                    type="text"
+                                    placeholder="Tìm kiếm khu vực..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
+                                    <RefreshCw className="w-8 h-8 animate-spin mb-4" />
+                                    <p className="text-sm">Đang tải danh sách...</p>
+                                </div>
+                            ) : filteredZones.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-40 text-slate-blue opacity-70">
+                                    <Map className="w-8 h-8 mb-3" />
+                                    <p className="text-sm">Không tìm thấy khu vực nào</p>
+                                </div>
+                            ) : (
+                                filteredZones.map((zone) => (
+                                    <div
+                                        key={zone.id}
+                                        onClick={() => handleSelectZone(zone)}
+                                        className={`p-3 rounded-xl border transition-all cursor-pointer group ${selectedZone?.id === zone.id
+                                            ? 'border-action-blue bg-blue-50/50 shadow-sm'
+                                            : 'border-platinum-tint bg-white hover:border-action-blue/50 hover:bg-cloud-mist/20'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h3 className="font-bold text-sm text-midnight-indigo">{zone.zone_name}</h3>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={(e) => handleEditClick(zone, e)}
+                                                    className="p-1 text-slate-blue hover:text-action-blue hover:bg-blue-50 rounded transition-colors"
+                                                    title="Sửa khu vực"
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteClick(zone, e)}
+                                                    className="p-1 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                    title="Xoá khu vực"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-blue flex items-center mt-1">
+                                            <MapPin className="w-3 h-3 mr-1" />
+                                            {[zone.building, zone.floor].filter(Boolean).join(' - ') || 'Chưa cập nhật vị trí'}
+                                        </p>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
-                                <RefreshCw className="w-8 h-8 animate-spin mb-4" />
-                                <p className="text-sm">Đang tải danh sách...</p>
-                            </div>
-                        ) : filteredZones.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-40 text-slate-blue opacity-70">
-                                <Map className="w-8 h-8 mb-3" />
-                                <p className="text-sm">Không tìm thấy khu vực nào</p>
-                            </div>
-                        ) : (
-                            filteredZones.map((zone) => (
-                                <div
-                                    key={zone.id}
-                                    onClick={() => handleSelectZone(zone)}
-                                    className={`p-3 rounded-xl border transition-all cursor-pointer group ${selectedZone?.id === zone.id
-                                            ? 'border-action-blue bg-blue-50/50 shadow-sm'
-                                            : 'border-platinum-tint bg-white hover:border-action-blue/50 hover:bg-cloud-mist/20'
-                                        }`}
-                                >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h3 className="font-bold text-sm text-midnight-indigo">{zone.zone_name}</h3>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={(e) => handleDeleteClick(zone, e)}
-                                                className="p-1 text-slate-blue hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                                                title="Xoá khu vực"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
+                    {/* ZONE DETAIL PANE */}
+                    <div className="w-full lg:w-2/3 flex flex-col bg-white rounded-2xl shadow-sm-1 border border-platinum-tint overflow-hidden">
+                        {selectedZone ? (
+                            <>
+                                <div className="p-4 border-b border-platinum-tint bg-cloud-mist/30 flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <Map className="w-5 h-5 text-action-blue shrink-0" />
+                                        <h2 className="font-bold text-midnight-indigo">{selectedZone.zone_name}</h2>
+                                        <button
+                                            onClick={() => setIsInfoModalOpen(true)}
+                                            className="p-1 rounded-full text-action-blue hover:bg-blue-50 transition-colors"
+                                            title="Xem thông tin chi tiết khu vực"
+                                        >
+                                            <Info className="w-4 h-4" />
+                                        </button>
                                     </div>
-                                    <p className="text-xs text-slate-blue flex items-center mt-1">
-                                        <MapPin className="w-3 h-3 mr-1" />
-                                        {[zone.building, zone.floor].filter(Boolean).join(' - ') || 'Chưa cập nhật vị trí'}
-                                    </p>
                                 </div>
-                            ))
+
+                                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                                    {detailLoading ? (
+                                        <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
+                                            <RefreshCw className="w-6 h-6 animate-spin mb-3" />
+                                            <p className="text-sm">Đang tải chi tiết...</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6">
+                                            <ZoneAccessLogCard zoneId={selectedZone.id} />
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-blue">
+                                <Map className="w-16 h-16 mb-4 opacity-20" />
+                                <p className="font-medium text-midnight-indigo mb-1">Chưa chọn khu vực</p>
+                                <p className="text-sm">Vui lòng chọn một khu vực bên danh sách để xem và cấu hình.</p>
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {/* ZONE DETAIL PANE */}
-                <div className="w-full lg:w-2/3 flex flex-col bg-white rounded-2xl shadow-sm-1 border border-platinum-tint overflow-hidden">
-                    {selectedZone ? (
-                        <>
-                            <div className="p-4 border-b border-platinum-tint bg-cloud-mist/30 flex justify-between items-center">
-                                <div>
-                                    <h2 className="font-bold text-midnight-indigo flex items-center">
-                                        <Map className="w-5 h-5 mr-2 text-action-blue" />
-                                        Chi tiết khu vực: {selectedZone.zone_name}
-                                    </h2>
-                                    <p className="text-xs text-slate-blue mt-1">Quản lý các camera được gán vào khu vực này</p>
-                                </div>
-                                <div className="flex gap-3">
-                                </div>
+                {/* CREATE MODAL */}
+                {isCreateModalOpen && createPortal(
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                        <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full flex flex-col">
+                            <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                                <h3 className="font-bold text-midnight-indigo">Tạo khu vực mới</h3>
+                                <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">✕</button>
                             </div>
-
-                            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                                {detailLoading ? (
-                                    <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
-                                        <RefreshCw className="w-6 h-6 animate-spin mb-3" />
-                                        <p className="text-sm">Đang tải chi tiết...</p>
+                            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã khu vực <span className="text-red-500">*</span></label>
+                                    <input required type="text" value={createForm.zone_code} onChange={e => setCreateForm({ ...createForm, zone_code: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: ROOM-101" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên khu vực <span className="text-red-500">*</span></label>
+                                    <input required type="text" value={createForm.zone_name} onChange={e => setCreateForm({ ...createForm, zone_name: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Phòng họp 1" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại khu vực <span className="text-red-500">*</span></label>
+                                    <select required value={createForm.zone_type} onChange={e => setCreateForm({ ...createForm, zone_type: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm">
+                                        <option value="gate">Cổng ra vào</option>
+                                        <option value="corridor">Hành lang</option>
+                                        <option value="lobby">Sảnh lễ tân</option>
+                                        <option value="parking">Bãi đỗ xe</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tòa nhà</label>
+                                        <input type="text" value={createForm.building} onChange={e => setCreateForm({ ...createForm, building: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Toà nhà A" />
                                     </div>
-                                ) : (
-                                    <div className="space-y-6">
-                                        <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm">
-                                            <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider mb-4">Thông tin chung</h3>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-xs text-slate-blue mb-1">Mô tả</p>
-                                                    <p className="text-sm font-medium text-midnight-indigo">{selectedZone.description || 'Không có mô tả'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-blue mb-1">Vị trí</p>
-                                                    <p className="text-sm font-medium text-midnight-indigo flex items-center">
-                                                        <MapPin className="w-4 h-4 mr-1 text-slate-blue" />
-                                                        {[selectedZone.building, selectedZone.floor].filter(Boolean).join(' - ') || 'Chưa rõ'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tầng</label>
+                                        <input type="text" value={createForm.floor} onChange={e => setCreateForm({ ...createForm, floor: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mô tả</label>
+                                    <textarea rows="3" value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Mô tả chức năng khu vực..." />
+                                </div>
+                                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
+                                    <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
+                                    <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue">Tạo mới</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
-                                        <div>
-                                            <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider mb-3">Thiết bị giám sát ({selectedZone.devices?.length || 0})</h3>
+                {/* EDIT MODAL */}
+                {isEditModalOpen && selectedZone && createPortal(
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                        <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full flex flex-col">
+                            <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                                <h3 className="font-bold text-midnight-indigo">Cập nhật khu vực</h3>
+                                <button onClick={() => setIsEditModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">✕</button>
+                            </div>
+                            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã khu vực <span className="text-red-500">*</span></label>
+                                    <input required type="text" value={editForm.zone_code} onChange={e => setEditForm({ ...editForm, zone_code: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: ROOM-101" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên khu vực <span className="text-red-500">*</span></label>
+                                    <input required type="text" value={editForm.zone_name} onChange={e => setEditForm({ ...editForm, zone_name: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Phòng họp 1" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại khu vực <span className="text-red-500">*</span></label>
+                                        <select required value={editForm.zone_type} onChange={e => setEditForm({ ...editForm, zone_type: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white">
+                                            <option value="gate">Cổng ra vào</option>
+                                            <option value="corridor">Hành lang</option>
+                                            <option value="lobby">Sảnh lễ tân</option>
+                                            <option value="parking">Bãi đỗ xe</option>
+                                            <option value="room">Phòng họp</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Trạng thái <span className="text-red-500">*</span></label>
+                                        <select required value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white">
+                                            <option value="active">Đang hoạt động</option>
+                                            <option value="inactive">Không hoạt động</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tòa nhà</label>
+                                        <input type="text" value={editForm.building} onChange={e => setEditForm({ ...editForm, building: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Toà nhà A" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tầng</label>
+                                        <input type="text" value={editForm.floor} onChange={e => setEditForm({ ...editForm, floor: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mô tả</label>
+                                    <textarea rows="2" value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Mô tả chức năng khu vực..." />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Metadata (JSON format)</label>
+                                    <textarea rows="3" value={editForm.metadata_json} onChange={e => setEditForm({ ...editForm, metadata_json: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono resize-none" placeholder='VD: { "note": "Ghi chú thêm" }' />
+                                </div>
+                                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
+                                    <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
+                                    <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue">Lưu thay đổi</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
-                                            {(!selectedZone.devices || selectedZone.devices.length === 0) ? (
-                                                <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-blue">
-                                                    <Video className="w-10 h-10 mb-3 text-slate-300" />
-                                                    <p className="text-sm font-medium">Khu vực này chưa có camera nào</p>
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {selectedZone.devices.map(device => (
-                                                        <div key={device.id} className="bg-white p-4 rounded-2xl border border-platinum-tint shadow-sm flex items-start justify-between">
-                                                            <div className="flex items-start">
-                                                                <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center mr-3 shrink-0">
-                                                                    <Camera className="w-5 h-5" />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="font-bold text-sm text-midnight-indigo">{device.device_name}</p>
-                                                                    <p className="text-xs text-slate-blue font-mono mt-0.5">{device.device_code}</p>
-                                                                    <span className="inline-flex mt-2 items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" /> Đang hoạt động
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => handleRemoveDevice(device.id)}
-                                                                className="text-slate-blue hover:text-red-500 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                                                                title="Gỡ thiết bị"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Card 3: Nhật ký ra vào */}
-                                        <ZoneAccessLogCard zoneId={selectedZone.id} />
+                {/* INFO MODAL */}
+                {isInfoModalOpen && selectedZone && createPortal(
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4" onClick={() => setIsInfoModalOpen(false)}>
+                        <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="px-6 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Info className="w-4 h-4 text-action-blue" />
+                                    <h3 className="font-bold text-midnight-indigo">Thông tin khu vực</h3>
+                                </div>
+                                <button onClick={() => setIsInfoModalOpen(false)} className="p-1.5 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist rounded-lg transition-colors">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center shrink-0">
+                                        <Map className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-midnight-indigo text-base">{selectedZone.zone_name}</p>
+                                        <p className="text-xs font-mono text-slate-400 mt-0.5">{selectedZone.zone_code || selectedZone.id}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                    <div className="bg-cloud-mist/40 rounded-xl p-3">
+                                        <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Loại khu vực</p>
+                                        <p className="text-sm font-semibold text-midnight-indigo">
+                                            {ZONE_TYPE_LABELS[selectedZone.zone_type] || selectedZone.zone_type || '—'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-cloud-mist/40 rounded-xl p-3">
+                                        <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Trạng thái</p>
+                                        <span className={`inline-flex items-center gap-1 text-xs font-bold ${selectedZone.status === 'active' || !selectedZone.status ? 'text-emerald-700' : 'text-slate-500'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${selectedZone.status === 'inactive' ? 'bg-slate-400' : 'bg-emerald-500'}`} />
+                                            {selectedZone.status === 'inactive' ? 'Không hoạt động' : 'Đang hoạt động'}
+                                        </span>
+                                    </div>
+                                    <div className="bg-cloud-mist/40 rounded-xl p-3">
+                                        <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Tòa nhà</p>
+                                        <p className="text-sm font-semibold text-midnight-indigo">{selectedZone.building || '—'}</p>
+                                    </div>
+                                    <div className="bg-cloud-mist/40 rounded-xl p-3">
+                                        <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Tầng</p>
+                                        <p className="text-sm font-semibold text-midnight-indigo">{selectedZone.floor || '—'}</p>
+                                    </div>
+                                </div>
+                                {selectedZone.description && (
+                                    <div className="bg-cloud-mist/40 rounded-xl p-3">
+                                        <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Mô tả</p>
+                                        <p className="text-sm text-midnight-indigo">{selectedZone.description}</p>
+                                    </div>
+                                )}
+                                {selectedZone.createdAt && (
+                                    <div className="bg-cloud-mist/40 rounded-xl p-3">
+                                        <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Ngày tạo</p>
+                                        <p className="text-sm font-semibold text-midnight-indigo">
+                                            {new Date(selectedZone.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })}
+                                        </p>
                                     </div>
                                 )}
                             </div>
-                        </>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-blue">
-                            <Map className="w-16 h-16 mb-4 opacity-20" />
-                            <p className="font-medium text-midnight-indigo mb-1">Chưa chọn khu vực</p>
-                            <p className="text-sm">Vui lòng chọn một khu vực bên danh sách để xem và cấu hình.</p>
                         </div>
-                    )}
-                </div>
+                    </div>,
+                    document.body
+                )}
+
+                {/* DELETE MODAL */}
+                {isDeleteModalOpen && zoneToDelete && createPortal(
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                        <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-sm w-full flex flex-col overflow-hidden">
+                            <div className="p-6 text-center">
+                                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <AlertTriangle className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-lg font-bold text-midnight-indigo mb-2">Xác nhận xoá khu vực</h3>
+                                <p className="text-sm text-slate-blue mb-1">
+                                    Bạn có chắc chắn muốn xoá khu vực <span className="font-bold text-midnight-indigo">{zoneToDelete.zone_name}</span>?
+                                </p>
+                            </div>
+                            <div className="p-4 bg-cloud-mist/30 border-t border-platinum-tint flex justify-end gap-3">
+                                <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting} className="px-4 py-2 bg-white border border-platinum-tint text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist">Hủy</button>
+                                <button onClick={handleConfirmDelete} disabled={isDeleting} className="inline-flex items-center px-4 py-2 bg-red-600 text-white font-semibold rounded-xl text-sm hover:bg-red-700">
+                                    {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xoá vĩnh viễn'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div>
-
-            {/* CREATE MODAL */}
-            {isCreateModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full flex flex-col">
-                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
-                            <h3 className="font-bold text-midnight-indigo">Tạo khu vực mới</h3>
-                            <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">✕</button>
-                        </div>
-                        <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã khu vực <span className="text-red-500">*</span></label>
-                                <input required type="text" value={createForm.zone_code} onChange={e => setCreateForm({ ...createForm, zone_code: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: ROOM-101" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên khu vực <span className="text-red-500">*</span></label>
-                                <input required type="text" value={createForm.zone_name} onChange={e => setCreateForm({ ...createForm, zone_name: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Phòng họp 1" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại khu vực <span className="text-red-500">*</span></label>
-                                <select required value={createForm.zone_type} onChange={e => setCreateForm({ ...createForm, zone_type: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm">
-                                    <option value="room">Phòng họp (room)</option>
-                                    <option value="gate">Cổng ra vào (gate)</option>
-                                    <option value="corridor">Hành lang (corridor)</option>
-                                    <option value="lobby">Sảnh lễ tân (lobby)</option>
-                                    <option value="parking">Bãi đỗ xe (parking)</option>
-                                </select>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tòa nhà</label>
-                                    <input type="text" value={createForm.building} onChange={e => setCreateForm({ ...createForm, building: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Toà nhà A" />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tầng</label>
-                                    <input type="text" value={createForm.floor} onChange={e => setCreateForm({ ...createForm, floor: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Tầng 1" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mô tả</label>
-                                <textarea rows="3" value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Mô tả chức năng khu vực..." />
-                            </div>
-                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
-                                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
-                                <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue">Tạo mới</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>,
-                document.body
-            )}
-
-            {/* DELETE MODAL */}
-            {isDeleteModalOpen && zoneToDelete && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-sm w-full flex flex-col overflow-hidden">
-                        <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <AlertTriangle className="w-8 h-8" />
-                            </div>
-                            <h3 className="text-lg font-bold text-midnight-indigo mb-2">Xác nhận xoá khu vực</h3>
-                            <p className="text-sm text-slate-blue mb-1">
-                                Bạn có chắc chắn muốn xoá khu vực <span className="font-bold text-midnight-indigo">{zoneToDelete.zone_name}</span>?
-                            </p>
-                        </div>
-                        <div className="p-4 bg-cloud-mist/30 border-t border-platinum-tint flex justify-end gap-3">
-                            <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting} className="px-4 py-2 bg-white border border-platinum-tint text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist">Hủy</button>
-                            <button onClick={handleConfirmDelete} disabled={isDeleting} className="inline-flex items-center px-4 py-2 bg-red-600 text-white font-semibold rounded-xl text-sm hover:bg-red-700">
-                                {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xoá vĩnh viễn'}
-                            </button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
-        </div>
-    );
-};
+        );
+    };
 
 export default ZoneManagement;
