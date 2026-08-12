@@ -1,6 +1,6 @@
 import { Users, RefreshCw } from 'lucide-react';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -9,10 +9,13 @@ import {
     getUsers,
     getUsersForManagement,
     createUser,
+    createPartnerUser,
     updateUser,
+    updatePartnerExpiry,
     updateUserRoles,
     lockUser,
     unlockUser,
+    updateUserStatus,
     deleteUser,
     getUserAuditLogs,
     importUsers,
@@ -23,6 +26,14 @@ import {
     getUserById,
     resyncUserPortrait,
 } from '../../service/businessAdminServices';
+import { adminRegisterVehicle } from '../../service/anprService';
+import {
+    PARTNER_DEPARTMENT_ID,
+    isPartnerAccount,
+    getExpiryStatus,
+    getExpiryLabel,
+    buildPartnerFormData,
+} from '../../constants/partnerAccount';
 
 
 /**
@@ -87,14 +98,27 @@ const UserManagement = () => {
     const [logsLoading, setLogsLoading] = useState(false);
     const [detailLoading, setDetailLoading] = useState(false);
 
+    // Expiry modal state
+    const [isExpiryModalOpen, setIsExpiryModalOpen] = useState(false);
+    const [expiryTargetUser, setExpiryTargetUser] = useState(null);
+    const [newExpiryDate, setNewExpiryDate] = useState('');
+    const [expiryLoading, setExpiryLoading] = useState(false);
+
     // Form inputs states
     const [formData, setFormData] = useState({
         email: '',
         fullName: '',
         phone: '',
         departmentId: '',
-        roleIds: []
+        roleIds: [],
+        // Partner-only fields
+        accountType: 'employee',
+        accountExpiresAt: '',
+        avatarFile: null,
+        plateRaw: '',
+        vehicleType: 'CAR',
     });
+    const avatarInputRef = useRef(null);
 
     const [formErrors, setFormErrors] = useState({});
 
@@ -214,9 +238,11 @@ const UserManagement = () => {
     }, [error]);
 
 
-    // Handle Create (UC-06)
+    // Handle Create (UC-06) — nhánh employee + partner
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
+
+        const isPartner = formData.accountType === 'partner';
 
         // Client-side Validation
         const errors = {};
@@ -226,8 +252,29 @@ const UserManagement = () => {
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
             errors.email = "Email không đúng định dạng";
         }
-        if (!formData.departmentId) errors.departmentId = "Vui lòng chọn phòng ban";
-        if (formData.roleIds.length === 0) errors.roleIds = "Vui lòng gán ít nhất 1 vai trò";
+        if (!isPartner && formData.roleIds.length === 0) {
+            errors.roleIds = "Vui lòng gán ít nhất 1 vai trò";
+        }
+
+        if (!isPartner) {
+            if (!formData.departmentId) errors.departmentId = "Vui lòng chọn phòng ban";
+        } else {
+            if (!formData.accountExpiresAt) {
+                errors.accountExpiresAt = "Vui lòng nhập ngày hết hạn";
+            } else if (new Date(formData.accountExpiresAt).getTime() <= Date.now()) {
+                errors.accountExpiresAt = "Ngày hết hạn phải là thời điểm tương lai";
+            }
+            if (!formData.avatarFile) {
+                errors.avatarFile = "Vui lòng chọn ảnh khuôn mặt (sinh trắc học)";
+            } else {
+                const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+                if (!allowed.includes(formData.avatarFile.type)) {
+                    errors.avatarFile = "Ảnh phải là JPEG, PNG hoặc WEBP";
+                } else if (formData.avatarFile.size > 5 * 1024 * 1024) {
+                    errors.avatarFile = "Ảnh không được vượt quá 5MB";
+                }
+            }
+        }
 
         if (Object.keys(errors).length > 0) {
             setFormErrors(errors);
@@ -239,25 +286,114 @@ const UserManagement = () => {
         setSuccessMessage(null);
 
         try {
-            const res = await createUser({
-                email: formData.email,
-                fullName: formData.fullName,
-                phoneNumber: formData.phone,
-                departmentId: formData.departmentId || null,
-                roleIds: formData.roleIds
-            });
+            let res;
+            if (isPartner) {
+                // Tự động gán vai trò Employee cho tài khoản đối tác
+                const employeeRole = roles.find(r => {
+                    const code = (r.roleCode || r.role_code || '').toUpperCase();
+                    return code === 'EMPLOYEE';
+                });
+                const partnerRoleIds = employeeRole ? [employeeRole.id] : [];
+
+                const fd = buildPartnerFormData({
+                    fullName: formData.fullName,
+                    email: formData.email,
+                    roleIds: partnerRoleIds,
+                    avatarFile: formData.avatarFile,
+                    accountExpiresAt: new Date(formData.accountExpiresAt).toISOString(),
+                });
+                res = await createPartnerUser(fd);
+            } else {
+                res = await createUser({
+                    email: formData.email,
+                    fullName: formData.fullName,
+                    phoneNumber: formData.phone,
+                    departmentId: formData.departmentId || null,
+                    roleIds: formData.roleIds,
+                });
+            }
+
             if (res?.success) {
-                setSuccessMessage('Tạo tài khoản người dùng thành công!');
+                // Đăng ký biển số xe nếu có
+                if (isPartner && formData.plateRaw.trim() && res.data?.id) {
+                    try {
+                        await adminRegisterVehicle({
+                            user_id: res.data.id,
+                            plate_raw: formData.plateRaw.trim(),
+                            vehicle_type: formData.vehicleType || 'CAR',
+                        });
+                        setSuccessMessage('Tạo tài khoản đối tác và đăng ký biển số xe thành công!');
+                    } catch (vehicleErr) {
+                        setSuccessMessage('Tạo tài khoản đối tác thành công. Lưu ý: đăng ký biển số thất bại — ' + (vehicleErr?.error?.message || vehicleErr?.message || 'vui lòng đăng ký lại trong mục ANPR.'));
+                    }
+                } else {
+                    setSuccessMessage(isPartner ? 'Tạo tài khoản đối tác thành công!' : 'Tạo tài khoản người dùng thành công!');
+                }
                 fetchUsers();
                 resetForm();
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi tạo tài khoản.');
             }
         } catch (err) {
-            setError(err?.error?.message || err?.message || 'Thao tác thất bại. Không thể kết nối tới server.');
+            const code = err?.error?.code;
+            const msgMap = {
+                AVATAR_FILE_REQUIRED: 'Vui lòng chọn ảnh sinh trắc học.',
+                AVATAR_FILE_TOO_LARGE: 'Ảnh vượt quá 5MB.',
+                AVATAR_FILE_TYPE_INVALID: 'Ảnh phải là JPEG, PNG hoặc WEBP.',
+                ACCOUNT_EXPIRES_AT_REQUIRED: 'Vui lòng nhập ngày hết hạn.',
+                ACCOUNT_EXPIRES_AT_MUST_BE_FUTURE: 'Ngày hết hạn phải là thời điểm tương lai.',
+                ACCOUNT_EMAIL_ALREADY_EXISTS: 'Email này đã tồn tại trong hệ thống.',
+                PARTNER_AVATAR_STORAGE_FAILED: 'Tải ảnh lên thất bại, vui lòng thử lại.',
+            };
+            setError(msgMap[code] || err?.error?.message || err?.message || 'Thao tác thất bại. Không thể kết nối tới server.');
         } finally {
-            // Close modal even on failure as requested
             setIsCreateModalOpen(false);
+        }
+    };
+
+    // Mở modal gia hạn / khoá sớm tài khoản đối tác
+    const openExpiryModal = (user) => {
+        setExpiryTargetUser(user);
+        const current = user.accountExpiresAt
+            ? new Date(user.accountExpiresAt).toISOString().slice(0, 16)
+            : '';
+        setNewExpiryDate(current);
+        setIsExpiryModalOpen(true);
+    };
+
+    const handleExpiryUpdate = async (lockNow = false) => {
+        if (!expiryTargetUser) return;
+        setExpiryLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const expiresAt = lockNow
+                ? new Date().toISOString()
+                : new Date(newExpiryDate).toISOString();
+
+            if (!lockNow && new Date(newExpiryDate).getTime() <= Date.now()) {
+                setError('Ngày gia hạn phải là thời điểm tương lai.');
+                setExpiryLoading(false);
+                return;
+            }
+
+            const res = await updatePartnerExpiry(expiryTargetUser.id, expiresAt);
+            if (res?.success) {
+                setSuccessMessage(lockNow ? 'Đã khoá sớm tài khoản đối tác.' : 'Đã cập nhật hạn tài khoản đối tác.');
+                setIsExpiryModalOpen(false);
+                fetchUsers();
+            } else {
+                setError(res?.message || 'Cập nhật hạn thất bại.');
+            }
+        } catch (err) {
+            const code = err?.error?.code;
+            if (code === 'ACCOUNT_EXPIRY_PARTNER_ONLY') {
+                setError('Chỉ áp dụng được cho tài khoản đối tác.');
+            } else {
+                setError(err?.error?.message || err?.message || 'Cập nhật hạn thất bại.');
+            }
+        } finally {
+            setExpiryLoading(false);
         }
     };
 
@@ -304,6 +440,25 @@ const UserManagement = () => {
             }
         } catch (err) {
             setError(err?.message || err?.error?.message || 'Không thể thay đổi trạng thái khóa. Vui lòng thử lại.');
+        }
+    };
+
+    // Toggle activate / deactivate (UC-08)
+    const handleStatusToggle = async (user) => {
+        const isActive = user.accountStatus === 'active' || (!user.accountStatus && !user.locked);
+        const newStatus = isActive ? 'inactive' : 'active';
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await updateUserStatus(user.id, { accountStatus: newStatus });
+            if (res?.success) {
+                setSuccessMessage(`${isActive ? 'Đã tạm dừng' : 'Đã kích hoạt lại'} tài khoản thành công!`);
+                fetchUsers();
+            } else {
+                setError(res?.message || 'Không thể đổi trạng thái tài khoản.');
+            }
+        } catch (err) {
+            setError(err?.message || err?.error?.message || 'Không thể đổi trạng thái. Vui lòng thử lại.');
         }
     };
 
@@ -561,9 +716,10 @@ const UserManagement = () => {
         const roleIds = (user.roles || [])
             .map(r => {
                 if (typeof r === 'string') {
-                    return roles.find(role => role.roleCode === r)?.id;
+                    return roles.find(role => (role.roleCode || role.role_code || '').toUpperCase() === r.toUpperCase())?.id;
                 }
-                return r.id || roles.find(role => role.roleCode === r.roleCode)?.id;
+                const rCode = (r.roleCode || r.role_code || '').toUpperCase();
+                return r.id || roles.find(role => (role.roleCode || role.role_code || '').toUpperCase() === rCode)?.id;
             })
             .filter(Boolean);
 
@@ -583,8 +739,14 @@ const UserManagement = () => {
             fullName: '',
             phone: '',
             departmentId: '',
-            roleIds: []
+            roleIds: [],
+            accountType: 'employee',
+            accountExpiresAt: '',
+            avatarFile: null,
+            plateRaw: '',
+            vehicleType: 'CAR',
         });
+        if (avatarInputRef.current) avatarInputRef.current.value = '';
         setImportFile(null);
         setImportPhotos([]);
         setBiometricConsentChecked(false);
@@ -775,13 +937,30 @@ const UserManagement = () => {
                                                         />
 
                                                         <div>
-                                                            <h4
-                                                                onClick={() => handleViewDetail(user)}
-                                                                className="text-sm font-bold text-midnight-indigo leading-tight cursor-pointer hover:underline hover:text-action-blue"
-                                                            >
-                                                                {user.fullName}
-                                                            </h4>
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <h4
+                                                                    onClick={() => handleViewDetail(user)}
+                                                                    className="text-sm font-bold text-midnight-indigo leading-tight cursor-pointer hover:underline hover:text-action-blue"
+                                                                >
+                                                                    {user.fullName}
+                                                                </h4>
+                                                                {isPartnerAccount(user) && (
+                                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+                                                                        Đối tác
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <p className="text-xs text-slate-blue leading-normal">{user.email}</p>
+                                                            {isPartnerAccount(user) && user.accountExpiresAt && (
+                                                                <p className={`text-[10px] font-medium mt-0.5 ${
+                                                                    getExpiryStatus(user.accountExpiresAt) === 'expired' ? 'text-red-500' :
+                                                                    getExpiryStatus(user.accountExpiresAt) === 'expiring_soon' ? 'text-amber-600' :
+                                                                    'text-green-600'
+                                                                }`}>
+                                                                    {getExpiryLabel(user.accountExpiresAt)}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -824,6 +1003,18 @@ const UserManagement = () => {
                                                     </span>
                                                 </td>
                                                 <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
+                                                    {isPartnerAccount(user) && (
+                                                        <button
+                                                            onClick={() => openExpiryModal(user)}
+                                                            title="Gia hạn / Khoá sớm tài khoản đối tác"
+                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-amber-600 hover:bg-amber-50 hover:text-amber-700 text-xs font-semibold transition-colors border border-amber-200"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            Gia hạn
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => handleViewDetail(user)}
                                                         title="Xem chi tiết hồ sơ"
@@ -880,6 +1071,26 @@ const UserManagement = () => {
                                                             </svg>
                                                         )}
                                                     </button>
+                                                    {(user.accountStatus === 'active' || user.accountStatus === 'inactive') && (
+                                                        <button
+                                                            onClick={() => handleStatusToggle(user)}
+                                                            title={user.accountStatus === 'inactive' ? 'Kích hoạt tài khoản' : 'Tạm dừng tài khoản'}
+                                                            className={`inline-flex p-1.5 rounded-lg transition-colors ${user.accountStatus === 'inactive'
+                                                                ? 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'
+                                                                : 'text-slate-400 hover:bg-amber-50 hover:text-amber-600'
+                                                            }`}
+                                                        >
+                                                            {user.accountStatus === 'inactive' ? (
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                            ) : (
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => handleDeleteUser(user)}
                                                         title="Xóa vĩnh viễn"
@@ -931,16 +1142,44 @@ const UserManagement = () => {
             {/* CREATE MODAL */}
             {isCreateModalOpen && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full overflow-hidden animate-fade-in-up">
-                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
-                            <h3 className="font-bold text-midnight-indigo">Tạo người dùng mới</h3>
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-lg w-full overflow-hidden animate-fade-in-up max-h-[90vh] flex flex-col">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 shrink-0">
+                            <h3 className="font-bold text-midnight-indigo">
+                                {formData.accountType === 'partner' ? 'Tạo tài khoản đối tác' : 'Tạo người dùng mới'}
+                            </h3>
                             <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
-                        <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleCreateSubmit} className="p-6 space-y-4 overflow-y-auto">
+
+                            {/* Account type toggle */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-2">Loại tài khoản</label>
+                                <div className="flex rounded-xl border border-platinum-tint overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setFormData(p => ({ ...p, accountType: 'employee' })); setFormErrors({}); }}
+                                        className={`flex-1 py-2 text-sm font-semibold transition-colors ${formData.accountType === 'employee' ? 'bg-action-blue text-white' : 'bg-white text-slate-blue hover:bg-cloud-mist'}`}
+                                    >
+                                        Nhân viên
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const employeeRole = roles.find(r => r.roleCode === 'EMPLOYEE');
+                                            setFormData(p => ({ ...p, accountType: 'partner', roleIds: employeeRole ? [employeeRole.id] : p.roleIds }));
+                                            setFormErrors({});
+                                        }}
+                                        className={`flex-1 py-2 text-sm font-semibold transition-colors border-l border-platinum-tint ${formData.accountType === 'partner' ? 'bg-amber-500 text-white' : 'bg-white text-slate-blue hover:bg-cloud-mist'}`}
+                                    >
+                                        Đối tác
+                                    </button>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.fullName ? 'text-red-500' : 'text-slate-blue'}`}>Họ và Tên</label>
                                 <input
@@ -958,54 +1197,138 @@ const UserManagement = () => {
                                     type="email"
                                     value={formData.email}
                                     onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFormErrors({ ...formErrors, email: '' }); }}
-                                    placeholder="email@smrmpts.com"
+                                    placeholder={formData.accountType === 'partner' ? 'doitac@congty-x.com' : 'email@smrmpts.com'}
                                     className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.email ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
                                 />
                                 {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Số điện thoại</label>
-                                <input
-                                    type="text"
-                                    value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    placeholder="09xxxxxxxx"
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                />
-                            </div>
-                            <div>
-                                <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.departmentId ? 'text-red-500' : 'text-slate-blue'}`}>Phòng ban</label>
-                                <select
-                                    value={formData.departmentId}
-                                    onChange={(e) => { setFormData({ ...formData, departmentId: e.target.value }); setFormErrors({ ...formErrors, departmentId: '' }); }}
-                                    className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none bg-white ${formErrors.departmentId ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
-                                >
-                                    <option value="">Chọn phòng ban...</option>
-                                    {departments.map(d => (
-                                        <option key={d.id} value={d.id}>{d.departmentName}</option>
-                                    ))}
-                                </select>
-                                {formErrors.departmentId && <p className="text-red-500 text-xs mt-1">{formErrors.departmentId}</p>}
-                            </div>
-                            <div>
-                                <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.roleIds ? 'text-red-500' : 'text-slate-blue'}`}>Gán vai trò (Role)</label>
-                                <div className="space-y-2 mt-1">
-                                    {roles.map(r => (
-                                        <label key={r.id} className="flex items-center gap-2 text-sm text-midnight-indigo font-medium cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.roleIds.includes(r.id)}
-                                                onChange={() => { handleRoleCheckboxChange(r.id); setFormErrors({ ...formErrors, roleIds: '' }); }}
-                                                className="rounded text-action-blue focus:ring-action-blue"
-                                            />
-                                            {r.roleName}
-                                        </label>
-                                    ))}
-                                </div>
-                                {formErrors.roleIds && <p className="text-red-500 text-xs mt-1">{formErrors.roleIds}</p>}
+                                {formData.accountType === 'partner' && (
+                                    <p className="text-xs text-amber-600 mt-1">Mật khẩu ban đầu = email này. Nên đặt hạn ngắn.</p>
+                                )}
                             </div>
 
-                            <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
+                            {/* Employee-only: phone + department */}
+                            {formData.accountType === 'employee' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Số điện thoại</label>
+                                        <input
+                                            type="text"
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                            placeholder="09xxxxxxxx"
+                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.departmentId ? 'text-red-500' : 'text-slate-blue'}`}>Phòng ban</label>
+                                        <select
+                                            value={formData.departmentId}
+                                            onChange={(e) => { setFormData({ ...formData, departmentId: e.target.value }); setFormErrors({ ...formErrors, departmentId: '' }); }}
+                                            className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none bg-white ${formErrors.departmentId ? 'border-red-500 focus:border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'}`}
+                                        >
+                                            <option value="">Chọn phòng ban...</option>
+                                            {departments.filter(d => d.id !== PARTNER_DEPARTMENT_ID).map(d => (
+                                                <option key={d.id} value={d.id}>{d.departmentName}</option>
+                                            ))}
+                                        </select>
+                                        {formErrors.departmentId && <p className="text-red-500 text-xs mt-1">{formErrors.departmentId}</p>}
+                                    </div>
+                                </>
+                            )}
+
+                            {formData.accountType !== 'partner' && (
+                                <div>
+                                    <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.roleIds ? 'text-red-500' : 'text-slate-blue'}`}>Gán vai trò (Role)</label>
+                                    <div className="space-y-2 mt-1">
+                                        {roles.map(r => (
+                                            <label key={r.id} className="flex items-center gap-2 text-sm text-midnight-indigo font-medium cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.roleIds.includes(r.id)}
+                                                    onChange={() => { handleRoleCheckboxChange(r.id); setFormErrors({ ...formErrors, roleIds: '' }); }}
+                                                    className="rounded text-action-blue focus:ring-action-blue"
+                                                />
+                                                {r.roleName}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {formErrors.roleIds && <p className="text-red-500 text-xs mt-1">{formErrors.roleIds}</p>}
+                                </div>
+                            )}
+
+                            {/* Partner-only fields */}
+                            {formData.accountType === 'partner' && (
+                                <div className="border border-amber-200 rounded-xl p-4 space-y-4 bg-amber-50/40">
+                                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Thông tin đối tác</p>
+
+                                    <div>
+                                        <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.accountExpiresAt ? 'text-red-500' : 'text-slate-blue'}`}>
+                                            Ngày hết hạn tài khoản <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="datetime-local"
+                                            value={formData.accountExpiresAt}
+                                            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                                            onChange={(e) => { setFormData({ ...formData, accountExpiresAt: e.target.value }); setFormErrors({ ...formErrors, accountExpiresAt: '' }); }}
+                                            className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.accountExpiresAt ? 'border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'} bg-white`}
+                                        />
+                                        {formErrors.accountExpiresAt && <p className="text-red-500 text-xs mt-1">{formErrors.accountExpiresAt}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.avatarFile ? 'text-red-500' : 'text-slate-blue'}`}>
+                                            Ảnh khuôn mặt (sinh trắc học) <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            ref={avatarInputRef}
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            onChange={(e) => {
+                                                const f = e.target.files?.[0] || null;
+                                                setFormData({ ...formData, avatarFile: f });
+                                                setFormErrors({ ...formErrors, avatarFile: '' });
+                                            }}
+                                            className="w-full text-sm text-slate-blue file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-platinum-tint file:text-xs file:font-semibold file:bg-white file:text-slate-blue hover:file:bg-cloud-mist"
+                                        />
+                                        <p className="text-[10px] text-slate-blue mt-1">JPEG / PNG / WEBP · Tối đa 5MB · Ảnh rõ mặt, không đeo kính đen</p>
+                                        {formErrors.avatarFile && <p className="text-red-500 text-xs mt-1">{formErrors.avatarFile}</p>}
+                                    </div>
+
+                                    {/* Biển số xe (tuỳ chọn) */}
+                                    <div className="border-t border-amber-200 pt-3">
+                                        <p className="text-xs font-bold text-slate-blue uppercase mb-2">Biển số xe (tuỳ chọn)</p>
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <label className="block text-[10px] text-slate-blue mb-1">Biển số</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.plateRaw}
+                                                    onChange={(e) => setFormData({ ...formData, plateRaw: e.target.value.toUpperCase() })}
+                                                    placeholder="VD: 51A-12345"
+                                                    maxLength={20}
+                                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue uppercase"
+                                                />
+                                            </div>
+                                            <div className="w-28">
+                                                <label className="block text-[10px] text-slate-blue mb-1">Loại xe</label>
+                                                <select
+                                                    value={formData.vehicleType}
+                                                    onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value })}
+                                                    className="w-full px-2 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                                >
+                                                    <option value="CAR">Ô tô</option>
+                                                    <option value="MOTORBIKE">Xe máy</option>
+                                                    <option value="TRUCK">Xe tải</option>
+                                                    <option value="OTHER">Khác</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-blue mt-1">Để trống nếu chưa cần đăng ký. Có thể thêm sau trong mục ANPR.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4 shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setIsCreateModalOpen(false)}
@@ -1015,12 +1338,77 @@ const UserManagement = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-colors"
+                                    className={`px-4 py-2 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors ${formData.accountType === 'partner' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-action-blue hover:bg-glacier-blue'}`}
                                 >
-                                    Tạo mới
+                                    {formData.accountType === 'partner' ? 'Tạo tài khoản đối tác' : 'Tạo mới'}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* EXPIRY MODAL — gia hạn / khoá sớm tài khoản đối tác */}
+            {isExpiryModalOpen && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-sm w-full overflow-hidden animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-amber-50/60">
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo">Gia hạn / Khoá sớm</h3>
+                                <p className="text-xs text-amber-700 mt-0.5">{expiryTargetUser?.fullName}</p>
+                            </div>
+                            <button onClick={() => setIsExpiryModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {expiryTargetUser?.accountExpiresAt && (
+                                <div className="flex items-center gap-2 text-xs text-slate-blue bg-cloud-mist/60 border border-platinum-tint rounded-xl px-3 py-2">
+                                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Hạn hiện tại: <strong className="text-midnight-indigo">{new Date(expiryTargetUser.accountExpiresAt).toLocaleString('vi-VN')}</strong></span>
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Hạn mới</label>
+                                <input
+                                    type="datetime-local"
+                                    value={newExpiryDate}
+                                    onChange={(e) => setNewExpiryDate(e.target.value)}
+                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2 border-t border-platinum-tint">
+                                <button
+                                    type="button"
+                                    disabled={expiryLoading}
+                                    onClick={() => handleExpiryUpdate(true)}
+                                    className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+                                >
+                                    Khoá ngay
+                                </button>
+                                <div className="flex-1"></div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsExpiryModalOpen(false)}
+                                    className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={expiryLoading || !newExpiryDate}
+                                    onClick={() => handleExpiryUpdate(false)}
+                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
+                                >
+                                    {expiryLoading ? 'Đang lưu...' : 'Cập nhật hạn'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>,
                 document.body
