@@ -229,10 +229,10 @@ export const router = [
                 path: 'departments',
                 element: <BusinessDepartmentManagement />
             },
-            {
-                path: 'meetings',
-                element: <BusinessMeetingManagement />
-            },
+            // {
+            //     path: 'meetings',
+            //     element: <BusinessMeetingManagement />
+            // },
             {
                 path: 'rooms',
                 element: <BusinessRoomManagement />
@@ -342,10 +342,6 @@ export const router = [
             {
                 path: 'user-journey',
                 element: <UserJourney />
-            },
-            {
-                path: 'room-analytics',
-                element: <RoomUsageAnalytics />
             },
             {
                 path: 'attendance-analytics',
