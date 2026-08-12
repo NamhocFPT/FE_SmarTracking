@@ -295,7 +295,7 @@ const RecordingManagement = () => {
                         onChange={(e) => { setSelectedRoom(e.target.value); setPage(1); }}
                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
                     >
-                        <option value="">Tất cả phòng họp</option>
+                        <option key="all-rooms" value="">Tất cả phòng họp</option>
                         {rooms.map(room => (
                             <option key={room.id} value={room.id}>{room.roomName}</option>
                         ))}

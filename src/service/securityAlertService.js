@@ -50,3 +50,11 @@ export const resolveSecurityAlert = async (id, data) => {
 export const bulkAcknowledgeSecurityAlerts = async (data) => {
     return await post(`/security-alerts/bulk-acknowledge`, data);
 };
+
+// ============================================================
+// REPORT EXPORTS (UC-120)
+// ============================================================
+
+export const exportSecurityAlertReport = async (params = {}) => {
+    return await post('/reports/security-alerts/exports', params);
+};

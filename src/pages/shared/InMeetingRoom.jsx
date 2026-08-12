@@ -91,11 +91,7 @@ const defaultMeeting = {
         { id: 'bot-2', fullName: 'Nguyễn Thị Minh', role: 'Thành viên', isMuted: false, isSpeaking: false, isBot: true },
         { id: 'bot-3', fullName: 'Phan Văn Minh', role: 'Thành viên', isMuted: false, isSpeaking: false, isBot: true },
     ],
-    agenda: [
-        { title: 'Khởi động & Demo giao diện', durationMin: 10, orderIndex: 0 },
-        { title: 'Thảo luận API tích hợp thiết bị', durationMin: 15, orderIndex: 1 },
-        { title: 'Chốt phương án & phân công nhiệm vụ', durationMin: 10, orderIndex: 2 },
-    ],
+    agenda: [],
     reactionsLocked: false,
     lastReaction: null,
 };
@@ -410,16 +406,14 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 initial.title = baseMeeting.title || initial.title;
                 initial.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || initial.roomName;
                 initial.room = baseMeeting.room || null;
-                if (baseMeeting.agendas?.length > 0) {
-                    initial.agenda = baseMeeting.agendas.map((a, idx) => ({
-                        id: a.id,
-                        title: a.title,
-                        description: a.description || '',
-                        durationMin: a.plannedDurationMinutes,
-                        orderIndex: a.agendaOrder ?? idx,
-                        attachments: a.attachments || [],
-                    }));
-                }
+                initial.agenda = (baseMeeting.agendas || []).map((a, idx) => ({
+                    id: a.id,
+                    title: a.title,
+                    description: a.description || '',
+                    durationMin: a.plannedDurationMinutes,
+                    orderIndex: a.agendaOrder ?? idx,
+                    attachments: a.attachments || [],
+                }));
                 let hostId = baseMeeting.host_id || baseMeeting.hostId || baseMeeting.organizer_id || baseMeeting.organizerId || initial.hostId;
                 const apiHost = baseMeeting.participants?.find(p =>
                     (p.userId || p.user_id || p.user?.id || p.id) === hostId ||

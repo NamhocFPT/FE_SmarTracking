@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, CheckSquare, Clock, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert, Image as ImageIcon, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CheckSquare, Clock, Download, Edit3, Eye, Filter, RefreshCw, Search, Shield, ShieldAlert, Image as ImageIcon, Users } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -7,6 +7,7 @@ import {
     getSecurityAlerts, acknowledgeSecurityAlert,
     resolveSecurityAlert, bulkAcknowledgeSecurityAlerts
 } from '../../service/securityAlertService';
+import ExportReportModal from '../../components/common/ExportReportModal';
 import { getZones } from '../../service/zoneServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
@@ -39,6 +40,8 @@ const SecurityAlerts = () => {
 
     const [snapshotEventId, setSnapshotEventId] = useState(null);
     const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+
+    const [isExportOpen, setIsExportOpen] = useState(false);
 
     // FE-AC: Occurrences detail modal
     const [occurrencesModal, setOccurrencesModal] = useState({ open: false, alert: null });
@@ -251,6 +254,14 @@ const SecurityAlerts = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsExportOpen(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-colors"
+                        title="Xuất báo cáo"
+                    >
+                        <Download className="w-4 h-4" />
+                        Xuất báo cáo
+                    </button>
                     <button
                         onClick={() => fetchAlerts()}
                         disabled={loading}
@@ -602,6 +613,13 @@ const SecurityAlerts = () => {
                 isOpen={isSnapshotOpen}
                 onClose={() => setIsSnapshotOpen(false)}
                 eventId={snapshotEventId}
+            />
+
+            <ExportReportModal
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                endpoint="/reports/security-alerts/exports"
+                title="Xuất báo cáo sự kiện an ninh"
             />
         </div>
     );

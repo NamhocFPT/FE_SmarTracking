@@ -139,3 +139,20 @@ export const updateVehicleControlRecord = async (id, data) => {
 export const deleteVehicleControlRecord = async (id) => {
     return await del(`/anpr/admin/control-list/${id}`);
 };
+
+// ============================================================
+// GATE ACCESS HISTORY (UC-107 — employee self-service)
+// ============================================================
+
+export const getMyGateAccessHistory = async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return await get(`/gate-access/history${query ? `?${query}` : ''}`);
+};
+
+// ============================================================
+// REPORT EXPORTS (UC-119)
+// ============================================================
+
+export const exportVehicleReport = async (params = {}) => {
+    return await post('/reports/vehicle/exports', params);
+};

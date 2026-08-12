@@ -128,66 +128,24 @@ const RoomManagement = () => {
 
     // Chi tiết phòng
     const [detailRoom, setDetailRoom] = useState(null);
-    const [detailTab, setDetailTab] = useState('info');
-    const [detailMeetings, setDetailMeetings] = useState([]);
-    const [detailMeetingsLoading, setDetailMeetingsLoading] = useState(false);
-    const [detailMeetingsPage, setDetailMeetingsPage] = useState(1);
-    const [detailMeetingsTotalPages, setDetailMeetingsTotalPages] = useState(1);
-    const [detailHistoryPage, setDetailHistoryPage] = useState(1);
-    const [detailHistoryTotalPages, setDetailHistoryTotalPages] = useState(1);
-    const DETAIL_LIMIT = 10;
-
-    const fetchDetailMeetings = useCallback(async (roomId, tab, page) => {
-        setDetailMeetingsLoading(true);
-        setDetailMeetings([]);
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            const params = {
-                roomId,
-                page,
-                limit: DETAIL_LIMIT,
-                sortBy: 'startTime',
-                sortOrder: tab === 'upcoming' ? 'asc' : 'desc',
-                ...(tab === 'upcoming' ? { from: today } : {}),
-            };
-            const res = await getMeetings(params);
-            if (res?.success) {
-                setDetailMeetings(res.data || []);
-                const total = res.meta?.totalPages || 1;
-                if (tab === 'upcoming') setDetailMeetingsTotalPages(total);
-                else setDetailHistoryTotalPages(total);
-            }
-        } catch { /* không block UI */ }
-        finally { setDetailMeetingsLoading(false); }
-    }, [DETAIL_LIMIT]);
+    const [loadingDetail, setLoadingDetail] = useState(false);
 
     const openRoomDetail = async (room) => {
         const roomId = room.id || room.roomId;
-        setLoading(true);
+        setDetailRoom(room);
+        setLoadingDetail(true);
         setError(null);
         try {
             const res = await getRoomDetail(roomId);
             if (res?.success && res.data) {
                 setDetailRoom(res.data);
-                setDetailTab('info');
-                setDetailMeetingsPage(1);
-                setDetailHistoryPage(1);
-                setDetailMeetings([]);
-            } else {
-                throw new Error("Không thể tải thông tin chi tiết phòng.");
             }
         } catch (err) {
-            setError(err?.error?.message || err?.message || "Lỗi tải thông tin chi tiết phòng.");
+            console.error("Lỗi tải thông tin chi tiết phòng:", err);
         } finally {
-            setLoading(false);
+            setLoadingDetail(false);
         }
     };
-
-    useEffect(() => {
-        if (!detailRoom || detailTab !== 'history') return;
-        const roomId = detailRoom.id || detailRoom.roomId;
-        fetchDetailMeetings(roomId, 'history', detailHistoryPage);
-    }, [detailRoom, detailTab, detailHistoryPage, fetchDetailMeetings]);
 
     const fetchRoomsList = useCallback(async () => {
         setLoading(true);
@@ -412,16 +370,16 @@ const RoomManagement = () => {
                                 <p className="text-xs text-slate-blue mt-1">Thử thay đổi bộ lọc hoặc thêm phòng mới.</p>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <div className="w-full">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-platinum-tint bg-cloud-mist/50">
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Phòng họp</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Vị trí</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Sức chứa</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Trang thiết bị</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide">Trạng thái</th>
-                                            <th className="py-3.5 px-5 text-[11px] font-bold text-slate-blue uppercase tracking-wide text-right">Hành động</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Phòng họp</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Vị trí</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Sức chứa</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Thiết bị</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide whitespace-nowrap">Trạng thái</th>
+                                            <th className="py-3 px-3 text-[11px] font-bold text-slate-blue uppercase tracking-wide text-right whitespace-nowrap">Hành động</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -431,21 +389,21 @@ const RoomManagement = () => {
                                             return (
                                                 <tr key={room.id || room.roomId || idx} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
                                                     {/* Phòng họp */}
-                                                    <td className="py-3.5 px-5">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="p-1.5 bg-blue-50 rounded-lg">
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-1 bg-blue-50 rounded-lg shrink-0">
                                                                 <Home className="w-3.5 h-3.5 text-action-blue" />
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-bold text-midnight-indigo leading-tight">{room.roomName}</p>
-                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                <p className="text-xs font-bold text-midnight-indigo leading-tight whitespace-nowrap">{room.roomName}</p>
+                                                                <div className="flex items-center gap-1 mt-0.5 whitespace-nowrap">
                                                                     {room.roomCode && (
-                                                                        <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint">
+                                                                        <span className="text-[9px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint shrink-0">
                                                                             {room.roomCode}
                                                                         </span>
                                                                     )}
                                                                     {room.roomType && (
-                                                                        <span className="text-[10px] text-steel-gray">
+                                                                        <span className="text-[9px] text-steel-gray shrink-0">
                                                                             {ROOM_TYPE_LABELS[room.roomType] || room.roomType}
                                                                         </span>
                                                                     )}
@@ -454,60 +412,58 @@ const RoomManagement = () => {
                                                         </div>
                                                     </td>
                                                     {/* Vị trí */}
-                                                    <td className="py-3.5 px-5">
+                                                    <td className="py-3 px-3 whitespace-nowrap">
                                                         {(room.siteName || room.areaName) ? (
-                                                            <div className="flex items-start gap-1.5">
-                                                                <MapPin className="w-3.5 h-3.5 text-steel-gray mt-0.5 shrink-0" />
-                                                                <div>
-                                                                    {room.siteName && <p className="text-xs font-semibold text-midnight-indigo">{room.siteName}</p>}
-                                                                    {room.areaName && <p className="text-[11px] text-steel-gray">{room.areaName}</p>}
-                                                                </div>
+                                                            <div className="flex items-center gap-1.5 text-xs text-midnight-indigo whitespace-nowrap">
+                                                                <MapPin className="w-3.5 h-3.5 text-steel-gray shrink-0" />
+                                                                <span className="font-semibold">{room.siteName || '—'}</span>
+                                                                {room.areaName && <span className="text-steel-gray text-[11px]">({room.areaName})</span>}
                                                             </div>
                                                         ) : (
                                                             <span className="text-xs text-steel-gray/50">—</span>
                                                         )}
                                                     </td>
                                                     {/* Sức chứa */}
-                                                    <td className="py-3.5 px-5">
-                                                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-blue">
-                                                            <Users className="w-3.5 h-3.5" />
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-blue whitespace-nowrap">
+                                                            <Users className="w-3.5 h-3.5 shrink-0" />
                                                             {room.capacity} người
                                                         </span>
                                                     </td>
                                                     {/* Trang thiết bị */}
-                                                    <td className="py-3.5 px-5">
-                                                        <div className="flex flex-wrap gap-1">
-                                                            <AmenityBadge active={room.hasCamera} icon={Video} label="Camera" />
-                                                            <AmenityBadge active={room.hasMicrophone} icon={Mic} label="Mic" />
-                                                            <AmenityBadge active={room.hasDisplay} icon={Monitor} label="Màn hình" />
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <div className="flex items-center gap-2 whitespace-nowrap">
+                                                            <Video className={`w-3.5 h-3.5 shrink-0 ${room.hasCamera ? 'text-action-blue' : 'text-slate-300'}`} title={room.hasCamera ? "Có Camera" : "Không có Camera"} />
+                                                            <Mic className={`w-3.5 h-3.5 shrink-0 ${room.hasMicrophone ? 'text-action-blue' : 'text-slate-300'}`} title={room.hasMicrophone ? "Có Microphone" : "Không có Microphone"} />
+                                                            <Monitor className={`w-3.5 h-3.5 shrink-0 ${room.hasDisplay ? 'text-action-blue' : 'text-slate-300'}`} title={room.hasDisplay ? "Có Màn hình" : "Không có Màn hình"} />
                                                         </div>
                                                     </td>
                                                     {/* Trạng thái */}
-                                                    <td className="py-3.5 px-5">
-                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border ${sc.cls}`}>
+                                                    <td className="py-3 px-3 whitespace-nowrap">
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${sc.cls}`}>
                                                             {sc.label}
                                                         </span>
                                                     </td>
                                                     {/* Hành động */}
-                                                    <td className="py-3.5 px-5 text-right">
-                                                        <div className="flex items-center justify-end gap-1">
+                                                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                                                        <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
                                                             <button
                                                                 onClick={() => openRoomDetail(room)}
-                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
                                                                 title="Xem chi tiết"
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleOpenModal('edit', room)}
-                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
                                                                 title="Chỉnh sửa"
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDelete(room)}
-                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
                                                                 title="Xoá phòng"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
@@ -705,7 +661,7 @@ const RoomManagement = () => {
             {/* Room Detail Modal with backdrop blur */}
             {detailRoom && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-2xl w-full overflow-hidden animate-fade-in-up flex flex-col relative min-h-[300px]">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 shrink-0">
                             <div className="flex items-center gap-3">
@@ -718,247 +674,74 @@ const RoomManagement = () => {
                                     {detailRoom.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
                                 </span>
                             </div>
-                            <button onClick={() => setDetailRoom(null)} className="text-slate-blue hover:text-midnight-indigo">
+                            {/* <button onClick={() => setDetailRoom(null)} className="text-slate-blue hover:text-midnight-indigo">
                                 <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Content tabs navigation */}
-                        <div className="px-6 py-3 border-b border-platinum-tint bg-white flex gap-2 shrink-0">
-                            {[
-                                { key: 'info', label: 'Thông tin tĩnh & Thiết bị', Icon: Home },
-                                { key: 'realtime', label: 'Trạng thái Realtime', Icon: Activity },
-                                { key: 'upcoming', label: 'Lịch họp sắp tới', Icon: Calendar },
-                                { key: 'history', label: 'Lịch sử cuộc họp', Icon: Clock },
-                            ].map(({ key, label, Icon }) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setDetailTab(key)}
-                                    className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-colors ${detailTab === key ? 'bg-blue-50 text-action-blue border border-blue-200' : 'text-slate-blue hover:text-midnight-indigo'
-                                        }`}
-                                >
-                                    <Icon className="w-4 h-4" />{label}
-                                </button>
-                            ))}
+                            </button> */}
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-6 overflow-y-auto flex-1 space-y-4">
-                            {/* Tab: Info */}
-                            {detailTab === 'info' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    {/* Info Panel */}
-                                    <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-3.5">
-                                        <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Thông tin phòng</h4>
+                        <div className="p-6 overflow-y-auto flex-1 space-y-5 relative min-h-[200px]">
+                            {loadingDetail && (
+                                <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center z-10 animate-fade-in">
+                                    <div className="w-8 h-8 border-3 border-action-blue border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                {/* Info Panel */}
+                                <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-3.5">
+                                    <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Thông tin phòng</h4>
+                                    {[
+                                        { label: 'Tên phòng', value: detailRoom.roomName },
+                                        { label: 'Mã phòng họp', value: detailRoom.roomCode || '—' },
+                                        { label: 'Loại phòng', value: ROOM_TYPE_LABELS[detailRoom.roomType] || detailRoom.roomType },
+                                        { label: 'Sức chứa tối đa', value: detailRoom.capacity ? `${detailRoom.capacity} người` : '—' },
+                                        { label: 'Tòa nhà / Cơ sở', value: detailRoom.siteName || '—' },
+                                        { label: 'Tầng / Khu vực', value: detailRoom.areaName || '—' },
+                                        { label: 'Vị trí chi tiết', value: detailRoom.locationDescription || '—' },
+                                        { label: 'Trạng thái hành chính', value: ADMIN_STATUS_LABELS[detailRoom.administrativeStatus] || detailRoom.administrativeStatus || '—' }
+                                    ].map(({ label, value }) => (
+                                        <div key={label} className="flex justify-between text-xs">
+                                            <span className="font-bold text-slate-blue uppercase">{label}</span>
+                                            <span className="font-semibold text-midnight-indigo">{value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Equipment Panel */}
+                                <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-4">
+                                    <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Trang thiết bị khả dụng</h4>
+                                    <div className="grid grid-cols-1 gap-3">
                                         {[
-                                            { label: 'Tên phòng', value: detailRoom.roomName },
-                                            { label: 'Mã phòng họp', value: detailRoom.roomCode || '—' },
-                                            { label: 'Loại phòng', value: ROOM_TYPE_LABELS[detailRoom.roomType] || detailRoom.roomType },
-                                            { label: 'Sức chứa tối đa', value: `${detailRoom.capacity} người` },
-                                            { label: 'Tòa nhà / Cơ sở', value: detailRoom.siteName || '—' },
-                                            { label: 'Tầng / Khu vực', value: detailRoom.areaName || '—' },
-                                            { label: 'Vị trí chi tiết', value: detailRoom.locationDescription || '—' },
-                                            { label: 'Trạng thái hành chính', value: ADMIN_STATUS_LABELS[detailRoom.administrativeStatus] || detailRoom.administrativeStatus }
-                                        ].map(({ label, value }) => (
-                                            <div key={label} className="flex justify-between text-xs">
-                                                <span className="font-bold text-slate-blue uppercase">{label}</span>
-                                                <span className="font-semibold text-midnight-indigo">{value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Equipment Panel */}
-                                    <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-4">
-                                        <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Trang thiết bị khả dụng</h4>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {[
-                                                { key: 'hasCamera', Icon: Video, label: 'Cảm biến Camera' },
-                                                { key: 'hasMicrophone', Icon: Mic, label: 'Hệ thống Mic' },
-                                                { key: 'hasDisplay', Icon: Monitor, label: 'Màn hình hiển thị' },
-                                                { key: 'allowRecording', Icon: Video, label: 'Cho phép ghi hình' },
-                                            ].map(({ key, Icon, label }) => {
-                                                const active = detailRoom[key];
-                                                return (
-                                                    <div key={key} className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs ${active ? 'border-action-blue bg-blue-50/50' : 'border-platinum-tint bg-white'}`}>
-                                                        <Icon className={`w-4 h-4 ${active ? 'text-action-blue' : 'text-steel-gray opacity-50'}`} />
-                                                        <div>
-                                                            <p className="font-bold text-midnight-indigo leading-tight">{label}</p>
-                                                            <p className="text-[10px] text-slate-blue mt-0.5">{active ? 'Tích hợp' : 'Không có'}</p>
-                                                        </div>
+                                            { key: 'hasCamera', Icon: Video, label: 'Cảm biến Camera ghi hình' },
+                                            { key: 'hasMicrophone', Icon: Mic, label: 'Hệ thống Microphone họp trực tuyến' },
+                                            { key: 'hasDisplay', Icon: Monitor, label: 'Màn hình chiếu/TV hiển thị' },
+                                            { key: 'allowRecording', Icon: Video, label: 'Cho phép ghi hình cuộc họp' },
+                                        ].map(({ key, Icon, label }) => {
+                                            const active = detailRoom[key];
+                                            return (
+                                                <div key={key} className={`flex items-center gap-3 p-3 rounded-xl border text-xs transition-colors ${active ? 'border-action-blue bg-blue-50/50' : 'border-platinum-tint bg-white opacity-60'}`}>
+                                                    <Icon className={`w-4 h-4 ${active ? 'text-action-blue' : 'text-steel-gray opacity-50'}`} />
+                                                    <div>
+                                                        <p className="font-bold text-midnight-indigo leading-tight">{label}</p>
+                                                        <p className="text-[10px] text-slate-blue mt-0.5">{active ? 'Tích hợp sẵn' : 'Không hỗ trợ'}</p>
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        </div>
 
-                            {/* Tab: Realtime Status */}
-                            {detailTab === 'realtime' && (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        {/* Occupancy card */}
-                                        <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-4 text-center space-y-1">
-                                            <span className="block text-[10px] font-bold text-slate-blue uppercase">Hiện diện thực tế</span>
-                                            <span className="block text-2xl font-black text-midnight-indigo">
-                                                {detailRoom.occupancyStatus?.occupancyCount === null
-                                                    ? 'N/A'
-                                                    : `${detailRoom.occupancyStatus.occupancyCount} người`}
-                                            </span>
-                                            <span className="block text-[10px] text-slate-blue">
-                                                {detailRoom.occupancyStatus?.occupancyCount === null
-                                                    ? 'Chưa có thông tin cảm biến'
-                                                    : detailRoom.occupancyStatus.occupancyCount === 0
-                                                        ? 'Phòng đang trống'
-                                                        : 'Phòng đang hoạt động'}
-                                            </span>
-                                        </div>
-
-                                        {/* Last presence card */}
-                                        <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-4 text-center space-y-1">
-                                            <span className="block text-[10px] font-bold text-slate-blue uppercase">Lần cuối có người</span>
-                                            <span className="block text-sm font-bold text-midnight-indigo py-1">
-                                                {detailRoom.occupancyStatus?.lastPresenceAt
-                                                    ? new Date(detailRoom.occupancyStatus.lastPresenceAt).toLocaleTimeString('vi-VN') + ' ' + new Date(detailRoom.occupancyStatus.lastPresenceAt).toLocaleDateString('vi-VN')
-                                                    : 'Chưa ghi nhận'}
-                                            </span>
-                                            <span className="block text-[10px] text-slate-blue">Phát hiện qua cảm biến hiện diện</span>
-                                        </div>
-
-                                        {/* No-show Status card */}
-                                        <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-4 text-center space-y-1">
-                                            <span className="block text-[10px] font-bold text-slate-blue uppercase">Trạng thái No-Show</span>
-                                            <div className="mt-1">
-                                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${getNoShowBadge(detailRoom.occupancyStatus?.noShowStatus).cls
-                                                    }`}>
-                                                    {getNoShowBadge(detailRoom.occupancyStatus?.noShowStatus).label}
-                                                </span>
-                                            </div>
-                                            <span className="block text-[10px] text-slate-blue mt-1">Trạng thái phát hiện vắng mặt</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Current Booking status */}
-                                    <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-5 space-y-3">
-                                        <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Cuộc họp hiện tại</h4>
-                                        {detailRoom.occupancyStatus?.currentBooking ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                                                <div>
-                                                    <span className="block text-slate-blue font-bold">Tên cuộc họp</span>
-                                                    <span className="text-sm font-bold text-midnight-indigo">{detailRoom.occupancyStatus.currentBooking.title}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="block text-slate-blue font-bold">Người chủ trì</span>
-                                                    <span className="text-sm font-semibold text-midnight-indigo">{detailRoom.occupancyStatus.currentBooking.hostName || '—'}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="block text-slate-blue font-bold">Thời gian đặt trước</span>
-                                                    <span className="text-xs font-mono font-semibold text-midnight-indigo">
-                                                        {formatTimeRange(detailRoom.occupancyStatus.currentBooking.reservedStartTime, detailRoom.occupancyStatus.currentBooking.reservedEndTime)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-xs text-slate-blue italic">Không có cuộc họp nào đang diễn ra tại phòng họp này.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tab: Upcoming bookings */}
-                            {detailTab === 'upcoming' && (
-                                <div className="border border-platinum-tint rounded-xl overflow-hidden bg-white">
-                                    <table className="w-full text-left text-xs">
-                                        <thead>
-                                            <tr className="bg-slate-50 border-b border-platinum-tint text-[10px] font-bold text-slate-blue uppercase">
-                                                <th className="px-4 py-2.5">Tiêu đề cuộc họp</th>
-                                                <th className="px-4 py-2.5">Thời gian họp dự kiến</th>
-                                                <th className="px-4 py-2.5">Người chủ trì</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-platinum-tint text-midnight-indigo">
-                                            {!detailRoom.upcomingBookings || detailRoom.upcomingBookings.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={3} className="px-4 py-6 text-center text-slate-blue italic">Không có lịch họp sắp tới nào được đăng ký</td>
-                                                </tr>
-                                            ) : (
-                                                detailRoom.upcomingBookings.map((bk, idx) => (
-                                                    <tr key={bk.bookingId || idx} className="hover:bg-slate-50/50">
-                                                        <td className="px-4 py-3 font-semibold">{bk.title}</td>
-                                                        <td className="px-4 py-3 font-mono">
-                                                            {formatTimeRange(bk.reservedStartTime, bk.reservedEndTime)}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-slate-blue">{bk.hostName || '—'}</td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {/* Tab: History */}
-                            {detailTab === 'history' && (
-                                <div className="border border-platinum-tint rounded-xl overflow-hidden bg-white">
-                                    {detailMeetingsLoading ? (
-                                        <div className="flex flex-col items-center justify-center py-12">
-                                            <div className="w-6 h-6 border-2 border-action-blue border-t-transparent rounded-full animate-spin" />
-                                            <span className="text-xs text-slate-blue mt-2">Đang tải lịch sử...</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <table className="w-full text-left text-xs">
-                                                <thead>
-                                                    <tr className="bg-slate-50 border-b border-platinum-tint text-[10px] font-bold text-slate-blue uppercase">
-                                                        <th className="px-4 py-2.5">Tiêu đề cuộc họp</th>
-                                                        <th className="px-4 py-2.5">Thời gian họp dự kiến</th>
-                                                        <th className="px-4 py-2.5">Người tổ chức</th>
-                                                        <th className="px-4 py-2.5">Trạng thái</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-platinum-tint text-midnight-indigo">
-                                                    {detailMeetings.length === 0 ? (
-                                                        <tr>
-                                                            <td colSpan={4} className="px-4 py-6 text-center text-slate-blue italic">Không có lịch sử cuộc họp nào</td>
-                                                        </tr>
-                                                    ) : (
-                                                        detailMeetings.map((m, idx) => {
-                                                            const sc = MEETING_STATUS_CONFIG[m.status] || { label: m.status, cls: 'bg-gray-50 text-gray-600 border-gray-200' };
-                                                            return (
-                                                                <tr key={m.id || idx} className="hover:bg-slate-50/50">
-                                                                    <td className="px-4 py-3 font-semibold">{m.title}</td>
-                                                                    <td className="px-4 py-3 font-mono">
-                                                                        {formatTimeRange(m.startTime, m.endTime)}
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-slate-blue">{m.organizerName || '—'}</td>
-                                                                    <td className="px-4 py-3">
-                                                                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${sc.cls}`}>{sc.label}</span>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })
-                                                    )}
-                                                </tbody>
-                                            </table>
-
-                                            {/* History Pagination */}
-                                            {detailHistoryTotalPages > 1 && (
-                                                <div className="px-4 py-2 border-t border-platinum-tint flex items-center justify-end gap-2 bg-cloud-mist/30">
-                                                    <button onClick={() => setDetailHistoryPage(p => Math.max(p - 1, 1))} disabled={detailHistoryPage === 1}
-                                                        className="p-1 border border-platinum-tint rounded bg-white text-slate-blue disabled:opacity-40">
-                                                        <ChevronLeft className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <span className="text-xs font-bold text-midnight-indigo">{detailHistoryPage} / {detailHistoryTotalPages}</span>
-                                                    <button onClick={() => setDetailHistoryPage(p => Math.min(p + 1, detailHistoryTotalPages))} disabled={detailHistoryPage === detailHistoryTotalPages}
-                                                        className="p-1 border border-platinum-tint rounded bg-white text-slate-blue disabled:opacity-40">
-                                                        <ChevronRight className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            )}
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end gap-2 shrink-0">
+                            <button
+                                onClick={() => setDetailRoom(null)}
+                                className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </div>
                 </div>,

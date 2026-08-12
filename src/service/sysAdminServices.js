@@ -684,3 +684,42 @@ export const getAuditActivityHourly = async (params = {}) => {
     const query = buildQuery(params);
     return await get(`/analytics/audit-activity/hourly${query}`);
 };
+
+// ============================================================
+// IOT DEVICE — AI CONFIG & STATUS SUMMARY (UC-51, UC-96, UC-48)
+// ============================================================
+
+export const getDeviceStatusSummary = async () => {
+    return await get('/iot-devices/status-summary');
+};
+
+export const updateDeviceAiConfig = async (deviceId, config) => {
+    return await patch(`/iot-devices/${deviceId}/ai-config`, config);
+};
+
+// UC-48: POST /iot-devices/:id/face-server/configure
+// Body: { callback_protocol, callback_base_url?, allowed_source_ip?, heartbeat_path, verify_path, stranger_path, callback_enabled? }
+// Response.data: { device, one_time_callback_token }  — token chỉ xuất hiện 1 lần
+export const configureFaceTerminal = async (deviceId, body) => {
+    return await post(`/iot-devices/${deviceId}/face-server/configure`, body);
+};
+
+// ============================================================
+// REPORT EXPORTS (UC-118)
+// ============================================================
+
+export const exportGateAccessReport = async (params = {}) => {
+    return await post('/reports/gate-access/exports', params);
+};
+
+// ============================================================
+// CAMPUS DASHBOARD — ZONE ANALYTICS
+// ============================================================
+
+// UC-110: GET /campus-dashboard/zones/:zoneId/timeline
+// Query: { from: ISOString, to: ISOString, userId?: UUID }
+// Max range: 31 ngày — BE trả 400 nếu vượt quá
+export const getZonePresenceTimeline = async (zoneId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/campus-dashboard/zones/${zoneId}/timeline${query}`);
+};

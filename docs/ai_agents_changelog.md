@@ -5,6 +5,40 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-12 14:05
+* **Tên Plan / Yêu cầu**: Ẩn và tự động gán vai trò Employee khi tạo tài khoản đối tác.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/UserManagement.jsx`:
+    * Ẩn hoàn toàn mục "Gán vai trò (Role)" trong modal Tạo mới tài khoản khi chọn loại tài khoản là "Đối tác" (accountType === 'partner').
+    * Cập nhật logic validate trong `handleCreateSubmit`: bỏ qua ràng buộc yêu cầu bắt buộc gán vai trò khi tạo tài khoản đối tác.
+    * Tự động tìm kiếm vai trò có mã `'EMPLOYEE'` trong danh sách `roles` (so khớp linh hoạt theo cả hai thuộc tính `roleCode` và `role_code` để tránh trả về mảng rỗng do lệch casing/naming trong API response thực tế của server, khắc phục hoàn toàn lỗi `400 Bad Request` khi gửi payload thiếu `roleIds`).
+    * Gán tự động ID vai trò Employee vào `roleIds` trước khi đóng gói payload gửi lên API tạo tài khoản đối tác.
+    * Cập nhật hàm `openEditModal` để phân tích vai trò linh hoạt theo cả `roleCode` và `role_code` tương ứng.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-12 12:40
+* **Tên Plan / Yêu cầu**: Tích hợp API và hoàn thiện giao diện Quản lý phòng ban theo API Contract mới.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/businessAdminServices.js`:
+    * Thêm các hàm API: `deactivateDepartment` gọi `POST /departments/:id/deactivate` và `reactivateDepartment` gọi `POST /departments/:id/reactivate` để bật/tắt phòng ban thay cho việc truyền `isActive` qua body của `PATCH` đã bị Backend gỡ bỏ.
+  * `[Cập nhật] src/pages/bussinessAdmin/DepartmentManagement.jsx`:
+    * Thêm cột **Trạng thái** trong bảng danh sách phòng ban hiển thị nhãn "Hoạt động" (nền xanh) hoặc "Vô hiệu hóa" (nền xám).
+    * Bổ sung nút hành động **Vô hiệu hóa** (Power icon) và **Kích hoạt lại** (Refresh icon) cho từng phòng ban.
+    * Tích hợp xử lý chi tiết các lỗi nghiệp vụ `409` trả về từ Backend khi deactive/reactive phòng ban để hiển thị thông báo thân thiện với người dùng (ví dụ: phòng ban con còn hoạt động, còn nhân viên, hoặc phòng ban cha đang bị vô hiệu hóa).
+    * Thay thế ô nhập text "Phòng ban" (đang bị disabled mặc định) thành select dropdown trong **Edit User Modal** cho phép chuyển đổi phòng ban của nhân sự (gọi API `updateUser`).
+    * Dropdown select chỉ hiển thị với actor có quyền `accounts.user.update` (thông qua helper `hasPermission`), còn đối với actor không có quyền này (như role `MANAGER`) sẽ hiển thị ô text input disabled để ngăn chặn chuyển đổi phòng ban.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-12 12:15
+* **Tên Plan / Yêu cầu**: Sửa lỗi trắng màn hình quản lý khu vực và hoàn thiện Edit Modal cùng Validation.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/ZoneManagement.jsx`:
+    * Sửa lỗi cú pháp lồng hàm do thiếu dấu đóng ngoặc `};` tại cuối hàm `handleEditSubmit` và xóa dấu đóng ngoặc dư `};` ở cuối file, giúp sửa triệt để lỗi crash làm trắng trang.
+    * Tích hợp Edit Modal hoàn chỉnh thông qua React Portal (`createPortal`) để chỉnh sửa thông tin khu vực bao gồm: Mã khu vực, Tên khu vực, Loại khu vực, Trạng thái (active/inactive), Tòa nhà, Tầng, Mô tả, và Metadata JSON.
+    * Bổ sung logic kiểm tra dữ liệu phía Client-side cho cả Create Form và Edit Form, chặn dữ liệu không hợp lệ vượt quá giới hạn độ dài ký tự của API (Mã khu vực tối đa 80, Tên khu vực tối đa 150, Tòa nhà tối đa 100, Tầng tối đa 30, Mô tả tối đa 255 ký tự).
+    * Bổ sung validation kiểm tra định dạng JSON hợp lệ đối với trường Metadata trong Edit Modal trước khi submit.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-09 12:55
 * **Tên Plan / Yêu cầu**: Tối ưu UI/UX - Xử lý lỗi spam API trong phòng họp (InMeetingRoom).
 * **Chi tiết thay đổi**:
@@ -480,73 +514,73 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
  -   * * S y s t e m A d m i n   D a s h b o a r d : * *   E n l a r g e d   R e c h a r t s   P i e C h a r t   r a d i i   ( i n n e r   5 8 - > 7 0 ,   o u t e r   8 8 - > 9 5 )   a n d   s h i f t e d   c x   t o   4 0 %   t o   p r e v e n t   c e n t e r   t e x t   f r o m   b e i n g   c r o p p e d   b y   t h e   a c t i v e   s l i c e   s t r o k e .   I n c r e a s e d   f o n t   s i z e   o f   c e n t e r   t e x t   f o r   b e t t e r   c l a r i t y . 
   
  
- -   * * I n M e e t i n g : * *   T h a y   t h �  t h �  v i �n   \ d o c x - p r e v i e w \   b �n g   M i c r o s o f t   O f f i c e   V i e w e r   i f r a m e   ( \ i s M s O f f i c e \ )   �  h i �n   t h �  c � c   f i l e   W o r d   ( \ . d o c \ ,   \ . d o c x \ )   v �   P o w e r P o i n t   n h �m   g i �i   q u y �t   l �i   v �  g i a o   d i �n / h i �n   t h �  s a i   n �i   d u n g ,   m a n g   l �i   t r �i   n g h i �m   x e m   t � i   l i �u   n h �t   q u � n   v �   �n   �n h   h �n . 
+ -   * * I n M e e t i n g : * *   T h a y   t h �  t h �  v i �n   \ d o c x - p r e v i e w \   b �n g   M i c r o s o f t   O f f i c e   V i e w e r   i f r a m e   ( \ i s M s O f f i c e \ )   �  h i �n   t h �  c � c   f i l e   W o r d   ( \ . d o c \ ,   \ . d o c x \ )   v �   P o w e r P o i n t   n h �m   g i �i   q u y �t   l �i   v �  g i a o   d i �n / h i �n   t h �  s a i   n �i   d u n g ,   m a n g   l �i   t r �i   n g h i �m   x e m   t � i   l i �u   n h �t   q u � n   v �   �n   �n h   h �n . 
   
  
-## [2026-08-09] T�ch c?t Ng�y v� Gi?
+## [2026-08-09] T�ch c?t Ng�y v� Gi?
 
-- **Thay d?i**: T�ch c?t 'Th?i di?m' (ho?c 'Th?i gian') th�nh 2 c?t 'Ng�y' v� 'Gi?' trong c�c danh s�ch.
+- **Thay d?i**: T�ch c?t 'Th?i di?m' (ho?c 'Th?i gian') th�nh 2 c?t 'Ng�y' v� 'Gi?' trong c�c danh s�ch.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/pages/systemAdmin/GateAccessManagement.jsx, src/pages/systemAdmin/AuditLogs.jsx.
-- **Tr?ng th�i**: �� commit v� push (35c4f8d).
+- **Tr?ng th�i**: �� commit v� push (35c4f8d).
 
-## [2026-08-09] C?p nh?t Nh?t k� ra/v�o ph�ng h?p (Room Access Logs)
+## [2026-08-09] C?p nh?t Nh?t k� ra/v�o ph�ng h?p (Room Access Logs)
 
 - **Thay d?i**: 
-  - C?p nh?t d?nh d?ng hi?n th? �? tin c?y (ki?m tra similarity, eliability, confidence). Nh�n v?i 100 n?u gi� tr? <= 1 d? lu�n hi?n th? d�ng % (v� d?:  .85 -> 85%).
-  - �?i t�n c?t 'G?n cu?c h?p' th�nh 'Cu?c h?p'.
-  - Hi?n th? T�n cu?c h?p thay v� ID cu?c h?p n?u c� th? l?y du?c d? li?u.
+  - C?p nh?t d?nh d?ng hi?n th? �? tin c?y (ki?m tra similarity, eliability, confidence). Nh�n v?i 100 n?u gi� tr? <= 1 d? lu�n hi?n th? d�ng % (v� d?:  .85 -> 85%).
+  - �?i t�n c?t 'G?n cu?c h?p' th�nh 'Cu?c h?p'.
+  - Hi?n th? T�n cu?c h?p thay v� ID cu?c h?p n?u c� th? l?y du?c d? li?u.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/components/meeting/MeetingPresenceIVSS.jsx.
-- **Tr?ng th�i**: �� commit v� push (d41a0fe).
+- **Tr?ng th�i**: �� commit v� push (d41a0fe).
 
 ---
 
 ## [2026-08-11] Fix: JSX fragment wrapping in UserJourney.jsx
 
-- **Y�u c?u**: S?a l?i build Adjacent JSX elements must be wrapped in an enclosing tag t?i UserJourney.jsx:589.
-- **Thay d?i**: B?c hai ph?n t? JSX ngang h�ng (<div> ch�nh v� <EventSnapshotModal>) trong React fragment <>...</> trong h�m eturn c?a component UserJourney.
+- **Y�u c?u**: S?a l?i build Adjacent JSX elements must be wrapped in an enclosing tag t?i UserJourney.jsx:589.
+- **Thay d?i**: B?c hai ph?n t? JSX ngang h�ng (<div> ch�nh v� <EventSnapshotModal>) trong React fragment <>...</> trong h�m eturn c?a component UserJourney.
 - **T?p tin ?nh hu?ng**: src/pages/shared/UserJourney.jsx.
-- **Tr?ng th�i**: �� ho�n th�nh.
+- **Tr?ng th�i**: �� ho�n th�nh.
 
 ---
 
 ## [2026-08-11] Fix: Avatar ngu?i tham d? hi?n th? sai trong tab Ngu?i tham d? (MeetingDetail)
 
-- **Nguy�n nh�n**: H�m 
-ormalizeMeetingDetail trong c? manager/MeetingDetail.jsx v� employee/MeetingDetail.jsx map danh s�ch participants nhung b? s�t tru?ng vatarUrl/vatar_url. K?t qu? l� m?i object participant sau normalize kh�ng c� tru?ng avatar, khi?n component UserAvatar lu�n hi?n th? ch? c�i d?u t�n thay v� ?nh th?t. Modal chi ti?t hi?n th? d�ng v� n� g?i th?ng getUserById() v� nh?n d?y d? d? li?u t? API.
-- **Thay d?i**: Th�m d�ng vatarUrl: p.avatarUrl || p.avatar_url || p.user?.avatarUrl || p.user?.avatar_url || '' v�o ph?n map participants trong 
+- **Nguy�n nh�n**: H�m 
+ormalizeMeetingDetail trong c? manager/MeetingDetail.jsx v� employee/MeetingDetail.jsx map danh s�ch participants nhung b? s�t tru?ng vatarUrl/vatar_url. K?t qu? l� m?i object participant sau normalize kh�ng c� tru?ng avatar, khi?n component UserAvatar lu�n hi?n th? ch? c�i d?u t�n thay v� ?nh th?t. Modal chi ti?t hi?n th? d�ng v� n� g?i th?ng getUserById() v� nh?n d?y d? d? li?u t? API.
+- **Thay d?i**: Th�m d�ng vatarUrl: p.avatarUrl || p.avatar_url || p.user?.avatarUrl || p.user?.avatar_url || '' v�o ph?n map participants trong 
 ormalizeMeetingDetail.
 - **T?p tin ?nh hu?ng**: src/pages/manager/MeetingDetail.jsx, src/pages/employee/MeetingDetail.jsx.
-- **Tr?ng th�i**: �� ho�n th�nh.
+- **Tr?ng th�i**: �� ho�n th�nh.
 
 ---
 
-## [2026-08-11] Feature: Avatar + Modal chi ti?t ch? xe trong L?ch s? �ang k� Xe
+## [2026-08-11] Feature: Avatar + Modal chi ti?t ch? xe trong L?ch s? �ang k� Xe
 
-- **Y�u c?u**: M�n h�nh L?ch s? �ang k� Xe c?n hi?n th? avatar th?c trong table v� m? modal chi ti?t th�ng tin ngu?i d�ng khi click v�o ch? xe, tuong t? m�n h�nh ANPR Management.
-- **Ph�n t�ch API**: API /anpr/admin/vehicle-registrations tr? v? eg.owner ch?a th�ng tin ch? xe (fullName/full_name, email, phoneNumber, avatarUrl, department). Kh�ng c?n g?i th�m API ph? khi m? modal.
+- **Y�u c?u**: M�n h�nh L?ch s? �ang k� Xe c?n hi?n th? avatar th?c trong table v� m? modal chi ti?t th�ng tin ngu?i d�ng khi click v�o ch? xe, tuong t? m�n h�nh ANPR Management.
+- **Ph�n t�ch API**: API /anpr/admin/vehicle-registrations tr? v? eg.owner ch?a th�ng tin ch? xe (fullName/full_name, email, phoneNumber, avatarUrl, department). Kh�ng c?n g?i th�m API ph? khi m? modal.
 - **Thay d?i**:
-  - Thay icon User tinh b?ng UserAvatar component (resolve d�ng avatar t? eg.owner).
-  - T�n ch? xe th�nh link m�u xanh, click m? modal chi ti?t.
-  - Th�m 
-ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
-  - Th�m modal chi ti?t (pattern createPortal gi?ng ANPRManagement.jsx) hi?n th? avatar l?n + ph�ng ban + email + S�T.
-  - Import th�m UserAvatar, createPortal, icon Briefcase/Mail/Phone/X.
+  - Thay icon User tinh b?ng UserAvatar component (resolve d�ng avatar t? eg.owner).
+  - T�n ch? xe th�nh link m�u xanh, click m? modal chi ti?t.
+  - Th�m 
+ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
+  - Th�m modal chi ti?t (pattern createPortal gi?ng ANPRManagement.jsx) hi?n th? avatar l?n + ph�ng ban + email + S�T.
+  - Import th�m UserAvatar, createPortal, icon Briefcase/Mail/Phone/X.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
-- **Tr?ng th�i**: �� ho�n th�nh.
+- **Tr?ng th�i**: �� ho�n th�nh.
 
 ---
 
-## [2026-08-11] Fix: Avatar ch? xe trong VehicleRegistrations � g?i getUserById d? l?y d? li?u d?y d?
+## [2026-08-11] Fix: Avatar ch? xe trong VehicleRegistrations � g?i getUserById d? l?y d? li?u d?y d?
 
-- **Ph�n t�ch**: Theo t�i li?u YEU_CAU_BE_BOSUNG_THONG_TIN_USER_2026-08-09.md, API /anpr/admin/vehicle-registrations chua tr? v? vatarUrl trong object owner (BE chua implement). Do d� c?n g?i th�m getUserById d? l?y full user data c� avatar.
+- **Ph�n t�ch**: Theo t�i li?u YEU_CAU_BE_BOSUNG_THONG_TIN_USER_2026-08-09.md, API /anpr/admin/vehicle-registrations chua tr? v? vatarUrl trong object owner (BE chua implement). Do d� c?n g?i th�m getUserById d? l?y full user data c� avatar.
 - **Thay d?i**:
-  - Import th�m getUserById t? sysAdminServices.
-  - Th�m state ownerDetail v� ownerDetailLoading.
+  - Import th�m getUserById t? sysAdminServices.
+  - Th�m state ownerDetail v� ownerDetailLoading.
   - handleOwnerClick m? modal ngay (v?i base info), r?i async fetch getUserById(userId) d? l?y avatar.
-  - Modal uu ti�n ownerDetail (full, c� avatar) khi c�, fallback v? selectedOwner (base info t? API danh s�ch).
+  - Modal uu ti�n ownerDetail (full, c� avatar) khi c�, fallback v? selectedOwner (base info t? API danh s�ch).
   - Hi?n spinner loading trong avatar slot khi dang fetch.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
-- **Tr?ng th�i**: �� ho�n th�nh.
+- **Tr?ng th�i**: �� ho�n th�nh.
 
 
 ---
@@ -667,4 +701,53 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - src/pages/bussinessAdmin/RoomManagement.jsx
   - src/service/businessAdminServices.js
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Style: Thêm whitespace-nowrap ngăn chặn xuống dòng dữ liệu bảng Phòng họp
+
+- **Phân tích**: Dữ liệu trong bảng phòng họp bị xuống dòng ngoài ý muốn khi chiều rộng màn hình thu hẹp. Thêm thuộc tính CSS `whitespace-nowrap` cho toàn bộ tiêu đề cột (`th`) và các ô dữ liệu (`td`), đồng thời thay thế `flex-wrap` bằng `flex items-center` đối với cột Trang thiết bị để giữ cho dữ liệu hiển thị thẳng trên cùng một hàng và kích hoạt thanh cuộn ngang khi cần.
+- **Thay đổi**:
+  - Cập nhật [RoomManagement.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/bussinessAdmin/RoomManagement.jsx):
+    - Thêm `whitespace-nowrap` vào 6 thẻ `th` trong `thead`.
+    - Thêm `whitespace-nowrap` và `shrink-0` cho các ô `td` trong danh sách.
+    - Sửa CSS Trang thiết bị của phòng từ `flex-wrap` thành `flex items-center`.
+- **Tập tin ảnh hưởng**:
+  - src/pages/bussinessAdmin/RoomManagement.jsx
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Refactor: Thiết kế bảng Phòng họp siêu gọn để tránh cuộn ngang (Scroll X)
+
+- **Phân tích**: Yêu cầu hiển thị ngang đầy đủ trên cùng một dòng nhưng không được xuất hiện thanh cuộn ngang (Scroll X) trên màn hình tiêu chuẩn. Thực hiện tối ưu hóa diện tích các cột và giảm padding.
+- **Thay đổi**:
+  - Cập nhật [RoomManagement.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/pages/bussinessAdmin/RoomManagement.jsx):
+    - Đổi lớp bọc từ `overflow-x-auto` thành `w-full` để triệt tiêu thanh cuộn ngang.
+    - Giảm padding của tất cả các ô tiêu đề (`th`) và dữ liệu (`td`) từ `py-3.5 px-5` thành `py-3 px-3` cực kỳ gọn.
+    - Thay thế cột Trang thiết bị dạng chữ dài bằng **biểu tượng icon tối giản** (Video, Mic, Monitor) có kèm thuộc tính `title` để hiển thị tooltip.
+    - Định dạng cột Vị trí hiển thị inline gọn gàng dạng `Tòa nhà A (Khu vực B)` trên cùng một hàng.
+    - Đảm bảo giữ nguyên bộ phân trang đầy đủ (`totalPages > 1`).
+- **Tập tin ảnh hưởng**:
+  - src/pages/bussinessAdmin/RoomManagement.jsx
+- **Trạng thái**: Đã hoàn thành.
+
+
+---
+
+## [2026-08-11] Feat: Hỗ trợ xóa biên bản họp nháp (Draft) và sửa backdrop blur
+
+- **Phân tích**: Tích hợp API xoá biên bản họp nháp `DELETE /api/v1/meeting-minutes/:id` (UC-MKM-05) của Backend. Chỉ cho phép các vai trò được phân quyền (người tạo, host cuộc họp, admin) thực hiện xóa, và chỉ áp dụng khi trạng thái là `draft`. Sửa lỗi làm mờ nền (backdrop blur) của Modal xác nhận ban hành và Modal xóa.
+- **Thay đổi**:
+  - Cập nhật [MinutesViewerEditor.jsx](file:///c:/Users/ASUS/Documents/ĐỒ%20ÁN%20SUMMER%202026/fe_smartracking/src/components/minutes/MinutesViewerEditor.jsx):
+    - Nhập API `deleteMeetingMinutes` và icon `Trash2`.
+    - Tính toán quyền xóa `canDelete` dựa trên vai trò hiện tại của user lấy từ `localStorage` và `isHost` prop.
+    - Thêm nút **Xóa** ở thanh công cụ header, nút này sẽ bị disable nếu trạng thái biên bản không phải là `draft` (ví dụ đã published).
+    - Triển khai Modal xác nhận xóa nháp sử dụng `createPortal` có nền làm mờ đầy đủ.
+    - Sửa lớp phủ nền của Modal xác nhận ban hành từ `absolute` thành `fixed` để làm mờ toàn bộ màn hình một cách hoàn chỉnh.
+- **Tập tin ảnh hưởng**:
+  - src/components/minutes/MinutesViewerEditor.jsx
 - **Trạng thái**: Đã hoàn thành.

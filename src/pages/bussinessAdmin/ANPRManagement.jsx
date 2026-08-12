@@ -1,4 +1,4 @@
-import { Car, Image as ImageIcon, Search, Calendar as CalendarIcon, UserX, X, Mail, Phone, Briefcase } from 'lucide-react';
+import { Car, Download, Image as ImageIcon, Search, Calendar as CalendarIcon, UserX, X, Mail, Phone, Briefcase } from 'lucide-react';
 import toast from '../../utils/toast';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,6 +13,7 @@ import {
 } from '../../service/anprService';
 import { getUsers } from '../../service/employeeServices'; // Để lấy danh sách nhân viên
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
+import ExportReportModal from '../../components/common/ExportReportModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import UserAvatar from '../../components/common/UserAvatar';
 import Pagination from '../../components/common/Pagination';
@@ -20,6 +21,7 @@ import Pagination from '../../components/common/Pagination';
 const ANPRManagement = () => {
     const [activeTab, setActiveTab] = useState('history'); // 'history', 'register', 'unknown'
     const [loading, setLoading] = useState(false);
+    const [isExportOpen, setIsExportOpen] = useState(false);
 
     // Snapshot Modal
     const [snapshotEventId, setSnapshotEventId] = useState(null);
@@ -219,6 +221,13 @@ const ANPRManagement = () => {
                 <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 p-6 space-y-6 animate-fade-in">
                     <div className="flex justify-between items-center">
                         <h2 className="text-lg font-bold text-midnight-indigo">Luồng xe vào ra hệ thống</h2>
+                        <button
+                            onClick={() => setIsExportOpen(true)}
+                            className="inline-flex items-center gap-2 px-3 py-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-colors"
+                        >
+                            <Download className="w-4 h-4" />
+                            Xuất báo cáo
+                        </button>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
@@ -572,6 +581,13 @@ const ANPRManagement = () => {
                 </div>,
                 document.body
             )}
+
+            <ExportReportModal
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                endpoint="/reports/vehicle/exports"
+                title="Xuất báo cáo phương tiện"
+            />
         </div>
     );
 };

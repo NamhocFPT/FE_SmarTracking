@@ -15,6 +15,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 const AlertRules = () => {
     const [rules, setRules] = useState([]);
     const [zones, setZones] = useState([]);
+
+    const INTRUSION_ZONE_TYPES = ['corridor', 'lobby', 'parking'];
+    const intrusionZones = zones.filter(z => INTRUSION_ZONE_TYPES.includes(z.zone_type));
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -139,8 +142,16 @@ const AlertRules = () => {
     };
 
     const handleFormChange = (key, value) => {
-        setFormData(prev => ({ ...prev, [key]: value }));
-        // Clear specific error on change
+        setFormData(prev => {
+            const updated = { ...prev, [key]: value };
+            if (key === 'alert_type' && value === 'intrusion' && prev.zone_id) {
+                const currentZone = zones.find(z => z.id === prev.zone_id);
+                if (currentZone && !INTRUSION_ZONE_TYPES.includes(currentZone.zone_type)) {
+                    updated.zone_id = '';
+                }
+            }
+            return updated;
+        });
         if (formErrors[key]) {
             setFormErrors(prev => ({ ...prev, [key]: null }));
         }
@@ -558,16 +569,21 @@ const AlertRules = () => {
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Khu vực áp dụng</label>
-                                    <select 
-                                        value={formData.zone_id} 
+                                    <select
+                                        value={formData.zone_id}
                                         onChange={(e) => handleFormChange('zone_id', e.target.value)}
                                         className="w-full px-4 py-2.5 bg-slate-50 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue focus:bg-white transition-colors"
                                     >
                                         <option value="">Toàn hệ thống (Mọi khu vực)</option>
-                                        {zones.map(z => (
+                                        {(formData.alert_type === 'intrusion' ? intrusionZones : zones).map(z => (
                                             <option key={z.id} value={z.id}>{z.zone_name}</option>
                                         ))}
                                     </select>
+                                    {formData.alert_type === 'intrusion' && (
+                                        <p className="text-[10px] text-slate-400 mt-1.5">
+                                            Chỉ hiển thị khu vực loại hành lang, sảnh, bãi đỗ xe — phòng họp và cổng ra vào không áp dụng cho cảnh báo xâm nhập.
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
