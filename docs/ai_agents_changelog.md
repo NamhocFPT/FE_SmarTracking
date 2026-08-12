@@ -5,6 +5,30 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-12 14:05
+* **Tên Plan / Yêu cầu**: Ẩn và tự động gán vai trò Employee khi tạo tài khoản đối tác.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/UserManagement.jsx`:
+    * Ẩn hoàn toàn mục "Gán vai trò (Role)" trong modal Tạo mới tài khoản khi chọn loại tài khoản là "Đối tác" (accountType === 'partner').
+    * Cập nhật logic validate trong `handleCreateSubmit`: bỏ qua ràng buộc yêu cầu bắt buộc gán vai trò khi tạo tài khoản đối tác.
+    * Tự động tìm kiếm vai trò có mã `'EMPLOYEE'` trong danh sách `roles` (so khớp linh hoạt theo cả hai thuộc tính `roleCode` và `role_code` để tránh trả về mảng rỗng do lệch casing/naming trong API response thực tế của server, khắc phục hoàn toàn lỗi `400 Bad Request` khi gửi payload thiếu `roleIds`).
+    * Gán tự động ID vai trò Employee vào `roleIds` trước khi đóng gói payload gửi lên API tạo tài khoản đối tác.
+    * Cập nhật hàm `openEditModal` để phân tích vai trò linh hoạt theo cả `roleCode` và `role_code` tương ứng.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-12 12:40
+* **Tên Plan / Yêu cầu**: Tích hợp API và hoàn thiện giao diện Quản lý phòng ban theo API Contract mới.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/businessAdminServices.js`:
+    * Thêm các hàm API: `deactivateDepartment` gọi `POST /departments/:id/deactivate` và `reactivateDepartment` gọi `POST /departments/:id/reactivate` để bật/tắt phòng ban thay cho việc truyền `isActive` qua body của `PATCH` đã bị Backend gỡ bỏ.
+  * `[Cập nhật] src/pages/bussinessAdmin/DepartmentManagement.jsx`:
+    * Thêm cột **Trạng thái** trong bảng danh sách phòng ban hiển thị nhãn "Hoạt động" (nền xanh) hoặc "Vô hiệu hóa" (nền xám).
+    * Bổ sung nút hành động **Vô hiệu hóa** (Power icon) và **Kích hoạt lại** (Refresh icon) cho từng phòng ban.
+    * Tích hợp xử lý chi tiết các lỗi nghiệp vụ `409` trả về từ Backend khi deactive/reactive phòng ban để hiển thị thông báo thân thiện với người dùng (ví dụ: phòng ban con còn hoạt động, còn nhân viên, hoặc phòng ban cha đang bị vô hiệu hóa).
+    * Thay thế ô nhập text "Phòng ban" (đang bị disabled mặc định) thành select dropdown trong **Edit User Modal** cho phép chuyển đổi phòng ban của nhân sự (gọi API `updateUser`).
+    * Dropdown select chỉ hiển thị với actor có quyền `accounts.user.update` (thông qua helper `hasPermission`), còn đối với actor không có quyền này (như role `MANAGER`) sẽ hiển thị ô text input disabled để ngăn chặn chuyển đổi phòng ban.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-12 12:15
 * **Tên Plan / Yêu cầu**: Sửa lỗi trắng màn hình quản lý khu vực và hoàn thiện Edit Modal cùng Validation.
 * **Chi tiết thay đổi**:
