@@ -1,1173 +1,1102 @@
-import { Activity, AlertTriangle, ArrowRight, BarChart3, Building2, Calendar, Car, ChevronRight, Clock, Download, LogIn, MapPin, PieChart as PieIcon, Plus, RefreshCw, ShieldAlert, Sliders, TrendingUp, Users } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import {
+    Activity, AlertTriangle, ArrowRight, BarChart3, Building2, Calendar,
+    Car, CheckCircle, ChevronRight, Clock, Download, LogIn, MapPin,
+    PieChart as PieIcon, Plus, RefreshCw, ShieldAlert, Sliders,
+    TrendingUp, Users, Wifi, WifiOff,
+} from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    BarChart, Bar, Legend, PieChart, Pie, Cell
+    BarChart, Bar, Legend, PieChart, Pie, Cell, Sector,
 } from 'recharts';
+import { Chart } from 'react-google-charts';
 
 import {
-    getDashboardOverview,
-    getRoomAnalytics,
-    getAttendanceAnalytics,
-    getMeetingsCountByPeriod,
-    getMeetingStatusBreakdown,
-    getAverageMeetingDuration,
-    getMeetingCancelRate,
-    getNoShowStats,
-    exportMeetingActivity,
-    getDepartments
+    getDashboardOverview, getRoomAnalytics, getAttendanceAnalytics,
+    getMeetingsCountByPeriod, getMeetingStatusBreakdown, getAverageMeetingDuration,
+    getMeetingCancelRate, getNoShowStats, exportMeetingActivity, getDepartments,
 } from '../../service/businessAdminServices';
-import { getDevices, getAdminVehicleTrafficStats, getAdminGateAccessHistory } from '../../service/sysAdminServices';
+import {
+    getDevices, getAdminVehicleTrafficStats, getAdminGateAccessHistory,
+    getSecurityAlertsDailyTrend, getAuditActivityHourly,
+} from '../../service/sysAdminServices';
 import { getZones } from '../../service/zoneServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getVehicleControlList } from '../../service/anprService';
 import { getBusinessAdminSummary } from '../../service/campusService';
 import DashboardBanner from '../../components/common/DashboardBanner';
 
-// Premium color palettes
-const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
+// ─── Design tokens (Sky Blueprint — mirrored from sysadmin) ──────────────────
 
-const SEVERITY_STYLES = {
-    critical: 'bg-red-50 text-red-700',
-    high: 'bg-orange-50 text-orange-700',
-    medium: 'bg-amber-50 text-amber-700',
-    low: 'bg-blue-50 text-blue-700',
+const D = {
+    pageBg:   '#F8F9FB',
+    cardBg:   '#ffffff',
+    cardBg2:  '#F8F9FB',
+    border:   '#D4E0ED',
+    borderSub:'#E7EDF6',
+    text:     '#0B3558',
+    muted:    '#476788',
+    muted2:   '#A6BBD1',
+    cyan:     '#0099ff',
+    blue:     '#006BFF',
+    purple:   '#8247f5',
+    green:    '#10b981',
+    amber:    '#ffa600',
+    red:      '#ef4444',
+    grid:     '#E7EDF6',
+    axisText: '#476788',
+    shadow:   'rgba(71,103,136,0.04) 0px 4px 5px 0px, rgba(71,103,136,0.03) 0px 8px 15px 0px, rgba(71,103,136,0.08) 0px 30px 50px 0px',
+    shadowSm: 'rgba(71,103,136,0.04) 0px 4px 5px 0px, rgba(71,103,136,0.03) 0px 4px 10px 0px, rgba(71,103,136,0.05) 0px 10px 20px 0px',
 };
 
-const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.1
-        }
-    }
+const GC_BASE = {
+    backgroundColor: 'transparent',
+    fontName: 'inherit',
+    chartArea: { backgroundColor: 'transparent', width: '88%', height: '68%' },
+    hAxis: { textStyle: { color: D.axisText, fontSize: 10 }, gridlines: { color: D.grid }, baselineColor: D.grid },
+    vAxis: { textStyle: { color: D.axisText, fontSize: 10 }, gridlines: { color: D.grid }, baselineColor: D.grid, minValue: 0 },
+    tooltip: { textStyle: { color: D.text, fontSize: 12 }, showColorCode: true },
+    legend: { textStyle: { color: D.muted, fontSize: 11 } },
 };
 
-const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SEVERITY_COLORS = { critical: '#ef4444', high: '#f97316', medium: '#ffa600', low: '#006BFF' };
+const SEVERITY_LABEL  = { critical: 'Nguy cấp', high: 'Cao', medium: 'Trung bình', low: 'Thấp' };
+const ALERT_TYPE_KEYS   = ['intrusion', 'stranger', 'crowd', 'vehicle_control_match'];
+const ALERT_TYPE_LABELS = ['Xâm nhập', 'Khuôn mặt lạ', 'Tụ tập', 'Xe kiểm soát'];
+const ALERT_TYPE_COLORS = ['#ef4444', '#f97316', '#ffa600', '#006BFF'];
+const STATUS_COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+const useInView = (threshold = 0.12) => {
+    const ref = useRef(null);
+    const [inView, setInView] = useState(false);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const obs = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
+            { threshold }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, [threshold]);
+    return [ref, inView];
 };
+
+const useCountUp = (target, active, duration = 750) => {
+    const [display, setDisplay] = useState(0);
+    const rafRef = useRef(null);
+    useEffect(() => {
+        if (!active || typeof target !== 'number') return;
+        const startTime = performance.now();
+        const tick = (now) => {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased    = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.round(target * eased));
+            if (progress < 1) rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafRef.current);
+    }, [active, target, duration]);
+    return display;
+};
+
+// ─── Primitive components ─────────────────────────────────────────────────────
+
+const ScrollReveal = ({ children, delay = 0, className = '', fromBelow = true }) => {
+    const [ref, inView] = useInView();
+    return (
+        <div
+            ref={ref}
+            className={`transition-all duration-700 ease-out ${
+                inView ? 'opacity-100 translate-y-0' : `opacity-0 ${fromBelow ? 'translate-y-8' : 'translate-y-2'}`
+            } ${className}`}
+            style={{ transitionDelay: inView ? `${delay}ms` : '0ms' }}
+        >
+            {children}
+        </div>
+    );
+};
+
+const PulseSkeleton = ({ height = 220 }) => (
+    <div className="animate-pulse rounded-xl" style={{ background: D.borderSub, minHeight: height }} />
+);
+
+const EmptyState = ({ message = 'Không có dữ liệu' }) => (
+    <div className="h-full flex flex-col items-center justify-center gap-2 py-6" style={{ color: D.muted2 }}>
+        <ShieldAlert className="w-8 h-8 opacity-30" />
+        <p className="text-xs">{message}</p>
+    </div>
+);
+
+const DonutLegend = ({ data }) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 14px', paddingTop: 8 }}>
+        {data.map(d => (
+            <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: D.text }}>
+                    {d.name}&nbsp;<span style={{ fontWeight: 400, color: D.muted }}>({d.value})</span>
+                </span>
+            </div>
+        ))}
+    </div>
+);
+
+const BarTooltip = ({ active, payload, label, unit = '' }) => {
+    if (!active || !payload?.length) return null;
+    return (
+        <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 12, padding: '10px 14px', minWidth: 130, pointerEvents: 'none', boxShadow: D.shadowSm }}>
+            {label && <p style={{ fontSize: 11, fontWeight: 700, color: D.text, marginBottom: 6 }}>{label}</p>}
+            {payload.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color || p.fill, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: D.muted }}>{p.name}:</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: D.text }}>{p.value}{unit}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const DonutTooltip = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    const d = payload[0];
+    return (
+        <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 12, padding: '10px 14px', pointerEvents: 'none', boxShadow: D.shadowSm }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.payload?.color || d.fill, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: D.text }}>{d.name}</span>
+            </div>
+            <p style={{ fontSize: 11, color: D.muted, paddingLeft: 18 }}>{d.value} · {((d.percent || 0) * 100).toFixed(1)}%</p>
+        </div>
+    );
+};
+
+const ActiveSlice = (props) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    return (
+        <Sector cx={cx} cy={cy} innerRadius={innerRadius - 2} outerRadius={outerRadius + 8}
+            startAngle={startAngle} endAngle={endAngle} fill={fill}
+            style={{ filter: `drop-shadow(0 0 8px ${fill}80)` }} />
+    );
+};
+
+// ─── Chart Card wrappers ──────────────────────────────────────────────────────
+
+const ChartCard = ({ title, sub, delay = 0, renderChart, accent = D.cyan }) => {
+    const [ref, inView] = useInView(0.1);
+    return (
+        <div ref={ref}
+            style={{ background: D.cardBg, border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px 20px 16px', display: 'flex', flexDirection: 'column', boxShadow: D.shadow, position: 'relative', overflow: 'hidden', transitionDelay: inView ? `${delay}ms` : '0ms' }}
+            className={`transition-all duration-700 ease-out ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+        >
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accent} 0%, ${accent}44 50%, transparent 100%)` }} />
+            <div style={{ position: 'absolute', top: -60, left: -30, width: 160, height: 160, borderRadius: '50%', opacity: 0.04, background: accent, filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div style={{ marginBottom: 14, flexShrink: 0, position: 'relative' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, letterSpacing: '-0.1px' }}>{title}</h3>
+                {sub && <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>{sub}</p>}
+            </div>
+            <div style={{ flex: 1 }}>{renderChart(inView)}</div>
+        </div>
+    );
+};
+
+const GChartCard = ({ title, sub, delay = 0, accent = D.cyan, loading, empty, emptyMsg, children }) => {
+    const [ref, inView] = useInView(0.1);
+    return (
+        <div ref={ref}
+            style={{ background: D.cardBg, border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px 20px 16px', display: 'flex', flexDirection: 'column', boxShadow: D.shadow, position: 'relative', overflow: 'hidden', transitionDelay: inView ? `${delay}ms` : '0ms' }}
+            className={`transition-all duration-700 ease-out ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+        >
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${accent} 0%, ${accent}44 50%, transparent 100%)` }} />
+            <div style={{ position: 'absolute', top: -60, left: -30, width: 160, height: 160, borderRadius: '50%', opacity: 0.04, background: accent, filter: 'blur(40px)', pointerEvents: 'none' }} />
+            <div style={{ marginBottom: 14, flexShrink: 0, position: 'relative' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>{title}</h3>
+                {sub && <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>{sub}</p>}
+            </div>
+            <div style={{ flex: 1, minHeight: 220 }}>
+                {!inView || loading ? <PulseSkeleton /> : empty ? <EmptyState message={emptyMsg} /> : children}
+            </div>
+        </div>
+    );
+};
+
+// ─── KPI Tile ─────────────────────────────────────────────────────────────────
+
+const KpiTile = ({ icon: Icon, label, value, sub, subColor, iconColor = D.cyan, delay, progress }) => {
+    const [ref, inView] = useInView(0.2);
+    const numericTarget = typeof value === 'number' ? value : null;
+    const counted       = useCountUp(numericTarget, inView);
+    const displayValue  = numericTarget !== null ? counted : value;
+
+    return (
+        <div ref={ref}
+            style={{ background: D.cardBg, border: `1px solid ${D.border}`, borderRadius: 16, padding: '16px 16px 14px', position: 'relative', overflow: 'hidden', boxShadow: D.shadowSm, transitionDelay: inView ? `${delay}ms` : '0ms' }}
+            className={`transition-all duration-600 ease-out cursor-default hover:scale-[1.025] ${inView ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}
+        >
+            <div style={{ position: 'absolute', top: -24, right: -24, width: 90, height: 90, borderRadius: '50%', opacity: 0.07, background: iconColor, filter: 'blur(24px)', pointerEvents: 'none' }} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: D.muted, lineHeight: 1.45, paddingRight: 8 }}>{label}</p>
+                <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${iconColor}15`, border: `1px solid ${iconColor}35` }}>
+                    <Icon style={{ width: 17, height: 17, color: iconColor }} />
+                </div>
+            </div>
+            <p style={{ fontSize: 27, fontWeight: 800, color: D.text, letterSpacing: '-0.8px', lineHeight: 1 }} className="tabular-nums">
+                {displayValue}
+            </p>
+            {progress !== undefined && (
+                <div style={{ marginTop: 10, height: 3, borderRadius: 99, background: D.borderSub }}>
+                    <div style={{ height: 3, borderRadius: 99, width: inView ? `${Math.min(progress, 100)}%` : '0%', background: `linear-gradient(90deg, ${iconColor}, ${iconColor}70)`, transition: 'width 1.1s cubic-bezier(.22,1,.36,1)' }} />
+                </div>
+            )}
+            {sub && <p style={{ fontSize: 11, marginTop: 8, fontWeight: 500, color: subColor || D.muted }}>{sub}</p>}
+        </div>
+    );
+};
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 const DashBoard = () => {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [activeTab, setActiveTab] = useState('overview');
+    const [lastUpdated, setLastUpdated] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
-    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'meetings' | 'security'
+    const [formError, setFormError] = useState(null);
 
-    // Campus Overview & Security tab states
-    const [campusStats, setCampusStats] = useState({
-        gateEventsToday: 0,
-        newAlertsCount: 0,
-        zonesActive: 0,
-        zonesTotal: 0,
-        devicesOnline: 0,
-        devicesTotal: 0,
-        blocklistActive: 0,
-        vehicleControlHitsToday: 0,
-        securityAlertsBySeverity: null,
+    // ── Campus / Security data ────────────────────────────────────────────────
+    const [campusLoading, setCampusLoading] = useState(true);
+    const [kpi, setKpi] = useState({
+        gateEventsToday: 0, alertsNew: 0, zonesActive: 0, zonesTotal: 0,
+        devicesOnline: 0, devicesTotal: 0, devicesOffline: 0, vehicleHitsToday: 0,
     });
-    const [recentAlerts, setRecentAlerts] = useState([]);
-    const [zonesList, setZonesList] = useState([]);
+    const [severityData,    setSeverityData]    = useState([]);
+    const [trafficData,     setTrafficData]     = useState([]);
+    const [recentAlerts,    setRecentAlerts]    = useState([]);
     const [vehicleWatchlist, setVehicleWatchlist] = useState([]);
     const [recentGateAccess, setRecentGateAccess] = useState([]);
-    const [campusLoading, setCampusLoading] = useState(true);
+    const [alertTrendGCData, setAlertTrendGCData] = useState(null);
+    const [alertTrendTotal,  setAlertTrendTotal]  = useState(0);
+    const [auditHourlyData,  setAuditHourlyData]  = useState([]);
+    const [auditTotal,       setAuditTotal]       = useState(0);
+    const [activeSeverityIdx, setActiveSeverityIdx] = useState(null);
 
-    // Filter states
+    // ── Meeting / Room data ───────────────────────────────────────────────────
+    const [meetLoading, setMeetLoading] = useState(true);
     const [fromDate, setFromDate] = useState('2026-06-01');
-    const [toDate, setToDate] = useState('2026-06-30');
-    const [selectedDept, setSelectedDept] = useState('');
-    const [departmentsList, setDepartmentsList] = useState([]);
-
-    // Stats states
-    const [stats, setStats] = useState({
-        meetingCount: 0,
-        activeRooms: 0,
-        utilizationRate: 0,
-        noShowRate: 0,
-        onTimeRate: 0,
-        recordingCount: 0
+    const [toDate,   setToDate]   = useState('2026-06-30');
+    const [selectedDept,     setSelectedDept]     = useState('');
+    const [departmentsList,  setDepartmentsList]  = useState([]);
+    const [stats,            setStats]            = useState({ meetingCount: 0, activeRooms: 0, utilizationRate: 0, noShowRate: 0, onTimeRate: 0 });
+    const [roomStats,        setRoomStats]        = useState([]);
+    const [attendanceData,   setAttendanceData]   = useState([]);
+    const [activeAttIdx,     setActiveAttIdx]     = useState(null);
+    const [meetingsTrend,    setMeetingsTrend]    = useState([]);
+    const [statusBreakdown,  setStatusBreakdown]  = useState([]);
+    const [avgDuration,      setAvgDuration]      = useState({ averageMinutes: 0 });
+    const [cancelRateStats,  setCancelRateStats]  = useState({ cancelRate: 0 });
+    const [noShowTrend,      setNoShowTrend]      = useState([]);
+    const [isExporting,      setIsExporting]      = useState(false);
+    const [exportForm,       setExportForm]       = useState({
+        format: 'xlsx', sections: ['overview', 'rooms', 'attendance', 'no_show'], delivery: 'download',
     });
 
-    // Room stats & Attendance list
-    const [roomStats, setRoomStats] = useState([]);
-    const [attendanceSummary, setAttendanceSummary] = useState({
-        presentRate: 0,
-        onTimeRate: 0,
-        lateCount: 0,
-        absentCount: 0,
-        topLateUsers: []
-    });
-
-    // Advanced analytics states
-    const [meetingsTrend, setMeetingsTrend] = useState([]);
-    const [statusBreakdown, setStatusBreakdown] = useState([]);
-    const [avgDuration, setAvgDuration] = useState({ averageMinutes: 0 });
-    const [cancelRateStats, setCancelRateStats] = useState({ cancelRate: 0 });
-    const [noShowTrend, setNoShowTrend] = useState([]);
-
-    // Report Export states
-    const [isExporting, setIsExporting] = useState(false);
-    const [exportForm, setExportForm] = useState({
-        format: 'xlsx',
-        sections: ['overview', 'rooms', 'attendance', 'no_show'],
-        delivery: 'download'
-    });
-
-    // Load reference data
-    const loadInitData = useCallback(async () => {
-        try {
-            const deptRes = await getDepartments({ limit: 100 });
-            if (deptRes?.success) {
-                setDepartmentsList(deptRes.data || []);
-            }
-        } catch {
-            setDepartmentsList([
-                { id: 'dept-1', departmentCode: 'IT', departmentName: 'Phòng Công nghệ thông tin' },
-                { id: 'dept-2', departmentCode: 'HR', departmentName: 'Phòng Nhân sự' },
-                { id: 'dept-3', departmentCode: 'SALES', departmentName: 'Phòng Kinh doanh' }
-            ]);
-        }
+    // ── Load departments ──────────────────────────────────────────────────────
+    useEffect(() => {
+        getDepartments({ limit: 100 })
+            .then(r => { if (r?.success) setDepartmentsList(r.data || []); })
+            .catch(() => setDepartmentsList([
+                { id: 'dept-1', departmentName: 'Phòng Công nghệ thông tin' },
+                { id: 'dept-2', departmentName: 'Phòng Nhân sự' },
+                { id: 'dept-3', departmentName: 'Phòng Kinh doanh' },
+            ]));
     }, []);
 
-    // Load Dashboard Overview & Analytics data
-    const fetchDashboardData = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const params = {
-                from: fromDate,
-                to: toDate,
-                departmentId: selectedDept || undefined
-            };
+    // ── Fetch campus / security data ──────────────────────────────────────────
+    const fetchCampusData = useCallback(async () => {
+        setCampusLoading(true);
+        const now        = new Date();
+        const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
 
-            const [
-                overviewRes, roomRes, attendanceRes,
-                trendRes, breakdownRes, durationRes,
-                cancelRes, noShowRes
-            ] = await Promise.allSettled([
+        const [
+            summaryRes, devicesRes, alertsRes, trafficRes,
+            blocklistRes, gateHistoryRes, trendRes, auditRes,
+        ] = await Promise.allSettled([
+            getBusinessAdminSummary(),
+            getDevices({ limit: 100 }),
+            getSecurityAlerts({ status: 'new', limit: 5 }),
+            getAdminVehicleTrafficStats({ from: todayStart.toISOString(), to: todayEnd.toISOString(), group_by: 'hour' }),
+            getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 }),
+            getAdminGateAccessHistory({ from: todayStart.toISOString(), to: todayEnd.toISOString(), limit: 5 }),
+            getSecurityAlertsDailyTrend({ days: 7 }),
+            getAuditActivityHourly(),
+        ]);
+
+        // Devices
+        let devList = [];
+        if (devicesRes.status === 'fulfilled' && devicesRes.value?.success) devList = devicesRes.value.data || [];
+        const online  = devList.filter(d => d.status === 'online').length;
+        const offline = devList.filter(d => ['offline', 'disabled', 'maintenance'].includes(d.status)).length;
+
+        // Summary
+        let gateToday = 0, zonesActive = 0, zonesTotal = 0, vehicleHits = 0;
+        if (summaryRes.status === 'fulfilled' && summaryRes.value?.success) {
+            const s = summaryRes.value.data;
+            gateToday   = s.gateTrafficToday?.entriesToday || 0;
+            zonesActive = s.zoneOccupancy?.zonesWithDataCount || 0;
+            zonesTotal  = s.zoneOccupancy?.totalZoneCount    || 0;
+            vehicleHits = s.vehicleControlHitsToday || 0;
+            const sev   = s.securityAlertsBySeverity;
+            if (sev) {
+                setSeverityData(Object.entries(sev).filter(([, v]) => v > 0).map(([key, value]) => ({
+                    name: SEVERITY_LABEL[key] || key, value, color: SEVERITY_COLORS[key] || '#94A3B8',
+                })));
+            }
+        }
+
+        // Alerts
+        let alertsNew = 0;
+        if (alertsRes.status === 'fulfilled' && alertsRes.value?.success) {
+            alertsNew = alertsRes.value.meta?.total || (alertsRes.value.data || []).length;
+            setRecentAlerts((alertsRes.value.data || []).slice(0, 5));
+        } else {
+            setRecentAlerts([
+                { id: 'a-1', alert_type: 'intrusion', severity: 'high', zone_name: 'Cổng phụ B', created_at: new Date(Date.now() - 900000).toISOString() },
+                { id: 'a-2', alert_type: 'vehicle_control_match', severity: 'critical', zone_name: 'Cổng chính', created_at: new Date(Date.now() - 1800000).toISOString() },
+            ]);
+            alertsNew = 2;
+        }
+
+        setKpi({ gateEventsToday: gateToday, alertsNew, zonesActive, zonesTotal, devicesOnline: online, devicesTotal: devList.length, devicesOffline: offline, vehicleHitsToday: vehicleHits });
+
+        // Traffic
+        if (trafficRes.status === 'fulfilled' && trafficRes.value?.success) {
+            const buckets = trafficRes.value.data?.buckets || trafficRes.value.data?.data?.buckets || [];
+            setTrafficData(buckets.map(b => ({ hour: b.period, 'Vào': b.total_enter || 0, 'Ra': b.total_leave || 0 })));
+        }
+
+        // Blocklist
+        if (blocklistRes.status === 'fulfilled' && blocklistRes.value?.success) {
+            setVehicleWatchlist((blocklistRes.value.data || []).slice(0, 5));
+        }
+
+        // Gate history
+        if (gateHistoryRes.status === 'fulfilled' && gateHistoryRes.value?.success) {
+            setRecentGateAccess((gateHistoryRes.value.data || []).slice(0, 5));
+        }
+
+        // Alert trend 7d — tận dụng từ sysadmin API (graceful nếu 403)
+        if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
+            const series = trendRes.value.data?.series || [];
+            if (series.length > 0) {
+                const header = ['Ngày', ...ALERT_TYPE_LABELS];
+                const rows = series.map(s => [
+                    s.date ? s.date.slice(5).replace('-', '/') : '',
+                    ...ALERT_TYPE_KEYS.map(k => s.byType?.[k] || 0),
+                ]);
+                setAlertTrendGCData([header, ...rows]);
+                setAlertTrendTotal(trendRes.value.data?.totalInPeriod || 0);
+            }
+        }
+
+        // Audit hourly — tận dụng từ sysadmin API (graceful nếu 403)
+        if (auditRes.status === 'fulfilled' && auditRes.value?.success) {
+            const buckets = auditRes.value.data?.buckets || [];
+            setAuditTotal(auditRes.value.data?.totalToday || 0);
+            if (buckets.length > 0) {
+                setAuditHourlyData(buckets.map(b => ({
+                    hour: typeof b.hour === 'number' ? String(b.hour).padStart(2, '0') + 'h' : String(b.hour ?? '').slice(0, 2) + 'h',
+                    count: b.count ?? 0,
+                })));
+            }
+        }
+
+        setLastUpdated(new Date());
+        setCampusLoading(false);
+    }, []);
+
+    // ── Fetch meeting / room data ─────────────────────────────────────────────
+    const fetchMeetingData = useCallback(async () => {
+        setMeetLoading(true);
+        const params = { from: fromDate, to: toDate, departmentId: selectedDept || undefined };
+        const monthStart = new Date(); monthStart.setDate(1);
+        const monthEnd   = new Date(); monthEnd.setHours(23, 59, 59, 999);
+        const attParams  = { from: monthStart.toISOString(), to: monthEnd.toISOString() };
+
+        const [overviewRes, roomRes, attendanceRes, trendRes, breakdownRes, durationRes, cancelRes, noShowRes] =
+            await Promise.allSettled([
                 getDashboardOverview(params),
                 getRoomAnalytics(params),
-                getAttendanceAnalytics(params),
+                getAttendanceAnalytics(attParams),
                 getMeetingsCountByPeriod({ ...params, granularity: 'week' }),
                 getMeetingStatusBreakdown(params),
                 getAverageMeetingDuration(params),
                 getMeetingCancelRate(params),
-                getNoShowStats(params)
+                getNoShowStats(params),
             ]);
 
-            // Map overview stats
-            if (overviewRes.status === 'fulfilled' && overviewRes.value?.success) {
-                setStats(overviewRes.value.data);
-            } else {
-                setStats({
-                    meetingCount: 145,
-                    activeRooms: 12,
-                    utilizationRate: 68.5,
-                    noShowRate: 7.2,
-                    onTimeRate: 85.3,
-                    recordingCount: 38
-                });
-            }
-
-            // Map rooms analytics
-            if (roomRes.status === 'fulfilled' && roomRes.value?.success) {
-                setRoomStats(roomRes.value.data.rooms || []);
-            } else {
-                setRoomStats([
-                    { roomId: 'r-1', roomName: 'Phòng Apollo 101', utilizationRate: 82.0, bookedHours: 120, actualHours: 98.4 },
-                    { roomId: 'r-2', roomName: 'Phòng Athena 102', utilizationRate: 74.5, bookedHours: 90, actualHours: 67.05 },
-                    { roomId: 'r-3', roomName: 'Phòng Zeus 201', utilizationRate: 58.0, bookedHours: 110, actualHours: 63.8 },
-                    { roomId: 'r-4', roomName: 'Phòng Hermes 302', utilizationRate: 45.2, bookedHours: 80, actualHours: 36.16 }
-                ]);
-            }
-
-            // Map attendance analytics
-            if (attendanceRes.status === 'fulfilled' && attendanceRes.value?.success) {
-                const data = attendanceRes.value.data;
-                const totalReq = data.totalRequiredParticipants || ((data.onTimeCount || 0) + (data.lateCount || 0));
-                const presentCount = (data.onTimeCount || 0) + (data.lateCount || 0);
-                const presentRate = totalReq ? ((presentCount / totalReq) * 100).toFixed(1) : 0;
-                setAttendanceSummary({
-                    ...data,
-                    presentRate: parseFloat(presentRate),
-                    topLateUsers: data.topLateUsers || []
-                });
-            } else {
-                setAttendanceSummary({
-                    presentRate: 91.2,
-                    onTimeRate: 85.3,
-                    lateCount: 24,
-                    absentCount: 12,
-                    topLateUsers: [
-                        { userId: 'u-1', fullName: 'Nguyễn Văn Hoàng', lateCount: 4 },
-                        { userId: 'u-2', fullName: 'Lê Thị Thu Thủy', lateCount: 3 },
-                        { userId: 'u-3', fullName: 'Trần Hữu Nam', lateCount: 2 }
-                    ]
-                });
-            }
-
-            // Map trend data (UC-151)
-            if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
-                setMeetingsTrend(trendRes.value.data.series || []);
-            } else {
-                setMeetingsTrend([
-                    { period: 'Tuần 22', count: 32, utilizationRate: 60.5 },
-                    { period: 'Tuần 23', count: 38, utilizationRate: 64.2 },
-                    { period: 'Tuần 24', count: 45, utilizationRate: 68.5 },
-                    { period: 'Tuần 25', count: 42, utilizationRate: 65.0 },
-                    { period: 'Tuần 26', count: 48, utilizationRate: 72.3 }
-                ]);
-            }
-
-            // Map breakdown status (UC-152)
-            if (breakdownRes.status === 'fulfilled' && breakdownRes.value?.success) {
-                setStatusBreakdown(breakdownRes.value.data.items || []);
-            } else {
-                setStatusBreakdown([
-                    { status: 'Hoàn thành', count: 98, percentage: 67.6 },
-                    { status: 'Lên lịch', count: 30, percentage: 20.7 },
-                    { status: 'Hủy bỏ', count: 15, percentage: 10.3 },
-                    { status: 'Đang họp', count: 2, percentage: 1.4 }
-                ]);
-            }
-
-            // Map average duration (UC-153)
-            if (durationRes.status === 'fulfilled' && durationRes.value?.success) {
-                setAvgDuration(durationRes.value.data);
-            } else {
-                setAvgDuration({ averageMinutes: 72.5 });
-            }
-
-            // Map cancel rate (UC-154)
-            if (cancelRes.status === 'fulfilled' && cancelRes.value?.success) {
-                setCancelRateStats(cancelRes.value.data);
-            } else {
-                setCancelRateStats({ cancelRate: 10.3 });
-            }
-
-            // Map no show analytics (UC-156)
-            if (noShowRes.status === 'fulfilled' && noShowRes.value?.success) {
-                setNoShowTrend(noShowRes.value.data.byRoom || []);
-            } else {
-                setNoShowTrend([
-                    { roomName: 'Phòng Apollo 101', noShowRate: 8.0 },
-                    { roomName: 'Phòng Athena 102', noShowRate: 5.5 },
-                    { roomName: 'Phòng Zeus 201', noShowRate: 10.2 },
-                    { roomName: 'Phòng Hermes 302', noShowRate: 4.8 }
-                ]);
-            }
-
-        } catch {
-            setError('Không thể kết nối đến máy chủ để tải dữ liệu thống kê.');
-        } finally {
-            setLoading(false);
+        if (overviewRes.status === 'fulfilled' && overviewRes.value?.success) {
+            setStats(overviewRes.value.data);
+        } else {
+            setStats({ meetingCount: 145, activeRooms: 12, utilizationRate: 68.5, noShowRate: 7.2, onTimeRate: 85.3 });
         }
+
+        if (roomRes.status === 'fulfilled' && roomRes.value?.success) {
+            const rooms = roomRes.value.data?.rooms || [];
+            setRoomStats(rooms.slice(0, 8).map(r => ({
+                name: (r.roomName || r.room_name || '').replace(/^Phòng\s+/i, '') || '—',
+                rate: +(parseFloat(r.utilizationRate || 0).toFixed(1)),
+                bookedHours: r.bookedHours || 0,
+                actualHours: r.actualHours || 0,
+            })));
+        } else {
+            setRoomStats([
+                { name: 'Apollo 101', rate: 82.0, bookedHours: 120, actualHours: 98.4 },
+                { name: 'Athena 102', rate: 74.5, bookedHours: 90,  actualHours: 67.1 },
+                { name: 'Zeus 201',   rate: 58.0, bookedHours: 110, actualHours: 63.8 },
+                { name: 'Hermes 302', rate: 45.2, bookedHours: 80,  actualHours: 36.2 },
+            ]);
+        }
+
+        if (attendanceRes.status === 'fulfilled' && attendanceRes.value?.success) {
+            const att = attendanceRes.value.data;
+            const onTime = att.onTimeCount || 0;
+            const late   = att.lateCount   || 0;
+            const absent = Math.max(0, (att.totalRequiredParticipants || 0) - onTime - late);
+            setAttendanceData([
+                { name: 'Đúng giờ', value: onTime, color: D.green },
+                { name: 'Đến muộn', value: late,   color: D.amber },
+                { name: 'Vắng mặt', value: absent, color: D.red },
+            ].filter(d => d.value > 0));
+        } else {
+            setAttendanceData([
+                { name: 'Đúng giờ', value: 142, color: D.green },
+                { name: 'Đến muộn', value: 24,  color: D.amber },
+                { name: 'Vắng mặt', value: 15,  color: D.red },
+            ]);
+        }
+
+        if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
+            setMeetingsTrend(trendRes.value.data?.series || []);
+        } else {
+            setMeetingsTrend([
+                { period: 'Tuần 22', count: 32, utilizationRate: 60.5 },
+                { period: 'Tuần 23', count: 38, utilizationRate: 64.2 },
+                { period: 'Tuần 24', count: 45, utilizationRate: 68.5 },
+                { period: 'Tuần 25', count: 42, utilizationRate: 65.0 },
+                { period: 'Tuần 26', count: 48, utilizationRate: 72.3 },
+            ]);
+        }
+
+        if (breakdownRes.status === 'fulfilled' && breakdownRes.value?.success) {
+            setStatusBreakdown(breakdownRes.value.data?.items || []);
+        } else {
+            setStatusBreakdown([
+                { status: 'Hoàn thành', count: 98, percentage: 67.6 },
+                { status: 'Lên lịch',   count: 30, percentage: 20.7 },
+                { status: 'Hủy bỏ',     count: 15, percentage: 10.3 },
+                { status: 'Đang họp',   count: 2,  percentage: 1.4  },
+            ]);
+        }
+
+        if (durationRes.status === 'fulfilled' && durationRes.value?.success) {
+            setAvgDuration(durationRes.value.data);
+        } else {
+            setAvgDuration({ averageMinutes: 72.5 });
+        }
+
+        if (cancelRes.status === 'fulfilled' && cancelRes.value?.success) {
+            setCancelRateStats(cancelRes.value.data);
+        } else {
+            setCancelRateStats({ cancelRate: 10.3 });
+        }
+
+        if (noShowRes.status === 'fulfilled' && noShowRes.value?.success) {
+            setNoShowTrend(noShowRes.value.data?.byRoom || []);
+        } else {
+            setNoShowTrend([
+                { roomName: 'Phòng Apollo 101', noShowRate: 8.0 },
+                { roomName: 'Phòng Athena 102', noShowRate: 5.5 },
+                { roomName: 'Phòng Zeus 201',   noShowRate: 10.2 },
+                { roomName: 'Phòng Hermes 302', noShowRate: 4.8 },
+            ]);
+        }
+
+        setMeetLoading(false);
     }, [fromDate, toDate, selectedDept]);
 
-    // Load Campus Overview & Security data (UC: Business Admin campus visibility)
-    const fetchCampusData = useCallback(async () => {
-        setCampusLoading(true);
-        try {
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
-            const todayEnd = new Date();
-            todayEnd.setHours(23, 59, 59, 999);
+    useEffect(() => { fetchCampusData(); }, [fetchCampusData]);
+    useEffect(() => { fetchMeetingData(); }, [fetchMeetingData]);
 
-            const [devicesRes, zonesRes, alertsRes, trafficRes, blocklistRes, gateHistoryRes, summaryRes] = await Promise.allSettled([
-                getDevices({ limit: 100 }),
-                getZones({ limit: 100 }),
-                getSecurityAlerts({ status: 'new', limit: 5 }),
-                getAdminVehicleTrafficStats({ from: todayStart.toISOString(), to: todayEnd.toISOString(), group_by: 'day' }),
-                getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 }),
-                getAdminGateAccessHistory({ from: todayStart.toISOString(), to: todayEnd.toISOString(), limit: 5 }),
-                getBusinessAdminSummary()
-            ]);
-
-            let devList = [];
-            if (devicesRes.status === 'fulfilled' && devicesRes.value?.success) {
-                devList = devicesRes.value.data || [];
-            } else {
-                devList = [{ status: 'ONLINE' }, { status: 'ONLINE' }, { status: 'OFFLINE' }];
-            }
-
-            let zonesData = [];
-            if (zonesRes.status === 'fulfilled' && zonesRes.value?.success) {
-                zonesData = zonesRes.value.data || [];
-            } else {
-                zonesData = [
-                    { id: 'z-1', zone_name: 'Cổng chính', status: 'active' },
-                    { id: 'z-2', zone_name: 'Bãi đỗ xe A', status: 'active' },
-                    { id: 'z-3', zone_name: 'Sảnh toà nhà A', status: 'active' },
-                ];
-            }
-
-            let alertsData = [];
-            if (alertsRes.status === 'fulfilled' && alertsRes.value?.success) {
-                alertsData = alertsRes.value.data || [];
-            } else {
-                alertsData = [
-                    { id: 'a-1', alert_type: 'Người lạ xâm nhập', severity: 'high', zone_name: 'Cổng phụ B', created_at: new Date(Date.now() - 900000).toISOString() },
-                    { id: 'a-2', alert_type: 'Biển số trong blocklist', severity: 'critical', zone_name: 'Cổng chính', created_at: new Date(Date.now() - 1800000).toISOString() },
-                ];
-            }
-
-            let blocklistData = [];
-            if (blocklistRes.status === 'fulfilled' && blocklistRes.value?.success) {
-                blocklistData = blocklistRes.value.data || [];
-            } else {
-                blocklistData = [
-                    { id: 'v-1', plate_raw: '30A-123.45', list_type: 'blocklist', reason: 'Xe báo mất cắp' },
-                    { id: 'v-2', plate_raw: '29B-678.90', list_type: 'watchlist', reason: 'Theo dõi ra vào bất thường' },
-                ];
-            }
-
-            let gateHistoryData = [];
-            if (gateHistoryRes.status === 'fulfilled' && gateHistoryRes.value?.success) {
-                gateHistoryData = gateHistoryRes.value.data || [];
-            } else {
-                gateHistoryData = [];
-            }
-
-            let gateEventsToday = 0;
-            if (trafficRes.status === 'fulfilled' && trafficRes.value?.success) {
-                const summary = trafficRes.value.data?.summary;
-                gateEventsToday = summary?.total_events ?? ((summary?.total_enter || 0) + (summary?.total_leave || 0));
-            } else {
-                gateEventsToday = 142;
-            }
-
-            // CDB-RS-001: business-admin-summary — nguồn tổng hợp chính thức từ BE, ưu tiên hơn số tự suy từ list /zones khi có sẵn
-            let zonesActive = zonesData.filter(z => z.status === 'active').length;
-            let zonesTotal = zonesData.length;
-            let vehicleControlHitsToday = 0;
-            let securityAlertsBySeverity = null;
-            if (summaryRes.status === 'fulfilled' && summaryRes.value?.success) {
-                const summary = summaryRes.value.data;
-                if (summary?.zoneOccupancy) {
-                    zonesActive = summary.zoneOccupancy.zonesWithDataCount ?? zonesActive;
-                    zonesTotal = summary.zoneOccupancy.totalZoneCount ?? zonesTotal;
-                }
-                vehicleControlHitsToday = summary?.vehicleControlHitsToday ?? 0;
-                securityAlertsBySeverity = summary?.securityAlertsBySeverity ?? null;
-            }
-
-            setZonesList(zonesData.slice(0, 6));
-            setRecentAlerts(alertsData.slice(0, 5));
-            setVehicleWatchlist(blocklistData.slice(0, 5));
-            setRecentGateAccess(gateHistoryData.slice(0, 5));
-            setCampusStats({
-                gateEventsToday,
-                newAlertsCount: alertsData.length,
-                zonesActive,
-                zonesTotal,
-                devicesOnline: devList.filter(d => d.status === 'ONLINE').length,
-                devicesTotal: devList.length,
-                blocklistActive: blocklistData.filter(v => v.list_type === 'blocklist').length,
-                vehicleControlHitsToday,
-                securityAlertsBySeverity,
-            });
-        } catch {
-            // Giữ giá trị mặc định nếu toàn bộ request thất bại (vd RBAC chưa mở cho BUSINESS_ADMIN)
-        } finally {
-            setCampusLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        loadInitData();
-        fetchCampusData();
-    }, [loadInitData, fetchCampusData]);
-
-    useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData]);
-
-    // Handle export request (UC-158)
+    // Export handler
     const handleExport = async (e) => {
         e.preventDefault();
-        setIsExporting(true);
-        setError(null);
-        setSuccessMsg(null);
+        setIsExporting(true); setFormError(null); setSuccessMsg(null);
         try {
-            const data = {
-                from: fromDate,
-                to: toDate,
-                format: exportForm.format,
-                scope: {
-                    departmentId: selectedDept || null,
-                    roomId: null,
-                    organizerId: null
-                },
-                sections: exportForm.sections,
-                delivery: exportForm.delivery
-            };
-
-            const res = await exportMeetingActivity(data);
+            const res = await exportMeetingActivity({
+                from: fromDate, to: toDate, format: exportForm.format,
+                scope: { departmentId: selectedDept || null, roomId: null, organizerId: null },
+                sections: exportForm.sections, delivery: exportForm.delivery,
+            });
             if (res?.success) {
-                setSuccessMsg(`Yêu cầu xuất báo cáo thành công! Mã tiến trình: ${res.data?.jobId || 'N/A'}. Báo cáo đang được chuẩn bị để tải xuống.`);
+                setSuccessMsg(`Yêu cầu xuất báo cáo thành công! Mã tiến trình: ${res.data?.jobId || 'N/A'}`);
             } else {
-                setError(res?.message || 'Không thể tạo yêu cầu xuất báo cáo.');
+                setFormError(res?.message || 'Không thể tạo yêu cầu xuất báo cáo.');
             }
         } catch (err) {
-            setError(err?.message || err?.error?.message || 'Lỗi khi gửi yêu cầu xuất báo cáo. Vui lòng thử lại.');
+            setFormError(err?.message || 'Lỗi khi gửi yêu cầu. Vui lòng thử lại.');
         } finally {
             setIsExporting(false);
         }
     };
-
-    const toggleSection = (sectionName) => {
-        setExportForm(prev => {
-            const sections = prev.sections.includes(sectionName)
-                ? prev.sections.filter(s => s !== sectionName)
-                : [...prev.sections, sectionName];
-            return { ...prev, sections };
-        });
+    const toggleSection = (key) => {
+        setExportForm(prev => ({
+            ...prev,
+            sections: prev.sections.includes(key) ? prev.sections.filter(s => s !== key) : [...prev.sections, key],
+        }));
     };
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[500px]">
-                <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                    className="w-12 h-12 border-4 border-action-blue border-t-transparent rounded-full"
-                />
-                <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-4 text-slate-blue font-semibold text-sm"
-                >
-                    Đang tải dữ liệu tổng quan và phân tích chuyên sâu...
-                </motion.p>
-            </div>
-        );
-    }
+    const onlinePct = kpi.devicesTotal > 0 ? (kpi.devicesOnline / kpi.devicesTotal) * 100 : 0;
+    const zonePct   = kpi.zonesTotal   > 0 ? (kpi.zonesActive   / kpi.zonesTotal)   * 100 : 0;
+    const monthLabel = `Tháng ${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+    const alertTrendOptions = {
+        ...GC_BASE, isStacked: true, colors: ALERT_TYPE_COLORS, areaOpacity: 0.18,
+        lineWidth: 2, pointSize: 5, pointShape: 'circle',
+        legend: { position: 'bottom', textStyle: { color: D.muted, fontSize: 10 }, maxLines: 2 },
+        chartArea: { ...GC_BASE.chartArea, height: '62%' },
+    };
 
+    // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="space-y-8"
-        >
-            {/* Header Greeting Section */}
-            <motion.div variants={itemVariants}>
-                <DashboardBanner roleName="Business Admin" />
-            </motion.div>
+        <div className="space-y-5" style={{ color: D.text }}>
 
-            {/* Notifications Alert */}
-            <AnimatePresence>
-                {successMsg && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-center gap-3"
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <ScrollReveal delay={0} fromBelow={false}>
+                <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, position: 'relative', overflow: 'hidden', boxShadow: D.shadow }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${D.blue} 0%, ${D.cyan}80 50%, transparent 100%)` }} />
+                    <div style={{ position: 'absolute', top: -60, right: 80, width: 200, height: 200, borderRadius: '50%', opacity: 0.05, background: D.blue, filter: 'blur(50px)', pointerEvents: 'none' }} />
+                    <div style={{ position: 'relative' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 50, fontSize: 11, fontWeight: 700, background: `${D.blue}12`, color: D.blue, border: `1px solid ${D.blue}30`, marginBottom: 8 }}>
+                            <Activity style={{ width: 13, height: 13 }} /> Business Admin
+                        </span>
+                        <h1 style={{ fontSize: 22, fontWeight: 800, color: D.text, letterSpacing: '-0.5px' }}>Bảng điều khiển</h1>
+                        <p style={{ fontSize: 12, color: D.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {lastUpdated ? (
+                                <>
+                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: D.green, boxShadow: `0 0 5px ${D.green}`, display: 'inline-block', flexShrink: 0 }} />
+                                    Cập nhật lúc {lastUpdated.toLocaleTimeString('vi-VN')}
+                                </>
+                            ) : 'Đang tải dữ liệu...'}
+                        </p>
+                    </div>
+                    <button onClick={() => { fetchCampusData(); fetchMeetingData(); }} disabled={campusLoading && meetLoading}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: D.blue, color: '#fff', border: 'none', cursor: (campusLoading && meetLoading) ? 'not-allowed' : 'pointer', opacity: (campusLoading && meetLoading) ? 0.6 : 1, transition: 'all 0.2s', flexShrink: 0, boxShadow: `0 2px 8px ${D.blue}40` }}
                     >
-                        <Activity className="w-5 h-5 flex-shrink-0 animate-pulse text-green-600" />
-                        <span>{successMsg}</span>
-                    </motion.div>
-                )}
-                {error && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-3"
-                    >
-                        <AlertTriangle className="w-5 h-5 flex-shrink-0 text-red-600" />
-                        <span>{error}</span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        <RefreshCw style={{ width: 15, height: 15 }} className={(campusLoading || meetLoading) ? 'animate-spin' : ''} />
+                        Làm mới
+                    </button>
+                </div>
+            </ScrollReveal>
 
-            {/* Tab Navigation */}
-            <motion.div variants={itemVariants} className="flex bg-white p-1.5 rounded-xl border border-platinum-tint/80 shadow-sm w-fit gap-1">
-                <button
-                    onClick={() => setActiveTab('overview')}
-                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'overview'
-                            ? 'bg-action-blue text-white shadow-sm'
-                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
-                        }`}
-                >
-                    Tổng quan
-                </button>
-                <button
-                    onClick={() => setActiveTab('meetings')}
-                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'meetings'
-                            ? 'bg-action-blue text-white shadow-sm'
-                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
-                        }`}
-                >
-                    Cuộc họp & Phòng
-                </button>
-                <button
-                    onClick={() => setActiveTab('security')}
-                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'security'
-                            ? 'bg-action-blue text-white shadow-sm'
-                            : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'
-                        }`}
-                >
-                    An Ninh & Khuôn Viên
-                </button>
-            </motion.div>
+            {/* ── Tab nav ─────────────────────────────────────────────────── */}
+            <ScrollReveal delay={60} fromBelow={false}>
+                <div className="flex bg-white p-1.5 rounded-xl border border-platinum-tint/80 shadow-sm w-fit gap-1">
+                    {[
+                        { key: 'overview',  label: 'Tổng quan' },
+                        { key: 'meetings',  label: 'Cuộc họp & Phòng' },
+                        { key: 'security',  label: 'An ninh & Khuôn viên' },
+                    ].map(t => (
+                        <button key={t.key} onClick={() => setActiveTab(t.key)}
+                            className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === t.key ? 'bg-action-blue text-white shadow-sm' : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist/50'}`}
+                        >{t.label}</button>
+                    ))}
+                </div>
+            </ScrollReveal>
 
-            {/* ================= OVERVIEW TAB ================= */}
+            {/* ════════════ OVERVIEW ════════════ */}
             {activeTab === 'overview' && (
-                <motion.div variants={itemVariants} className="space-y-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Lượt ra/vào hôm nay</span>
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <LogIn className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.gateEventsToday}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Qua các cổng/khu vực</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Cảnh báo chưa xử lý</span>
-                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
-                                    <ShieldAlert className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.newAlertsCount}</h3>
-                                <p className="text-xs text-red-600 font-semibold mt-1">Cần xem xét</p>
-                                {campusStats.securityAlertsBySeverity && (
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                        {Object.entries(campusStats.securityAlertsBySeverity).map(([severity, count]) => (
-                                            count > 0 && (
-                                                <span key={severity} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize ${SEVERITY_STYLES[severity] || 'bg-slate-100 text-slate-600'}`}>
-                                                    {severity}: {count}
-                                                </span>
-                                            )
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Khu vực hoạt động</span>
-                                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                    <MapPin className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.zonesActive}/{campusStats.zonesTotal}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Zone đang giám sát</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Thiết bị Online</span>
-                                <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-                                    <Activity className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.devicesOnline}/{campusStats.devicesTotal}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Camera, cảm biến, IoT</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Phòng đang dùng</span>
-                                <div className="w-10 h-10 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
-                                    <Building2 className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{stats.activeRooms}/{roomStats.length || stats.activeRooms}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Trên tổng số phòng theo dõi</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Tỷ lệ vắng mặt (No-show)</span>
-                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-700 flex items-center justify-center">
-                                    <AlertTriangle className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{stats.noShowRate}%</h3>
-                                <p className="text-xs text-slate-blue mt-1">Tuần này</p>
-                            </div>
-                        </div>
+                <>
+                    {/* KPI row */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <KpiTile delay={0}   icon={LogIn}       label="Lượt ra/vào hôm nay"  value={campusLoading ? '—' : kpi.gateEventsToday}  sub="Qua tất cả cổng"  iconColor={D.cyan} />
+                        <KpiTile delay={50}  icon={ShieldAlert} label="Cảnh báo chưa xử lý"   value={campusLoading ? '—' : kpi.alertsNew}         sub={kpi.alertsNew > 0 ? 'Cần xử lý ngay' : 'Ổn định'} iconColor={kpi.alertsNew > 0 ? D.red : D.green} subColor={kpi.alertsNew > 0 ? '#DC2626' : '#059669'} />
+                        <KpiTile delay={100} icon={MapPin}      label="Khu vực giám sát"       value={campusLoading ? '—' : `${kpi.zonesActive}/${kpi.zonesTotal}`} sub="Zone có dữ liệu hôm nay" iconColor={D.purple} progress={campusLoading ? undefined : zonePct} />
+                        <KpiTile delay={150} icon={Wifi}        label="Thiết bị Online"         value={campusLoading ? '—' : kpi.devicesOnline}    sub={campusLoading ? '' : `/ ${kpi.devicesTotal} thiết bị`} iconColor={D.green} progress={campusLoading ? undefined : onlinePct} />
+                        <KpiTile delay={200} icon={Building2}   label="Phòng đang sử dụng"      value={meetLoading ? '—' : stats.activeRooms}      sub="Trên tổng số phòng" iconColor={D.blue} />
+                        <KpiTile delay={250} icon={Car}         label="Xe khớp kiểm soát"       value={campusLoading ? '—' : kpi.vehicleHitsToday} sub={kpi.vehicleHitsToday > 0 ? 'Blocklist / Watchlist' : 'Không có khớp'} iconColor={kpi.vehicleHitsToday > 0 ? D.amber : D.muted2} subColor={kpi.vehicleHitsToday > 0 ? '#B45309' : D.muted} />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold text-midnight-indigo">Cảnh báo an ninh gần đây</h2>
-                                <Link to="/business-admin/security-alerts" className="text-sm font-semibold text-action-blue hover:underline flex items-center gap-1">
-                                    Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
-                                </Link>
-                            </div>
-                            <div className="space-y-3 flex-1">
-                                {campusLoading && recentAlerts.length === 0 && (
-                                    <p className="text-sm text-slate-blue py-6 text-center">Đang tải...</p>
-                                )}
-                                {!campusLoading && recentAlerts.length === 0 && (
-                                    <p className="text-sm text-slate-blue py-6 text-center">Không có cảnh báo mới.</p>
-                                )}
-                                {recentAlerts.map((alert) => (
-                                    <div key={alert.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                        <div className="min-w-0">
-                                            <h4 className="text-sm font-bold text-midnight-indigo truncate">{alert.alert_type}</h4>
-                                            <p className="text-xs text-slate-blue truncate">{alert.zone_name || 'Không xác định khu vực'}</p>
-                                        </div>
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${SEVERITY_STYLES[alert.severity] || 'bg-slate-100 text-slate-600'}`}>
-                                            {alert.severity}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold text-midnight-indigo">Khu vực giám sát</h2>
-                                <Link to="/business-admin/zones" className="text-sm font-semibold text-action-blue hover:underline">
-                                    Tất cả
-                                </Link>
-                            </div>
-                            <div className="space-y-3 flex-1">
-                                {zonesList.map((zone) => (
-                                    <div key={zone.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                        <h4 className="text-sm font-bold text-midnight-indigo truncate">{zone.zone_name}</h4>
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${zone.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {zone.status === 'active' ? 'Hoạt động' : 'Tạm ngưng'}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                    {/* Row: Severity donut + Traffic area */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <ChartCard accent={D.red} delay={0} title="Cảnh báo theo mức độ nghiêm trọng" sub="Phân bổ cảnh báo an ninh chưa xử lý"
+                            renderChart={(visible) => {
+                                if (!visible || campusLoading) return <PulseSkeleton />;
+                                if (!severityData.length) return <EmptyState message="Không có cảnh báo nào" />;
+                                const total = severityData.reduce((s, d) => s + d.value, 0);
+                                return (
+                                    <>
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <PieChart>
+                                                <Pie data={severityData} cx="50%" cy="50%" innerRadius={58} outerRadius={85} dataKey="value" paddingAngle={3}
+                                                    animationBegin={100} animationDuration={900} animationEasing="ease-out"
+                                                    activeIndex={activeSeverityIdx ?? undefined} activeShape={<ActiveSlice />}
+                                                    onMouseEnter={(_, i) => setActiveSeverityIdx(i)} onMouseLeave={() => setActiveSeverityIdx(null)}
+                                                >
+                                                    {severityData.map(e => <Cell key={e.name} fill={e.color} />)}
+                                                </Pie>
+                                                <text x="50%" y="47%" textAnchor="middle" dominantBaseline="middle">
+                                                    <tspan style={{ fontSize: 22, fontWeight: 800, fill: D.text }}>{total}</tspan>
+                                                </text>
+                                                <text x="50%" y="57%" textAnchor="middle" dominantBaseline="middle">
+                                                    <tspan style={{ fontSize: 10, fill: D.muted }}>Tổng cảnh báo</tspan>
+                                                </text>
+                                                <Tooltip content={<DonutTooltip />} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <DonutLegend data={severityData} />
+                                    </>
+                                );
+                            }}
+                        />
+                        <ChartCard accent={D.cyan} delay={100} title="Lưu lượng phương tiện 24h" sub="Lượt vào/ra qua cổng trong ngày hôm nay"
+                            renderChart={(visible) => {
+                                if (!visible || campusLoading) return <PulseSkeleton />;
+                                if (!trafficData.length) return <EmptyState message="Không có dữ liệu lưu lượng hôm nay" />;
+                                return (
+                                    <ResponsiveContainer width="100%" height={240}>
+                                        <AreaChart data={trafficData} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="gVao" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%"  stopColor={D.cyan}   stopOpacity={0.25} />
+                                                    <stop offset="95%" stopColor={D.cyan}   stopOpacity={0} />
+                                                </linearGradient>
+                                                <linearGradient id="gRa" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%"  stopColor={D.purple} stopOpacity={0.25} />
+                                                    <stop offset="95%" stopColor={D.purple} stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke={D.grid} vertical={false} />
+                                            <XAxis dataKey="hour" tick={{ fontSize: 9, fill: D.axisText }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                                            <YAxis tick={{ fontSize: 10, fill: D.axisText }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                            <Tooltip content={<BarTooltip />} />
+                                            <Legend iconType="circle" iconSize={8} formatter={v => <span style={{ fontSize: 11, fontWeight: 600, color: D.muted }}>{v}</span>} />
+                                            <Area type="monotone" dataKey="Vào" stroke={D.cyan}   strokeWidth={2} fill="url(#gVao)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: D.cyan }}   animationDuration={1000} />
+                                            <Area type="monotone" dataKey="Ra"  stroke={D.purple} strokeWidth={2} fill="url(#gRa)"  dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: D.purple }} animationDuration={1000} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                );
+                            }}
+                        />
                     </div>
-                </motion.div>
+
+                    {/* Recent alerts feed */}
+                    <ScrollReveal delay={0}>
+                        <div style={{ background: D.cardBg, border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px 20px 16px', boxShadow: D.shadow, position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${D.red} 0%, ${D.red}44 50%, transparent 100%)` }} />
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <div>
+                                    <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Cảnh báo an ninh gần đây</h3>
+                                    <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>5 sự kiện chưa xử lý mới nhất</p>
+                                </div>
+                                <Link to="/business-admin/security-alerts" style={{ fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none', padding: '6px 14px', background: `${D.blue}10`, border: `1px solid ${D.blue}28`, borderRadius: 8 }}>
+                                    Xem tất cả →
+                                </Link>
+                            </div>
+                            {campusLoading ? (
+                                <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="animate-pulse h-14 rounded-xl" style={{ background: D.borderSub }} />)}</div>
+                            ) : recentAlerts.length === 0 ? (
+                                <div className="py-8 text-center">
+                                    <CheckCircle style={{ width: 36, height: 36, color: D.green, margin: '0 auto 10px', opacity: 0.6 }} />
+                                    <p style={{ fontSize: 13, color: D.muted, fontWeight: 500 }}>Không có cảnh báo mới — hệ thống đang ổn định.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {recentAlerts.map((alert, i) => {
+                                        const sevColor = alert.severity === 'critical' ? D.red : alert.severity === 'high' ? '#f97316' : alert.severity === 'medium' ? D.amber : D.blue;
+                                        return (
+                                            <ScrollReveal key={alert.id} delay={i * 60} fromBelow={false}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', border: `1px solid ${D.border}`, borderRadius: 12, transition: 'border-color 0.2s, background 0.2s' }}
+                                                    onMouseEnter={e => { e.currentTarget.style.borderColor = `${sevColor}40`; e.currentTarget.style.background = D.cardBg2; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.borderColor = D.border; e.currentTarget.style.background = '#fff'; }}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                                        <div style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${sevColor}12`, border: `1px solid ${sevColor}30` }}>
+                                                            <ShieldAlert style={{ width: 16, height: 16, color: sevColor }} />
+                                                        </div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                {alert.alert_type?.replace(/_/g, ' ').toUpperCase()}
+                                                            </p>
+                                                            <p style={{ fontSize: 11, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                {alert.zone_name || 'Không xác định khu vực'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
+                                                        <span style={{ padding: '3px 10px', borderRadius: 50, fontSize: 10, fontWeight: 700, background: `${sevColor}12`, color: sevColor, border: `1px solid ${sevColor}30` }}>
+                                                            {SEVERITY_LABEL[alert.severity] || alert.severity}
+                                                        </span>
+                                                        <span style={{ fontSize: 11, color: D.muted2, whiteSpace: 'nowrap' }}>
+                                                            {new Date(alert.created_at || alert.triggered_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </ScrollReveal>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </ScrollReveal>
+                </>
             )}
 
-            {/* ================= SECURITY & ACCESS TAB ================= */}
-            {activeTab === 'security' && (
-                <motion.div variants={itemVariants} className="space-y-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Xe trong danh sách kiểm soát</span>
-                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-sunset-gold flex items-center justify-center">
-                                    <Car className="w-5 h-5" />
+            {/* ════════════ MEETINGS & ROOMS ════════════ */}
+            {activeTab === 'meetings' && (
+                <>
+                    {/* Filter bar */}
+                    <ScrollReveal delay={0} fromBelow={false}>
+                        <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px 24px', boxShadow: D.shadow, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+                            {[
+                                { label: 'Từ ngày', value: fromDate, set: setFromDate, type: 'date' },
+                                { label: 'Đến ngày', value: toDate,  set: setToDate,   type: 'date' },
+                            ].map(f => (
+                                <div key={f.label} style={{ flex: 1, minWidth: 140 }}>
+                                    <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: D.muted, textTransform: 'uppercase', marginBottom: 6 }}>{f.label}</label>
+                                    <input type={f.type} value={f.value} onChange={e => f.set(e.target.value)}
+                                        style={{ width: '100%', padding: '8px 12px', border: `1px solid ${D.border}`, borderRadius: 10, fontSize: 13, color: D.text, background: '#fff', outline: 'none' }} />
                                 </div>
+                            ))}
+                            <div style={{ flex: 1, minWidth: 160 }}>
+                                <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: D.muted, textTransform: 'uppercase', marginBottom: 6 }}>Phòng ban</label>
+                                <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)}
+                                    style={{ width: '100%', padding: '8px 12px', border: `1px solid ${D.border}`, borderRadius: 10, fontSize: 13, color: D.text, background: '#fff', outline: 'none' }}>
+                                    <option value="">Tất cả phòng ban</option>
+                                    {departmentsList.map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
+                                </select>
                             </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.blocklistActive}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Blocklist đang hiệu lực</p>
-                            </div>
+                            <button onClick={fetchMeetingData} disabled={meetLoading}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: D.blue, color: '#fff', border: 'none', cursor: 'pointer', boxShadow: `0 2px 8px ${D.blue}40`, flexShrink: 0 }}>
+                                <RefreshCw style={{ width: 15, height: 15 }} className={meetLoading ? 'animate-spin' : ''} /> Lọc
+                            </button>
                         </div>
+                    </ScrollReveal>
 
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Cảnh báo mới</span>
-                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
-                                    <ShieldAlert className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.newAlertsCount}</h3>
-                                <p className="text-xs text-red-600 font-semibold mt-1">Chưa xử lý</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Tổng lượt ra/vào hôm nay</span>
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <LogIn className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.gateEventsToday}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Qua các cổng/khu vực</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 hover-lift hover:shadow-sm-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-blue">Lượt khớp danh sách kiểm soát hôm nay</span>
-                                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
-                                    <Car className="w-5 h-5" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <h3 className="text-2xl font-bold text-midnight-indigo">{campusStats.vehicleControlHitsToday}</h3>
-                                <p className="text-xs text-slate-blue mt-1">Xe khớp blocklist/watchlist</p>
-                            </div>
-                        </div>
+                    {/* Meeting KPI tiles */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <KpiTile delay={0}   icon={Calendar}      label="Tổng cuộc họp"           value={meetLoading ? '—' : stats.meetingCount}    sub={`TB: ${avgDuration.averageMinutes}m · Huỷ: ${cancelRateStats.cancelRate}%`} iconColor={D.blue} />
+                        <KpiTile delay={60}  icon={TrendingUp}    label="Hiệu suất phòng"           value={meetLoading ? '—' : `${stats.utilizationRate}%`} sub="Sử dụng trung bình" iconColor={D.purple} />
+                        <KpiTile delay={120} icon={Clock}         label="Tham gia đúng giờ"         value={meetLoading ? '—' : `${stats.onTimeRate}%`}  sub="↑ Đạt chỉ tiêu tốt" iconColor={D.green} subColor="#059669" />
+                        <KpiTile delay={180} icon={AlertTriangle} label="Tỷ lệ đặt phòng vắng mặt" value={meetLoading ? '—' : `${stats.noShowRate}%`}   sub="Phòng tự giải phóng" iconColor={D.red} />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold text-midnight-indigo">Danh sách xe cần chú ý</h2>
-                                <Link to="/business-admin/anpr-management" className="text-sm font-semibold text-action-blue hover:underline flex items-center gap-1">
-                                    Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
-                                </Link>
-                            </div>
-                            <div className="space-y-3 flex-1">
-                                {vehicleWatchlist.length === 0 && (
-                                    <p className="text-sm text-slate-blue py-6 text-center">Không có phương tiện nào trong danh sách kiểm soát.</p>
-                                )}
-                                {vehicleWatchlist.map((v) => (
-                                    <div key={v.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                        <div className="min-w-0">
-                                            <h4 className="text-sm font-bold text-midnight-indigo truncate">{v.plate_raw}</h4>
-                                            <p className="text-xs text-slate-blue truncate">{v.reason}</p>
+                    {/* Meeting trend + Status donut */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        <ChartCard accent={D.blue} delay={0} title="Biến động cuộc họp theo tuần" sub="Số lượng cuộc họp và hiệu suất phòng"
+                            renderChart={(visible) => {
+                                if (!visible || meetLoading) return <PulseSkeleton height={260} />;
+                                if (!meetingsTrend.length) return <EmptyState message="Không có dữ liệu xu hướng" />;
+                                return (
+                                    <ResponsiveContainer width="100%" height={260}>
+                                        <AreaChart data={meetingsTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="cMeet" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%"  stopColor={D.blue} stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor={D.blue} stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={D.grid} />
+                                            <XAxis dataKey="period" tick={{ fontSize: 10, fill: D.axisText }} tickLine={false} axisLine={false} />
+                                            <YAxis tick={{ fontSize: 10, fill: D.axisText }} tickLine={false} axisLine={false} />
+                                            <Tooltip content={<BarTooltip />} />
+                                            <Area type="monotone" dataKey="count" stroke={D.blue} strokeWidth={2} fillOpacity={1} fill="url(#cMeet)" name="Số cuộc họp" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: D.blue }} animationDuration={1000} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                );
+                            }}
+                        />
+                        <ChartCard accent={D.purple} delay={100} title="Trạng thái cuộc họp" sub="Tỷ lệ phân phối theo trạng thái"
+                            renderChart={(visible) => {
+                                if (!visible || meetLoading) return <PulseSkeleton height={260} />;
+                                if (!statusBreakdown.length) return <EmptyState message="Không có dữ liệu trạng thái" />;
+                                return (
+                                    <>
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <PieChart>
+                                                <Pie data={statusBreakdown} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="count" animationBegin={100} animationDuration={900}>
+                                                    {statusBreakdown.map((_, idx) => <Cell key={idx} fill={STATUS_COLORS[idx % STATUS_COLORS.length]} />)}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="grid grid-cols-2 gap-2 text-xs pt-2">
+                                            {statusBreakdown.map((item, idx) => (
+                                                <div key={item.status} className="flex items-center gap-1.5">
+                                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: STATUS_COLORS[idx % STATUS_COLORS.length] }} />
+                                                    <span style={{ color: D.muted, fontSize: 11 }} className="truncate">{item.status}: {item.count}</span>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize flex-shrink-0 ${v.list_type === 'blocklist' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                                    </>
+                                );
+                            }}
+                        />
+                        <ChartCard accent={D.green} delay={200} title="Phân tích điểm danh" sub={monthLabel}
+                            renderChart={(visible) => {
+                                if (!visible || meetLoading) return <PulseSkeleton height={260} />;
+                                if (!attendanceData.length) return <EmptyState message="Không có dữ liệu điểm danh" />;
+                                const total = attendanceData.reduce((s, d) => s + d.value, 0);
+                                return (
+                                    <>
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <PieChart>
+                                                <Pie data={attendanceData} cx="50%" cy="50%" innerRadius={58} outerRadius={85} dataKey="value" paddingAngle={3} animationBegin={100} animationDuration={900}
+                                                    activeIndex={activeAttIdx ?? undefined} activeShape={<ActiveSlice />}
+                                                    onMouseEnter={(_, i) => setActiveAttIdx(i)} onMouseLeave={() => setActiveAttIdx(null)}
+                                                >
+                                                    {attendanceData.map(e => <Cell key={e.name} fill={e.color} />)}
+                                                </Pie>
+                                                <text x="50%" y="47%" textAnchor="middle" dominantBaseline="middle">
+                                                    <tspan style={{ fontSize: 22, fontWeight: 800, fill: D.text }}>{total}</tspan>
+                                                </text>
+                                                <text x="50%" y="57%" textAnchor="middle" dominantBaseline="middle">
+                                                    <tspan style={{ fontSize: 10, fill: D.muted }}>Người tham dự</tspan>
+                                                </text>
+                                                <Tooltip content={<DonutTooltip />} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <DonutLegend data={attendanceData} />
+                                    </>
+                                );
+                            }}
+                        />
+                    </div>
+
+                    {/* Room bar + No-show */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        <ChartCard accent={D.amber} delay={0} title="Tỷ lệ sử dụng phòng họp" sub={monthLabel}
+                            renderChart={(visible) => {
+                                if (!visible || meetLoading) return <PulseSkeleton height={260} />;
+                                if (!roomStats.length) return <EmptyState message="Không có dữ liệu phòng họp" />;
+                                return (
+                                    <ResponsiveContainer width="100%" height={Math.max(200, roomStats.length * 36)}>
+                                        <BarChart data={roomStats} layout="vertical" margin={{ top: 0, right: 36, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke={D.grid} horizontal={false} />
+                                            <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: D.axisText }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                                            <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 10, fill: D.axisText }} tickLine={false} axisLine={false} />
+                                            <Tooltip content={<BarTooltip unit="%" />} />
+                                            <Bar dataKey="rate" name="Sử dụng" radius={[0, 4, 4, 0]} animationDuration={900}>
+                                                {roomStats.map((e, i) => <Cell key={i} fill={e.rate >= 80 ? D.green : e.rate >= 50 ? D.cyan : D.amber} />)}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                );
+                            }}
+                        />
+
+                        {/* No-show per room */}
+                        <ChartCard accent={D.red} delay={100} title="Tỷ lệ đặt phòng vắng mặt" sub="Phòng tự giải phóng do không phát hiện người"
+                            renderChart={(visible) => {
+                                if (!visible || meetLoading) return <PulseSkeleton height={260} />;
+                                if (!noShowTrend.length) return <EmptyState message="Không có dữ liệu vắng mặt" />;
+                                return (
+                                    <div className="space-y-4 pt-2">
+                                        {noShowTrend.map(room => (
+                                            <div key={room.roomName} className="space-y-1.5">
+                                                <div className="flex justify-between text-xs font-semibold">
+                                                    <span style={{ color: D.text }}>{room.roomName}</span>
+                                                    <span style={{ color: D.red }}>{room.noShowRate}%</span>
+                                                </div>
+                                                <div style={{ width: '100%', background: D.borderSub, height: 6, borderRadius: 99, overflow: 'hidden' }}>
+                                                    <div style={{ width: `${Math.min(room.noShowRate * 8, 100)}%`, height: '100%', background: D.red, borderRadius: 99, transition: 'width 1s cubic-bezier(.22,1,.36,1)' }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }}
+                        />
+
+                        {/* Quick actions + Export */}
+                        <ScrollReveal delay={200}>
+                            <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px', boxShadow: D.shadow, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${D.blue} 0%, ${D.blue}44 50%, transparent 100%)` }} />
+                                <div>
+                                    <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, marginBottom: 12 }}>Thao tác tài khoản</h3>
+                                    <div className="space-y-2">
+                                        {[
+                                            { to: '/business-admin/users', icon: Plus,  label: 'Thêm mới tài khoản',    bg: `${D.blue}12`,   color: D.blue },
+                                            { to: '/business-admin/users', icon: Users, label: 'Danh sách & Phân quyền', bg: `${D.purple}12`, color: D.purple },
+                                        ].map(item => (
+                                            <Link key={item.label} to={item.to}
+                                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 10, border: `1px solid ${D.border}`, textDecoration: 'none', transition: 'all 0.2s' }}
+                                                onMouseEnter={e => { e.currentTarget.style.borderColor = item.color + '50'; e.currentTarget.style.background = item.bg; }}
+                                                onMouseLeave={e => { e.currentTarget.style.borderColor = D.border; e.currentTarget.style.background = 'transparent'; }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <div style={{ width: 30, height: 30, borderRadius: 8, background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <item.icon style={{ width: 15, height: 15, color: item.color }} />
+                                                    </div>
+                                                    <span style={{ fontSize: 12, fontWeight: 700, color: D.text }}>{item.label}</span>
+                                                </div>
+                                                <ChevronRight style={{ width: 14, height: 14, color: D.muted }} />
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Export form */}
+                                <form onSubmit={handleExport} className="space-y-3">
+                                    <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Sliders style={{ width: 15, height: 15, color: D.blue }} /> Xuất báo cáo (UC-158)
+                                    </h3>
+                                    {formError && <p style={{ fontSize: 12, color: D.red }}>{formError}</p>}
+                                    {successMsg && <p style={{ fontSize: 12, color: D.green }}>{successMsg}</p>}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                            { key: 'format',   label: 'Định dạng', options: [{ v: 'xlsx', l: 'Excel (.xlsx)' }, { v: 'pdf', l: 'PDF (.pdf)' }] },
+                                            { key: 'delivery', label: 'Nhận qua',  options: [{ v: 'download', l: 'Tải xuống' }, { v: 'email', l: 'Email' }] },
+                                        ].map(f => (
+                                            <div key={f.key}>
+                                                <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: D.muted, textTransform: 'uppercase', marginBottom: 4 }}>{f.label}</label>
+                                                <select value={exportForm[f.key]} onChange={e => setExportForm({ ...exportForm, [f.key]: e.target.value })}
+                                                    style={{ width: '100%', padding: '6px 10px', border: `1px solid ${D.border}`, borderRadius: 8, fontSize: 12, color: D.text, background: '#fff', outline: 'none' }}>
+                                                    {f.options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                                                </select>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[{ key: 'overview', l: 'Tổng quan' }, { key: 'rooms', l: 'Phòng họp' }, { key: 'attendance', l: 'Điểm danh' }, { key: 'no_show', l: 'Vắng mặt' }].map(s => (
+                                            <label key={s.key} className="flex items-center gap-2 cursor-pointer text-xs font-semibold" style={{ color: D.text }}>
+                                                <input type="checkbox" checked={exportForm.sections.includes(s.key)} onChange={() => toggleSection(s.key)}
+                                                    className="rounded text-action-blue focus:ring-action-blue w-3.5 h-3.5" />
+                                                {s.l}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <button type="submit" disabled={isExporting || exportForm.sections.length === 0}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: D.blue, color: '#fff', border: 'none', cursor: 'pointer', boxShadow: `0 2px 6px ${D.blue}40`, opacity: (isExporting || exportForm.sections.length === 0) ? 0.5 : 1, transition: 'all 0.2s' }}>
+                                        {isExporting ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Đang xuất...</> : <><Download style={{ width: 14, height: 14 }} /> Xuất báo cáo</>}
+                                    </button>
+                                </form>
+                            </div>
+                        </ScrollReveal>
+                    </div>
+                </>
+            )}
+
+            {/* ════════════ SECURITY & CAMPUS ════════════ */}
+            {activeTab === 'security' && (
+                <>
+                    {/* Security KPI tiles */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <KpiTile delay={0}   icon={ShieldAlert} label="Cảnh báo mới"                   value={campusLoading ? '—' : kpi.alertsNew}         sub={kpi.alertsNew > 0 ? 'Chưa xử lý' : 'Ổn định'} iconColor={kpi.alertsNew > 0 ? D.red : D.green} subColor={kpi.alertsNew > 0 ? '#DC2626' : '#059669'} />
+                        <KpiTile delay={60}  icon={Car}         label="Xe trong blocklist"               value={campusLoading ? '—' : kpi.vehicleHitsToday}  sub="Khớp hôm nay" iconColor={D.amber} />
+                        <KpiTile delay={120} icon={LogIn}       label="Tổng lượt ra/vào hôm nay"         value={campusLoading ? '—' : kpi.gateEventsToday}   sub="Qua tất cả cổng" iconColor={D.cyan} />
+                        <KpiTile delay={180} icon={Wifi}        label="Thiết bị Online"                  value={campusLoading ? '—' : kpi.devicesOnline}     sub={`Offline: ${kpi.devicesOffline}`} iconColor={D.green} progress={campusLoading ? undefined : onlinePct} />
+                    </div>
+
+                    {/* Alert trend 7d (sysadmin API) + Audit hourly (sysadmin API) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <GChartCard accent={D.red} delay={0} title="Xu hướng cảnh báo an ninh 7 ngày"
+                            sub={alertTrendTotal > 0 ? `Tổng ${alertTrendTotal} sự kiện · phân loại theo loại` : 'Dữ liệu từ Security Alerts API'}
+                            loading={campusLoading} empty={!alertTrendGCData || alertTrendGCData.length <= 1}
+                            emptyMsg="Không có dữ liệu xu hướng cảnh báo (có thể cần quyền truy cập)"
+                        >
+                            <Chart chartType="AreaChart" width="100%" height="240px" data={alertTrendGCData}
+                                options={{ ...GC_BASE, isStacked: true, colors: ALERT_TYPE_COLORS, areaOpacity: 0.18, lineWidth: 2, pointSize: 5, legend: { position: 'bottom', textStyle: { color: D.muted, fontSize: 10 }, maxLines: 2 }, chartArea: { ...GC_BASE.chartArea, height: '62%' } }}
+                                loader={<PulseSkeleton />} />
+                        </GChartCard>
+
+                        <ChartCard accent={D.blue} delay={100} title="Hoạt động hệ thống theo giờ"
+                            sub={auditTotal > 0 ? `Hôm nay · ${auditTotal} thao tác audit log` : 'Dữ liệu từ Audit Activity API'}
+                            renderChart={(visible) => {
+                                if (!visible || campusLoading) return <PulseSkeleton />;
+                                if (!auditHourlyData.length) return <EmptyState message="Không có dữ liệu audit (có thể cần quyền truy cập)" />;
+                                return (
+                                    <ResponsiveContainer width="100%" height={240}>
+                                        <BarChart data={auditHourlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke={D.grid} vertical={false} />
+                                            <XAxis dataKey="hour" tick={{ fontSize: 9, fill: D.axisText }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                                            <YAxis tick={{ fontSize: 9, fill: D.axisText }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                            <Tooltip content={<BarTooltip unit=" thao tác" />} />
+                                            <Bar dataKey="count" name="Thao tác" fill={D.blue} radius={[3, 3, 0, 0]} animationDuration={800} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                );
+                            }}
+                        />
+                    </div>
+
+                    {/* Vehicle watchlist + Gate history */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <ScrollReveal delay={0}>
+                            <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px', boxShadow: D.shadow, position: 'relative', overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${D.amber} 0%, ${D.amber}44 50%, transparent 100%)` }} />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <div>
+                                        <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Danh sách xe cần chú ý</h3>
+                                        <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>Blocklist đang hiệu lực</p>
+                                    </div>
+                                    <Link to="/business-admin/anpr-management" style={{ fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none', padding: '6px 14px', background: `${D.blue}10`, border: `1px solid ${D.blue}28`, borderRadius: 8 }}>
+                                        Xem tất cả →
+                                    </Link>
+                                </div>
+                                {campusLoading ? (
+                                    <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="animate-pulse h-12 rounded-xl" style={{ background: D.borderSub }} />)}</div>
+                                ) : vehicleWatchlist.length === 0 ? (
+                                    <div className="py-6 text-center"><p style={{ fontSize: 13, color: D.muted }}>Không có xe trong danh sách kiểm soát.</p></div>
+                                ) : vehicleWatchlist.map(v => (
+                                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', marginBottom: 8, background: D.cardBg2, border: `1px solid ${D.border}`, borderRadius: 10 }}>
+                                        <div style={{ minWidth: 0 }}>
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.plate_raw}</p>
+                                            <p style={{ fontSize: 11, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.reason}</p>
+                                        </div>
+                                        <span style={{ padding: '3px 10px', borderRadius: 50, fontSize: 10, fontWeight: 700, background: v.list_type === 'blocklist' ? '#FEF2F2' : '#FFF7ED', color: v.list_type === 'blocklist' ? D.red : '#C2410C', flexShrink: 0, marginLeft: 10 }}>
                                             {v.list_type}
                                         </span>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </ScrollReveal>
 
-                        <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold text-midnight-indigo">Lịch sử ra vào gần đây</h2>
-                                <Link to="/business-admin/gate-access" className="text-sm font-semibold text-action-blue hover:underline flex items-center gap-1">
-                                    Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
-                                </Link>
-                            </div>
-                            <div className="space-y-3 flex-1">
-                                {recentGateAccess.length === 0 && (
-                                    <p className="text-sm text-slate-blue py-6 text-center">Chưa có dữ liệu ra vào hôm nay.</p>
-                                )}
-                                {recentGateAccess.map((log) => (
-                                    <div key={log.id} className="flex items-center justify-between p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                        <div className="min-w-0">
-                                            <h4 className="text-sm font-bold text-midnight-indigo truncate">{log.plate_number || log.user_name || 'Không xác định'}</h4>
-                                            <p className="text-xs text-slate-blue truncate">{log.zone_name || ''}</p>
+                        <ScrollReveal delay={100}>
+                            <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px', boxShadow: D.shadow, position: 'relative', overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${D.cyan} 0%, ${D.cyan}44 50%, transparent 100%)` }} />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <div>
+                                        <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Lịch sử ra vào gần đây</h3>
+                                        <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>Hôm nay · Tất cả cổng</p>
+                                    </div>
+                                    <Link to="/business-admin/gate-access" style={{ fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none', padding: '6px 14px', background: `${D.blue}10`, border: `1px solid ${D.blue}28`, borderRadius: 8 }}>
+                                        Xem tất cả →
+                                    </Link>
+                                </div>
+                                {campusLoading ? (
+                                    <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="animate-pulse h-12 rounded-xl" style={{ background: D.borderSub }} />)}</div>
+                                ) : recentGateAccess.length === 0 ? (
+                                    <div className="py-6 text-center"><p style={{ fontSize: 13, color: D.muted }}>Chưa có dữ liệu ra vào hôm nay.</p></div>
+                                ) : recentGateAccess.map(log => (
+                                    <div key={log.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', marginBottom: 8, background: D.cardBg2, border: `1px solid ${D.border}`, borderRadius: 10 }}>
+                                        <div style={{ minWidth: 0 }}>
+                                            <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.plate_number || log.user_name || 'Không xác định'}</p>
+                                            <p style={{ fontSize: 11, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.zone_name || ''}</p>
                                         </div>
-                                        <span className="text-[10px] text-steel-gray whitespace-nowrap flex-shrink-0">
+                                        <span style={{ fontSize: 11, color: D.muted2, whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 10 }}>
                                             {log.access_time ? new Date(log.access_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </ScrollReveal>
                     </div>
-                </motion.div>
+                </>
             )}
-
-            {/* ================= MEETINGS & ROOMS TAB ================= */}
-            {activeTab === 'meetings' && (
-            <>
-            {/* Dashboard Filters & Controls */}
-            <motion.div
-                variants={itemVariants}
-                className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col md:flex-row md:items-end gap-4 justify-between"
-            >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" /> Từ ngày
-                        </label>
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" /> Đến ngày
-                        </label>
-                        <input
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5 flex items-center gap-1">
-                            <Building2 className="w-3.5 h-3.5" /> Phòng ban
-                        </label>
-                        <select
-                            value={selectedDept}
-                            onChange={(e) => setSelectedDept(e.target.value)}
-                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
-                        >
-                            <option value="">Tất cả phòng ban</option>
-                            {departmentsList.map(dept => (
-                                <option key={dept.id || dept.departmentCode} value={dept.id}>
-                                    {dept.departmentName}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={fetchDashboardData}
-                        className="px-5 py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-all duration-200 flex items-center gap-2"
-                    >
-                        <RefreshCw className="w-4 h-4" /> Lọc dữ liệu
-                    </motion.button>
-                </div>
-            </motion.div>
-
-            {/* Overview statistics cards */}
-            <motion.div
-                variants={itemVariants}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-            >
-                {/* Stats Card 1 */}
-                <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-blue">Tổng cuộc họp</span>
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
-                            <Calendar className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-2xl font-bold text-midnight-indigo">{stats.meetingCount}</h3>
-                        <p className="text-xs text-slate-blue mt-1">Đã kết thúc trong kỳ</p>
-                        <div className="mt-2 pt-2 border-t border-platinum-tint/40 flex justify-between text-[11px] text-slate-blue font-medium">
-                            <span>TB: {avgDuration.averageMinutes}m</span>
-                            <span>Huỷ: {cancelRateStats.cancelRate}%</span>
-                        </div>
-                    </div>
-                </motion.div>
-
-                {/* Stats Card 2 */}
-                <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-blue">Hiệu suất phòng</span>
-                        <div className="w-10 h-10 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
-                            <TrendingUp className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-2xl font-bold text-midnight-indigo">{stats.utilizationRate}%</h3>
-                        <p className="text-xs text-slate-blue mt-1">Sử dụng trung bình</p>
-                    </div>
-                </motion.div>
-
-                {/* Stats Card 3 */}
-                <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-blue">Tham gia đúng giờ</span>
-                        <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center">
-                            <Clock className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-2xl font-bold text-midnight-indigo">{stats.onTimeRate}%</h3>
-                        <p className="text-xs text-green-600 font-semibold mt-1">↑ Đạt chỉ tiêu tốt</p>
-                        <div className="mt-2 pt-2 border-t border-platinum-tint/40 text-[11px] text-slate-blue font-medium">
-                            Hiện diện: {attendanceSummary.presentRate}%
-                        </div>
-                    </div>
-                </motion.div>
-
-                {/* Stats Card 4 */}
-                <motion.div whileHover={{ y: -4 }} className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-blue">Tỷ lệ đặt phòng vắng mặt</span>
-                        <div className="w-10 h-10 rounded-xl bg-red-50 text-red-700 flex items-center justify-center">
-                            <AlertTriangle className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-2xl font-bold text-midnight-indigo">{stats.noShowRate}%</h3>
-                        <p className="text-xs text-slate-blue mt-1">Phòng bị giải phóng do vắng mặt</p>
-                    </div>
-                </motion.div>
-            </motion.div>
-
-            {/* Charts Panel: Area & Donut */}
-            <motion.div
-                variants={itemVariants}
-                className="grid grid-cols-1 lg:grid-cols-3 gap-8"
-            >
-                {/* Meeting Count Trend Chart (UC-151) */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
-                    <div className="mb-4">
-                        <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-action-blue" />
-                            Biến động số lượng cuộc họp theo tuần
-                        </h2>
-                        <p className="text-xs text-slate-blue mt-0.5">Số lượng cuộc họp và hiệu suất sử dụng phòng họp theo từng tuần</p>
-                    </div>
-
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={meetingsTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#006BFF" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#006BFF" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7EDF6" />
-                                <XAxis dataKey="period" stroke="#8795A5" fontSize={11} tickLine={false} />
-                                <YAxis stroke="#8795A5" fontSize={11} tickLine={false} />
-                                <Tooltip />
-                                <Area type="monotone" dataKey="count" stroke="#006BFF" strokeWidth={2} fillOpacity={1} fill="url(#colorCount)" name="Số cuộc họp" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Meeting Status Breakdown Donut Chart (UC-152) */}
-                <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col">
-                    <div className="mb-2">
-                        <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                            <PieIcon className="w-4 h-4 text-royal-amethyst" />
-                            Trạng thái cuộc họp
-                        </h2>
-                        <p className="text-xs text-slate-blue mt-0.5">Tỷ lệ phân phối cuộc họp</p>
-                    </div>
-
-                    <div className="h-[200px] w-full relative flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={statusBreakdown}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={55}
-                                    outerRadius={75}
-                                    paddingAngle={3}
-                                    dataKey="count"
-                                >
-                                    {statusBreakdown.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    {/* Custom Legend */}
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-                        {statusBreakdown.map((item, idx) => (
-                            <div key={item.status} className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                                <span className="text-slate-blue truncate w-full" title={`${item.status} (${item.percentage}%)`}>
-                                    {item.status}: {item.count}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </motion.div>
-
-            {/* Room bookings vs Actual used hours bar chart (UC-155) & No-show rates */}
-            <motion.div
-                variants={itemVariants}
-                className="grid grid-cols-1 lg:grid-cols-3 gap-8"
-            >
-                {/* Bar chart room usage details (UC-149 / UC-155) */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1">
-                    <div className="mb-4">
-                        <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4 text-sunset-gold" />
-                            Thời lượng sử dụng thực tế so với Đặt lịch
-                        </h2>
-                        <p className="text-xs text-slate-blue mt-0.5">So sánh tổng giờ đặt lịch (Booked Hours) vs giờ sử dụng có người hiện diện thực tế (Actual Hours)</p>
-                    </div>
-
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={roomStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E7EDF6" />
-                                <XAxis dataKey="roomName" stroke="#8795A5" fontSize={10} tickFormatter={(v) => v.replace('Phòng ', '')} tickLine={false} />
-                                <YAxis stroke="#8795A5" fontSize={11} tickLine={false} />
-                                <Tooltip />
-                                <Legend verticalAlign="top" height={36} iconType="circle" />
-                                <Bar dataKey="bookedHours" fill="#C4D7FF" radius={[4, 4, 0, 0]} name="Số giờ đã đặt" />
-                                <Bar dataKey="actualHours" fill="#006BFF" radius={[4, 4, 0, 0]} name="Số giờ thực tế sử dụng" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* No-show rate summary per room (UC-156) */}
-                <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col justify-between">
-                    <div>
-                        <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                            Tỷ lệ đặt phòng vắng mặt theo phòng
-                        </h2>
-                        <p className="text-xs text-slate-blue mt-0.5">Tỷ lệ giải phóng phòng họp tự động do không phát hiện người có mặt sau thời gian quy định</p>
-                    </div>
-
-                    <div className="space-y-4 pt-4 flex-1">
-                        {noShowTrend.map((room) => (
-                            <div key={room.roomName} className="space-y-1.5">
-                                <div className="flex justify-between text-xs font-semibold">
-                                    <span className="text-midnight-indigo">{room.roomName}</span>
-                                    <span className="text-red-600">{room.noShowRate}%</span>
-                                </div>
-                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${room.noShowRate * 8}%` }}
-                                        transition={{ duration: 1 }}
-                                        className="bg-red-500 h-full rounded-full"
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </motion.div>
-
-            {/* Quick Actions & Report Export Panel */}
-            <motion.div
-                variants={itemVariants}
-                className="grid grid-cols-1 lg:grid-cols-3 gap-8"
-            >
-                {/* Personnel Management Shortcuts */}
-                <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col justify-between">
-                    <div>
-                        <h2 className="text-base font-bold text-midnight-indigo mb-1">Thao tác tài khoản</h2>
-                        <p className="text-xs text-slate-blue mb-4">Các lối tắt quản lý nhân sự của Business Admin</p>
-                    </div>
-
-                    <div className="space-y-3">
-                        <Link
-                            to="/business-admin/users"
-                            className="flex items-center justify-between p-3.5 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/20 transition-all no-underline text-midnight-indigo"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-blue-50 text-action-blue flex items-center justify-center">
-                                    <Plus className="w-4 h-4" />
-                                </div>
-                                <span className="text-xs font-bold">Thêm mới tài khoản</span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-slate-blue" />
-                        </Link>
-
-                        <Link
-                            to="/business-admin/users"
-                            className="flex items-center justify-between p-3.5 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/20 transition-all no-underline text-midnight-indigo"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-purple-50 text-royal-amethyst flex items-center justify-center">
-                                    <Users className="w-4 h-4" />
-                                </div>
-                                <span className="text-xs font-bold">Danh sách & Phân quyền</span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-slate-blue" />
-                        </Link>
-                    </div>
-                </div>
-
-                {/* Excel Export Report Form (UC-158) */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm-1">
-                    <div>
-                        <h2 className="text-base font-bold text-midnight-indigo mb-1 flex items-center gap-2">
-                            <Sliders className="w-4 h-4 text-action-blue" />
-                            Xuất báo cáo hoạt động cuộc họp (UC-158)
-                        </h2>
-                        <p className="text-xs text-slate-blue mb-4">Khởi tạo tiến trình xuất báo cáo hoạt động chi tiết định dạng Excel.</p>
-                    </div>
-
-                    <form onSubmit={handleExport} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Định dạng</label>
-                                <select
-                                    value={exportForm.format}
-                                    onChange={(e) => setExportForm({ ...exportForm, format: e.target.value })}
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue text-midnight-indigo font-semibold"
-                                >
-                                    <option value="xlsx">Microsoft Excel (.xlsx)</option>
-                                    <option value="pdf">Adobe PDF (.pdf)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Nhận tệp qua</label>
-                                <select
-                                    value={exportForm.delivery}
-                                    onChange={(e) => setExportForm({ ...exportForm, delivery: e.target.value })}
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-xs focus:outline-none focus:border-action-blue text-midnight-indigo font-semibold"
-                                >
-                                    <option value="download">Tải xuống trực tiếp</option>
-                                    <option value="email">Hộp thư cá nhân</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-slate-blue uppercase mb-2">Các phần của báo cáo</label>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                {[
-                                    { key: 'overview', label: 'Tổng quan' },
-                                    { key: 'rooms', label: 'Phòng họp' },
-                                    { key: 'attendance', label: 'Điểm danh' },
-                                    { key: 'no_show', label: 'Vắng mặt (No-show)' }
-                                ].map(sec => (
-                                    <label key={sec.key} className="flex items-center gap-2 p-2.5 rounded-lg border border-platinum-tint bg-cloud-mist/30 hover:bg-cloud-mist/75 cursor-pointer transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={exportForm.sections.includes(sec.key)}
-                                            onChange={() => toggleSection(sec.key)}
-                                            className="w-4 h-4 rounded text-action-blue focus:ring-action-blue border-platinum-tint"
-                                        />
-                                        <span className="text-xs font-semibold text-midnight-indigo">{sec.label}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end pt-2">
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                type="submit"
-                                disabled={isExporting || exportForm.sections.length === 0}
-                                className="inline-flex items-center justify-center px-5 py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold shadow-sm transition-all duration-200 disabled:opacity-50"
-                            >
-                                {isExporting ? (
-                                    <>
-                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                        Đang xuất file...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Yêu cầu xuất báo cáo
-                                    </>
-                                )}
-                            </motion.button>
-                        </div>
-                    </form>
-                </div>
-            </motion.div>
-            </>
-            )}
-        </motion.div>
+        </div>
     );
 };
 
