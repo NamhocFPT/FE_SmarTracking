@@ -80,8 +80,21 @@ export const createUser = async (data) => {
     return await post('/users', data);
 };
 
+// Tạo tài khoản đối tác — gửi FormData (multipart/form-data) vì có avatarFile
+// Dùng buildPartnerFormData() từ src/constants/partnerAccount.js để tạo payload
+export const createPartnerUser = async (formData) => {
+    return await post('/users', formData);
+};
+
 export const updateUser = async (userId, data) => {
     return await patch(`/users/${userId}`, data);
+};
+
+// Gia hạn hoặc khoá sớm tài khoản đối tác bằng cách cập nhật accountExpiresAt
+// Khoá ngay: truyền new Date().toISOString()
+// Gia hạn: truyền thời điểm tương lai (ISO 8601)
+export const updatePartnerExpiry = async (userId, accountExpiresAt) => {
+    return await patch(`/users/${userId}`, { accountExpiresAt });
 };
 
 export const updateUserRoles = async (userId, data) => {
@@ -104,6 +117,10 @@ export const unlockUser = async (userId, data = {}) => {
     return await patch(`/users/${userId}/unlock`, {
         reason: data.reason || 'Mở khóa tài khoản'
     });
+};
+
+export const updateUserStatus = async (userId, data) => {
+    return await patch(`/users/${userId}/status`, data);
 };
 
 export const deleteUser = async (userId) => {
@@ -145,12 +162,24 @@ export const getDepartments = async (params = {}) => {
     return await get(`/departments${query}`);
 };
 
+export const getDepartmentById = async (id) => {
+    return await get(`/departments/${id}`);
+};
+
 export const createDepartment = async (data) => {
     return await post('/departments', data);
 };
 
 export const updateDepartment = async (id, data) => {
     return await patch(`/departments/${id}`, data);
+};
+
+export const deactivateDepartment = async (id) => {
+    return await post(`/departments/${id}/deactivate`);
+};
+
+export const reactivateDepartment = async (id) => {
+    return await post(`/departments/${id}/reactivate`);
 };
 
 /**

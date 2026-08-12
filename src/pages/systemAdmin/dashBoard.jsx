@@ -90,14 +90,14 @@ const ALERT_TYPE_COLORS = ['#ef4444', '#f97316', '#ffa600', '#006BFF'];
 
 const DEVICE_TYPE_LABEL = {
     ip_camera:        'Camera AI',
-    door_camera:      'Door Camera',
-    room_camera:      'Room Camera',
-    face_server:      'Face Server',
+    door_camera:      'Camera kiểm soát vào/ra',
+    room_camera:      'Camera phòng họp',
+    face_server:      'Máy chủ Face Server',
     face_terminal:    'Face Terminal',
-    microphone:       'Microphone',
+    microphone:       'Micro ghi âm',
     capture_agent:    'Capture Agent',
-    occupancy_sensor: 'Occ. Sensor',
-    display:          'Display',
+    occupancy_sensor: 'Cảm biến đếm người',
+    display:          'Màn hình hiển thị',
 };
 
 const DEVICE_STATUS_CONFIG = [
@@ -418,10 +418,10 @@ const DashBoard = () => {
     const [deviceStatusData, setDeviceStatusData] = useState([]);
     const [recentAlerts,     setRecentAlerts]     = useState([]);
 
-    const [alertTrendGCData,  setAlertTrendGCData]  = useState(null);
-    const [auditHourlyGCData, setAuditHourlyGCData] = useState(null);
-    const [alertTrendTotal,   setAlertTrendTotal]   = useState(0);
-    const [auditTotal,        setAuditTotal]        = useState(0);
+    const [alertTrendGCData, setAlertTrendGCData] = useState(null);
+    const [auditHourlyData,  setAuditHourlyData]  = useState([]);
+    const [alertTrendTotal,  setAlertTrendTotal]  = useState(0);
+    const [auditTotal,       setAuditTotal]       = useState(0);
 
     const [activeSeverityIdx,     setActiveSeverityIdx]     = useState(null);
     const [activeAttendanceIdx,   setActiveAttendanceIdx]   = useState(null);
@@ -594,14 +594,12 @@ const DashBoard = () => {
             const buckets = auditRes.value.data?.buckets || [];
             setAuditTotal(auditRes.value.data?.totalToday || 0);
             if (buckets.length > 0) {
-                const header = ['Giờ', 'Hoạt động'];
-                const rows = buckets.map(b => {
-                    const h = typeof b.hour === 'number'
+                setAuditHourlyData(buckets.map(b => ({
+                    hour: typeof b.hour === 'number'
                         ? String(b.hour).padStart(2, '0') + 'h'
-                        : String(b.hour ?? '').slice(0, 2) + 'h';
-                    return [h, b.count ?? 0];
-                });
-                setAuditHourlyGCData([header, ...rows]);
+                        : String(b.hour ?? '').slice(0, 2) + 'h',
+                    count: b.count ?? 0,
+                })));
             }
         }
 
@@ -629,15 +627,6 @@ const DashBoard = () => {
             maxLines: 2,
         },
         chartArea: { ...GC_BASE.chartArea, height: '62%' },
-    };
-
-    const auditHourlyOptions = {
-        ...GC_BASE,
-        legend: { position: 'none' },
-        colors: [D.blue],
-        bar: { groupWidth: '72%' },
-        animation: { startup: true, duration: 800, easing: 'out' },
-        chartArea: { ...GC_BASE.chartArea, width: '92%', height: '72%' },
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -860,23 +849,26 @@ const DashBoard = () => {
                     />
                 </GChartCard>
 
-                <GChartCard
+                <ChartCard
                     accent={D.blue} delay={100}
                     title="Hoạt động hệ thống theo giờ"
                     sub={`Hôm nay · ${auditTotal} thao tác audit log (24 khung giờ)`}
-                    loading={loading}
-                    empty={!auditHourlyGCData || auditHourlyGCData.length <= 1}
-                    emptyMsg="Không có dữ liệu audit log hôm nay"
-                >
-                    <Chart
-                        chartType="ColumnChart"
-                        width="100%"
-                        height="240px"
-                        data={auditHourlyGCData}
-                        options={auditHourlyOptions}
-                        loader={<PulseSkeleton />}
-                    />
-                </GChartCard>
+                    renderChart={(visible) => {
+                        if (!visible || loading) return <PulseSkeleton />;
+                        if (!auditHourlyData.length) return <EmptyState message="Không có dữ liệu audit log hôm nay" />;
+                        return (
+                            <ResponsiveContainer width="100%" height={240}>
+                                <BarChart data={auditHourlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke={D.grid} vertical={false} />
+                                    <XAxis dataKey="hour" tick={{ fontSize: 9, fill: D.axisText }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                                    <YAxis tick={{ fontSize: 9, fill: D.axisText }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <Tooltip content={<BarTooltip unit=" thao tác" />} />
+                                    <Bar dataKey="count" name="Thao tác" fill={D.blue} radius={[3, 3, 0, 0]} animationDuration={800} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        );
+                    }}
+                />
             </div>
 
             {/* ── Row 3: Room bar + Attendance donut ────────────────────────── */}

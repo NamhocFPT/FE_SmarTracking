@@ -3,7 +3,12 @@ import { createPortal } from 'react-dom';
 import { X, FileText, CheckCircle, AlertTriangle, Download, RefreshCw } from 'lucide-react';
 import { post, get } from '../../utils/request';
 
-const ExportReportModal = ({ isOpen, onClose }) => {
+const ExportReportModal = ({
+    isOpen,
+    onClose,
+    endpoint = '/reports/room-utilization/exports',
+    title = 'Xuất báo cáo hiệu năng',
+}) => {
     const [format, setFormat] = useState('xlsx');
     const [preset, setPreset] = useState('month');
     const [from, setFrom] = useState('');
@@ -76,7 +81,7 @@ const ExportReportModal = ({ isOpen, onClose }) => {
                 preset,
                 ...(preset === 'custom' && { from, to })
             };
-            const res = await post('/reports/room-utilization/exports', payload);
+            const res = await post(endpoint, payload);
             if (res?.success) {
                 setJobId(res.data.jobId);
                 setJobStatus(res.data.status || 'queued');
@@ -113,7 +118,7 @@ const ExportReportModal = ({ isOpen, onClose }) => {
                 <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                     <h3 className="font-bold text-midnight-indigo flex items-center gap-2">
                         <FileText className="w-5 h-5 text-action-blue" />
-                        Xuất báo cáo hiệu năng
+                        {title}
                     </h3>
                     <button 
                         onClick={onClose} 

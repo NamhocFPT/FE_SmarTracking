@@ -12,6 +12,26 @@ import {
     manualAttendanceCheckIn 
 } from '../../service/managerServices';
 
+const CHECK_IN_METHOD_MAP = {
+    door_camera:   'Nhận diện khuôn mặt',
+    face:          'Nhận diện khuôn mặt',
+    face_terminal: 'Face Terminal',
+    manual:        'Điểm danh thủ công',
+    qr:            'Quét mã QR',
+    kiosk:         'Kiosk tự phục vụ',
+    biometric:     'Sinh trắc học',
+    nfc:           'Quẹt thẻ NFC',
+};
+
+const ATTENDANCE_SOURCE_MAP = {
+    face_terminal: 'Face Terminal',
+    door_camera:   'Camera cửa ra/vào',
+    camera:        'Camera AI',
+    manual:        'Thủ công',
+    kiosk:         'Kiosk',
+    system:        'Hệ thống',
+};
+
 const MeetingAttendanceBoard = ({ meetingId }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -152,6 +172,20 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                         {isLate ? `Đến muộn (${lateMinutes}p)` : 'Có mặt'}
                     </span>
                 );
+            case 'late':
+                return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600">
+                        <AlertCircle className="w-3 h-3" />
+                        {lateMinutes ? `Đến muộn (${lateMinutes}p)` : 'Đến muộn'}
+                    </span>
+                );
+            case 'checked_in':
+            case 'maybe_present':
+                return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600">
+                        <CheckCircle className="w-3 h-3" /> Đã điểm danh
+                    </span>
+                );
             case 'absent':
                 return (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-600">
@@ -167,7 +201,7 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
             default:
                 return (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-cloud-mist text-slate-blue">
-                        {status || 'Unknown'}
+                        <Clock className="w-3 h-3" /> {status || 'Không xác định'}
                     </span>
                 );
         }
@@ -313,11 +347,11 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                                             <div className="flex flex-col gap-0.5">
                                                 {item.checkInMethod && (
                                                     <span className="text-[10px] font-semibold text-slate-700">
-                                                        Phương thức: {item.checkInMethod === 'face' ? 'Khuôn mặt' : item.checkInMethod === 'manual' ? 'Thủ công' : item.checkInMethod}
+                                                        Phương thức: {CHECK_IN_METHOD_MAP[item.checkInMethod] ?? item.checkInMethod}
                                                     </span>
                                                 )}
                                                 {item.attendanceSource && (
-                                                    <span className="text-[10px] text-slate-500">Nguồn: {item.attendanceSource}</span>
+                                                    <span className="text-[10px] text-slate-500">Nguồn: {ATTENDANCE_SOURCE_MAP[item.attendanceSource] ?? item.attendanceSource}</span>
                                                 )}
                                                 {!item.checkInMethod && !item.attendanceSource && <span className="text-[10px] text-slate-400">Không có thông tin</span>}
                                             </div>

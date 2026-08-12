@@ -2,8 +2,10 @@ import { Cpu } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
+import { API_BASE_URL } from '../../utils/request';
 import {
     getDevices,
+    getDeviceStatusSummary,
     registerDevice,
     updateDevice,
     getRooms,
@@ -13,7 +15,9 @@ import {
     configDeviceRtsp,
     rotateFaceServerToken,
     revokeFaceServerToken,
-    checkDeviceAvailability
+    checkDeviceAvailability,
+    updateDeviceAiConfig,
+    configureFaceTerminal,
 } from '../../service/sysAdminServices';
 
 /**
@@ -56,11 +60,39 @@ const DeviceManagement = () => {
     });
 
     // FE-5: Token Display Modal (chỉ hiện 1 lần)
-    const [tokenModalData, setTokenModalData] = useState(null); // { token, deviceName }
-    const [tokenCopied, setTokenCopied] = useState(false);
+    // tokenModalData: { token, deviceName, deviceCode?, urls?: { verify, heartbeat, stranger } }
+    const [tokenModalData, setTokenModalData] = useState(null);
+    const [copiedField, setCopiedField] = useState(null); // 'token'|'verify'|'heartbeat'|'stranger'|null
 
     // FE-5: Confirmation Modal (replaces window.confirm)
     const [confirmModal, setConfirmModal] = useState(null); // { title, message, onConfirm, type }
+
+    // UC-51: Device status summary
+    const [statusSummary, setStatusSummary] = useState(null);
+
+    // UC-96: AI Config Modal
+    const [isAiConfigModalOpen, setIsAiConfigModalOpen] = useState(false);
+    const [aiConfigDevice, setAiConfigDevice] = useState(null);
+    const [aiConfig, setAiConfig] = useState({
+        faceRecognitionEnabled: false,
+        strangerDetectionEnabled: false,
+        occupancyCountingEnabled: false,
+    });
+    const [aiConfigSubmitting, setAiConfigSubmitting] = useState(false);
+
+    // FE-AR: Face Terminal first-time configure modal
+    const [isFaceConfigModalOpen, setIsFaceConfigModalOpen] = useState(false);
+    const [faceConfigDevice, setFaceConfigDevice] = useState(null);
+    const [faceConfigForm, setFaceConfigForm] = useState({
+        callback_protocol: 'https',
+        callback_base_url: '',
+        allowed_source_ip: '',
+        heartbeat_path: '/heartbeat',
+        verify_path: '/verify',
+        stranger_path: '/stranger',
+        callback_enabled: true,
+    });
+    const [faceConfigSubmitting, setFaceConfigSubmitting] = useState(false);
 
     // Filters states
     const [search, setSearch] = useState('');
@@ -86,13 +118,15 @@ const DeviceManagement = () => {
         setLoading(true);
         setError(null);
         try {
-            const [roomsRes, devicesRes] = await Promise.all([
+            const [roomsRes, devicesRes, summaryRes] = await Promise.all([
                 getRooms({ limit: 100 }),
-                getDevices({ limit: 100 })
+                getDevices({ limit: 100 }),
+                getDeviceStatusSummary().catch(() => null),
             ]);
 
             if (roomsRes?.success) setRooms(roomsRes.data || []);
             if (devicesRes?.success) setDevicesList(devicesRes.data || []);
+            if (summaryRes?.success) setStatusSummary(summaryRes.data);
         } catch (err) {
             setError(err?.error?.message || err?.message || 'Không thể tải dữ liệu thiết bị và phòng họp.');
         } finally {
@@ -314,12 +348,11 @@ const DeviceManagement = () => {
                 try {
                     const res = await rotateFaceServerToken(device.id);
                     if (res?.success) {
-                        // FE-5: Hiển thị token trong modal "chỉ hiện 1 lần"
                         setTokenModalData({
                             token: res.data?.token || res.data?.accessToken || 'Token đã được tạo',
-                            deviceName: device.device_name
+                            deviceName: device.device_name,
                         });
-                        setTokenCopied(false);
+                        setCopiedField(null);
                     } else {
                         throw new Error(res?.error?.message || res?.message || 'Không thể rotate token.');
                     }
@@ -407,38 +440,130 @@ const DeviceManagement = () => {
         }
     };
 
-    // FE-5: Copy token to clipboard
-    const handleCopyToken = async () => {
-        if (tokenModalData?.token) {
+    // FE-5: Copy any text to clipboard by field name
+    const handleCopyText = async (text, field) => {
+        const doCopy = (t) => {
             try {
-                await navigator.clipboard.writeText(tokenModalData.token);
-                setTokenCopied(true);
-                setTimeout(() => setTokenCopied(false), 2000);
+                navigator.clipboard.writeText(t);
             } catch {
-                // Fallback
-                const textarea = document.createElement('textarea');
-                textarea.value = tokenModalData.token;
-                document.body.appendChild(textarea);
-                textarea.select();
+                const ta = document.createElement('textarea');
+                ta.value = t;
+                document.body.appendChild(ta);
+                ta.select();
                 document.execCommand('copy');
-                document.body.removeChild(textarea);
-                setTokenCopied(true);
-                setTimeout(() => setTokenCopied(false), 2000);
+                document.body.removeChild(ta);
             }
+        };
+        doCopy(text);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 2000);
+    };
+
+    // FE-AR: Open configure form for unconfigured face_server
+    const handleOpenFaceConfig = (device) => {
+        setFaceConfigDevice(device);
+        setFaceConfigForm({
+            callback_protocol: 'https',
+            callback_base_url: '',
+            allowed_source_ip: '',
+            heartbeat_path: '/heartbeat',
+            verify_path: '/verify',
+            stranger_path: '/stranger',
+            callback_enabled: true,
+        });
+        setIsFaceConfigModalOpen(true);
+    };
+
+    // FE-AR: Submit configure form
+    const handleFaceConfigSubmit = async (e) => {
+        e.preventDefault();
+        setFaceConfigSubmitting(true);
+        setError(null);
+        try {
+            const payload = {
+                callback_protocol: faceConfigForm.callback_protocol,
+                heartbeat_path: faceConfigForm.heartbeat_path.trim() || '/heartbeat',
+                verify_path: faceConfigForm.verify_path.trim() || '/verify',
+                stranger_path: faceConfigForm.stranger_path.trim() || '/stranger',
+                callback_enabled: faceConfigForm.callback_enabled,
+            };
+            if (faceConfigForm.callback_base_url.trim()) payload.callback_base_url = faceConfigForm.callback_base_url.trim();
+            if (faceConfigForm.allowed_source_ip.trim()) payload.allowed_source_ip = faceConfigForm.allowed_source_ip.trim();
+
+            const res = await configureFaceTerminal(faceConfigDevice.id, payload);
+            if (res?.success) {
+                const token = res.data?.one_time_callback_token;
+                const code = faceConfigDevice.device_code;
+                setTokenModalData({
+                    token,
+                    deviceName: faceConfigDevice.device_name,
+                    deviceCode: code,
+                    urls: token ? {
+                        verify: `${API_BASE_URL}/vf/${code}/${token}`,
+                        heartbeat: `${API_BASE_URL}/hb/${code}/${token}`,
+                        stranger: `${API_BASE_URL}/sf/${code}/${token}`,
+                    } : null,
+                });
+                setCopiedField(null);
+                setIsFaceConfigModalOpen(false);
+                fetchData();
+            } else {
+                const errCode = res?.error?.code || '';
+                if (errCode === 'DEVICE_ROOM_ASSIGNMENT_REQUIRED') throw new Error('Cần gán phòng cho thiết bị trước khi cấu hình.');
+                else if (errCode === 'DEVICE_TYPE_NOT_FACE_SERVER') throw new Error('Thiết bị này không phải Face Terminal.');
+                else throw new Error(res?.error?.message || res?.message || 'Không thể cấu hình thiết bị.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể cấu hình thiết bị.');
+        } finally {
+            setFaceConfigSubmitting(false);
+        }
+    };
+
+    // UC-96: Open AI Config modal and pre-fill from device metadata
+    const handleAiConfigOpen = (device) => {
+        const saved = device.metadata_json?.ai_config || {};
+        setAiConfigDevice(device);
+        setAiConfig({
+            faceRecognitionEnabled: saved.faceRecognitionEnabled ?? false,
+            strangerDetectionEnabled: saved.strangerDetectionEnabled ?? false,
+            occupancyCountingEnabled: saved.occupancyCountingEnabled ?? false,
+        });
+        setIsAiConfigModalOpen(true);
+    };
+
+    const handleAiConfigSubmit = async (e) => {
+        e.preventDefault();
+        if (!aiConfigDevice) return;
+        setAiConfigSubmitting(true);
+        setError(null);
+        try {
+            const res = await updateDeviceAiConfig(aiConfigDevice.id, aiConfig);
+            if (res?.success) {
+                setSuccessMessage(`Đã cập nhật cấu hình AI cho ${aiConfigDevice.device_name} thành công.`);
+                setIsAiConfigModalOpen(false);
+                fetchData();
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không thể cập nhật cấu hình AI.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể cập nhật cấu hình AI.');
+        } finally {
+            setAiConfigSubmitting(false);
         }
     };
 
     // Helper translation dicts
     const TYPE_MAP = {
-        'ip_camera': 'Camera AI',
-        'door_camera': 'Door Camera',
-        'room_camera': 'Room Camera',
-        'face_server': 'Face Server',
-        'face_terminal': 'Face Terminal',
-        'microphone': 'Microphone',
-        'capture_agent': 'Capture Agent',
-        'occupancy_sensor': 'Occupancy Sensor',
-        'display': 'Display'
+        'ip_camera':       'Camera AI',
+        'door_camera':     'Camera kiểm soát vào/ra',
+        'room_camera':     'Camera phòng họp',
+        'face_server':     'Máy chủ Face Server',
+        'face_terminal':   'Face Terminal (điểm danh)',
+        'microphone':      'Micro ghi âm',
+        'capture_agent':   'Capture Agent',
+        'occupancy_sensor':'Cảm biến đếm người',
+        'display':         'Màn hình hiển thị',
     };
 
     // Filtered list
@@ -481,6 +606,48 @@ const DeviceManagement = () => {
                     Đăng ký thiết bị
                 </button>
             </div>
+
+            {/* UC-51: Device status summary cards */}
+            {statusSummary && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-xl border border-platinum-tint p-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                            <Cpu className="w-4 h-4 text-action-blue" />
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-blue font-medium">Tổng thiết bị</p>
+                            <p className="text-xl font-bold text-midnight-indigo leading-tight">{statusSummary.total ?? devicesList.length}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-platinum-tint p-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center">
+                            <span className="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-blue font-medium">Online</p>
+                            <p className="text-xl font-bold text-green-600 leading-tight">{statusSummary.online ?? 0}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-platinum-tint p-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center">
+                            <span className="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-blue font-medium">Offline</p>
+                            <p className="text-xl font-bold text-red-600 leading-tight">{statusSummary.offline ?? 0}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-platinum-tint p-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <span className="w-3 h-3 rounded-full bg-gray-400 inline-block"></span>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-blue font-medium">Vô hiệu</p>
+                            <p className="text-xl font-bold text-steel-gray leading-tight">{statusSummary.disabled ?? 0}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Notification messages */}
             {successMessage && (
@@ -547,14 +714,14 @@ const DeviceManagement = () => {
                             >
                                 <option value="">Tất cả loại thiết bị</option>
                                 <option value="ip_camera">Camera AI</option>
-                                <option value="door_camera">Door Camera</option>
-                                <option value="room_camera">Room Camera</option>
-                                <option value="face_server">Face Server</option>
-                                <option value="face_terminal">Face Terminal</option>
-                                <option value="microphone">Microphone</option>
+                                <option value="door_camera">Camera kiểm soát vào/ra</option>
+                                <option value="room_camera">Camera phòng họp</option>
+                                <option value="face_server">Máy chủ Face Server</option>
+                                <option value="face_terminal">Face Terminal (điểm danh)</option>
+                                <option value="microphone">Micro ghi âm</option>
                                 <option value="capture_agent">Capture Agent</option>
-                                <option value="occupancy_sensor">Occupancy Sensor</option>
-                                <option value="display">Display</option>
+                                <option value="occupancy_sensor">Cảm biến đếm người</option>
+                                <option value="display">Màn hình hiển thị</option>
                             </select>
 
                             {/* Status Filter */}
@@ -666,27 +833,54 @@ const DeviceManagement = () => {
                                                         </button>
                                                         {device.device_type === 'face_server' && (
                                                             <>
-                                                            <button
-                                                                onClick={() => handleRotateToken(device)}
-                                                                title="Tạo lại Token (Rotate)"
-                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                                </svg>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleRevokeToken(device)}
-                                                                title="Thu hồi Token (Revoke)"
-                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                                                </svg>
-                                                            </button>
+                                                            {!device.metadata_json?.face_server_config ? (
+                                                                // Chưa cấu hình → chỉ hiện nút Configure
+                                                                <button
+                                                                    onClick={() => handleOpenFaceConfig(device)}
+                                                                    title="Cấu hình Face Terminal lần đầu"
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                                                                    </svg>
+                                                                    Cấu hình
+                                                                </button>
+                                                            ) : (
+                                                                // Đã cấu hình → hiện Rotate + Revoke
+                                                                <>
+                                                                <button
+                                                                    onClick={() => handleRotateToken(device)}
+                                                                    title="Tạo lại Token (Rotate)"
+                                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleRevokeToken(device)}
+                                                                    title="Thu hồi Token (Revoke)"
+                                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                                    </svg>
+                                                                </button>
+                                                                </>
+                                                            )}
                                                             </>
                                                         )}
                                                         {['ip_camera', 'door_camera', 'room_camera'].includes(device.device_type) && (
+                                                            <>
+                                                            <button
+                                                                onClick={() => handleAiConfigOpen(device)}
+                                                                title="Cấu hình AI Camera"
+                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                                </svg>
+                                                            </button>
                                                             <button
                                                                 onClick={() => {
                                                                     const saved = device.metadata_json?.rtsp_config || {};
@@ -708,6 +902,7 @@ const DeviceManagement = () => {
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                                 </svg>
                                                             </button>
+                                                            </>
                                                         )}
                                                         <button
                                                             onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.room_id || ''); setIsAssignRoomModalOpen(true); }}
@@ -847,14 +1042,14 @@ const DeviceManagement = () => {
                                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                                     >
                                         <option value="ip_camera">Camera AI</option>
-                                        <option value="door_camera">Door Camera</option>
-                                        <option value="room_camera">Room Camera</option>
-                                        <option value="face_server">Face Server</option>
-                                        <option value="face_terminal">Face Terminal</option>
-                                        <option value="microphone">Microphone</option>
+                                        <option value="door_camera">Camera kiểm soát vào/ra</option>
+                                        <option value="room_camera">Camera phòng họp</option>
+                                        <option value="face_server">Máy chủ Face Server</option>
+                                        <option value="face_terminal">Face Terminal (điểm danh)</option>
+                                        <option value="microphone">Micro ghi âm</option>
                                         <option value="capture_agent">Capture Agent</option>
-                                        <option value="occupancy_sensor">Occupancy Sensor</option>
-                                        <option value="display">Display</option>
+                                        <option value="occupancy_sensor">Cảm biến đếm người</option>
+                                        <option value="display">Màn hình hiển thị</option>
                                     </select>
                                 </div>
                                 <div>
@@ -943,14 +1138,14 @@ const DeviceManagement = () => {
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại thiết bị</label>
                                     <select value={formData.deviceType} onChange={(e) => setFormData({...formData, deviceType: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
                                         <option value="ip_camera">Camera AI</option>
-                                        <option value="door_camera">Door Camera</option>
-                                        <option value="room_camera">Room Camera</option>
-                                        <option value="face_server">Face Server</option>
-                                        <option value="face_terminal">Face Terminal</option>
-                                        <option value="microphone">Microphone</option>
+                                        <option value="door_camera">Camera kiểm soát vào/ra</option>
+                                        <option value="room_camera">Camera phòng họp</option>
+                                        <option value="face_server">Máy chủ Face Server</option>
+                                        <option value="face_terminal">Face Terminal (điểm danh)</option>
+                                        <option value="microphone">Micro ghi âm</option>
                                         <option value="capture_agent">Capture Agent</option>
-                                        <option value="occupancy_sensor">Occupancy Sensor</option>
-                                        <option value="display">Display</option>
+                                        <option value="occupancy_sensor">Cảm biến đếm người</option>
+                                        <option value="display">Màn hình hiển thị</option>
                                     </select>
                                 </div>
                                 <div>
@@ -1065,35 +1260,249 @@ const DeviceManagement = () => {
                 document.body
             )}
 
-            {/* FE-5: TOKEN DISPLAY MODAL (chỉ hiện 1 lần) */}
+            {/* TOKEN DISPLAY MODAL — chỉ hiện 1 lần, hỗ trợ cả Rotate (token only) và Configure (token + 3 URLs) */}
             {tokenModalData && createPortal(
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in-up">
                         <div className="bg-amber-50 p-6 text-center border-b border-amber-100">
                             <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                             </div>
-                            <h2 className="text-lg font-bold text-amber-900">Token mới đã được tạo</h2>
+                            <h2 className="text-lg font-bold text-amber-900">
+                                {tokenModalData.urls ? 'Cấu hình Face Terminal thành công' : 'Token mới đã được tạo'}
+                            </h2>
                             <p className="text-xs text-amber-700 mt-1">Thiết bị: {tokenModalData.deviceName}</p>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                            {/* Cảnh báo one-time */}
                             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 font-semibold text-center">
-                                ⚠ Token này chỉ hiển thị MỘT LẦN. Vui lòng sao chép và lưu trữ an toàn.
+                                ⚠ Lưu lại ngay — sẽ không hiển thị lại được. Nếu mất, phải cấu hình lại từ đầu (token cũ sẽ mất tác dụng).
                             </div>
-                            <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-green-400 break-all select-all">
-                                {tokenModalData.token}
-                            </div>
-                            <button onClick={handleCopyToken} className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${tokenCopied ? 'bg-green-600 text-white' : 'bg-action-blue hover:bg-glacier-blue text-white'}`}>
-                                {tokenCopied ? (
-                                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg> Đã sao chép!</>
-                                ) : (
-                                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Sao chép Token</>
-                                )}
-                            </button>
+
+                            {/* Token */}
+                            {tokenModalData.token && (
+                                <div>
+                                    <p className="text-xs font-bold text-slate-blue uppercase mb-1">Callback Token</p>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 bg-slate-900 rounded-xl px-4 py-3 font-mono text-sm text-green-400 break-all select-all">
+                                            {tokenModalData.token}
+                                        </div>
+                                        <button
+                                            onClick={() => handleCopyText(tokenModalData.token, 'token')}
+                                            title="Sao chép token"
+                                            className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all ${copiedField === 'token' ? 'bg-green-600 text-white' : 'bg-action-blue hover:bg-glacier-blue text-white'}`}
+                                        >
+                                            {copiedField === 'token' ? '✓ Đã sao chép' : 'Sao chép'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 3 Callback URLs — chỉ hiện khi Configure (không phải Rotate) */}
+                            {tokenModalData.urls && (
+                                <div className="space-y-3">
+                                    <p className="text-xs font-bold text-slate-blue uppercase">URL Callback (điền vào cấu hình thiết bị vật lý)</p>
+                                    <p className="text-[10px] text-slate-blue bg-blue-50 rounded-lg p-2">
+                                        Các URL này đã bao gồm device_code và token. Sao chép trực tiếp vào từng field tương ứng trên thiết bị.
+                                    </p>
+
+                                    {[
+                                        { label: 'Verify URL', key: 'verify', url: tokenModalData.urls.verify },
+                                        { label: 'Heartbeat URL', key: 'heartbeat', url: tokenModalData.urls.heartbeat },
+                                        { label: 'Stranger URL', key: 'stranger', url: tokenModalData.urls.stranger },
+                                    ].map(({ label, key, url }) => (
+                                        <div key={key}>
+                                            <p className="text-[10px] font-bold text-slate-blue mb-1">{label}</p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 bg-slate-100 rounded-lg px-3 py-2 font-mono text-[11px] text-midnight-indigo break-all select-all">
+                                                    {url}
+                                                </div>
+                                                <button
+                                                    onClick={() => handleCopyText(url, key)}
+                                                    className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold transition-all ${copiedField === key ? 'bg-green-600 text-white' : 'bg-slate-700 hover:bg-slate-800 text-white'}`}
+                                                >
+                                                    {copiedField === key ? '✓' : 'Copy'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 text-right">
                             <button onClick={() => setTokenModalData(null)} className="px-4 py-2 text-xs font-bold text-slate-blue hover:text-midnight-indigo">Đã lưu, đóng lại</button>
                         </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* UC-96: AI CONFIG MODAL */}
+            {isAiConfigModalOpen && aiConfigDevice && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-sm w-full overflow-hidden animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình AI Camera</h3>
+                                <p className="text-[10px] text-slate-blue mt-0.5">{aiConfigDevice.device_name}</p>
+                            </div>
+                            <button onClick={() => setIsAiConfigModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleAiConfigSubmit} className="p-6 space-y-4">
+                            <div className="space-y-3">
+                                <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-platinum-tint hover:bg-cloud-mist/40 cursor-pointer">
+                                    <div>
+                                        <p className="text-sm font-semibold text-midnight-indigo">Nhận diện khuôn mặt</p>
+                                        <p className="text-[10px] text-slate-blue">Face Recognition — xác định nhân viên</p>
+                                    </div>
+                                    <div
+                                        onClick={() => setAiConfig(c => ({ ...c, faceRecognitionEnabled: !c.faceRecognitionEnabled }))}
+                                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${aiConfig.faceRecognitionEnabled ? 'bg-action-blue' : 'bg-platinum-tint'}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${aiConfig.faceRecognitionEnabled ? 'translate-x-5' : 'translate-x-0'}`}></span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-platinum-tint hover:bg-cloud-mist/40 cursor-pointer">
+                                    <div>
+                                        <p className="text-sm font-semibold text-midnight-indigo">Phát hiện người lạ</p>
+                                        <p className="text-[10px] text-slate-blue">Stranger Detection — cảnh báo ngoài danh sách</p>
+                                    </div>
+                                    <div
+                                        onClick={() => setAiConfig(c => ({ ...c, strangerDetectionEnabled: !c.strangerDetectionEnabled }))}
+                                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${aiConfig.strangerDetectionEnabled ? 'bg-action-blue' : 'bg-platinum-tint'}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${aiConfig.strangerDetectionEnabled ? 'translate-x-5' : 'translate-x-0'}`}></span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-platinum-tint hover:bg-cloud-mist/40 cursor-pointer">
+                                    <div>
+                                        <p className="text-sm font-semibold text-midnight-indigo">Đếm người trong phòng</p>
+                                        <p className="text-[10px] text-slate-blue">Occupancy Counting — theo dõi sĩ số</p>
+                                    </div>
+                                    <div
+                                        onClick={() => setAiConfig(c => ({ ...c, occupancyCountingEnabled: !c.occupancyCountingEnabled }))}
+                                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${aiConfig.occupancyCountingEnabled ? 'bg-action-blue' : 'bg-platinum-tint'}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${aiConfig.occupancyCountingEnabled ? 'translate-x-5' : 'translate-x-0'}`}></span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setIsAiConfigModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
+                                <button type="submit" disabled={aiConfigSubmitting} className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold disabled:opacity-50">
+                                    {aiConfigSubmitting ? 'Đang lưu...' : 'Lưu cấu hình AI'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FE-AR: FACE TERMINAL CONFIGURE MODAL */}
+            {isFaceConfigModalOpen && faceConfigDevice && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình Face Terminal lần đầu</h3>
+                                <p className="text-[10px] text-slate-blue mt-0.5">{faceConfigDevice.device_name} · {faceConfigDevice.device_code}</p>
+                            </div>
+                            <button onClick={() => setIsFaceConfigModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleFaceConfigSubmit} className="p-6 space-y-4">
+                            {/* callback_protocol */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Protocol <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={faceConfigForm.callback_protocol}
+                                        onChange={(e) => setFaceConfigForm(f => ({ ...f, callback_protocol: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                    >
+                                        <option value="https">https</option>
+                                        <option value="http">http</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Callback Base URL</label>
+                                    <input
+                                        type="text"
+                                        value={faceConfigForm.callback_base_url}
+                                        onChange={(e) => setFaceConfigForm(f => ({ ...f, callback_base_url: e.target.value }))}
+                                        placeholder="https://your-server.com"
+                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* allowed_source_ip */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Allowed Source IP</label>
+                                <input
+                                    type="text"
+                                    value={faceConfigForm.allowed_source_ip}
+                                    onChange={(e) => setFaceConfigForm(f => ({ ...f, allowed_source_ip: e.target.value }))}
+                                    placeholder="10.0.5.20 (để trống nếu không chắc IP thiết bị)"
+                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue"
+                                />
+                                <p className="text-[10px] text-amber-600 mt-1">⚠ Nếu điền sai IP, mọi callback từ thiết bị sẽ bị chặn 403. Để trống để bỏ qua kiểm tra.</p>
+                            </div>
+
+                            {/* paths */}
+                            <div className="space-y-3">
+                                <p className="text-xs font-bold text-slate-blue uppercase">Callback Paths (chỉ để lưu tham chiếu)</p>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                        { label: 'Verify Path', key: 'verify_path' },
+                                        { label: 'Heartbeat Path', key: 'heartbeat_path' },
+                                        { label: 'Stranger Path', key: 'stranger_path' },
+                                    ].map(({ label, key }) => (
+                                        <div key={key}>
+                                            <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">{label} <span className="text-red-500">*</span></label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={faceConfigForm[key]}
+                                                onChange={(e) => setFaceConfigForm(f => ({ ...f, [key]: e.target.value }))}
+                                                placeholder="/path"
+                                                className="w-full px-2 py-2 border border-platinum-tint rounded-xl text-xs font-mono focus:outline-none focus:border-action-blue"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-slate-blue">URL thật server lắng nghe cố định: <span className="font-mono">/api/v1/vf/</span>, <span className="font-mono">/api/v1/hb/</span>, <span className="font-mono">/api/v1/sf/</span> — không phụ thuộc vào giá trị nhập ở đây.</p>
+                            </div>
+
+                            {/* callback_enabled */}
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <div
+                                    onClick={() => setFaceConfigForm(f => ({ ...f, callback_enabled: !f.callback_enabled }))}
+                                    className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${faceConfigForm.callback_enabled ? 'bg-action-blue' : 'bg-platinum-tint'}`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${faceConfigForm.callback_enabled ? 'translate-x-5' : 'translate-x-0'}`}></span>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-midnight-indigo">Bật callback ngay</p>
+                                    <p className="text-[10px] text-slate-blue">callback_enabled — mặc định bật</p>
+                                </div>
+                            </label>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setIsFaceConfigModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
+                                <button
+                                    type="submit"
+                                    disabled={faceConfigSubmitting}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50"
+                                >
+                                    {faceConfigSubmitting ? 'Đang cấu hình...' : 'Cấu hình & Lấy Token'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>,
                 document.body

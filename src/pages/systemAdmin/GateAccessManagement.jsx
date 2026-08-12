@@ -1,7 +1,8 @@
-import { Activity, BarChart2, Filter, List, LogOut, RefreshCw, Shield, User, X } from 'lucide-react';
+import { Activity, BarChart2, Download, Filter, List, LogOut, RefreshCw, Shield, User, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAdminGateAccessLogs, getAdminGateAccessHistory, getAdminVehicleTrafficStats, getAdminGateAccessHistoryDetail } from '../../service/sysAdminServices';
+import ExportReportModal from '../../components/common/ExportReportModal';
 
 
 export default function GateAccessManagement() {
@@ -24,6 +25,7 @@ export default function GateAccessManagement() {
 
     // Stats State
     const [stats, setStats] = useState(null);
+    const [isExportOpen, setIsExportOpen] = useState(false);
 
     const itemsPerPage = 10;
 
@@ -124,6 +126,14 @@ export default function GateAccessManagement() {
                     <p className="text-sm font-medium text-slate-blue mt-1">Quản lý phương tiện và người ra vào theo thời gian thực</p>
                 </div>
 
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsExportOpen(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        Xuất báo cáo
+                    </button>
                 <div className="flex bg-cloud-mist/50 p-1.5 rounded-xl border border-platinum-tint shadow-sm">
                     {[
                         { id: 'logs', label: 'Nhật ký ', icon: List },
@@ -142,6 +152,7 @@ export default function GateAccessManagement() {
                             {tab.label}
                         </button>
                     ))}
+                </div>
                 </div>
             </div>
 
@@ -474,6 +485,13 @@ export default function GateAccessManagement() {
                     </div>
                 )}
             </AnimatePresence>
+
+            <ExportReportModal
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                endpoint="/reports/gate-access/exports"
+                title="Xuất báo cáo ra vào khuôn viên"
+            />
         </div>
     );
 }

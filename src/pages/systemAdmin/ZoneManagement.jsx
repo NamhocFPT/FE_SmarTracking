@@ -1,12 +1,12 @@
-import { AlertTriangle, Calendar, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, Info, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Video, X } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
-
+import { Activity, AlertTriangle, BarChart3, Calendar, Camera, CheckCircle, ChevronLeft, ChevronRight, Edit2, Eye, History, Info, LogIn, LogOut, Map, MapPin, Monitor, Plus, RefreshCw, Search, Server, Shield, ShieldCheck, ShieldQuestion, Trash2, Users, Video, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { createPortal } from 'react-dom';
 import {
     getZones, getZoneById, createZone, updateZone,
     deleteZone, assignDeviceToZone, removeDeviceFromZone
 } from '../../service/zoneServices';
-import { getDevices, getZoneAccessLog } from '../../service/sysAdminServices';
+import { getDevices, getZoneAccessLog, getZonePresenceTimeline } from '../../service/sysAdminServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 
@@ -237,6 +237,298 @@ const ZoneAccessLogCard = ({ zoneId }) => {
     );
 };
 
+// ─── ZoneTimelineCard ────────────────────────────────────────────────────────
+// UC-110: GET /campus-dashboard/zones/:zoneId/timeline
+// BE trả event log thô (appear/disappear/count) — FE tự aggregate theo giờ VN
+
+const toVnHour = (isoStr) => {
+    try {
+        return parseInt(
+            new Date(isoStr).toLocaleString('en-US', {
+                timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false
+            }),
+            10
+        ) % 24;
+    } catch { return 0; }
+};
+
+const buildIso = (dateStr, isEnd) =>
+    isEnd ? `${dateStr}T23:59:59+07:00` : `${dateStr}T00:00:00+07:00`;
+
+const MAX_TIMELINE_DAYS = 31;
+
+const EVENT_TYPE_BADGE = {
+    appear: (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+            <Eye className="w-2.5 h-2.5" />Xuất hiện
+        </span>
+    ),
+    disappear: (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 text-slate-600 border border-slate-200 whitespace-nowrap">
+            <X className="w-2.5 h-2.5" />Rời đi
+        </span>
+    ),
+    count: (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+            <Users className="w-2.5 h-2.5" />Đếm người
+        </span>
+    ),
+};
+
+const ZoneTimelineCard = ({ zoneId }) => {
+    const [fromDate, setFromDate] = useState(getTodayVN);
+    const [toDate, setToDate] = useState(getTodayVN);
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const fetchTimeline = useCallback(async () => {
+        if (!zoneId) return;
+        const fromMs = new Date(fromDate).getTime();
+        const toMs = new Date(toDate).getTime();
+        if (toMs < fromMs) {
+            setError('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.');
+            return;
+        }
+        if ((toMs - fromMs) > MAX_TIMELINE_DAYS * 86400000) {
+            setError(`Khoảng thời gian tối đa ${MAX_TIMELINE_DAYS} ngày.`);
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        setData(null);
+        try {
+            const res = await getZonePresenceTimeline(zoneId, {
+                from: buildIso(fromDate, false),
+                to: buildIso(toDate, true),
+            });
+            if (res?.success) {
+                setData(res.data);
+            } else {
+                throw new Error(res?.message || 'Không thể tải dữ liệu timeline.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Lỗi khi tải timeline.');
+        } finally {
+            setLoading(false);
+        }
+    }, [zoneId, fromDate, toDate]);
+
+    // Reset + refetch khi đổi zone
+    useEffect(() => {
+        setData(null);
+        setError(null);
+        fetchTimeline();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zoneId]);
+
+    // Aggregate events by VN hour (0–23) cho BarChart
+    const hourlyData = useMemo(() => {
+        if (!data?.events?.length) return [];
+        const buckets = Array.from({ length: 24 }, (_, h) => ({
+            hour: h, appear: 0, disappear: 0, maxOccupancy: 0,
+        }));
+        data.events.forEach(ev => {
+            const h = toVnHour(ev.eventTime);
+            if (ev.eventType === 'appear') buckets[h].appear++;
+            if (ev.eventType === 'disappear') buckets[h].disappear++;
+            if (ev.eventType === 'count' && ev.occupancyCount != null) {
+                buckets[h].maxOccupancy = Math.max(buckets[h].maxOccupancy, ev.occupancyCount);
+            }
+        });
+        return buckets;
+    }, [data]);
+
+    const appearTotal = useMemo(() => data?.events?.filter(e => e.eventType === 'appear').length ?? 0, [data]);
+    const countEvents = useMemo(() => (data?.events ?? []).filter(e => e.eventType === 'count'), [data]);
+    const maxOccupancy = useMemo(() => countEvents.length ? Math.max(...countEvents.map(e => e.occupancyCount ?? 0)) : null, [countEvents]);
+    const recentEvents = useMemo(() => [...(data?.events ?? [])].reverse().slice(0, 30), [data]);
+    const hasChart = hourlyData.some(b => b.appear > 0 || b.disappear > 0);
+
+    return (
+        <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-action-blue" />
+                    Timeline Hiện Diện
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-blue font-medium">Từ</span>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={e => setFromDate(e.target.value)}
+                            className="px-2 py-1 border border-platinum-tint rounded-lg text-xs text-midnight-indigo focus:outline-none focus:border-action-blue"
+                        />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-blue font-medium">Đến</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            min={fromDate}
+                            onChange={e => setToDate(e.target.value)}
+                            className="px-2 py-1 border border-platinum-tint rounded-lg text-xs text-midnight-indigo focus:outline-none focus:border-action-blue"
+                        />
+                    </div>
+                    <button
+                        onClick={fetchTimeline}
+                        disabled={loading}
+                        title="Tải lại"
+                        className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Body */}
+            {loading ? (
+                <div className="flex items-center justify-center h-36 text-slate-blue text-sm gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Đang tải timeline...</span>
+                </div>
+            ) : error ? (
+                <div className="p-5 flex items-center gap-2 text-sm text-red-600 bg-red-50 border-t border-red-100">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                </div>
+            ) : !data || data.events.length === 0 ? (
+                <div className="p-10 text-center text-slate-blue">
+                    <Activity className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-medium">{data?.message || 'Không có sự kiện trong khoảng thời gian này.'}</p>
+                    <p className="text-xs mt-1">Camera khu vực cần ghi nhận sự kiện hiện diện để hiển thị dữ liệu.</p>
+                </div>
+            ) : (
+                <div className="p-5 space-y-5">
+                    {/* KPI chips */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-cloud-mist/40 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-slate-blue font-medium uppercase">Tổng sự kiện</p>
+                            <p className="text-lg font-bold text-midnight-indigo mt-0.5">{data.events.length}</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-blue-600 font-medium uppercase">Lượt xuất hiện</p>
+                            <p className="text-lg font-bold text-blue-700 mt-0.5">{appearTotal}</p>
+                        </div>
+                        <div className={`rounded-xl p-3 text-center ${maxOccupancy !== null ? 'bg-purple-50' : 'bg-cloud-mist/40'}`}>
+                            <p className={`text-[10px] font-medium uppercase ${maxOccupancy !== null ? 'text-purple-600' : 'text-slate-blue'}`}>Đỉnh Occupancy</p>
+                            <p className={`text-lg font-bold mt-0.5 ${maxOccupancy !== null ? 'text-purple-700' : 'text-steel-gray'}`}>
+                                {maxOccupancy !== null ? `${maxOccupancy} người` : '—'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* personDataAvailable warning */}
+                    {data.personDataAvailable === false && (
+                        <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <span>Khu vực chưa có dữ liệu nhận diện khuôn mặt — tất cả sự kiện không gắn danh tính người dùng.</span>
+                        </div>
+                    )}
+
+                    {/* Bar chart — appear events by VN hour */}
+                    {hasChart && (
+                        <div>
+                            <p className="text-[10px] font-bold text-midnight-indigo uppercase mb-3 flex items-center gap-1.5">
+                                <BarChart3 className="w-3.5 h-3.5 text-action-blue" />
+                                Phân bố lượt xuất hiện theo giờ (giờ VN)
+                            </p>
+                            <div className="h-44">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={hourlyData} barSize={10} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis
+                                            dataKey="hour"
+                                            tickLine={false}
+                                            axisLine={false}
+                                            style={{ fontSize: 9, fill: '#64748b' }}
+                                            tickFormatter={h => `${h}h`}
+                                            interval={2}
+                                        />
+                                        <YAxis
+                                            tickLine={false}
+                                            axisLine={false}
+                                            style={{ fontSize: 9, fill: '#64748b' }}
+                                            allowDecimals={false}
+                                        />
+                                        <Tooltip
+                                            labelFormatter={h => `${h}:00 – ${h}:59`}
+                                            formatter={(v, name) => [v, name === 'appear' ? 'Xuất hiện' : 'Rời đi']}
+                                            contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                                        />
+                                        <Bar dataKey="appear" radius={[3, 3, 0, 0]} name="appear">
+                                            {hourlyData.map((entry, i) => (
+                                                <Cell key={i} fill={entry.appear === 0 ? '#e2e8f0' : '#3b82f6'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Recent events list (30 sự kiện gần nhất) */}
+                    <div>
+                        <p className="text-[10px] font-bold text-midnight-indigo uppercase mb-3 flex items-center gap-1.5">
+                            <History className="w-3.5 h-3.5 text-slate-blue" />
+                            {recentEvents.length < (data?.events?.length ?? 0)
+                                ? `${recentEvents.length} sự kiện gần nhất (tổng ${data.events.length})`
+                                : `${recentEvents.length} sự kiện`}
+                        </p>
+                        <div className="border border-platinum-tint rounded-xl overflow-hidden">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-platinum-tint text-[10px] font-bold text-slate-blue uppercase">
+                                        <th className="px-3 py-2">Thời điểm</th>
+                                        <th className="px-3 py-2">Loại</th>
+                                        <th className="px-3 py-2 text-center">Occupancy</th>
+                                        <th className="px-3 py-2">Danh tính</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-platinum-tint">
+                                    {recentEvents.map((ev, i) => (
+                                        <tr key={i} className="hover:bg-cloud-mist/30 transition-colors">
+                                            <td className="px-3 py-2 font-mono text-[10px] text-midnight-indigo whitespace-nowrap">
+                                                {fmtEventTime(ev.eventTime)}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                {EVENT_TYPE_BADGE[ev.eventType] ?? (
+                                                    <span className="text-[10px] text-slate-blue">{ev.eventType}</span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2 text-center">
+                                                {ev.occupancyCount != null ? (
+                                                    <span className="font-bold text-purple-700">{ev.occupancyCount}</span>
+                                                ) : (
+                                                    <span className="text-steel-gray">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                {ev.userId ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                                                        <CheckCircle className="w-2.5 h-2.5" />Đã nhận dạng
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] text-steel-gray">
+                                                        <Shield className="w-2.5 h-2.5" />Chưa xác định
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 const ZoneManagement = () => {
@@ -248,6 +540,7 @@ const ZoneManagement = () => {
     // UI states
     const [loading, setLoading] = useState(true);
     const [detailLoading, setDetailLoading] = useState(false);
+    const [detailTab, setDetailTab] = useState('log'); // 'log' | 'timeline'
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -335,6 +628,7 @@ const ZoneManagement = () => {
 
     const handleSelectZone = async (zone) => {
         setDetailLoading(true);
+        setDetailTab('log');
         setError(null);
         try {
             const res = await getZoneById(zone.id);
@@ -673,6 +967,32 @@ const ZoneManagement = () => {
                                     </div>
                                 </div>
 
+                                {/* Tab bar */}
+                                <div className="border-b border-platinum-tint bg-white px-4 flex gap-0">
+                                    <button
+                                        onClick={() => setDetailTab('log')}
+                                        className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+                                            detailTab === 'log'
+                                                ? 'border-action-blue text-action-blue'
+                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                        }`}
+                                    >
+                                        <History className="w-3.5 h-3.5" />
+                                        Nhật ký ra/vào
+                                    </button>
+                                    <button
+                                        onClick={() => setDetailTab('timeline')}
+                                        className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+                                            detailTab === 'timeline'
+                                                ? 'border-action-blue text-action-blue'
+                                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                                        }`}
+                                    >
+                                        <Activity className="w-3.5 h-3.5" />
+                                        Timeline Hiện Diện
+                                    </button>
+                                </div>
+
                                 <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                                     {detailLoading ? (
                                         <div className="flex flex-col items-center justify-center h-40 text-slate-blue">
@@ -681,7 +1001,12 @@ const ZoneManagement = () => {
                                         </div>
                                     ) : (
                                         <div className="space-y-6">
-                                            <ZoneAccessLogCard zoneId={selectedZone.id} />
+                                            {detailTab === 'log' && (
+                                                <ZoneAccessLogCard zoneId={selectedZone.id} />
+                                            )}
+                                            {detailTab === 'timeline' && (
+                                                <ZoneTimelineCard zoneId={selectedZone.id} />
+                                            )}
                                         </div>
                                     )}
                                 </div>

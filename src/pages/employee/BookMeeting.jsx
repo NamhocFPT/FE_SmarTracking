@@ -287,7 +287,7 @@ const BookMeeting = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchEmail, defaultSuggestions]);
 
-    const selectedRoom = availableRooms.find(r => r.id === selectedRoomId);
+    const selectedRoom = availableRooms.find(r => (r.id || r.roomId) === selectedRoomId);
 
     const getMeetingDurationMinutes = () => {
         if (!startStr || !endStr || !startTime || !endTime) return 0;
@@ -354,7 +354,7 @@ const BookMeeting = () => {
     };
 
     const handleSelectRoom = (room) => {
-        setSelectedRoomId(room.id);
+        setSelectedRoomId(room.id || room.roomId);
         setCapacityOverrideConfirmed(false);
     };
 
@@ -898,7 +898,7 @@ const BookMeeting = () => {
                 const params = { startTime: isoStart, endTime: isoEnd };
                 if (expectedAttendeeCount) params.minCapacity = expectedAttendeeCount;
                 const altRes = await getAvailableRooms(params);
-                const alts = (altRes?.data || []).filter(r => r.id !== selectedRoomId);
+                const alts = (altRes?.data || []).filter(r => (r.id || r.roomId) !== selectedRoomId);
                 setAlternativeRooms(alts);
             } catch (altErr) {
                 console.error('Failed to fetch alternative rooms', altErr);
@@ -1096,10 +1096,11 @@ const BookMeeting = () => {
                                 {availableRooms.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {availableRooms.map(room => {
-                                            const isSelected = selectedRoomId === room.id;
+                                            const roomId = room.id || room.roomId;
+                                            const isSelected = selectedRoomId === roomId;
                                             return (
                                                 <div
-                                                    key={room.id}
+                                                    key={roomId}
                                                     onClick={() => handleSelectRoom(room)}
                                                     className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${isSelected
                                                         ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15'
@@ -1895,8 +1896,8 @@ const BookMeeting = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {alternativeRooms.map(room => (
                                         <div
-                                            key={room.id}
-                                            onClick={() => handleSelectAlternativeRoom(room.id)}
+                                            key={room.id || room.roomId}
+                                            onClick={() => handleSelectAlternativeRoom(room.id || room.roomId)}
                                             className="p-4 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/20 cursor-pointer transition-all flex items-center justify-between"
                                         >
                                             <div>
