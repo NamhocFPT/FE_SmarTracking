@@ -191,7 +191,8 @@ const ManagerHomePage = () => {
         try {
             const params = {
                 from: fromDate,
-                to: toDate
+                to: toDate,
+                departmentId: currentUser?.departmentId || undefined
             };
 
             const [
@@ -213,23 +214,19 @@ const ManagerHomePage = () => {
                 setStats(overviewRes.value.data);
             } else {
                 setStats({
-                    meetingCount: 84,
-                    activeRooms: 6,
-                    utilizationRate: 71.2,
-                    noShowRate: 4.8,
-                    onTimeRate: 88.5,
-                    recordingCount: 22
+                    meetingCount: 0,
+                    activeRooms: 0,
+                    utilizationRate: 0,
+                    noShowRate: 0,
+                    onTimeRate: 0,
+                    recordingCount: 0
                 });
             }
 
             if (roomRes.status === 'fulfilled' && roomRes.value?.success) {
                 setRoomStats(roomRes.value.data.rooms || []);
             } else {
-                setRoomStats([
-                    { roomId: 'r-1', roomName: 'Phòng Apollo 101', utilizationRate: 82.0, bookedHours: 64, actualHours: 52.4 },
-                    { roomId: 'r-2', roomName: 'Phòng Athena 102', utilizationRate: 74.5, bookedHours: 50, actualHours: 37.2 },
-                    { roomId: 'r-3', roomName: 'Phòng Zeus 201', utilizationRate: 58.0, bookedHours: 72, actualHours: 41.7 }
-                ]);
+                setRoomStats([]);
             }
 
             if (attendanceRes.status === 'fulfilled' && attendanceRes.value?.success) {
@@ -244,65 +241,49 @@ const ManagerHomePage = () => {
                 });
             } else {
                 setAttendanceSummary({
-                    presentRate: 93.4,
-                    onTimeRate: 88.5,
-                    lateCount: 8,
-                    absentCount: 4,
-                    topLateUsers: [
-                        { userId: 'u-1', fullName: 'Nguyễn Văn Hoàng', lateCount: 2 },
-                        { userId: 'u-2', fullName: 'Lê Thị Thu Thủy', lateCount: 1 }
-                    ]
+                    presentRate: 0,
+                    onTimeRate: 0,
+                    lateCount: 0,
+                    absentCount: 0,
+                    topLateUsers: []
                 });
             }
 
             if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
                 setMeetingsTrend(trendRes.value.data.series || []);
             } else {
-                setMeetingsTrend([
-                    { period: 'Tuần 22', count: 18, utilizationRate: 65.5 },
-                    { period: 'Tuần 23', count: 21, utilizationRate: 68.2 },
-                    { period: 'Tuần 24', count: 25, utilizationRate: 71.2 },
-                    { period: 'Tuần 25', count: 20, utilizationRate: 70.0 }
-                ]);
+                setMeetingsTrend([]);
             }
 
             if (breakdownRes.status === 'fulfilled' && breakdownRes.value?.success) {
                 setStatusBreakdown(breakdownRes.value.data.items || []);
             } else {
-                setStatusBreakdown([
-                    { status: 'Hoàn thành', count: 62, percentage: 73.8 },
-                    { status: 'Lên lịch', count: 14, percentage: 16.7 },
-                    { status: 'Hủy bỏ', count: 8, percentage: 9.5 }
-                ]);
+                setStatusBreakdown([]);
             }
 
             if (durationRes.status === 'fulfilled' && durationRes.value?.success) {
                 setAvgDuration(durationRes.value.data);
             } else {
-                setAvgDuration({ averageMinutes: 65.0 });
+                setAvgDuration({ averageMinutes: 0 });
             }
 
             if (cancelRes.status === 'fulfilled' && cancelRes.value?.success) {
                 setCancelRateStats(cancelRes.value.data);
             } else {
-                setCancelRateStats({ cancelRate: 9.5 });
+                setCancelRateStats({ cancelRate: 0 });
             }
 
             if (noShowRes.status === 'fulfilled' && noShowRes.value?.success) {
                 setNoShowTrend(noShowRes.value.data.byRoom || []);
             } else {
-                setNoShowTrend([
-                    { roomName: 'Phòng Apollo 101', noShowRate: 5.2 },
-                    { roomName: 'Phòng Athena 102', noShowRate: 3.8 },
-                    { roomName: 'Phòng Zeus 201', noShowRate: 6.5 }
-                ]);
+                setNoShowTrend([]);
             }
         } catch {
             setError('Không thể kết nối đến máy chủ để tải dữ liệu thống kê của phòng ban.');
         } finally {
             setLoadingAnalytics(false);
         }
-    }, [fromDate, toDate]);
+    }, [fromDate, toDate, currentUser]);
 
     const handleExport = async (e) => {
         e.preventDefault();
@@ -559,7 +540,10 @@ const ManagerHomePage = () => {
                                 Lối tắt chức năng nhanh
                             </h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <div className="group bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                                <div 
+                                    onClick={() => navigate('/manager/meeting-approvals')}
+                                    className="group bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                                >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                                             <Sliders className="w-6 h-6 text-white" />
@@ -573,7 +557,7 @@ const ManagerHomePage = () => {
                                 </div>
 
                                 <div 
-                                    onClick={() => setActiveTab('analytics')}
+                                    onClick={() => navigate('/manager/room-analytics')}
                                     className="group bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
                                     <div className="flex justify-between items-start mb-4">
@@ -588,7 +572,10 @@ const ManagerHomePage = () => {
                                     </div>
                                 </div>
 
-                                <div className="group bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                                <div 
+                                    onClick={() => navigate('/manager/attendance-analytics')}
+                                    className="group bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                                >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                                             <Clock className="w-6 h-6 text-white" />

@@ -5,6 +5,31 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 03:36
+* **Tên Plan / Yêu cầu**: Tái cấu trúc và sửa đổi phong cách hiển thị Modal Chi tiết lượt vi phạm (Security Alerts).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/SecurityAlerts.jsx`:
+    * Sửa đổi cấu trúc layout từng lượt vi phạm từ `items-center` thành `items-start` để căn lề trên đẹp mắt khi có nội dung dài.
+    * Sửa kích thước ThumbnailImage trong modal bằng cách thêm `className="w-full h-full object-cover rounded-lg aspect-square border-0"` giúp ảnh nằm gọn gàng bên trong khung `w-20 h-20` (khắc phục hoàn toàn lỗi ảnh overflow đè lên cột thông tin văn bản bên cạnh).
+    * Bổ sung các icon và hiển thị thông tin động trực quan cho các loại vi phạm: Thời gian (Clock icon), Họ tên (User icon), UID (Monospace), Biển số xe & Loại xe (Car icon & Plate badge), Watchlist (Pin icon), Độ tin cậy (Progress bar), Chi tiết lý do/lỗi (Alert icon).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 03:34
+* **Tên Plan / Yêu cầu**: Tạm thời ẩn màn hình Quản lý cuộc họp phía Business Admin.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/layout/BusinessAdminLayout.jsx`:
+    * Comment out mục "Cuộc họp" trong danh sách `STATIC_NAVIGATION_ITEMS` để ẩn khỏi menu Sidebar của Business Admin.
+  * `[Cập nhật] src/routers/index.js`:
+    * Comment out router `meetings` của Business Admin để vô hiệu hóa việc truy cập trực tiếp bằng URL.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 03:06
+* **Tên Plan / Yêu cầu**: Sửa lỗi cập nhật trạng thái tài khoản người dùng (UC-08).
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/UserManagement.jsx`:
+    * Đổi tên trường trong payload gửi lên API `updateUserStatus` từ `accountStatus` thành `status` để khớp với DTO validator của Backend (sửa lỗi `property accountStatus should not exist`, `Trạng thái chỉ được là active hoặc inactive`, `Trạng thái phải là chuỗi ký tự`, và `Trạng thái không được để trống`).
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-12 14:05
 * **Tên Plan / Yêu cầu**: Ẩn và tự động gán vai trò Employee khi tạo tài khoản đối tác.
 * **Chi tiết thay đổi**:
@@ -751,3 +776,4 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
 - **Tập tin ảnh hưởng**:
   - src/components/minutes/MinutesViewerEditor.jsx
 - **Trạng thái**: Đã hoàn thành.
+- **[2026-08-13]** [Implementation Plan: Fix Manager Homepage Shortcuts & API Verification] Fix Manager Homepage shortcuts (Trạng thái phòng, Điểm danh phòng ban) & add departmentId to analytics API calls to prevent 403 Forbidden/Mock Data fallback.

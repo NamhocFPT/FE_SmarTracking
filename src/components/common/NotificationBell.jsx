@@ -4,6 +4,11 @@ import { Bell, ShieldAlert, BellRing } from 'lucide-react';
 import { getNotifications } from '../../service/sysAdminServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 
+const stripHtml = (html) => {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+};
+
 const SEVERITY_DOT = {
     critical: 'bg-red-600',
     high: 'bg-orange-500',
@@ -191,7 +196,7 @@ const NotificationBell = ({
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-semibold text-midnight-indigo truncate">{item.title}</p>
                                         <p className="text-xs text-slate-blue truncate">
-                                            {item.body}
+                                            {stripHtml(item.body)}
                                             {item.payloadJson?.conflictDetails?.[0] && (
                                                 <span className="text-rose-600 font-medium"> — trùng với "{item.payloadJson.conflictDetails[0].meetingTitle}"</span>
                                             )}

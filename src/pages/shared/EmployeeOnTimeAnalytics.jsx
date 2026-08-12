@@ -92,15 +92,6 @@ const Pagination = ({ page, totalPages, total, onPageChange }) => {
     );
 };
 
-// ── Mock member data factory ─────────────────────────────────────────────────
-const makeMockMembers = (deptName = '') => [
-    { userId: 'm-1', fullName: 'Nguyễn Thị Lan', email: 'lan.nguyen@company.com', avatarUrl: null, employeeCode: 'EMP001', departmentName: deptName, lateCount: 3, onTimeCount: 12, absentCount: 1, totalRequired: 16, lateRate: 18.8 },
-    { userId: 'm-2', fullName: 'Trần Văn Minh', email: 'minh.tran@company.com', avatarUrl: null, employeeCode: 'EMP002', departmentName: deptName, lateCount: 1, onTimeCount: 14, absentCount: 0, totalRequired: 15, lateRate: 6.7 },
-    { userId: 'm-3', fullName: 'Lê Thị Hoa', email: 'hoa.le@company.com', avatarUrl: null, employeeCode: 'EMP003', departmentName: deptName, lateCount: 2, onTimeCount: 11, absentCount: 2, totalRequired: 15, lateRate: 13.3 },
-    { userId: 'm-4', fullName: 'Phạm Đức Anh', email: 'anh.pham@company.com', avatarUrl: null, employeeCode: 'EMP004', departmentName: deptName, lateCount: 0, onTimeCount: 16, absentCount: 0, totalRequired: 16, lateRate: 0 },
-    { userId: 'm-5', fullName: 'Đỗ Thị Mai', email: 'mai.do@company.com', avatarUrl: null, employeeCode: 'EMP005', departmentName: deptName, lateCount: 0, onTimeCount: 14, absentCount: 1, totalRequired: 15, lateRate: 0 },
-];
-
 // ────────────────────────────────────────────────────────────────────────────
 const EmployeeOnTimeAnalytics = () => {
     // Đọc user từ localStorage synchronously
@@ -273,12 +264,9 @@ const EmployeeOnTimeAnalytics = () => {
                 throw new Error('no data');
             }
         } catch {
-            const mock = makeMockMembers(
-                departments.find(d => d.id === managerDeptId)?.departmentName || 'Phòng ban'
-            );
-            setMemberStats(mock);
+            setMemberStats([]);
             setMemberTotalPages(1);
-            setMemberTotal(mock.length);
+            setMemberTotal(0);
         } finally {
             setMemberLoading(false);
         }
@@ -312,10 +300,9 @@ const EmployeeOnTimeAnalytics = () => {
                 throw new Error('no data');
             }
         } catch {
-            const mock = makeMockMembers(modalDept.departmentName);
-            setModalMembers(mock);
+            setModalMembers([]);
             setModalTotalPages(1);
-            setModalTotal(mock.length);
+            setModalTotal(0);
         } finally {
             setModalLoading(false);
         }
@@ -698,7 +685,7 @@ const EmployeeOnTimeAnalytics = () => {
                         ) : !data?.trend?.length ? (
                             <div className="w-full h-full flex items-center justify-center text-slate-blue italic text-xs">Không có dữ liệu xu hướng</div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height={288}>
                                 <BarChart data={data.trend}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                     <XAxis dataKey="period" tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth() + 1}`; }} tick={{ fontSize: 10, fill: '#64748b' }} />
@@ -724,7 +711,7 @@ const EmployeeOnTimeAnalytics = () => {
                         ) : !data?.lateByHourOfDay?.length ? (
                             <div className="w-full h-full flex items-center justify-center text-slate-blue italic text-xs">Không có dữ liệu khung giờ</div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height={288}>
                                 <BarChart data={data.lateByHourOfDay}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                     <XAxis dataKey="hourOfDay" tickFormatter={(h) => `${h}h`} tick={{ fontSize: 10, fill: '#64748b' }} />

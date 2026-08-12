@@ -104,30 +104,14 @@ const Profile = () => {
             }
         } catch (err) {
             const localUserStr = localStorage.getItem("user");
-            let localUser = { id: "mock-uuid", fullName: "Người dùng mẫu", email: defaultMockEmail };
+            let localUser = {};
             if (localUserStr) { try { localUser = JSON.parse(localUserStr); } catch (e) {} }
-            const mockProfile = {
-                id: localUser.id || "mock-uuid",
-                employeeCode: defaultMockCode,
-                email: localUser.email || defaultMockEmail,
-                fullName: localUser.fullName || (roleLabel + " Mẫu"),
-                phoneNumber: "0987654321",
-                avatarUrl: localUser.avatarUrl || "",
-                positionTitle: defaultMockTitle,
-                department: { id: "dept-2", departmentName: "Phòng Phát triển Phần mềm" },
-                directManager: { id: "dir-1", fullName: "Giám đốc Điều hành" },
-                accountStatus: "active",
-                employmentStatus: "active",
-                lastLoginAt: new Date().toISOString(),
-                hasFaceProfile: false,
-                createdAt: "2026-01-10T09:00:00+07:00"
-            };
-            setProfile(mockProfile);
+            setProfile({ ...localUser });
             setFormData({
-                fullName: mockProfile.fullName,
-                phone: mockProfile.phoneNumber,
+                fullName: localUser.fullName || "",
+                phone: localUser.phoneNumber || localUser.phone || "",
                 avatarFile: null,
-                avatarPreview: mockProfile.avatarUrl
+                avatarPreview: localUser.avatarUrl || ""
             });
         } finally {
             setLoading(false);
