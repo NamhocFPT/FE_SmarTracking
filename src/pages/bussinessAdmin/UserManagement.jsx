@@ -2,6 +2,10 @@ import { Users, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { vi } from 'date-fns/locale/vi';
+import TimePicker from '../../components/common/TimePicker';
 
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -69,7 +73,7 @@ const UserManagement = () => {
     useEffect(() => {
         const fetchUsersMap = async () => {
             try {
-                const res = await getUsers({ limit: 1000 });
+                const res = await getUsers({ limit: 100 });
                 if (res?.success && res.data) {
                     const map = {};
                     res.data.forEach(u => {
@@ -113,6 +117,14 @@ const UserManagement = () => {
     const [newExpiryDate, setNewExpiryDate] = useState('');
     const [expiryLoading, setExpiryLoading] = useState(false);
 
+    // Date+time picker states for create-partner form
+    const [expiryPickerDate, setExpiryPickerDate] = useState(null);
+    const [expiryPickerTime, setExpiryPickerTime] = useState('23:59');
+
+    // Date+time picker states for expiry modal
+    const [newExpiryDateObj, setNewExpiryDateObj] = useState(null);
+    const [newExpiryTimeStr, setNewExpiryTimeStr] = useState('23:59');
+
     // Form inputs states
     const [formData, setFormData] = useState({
         email: '',
@@ -154,18 +166,8 @@ const UserManagement = () => {
             if (deptRes?.success) setDepartments(deptRes.data || []);
             if (rolesRes?.success) setRoles(rolesRes.data || []);
         } catch {
-            // Field theo đúng shape thật của DepartmentResponseDto/RoleResponseDto
-            // (departmentName, roleCode, roleName) để khớp với phần render bên dưới.
-            setDepartments([
-                { id: 'dept-1', departmentName: 'Phòng Kỹ Thuật' },
-                { id: 'dept-2', departmentName: 'Phòng Hành Chính' },
-                { id: 'dept-3', departmentName: 'Ban Giám Đốc' },
-            ]);
-            setRoles([
-                { id: 'role-1', roleName: 'System Admin', roleCode: 'SYSTEM_ADMIN' },
-                { id: 'role-2', roleName: 'Business Admin', roleCode: 'BUSINESS_ADMIN' },
-                { id: 'role-3', roleName: 'Employee', roleCode: 'EMPLOYEE' }
-            ]);
+            setDepartments([]);
+            setRoles([]);
         }
     }, []);
 
@@ -191,33 +193,9 @@ const UserManagement = () => {
                 throw new Error('API request failed');
             }
         } catch (err) {
-            // Mock preview filtering
-            const mockUsers = [
-                { id: 101, email: 'hoang.nam@smrmpts.com', fullName: 'Nguyễn Hoàng Nam', phone: '0912345678', locked: false, roles: [{ id: 1, name: 'System Admin' }], departments: [{ id: 3, name: 'Ban Giám Đốc' }] },
-                { id: 102, email: 'thanh.thao@smrmpts.com', fullName: 'Lê Thị Thanh Thảo', phone: '0987654321', locked: false, roles: [{ id: 2, name: 'Business Admin' }], departments: [{ id: 2, name: 'Phòng Hành Chính' }] },
-                { id: 103, email: 'minh.tuan@smrmpts.com', fullName: 'Trần Minh Tuấn', phone: '0905556677', locked: true, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 1, name: 'Phòng Kỹ Thuật' }] },
-                { id: 104, email: 'quoc.anh@smrmpts.com', fullName: 'Phạm Quốc Anh', phone: '0933445566', locked: false, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 1, name: 'Phòng Kỹ Thuật' }] },
-            ];
-
-            let filtered = mockUsers;
-            if (search.trim()) {
-                const s = search.toLowerCase();
-                filtered = filtered.filter(u => u.fullName.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
-            }
-            if (selectedRole) {
-                filtered = filtered.filter(u => u.roles.some(r => r.id === Number(selectedRole)));
-            }
-            if (selectedDept) {
-                filtered = filtered.filter(u => u.departments.some(d => d.id === Number(selectedDept)));
-            }
-            if (selectedStatus) {
-                const isLocked = selectedStatus === 'LOCKED';
-                filtered = filtered.filter(u => u.locked === isLocked);
-            }
-
-            setUsersList(filtered);
+            setUsersList([]);
             setTotalPages(1);
-            setTotalUsers(filtered.length);
+            setTotalUsers(0);
         } finally {
             setLoading(false);
         }
@@ -306,7 +284,11 @@ const UserManagement = () => {
                     const code = (r.roleCode || r.role_code || '').toUpperCase();
                     return code === 'EMPLOYEE';
                 });
-                const partnerRoleIds = employeeRole ? [employeeRole.id] : [];
+                if (!employeeRole) {
+                    setError('Không tìm thấy vai trò EMPLOYEE trong hệ thống. Vui lòng tải lại trang.');
+                    return;
+                }
+                const partnerRoleIds = [employeeRole.id];
 
                 const fd = buildPartnerFormData({
                     fullName: formData.fullName,
@@ -364,13 +346,51 @@ const UserManagement = () => {
         }
     };
 
+    // Kết hợp Date object + HH:MM string → ISO string
+    const combineDateTime = (dateObj, timeStr) => {
+        if (!dateObj || !timeStr) return '';
+        const [hh, mm] = timeStr.split(':');
+        const d = new Date(dateObj);
+        d.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
+        return d.toISOString();
+    };
+
+    // Handlers cho picker trong create form
+    const handleExpiryPickerDate = (date) => {
+        setExpiryPickerDate(date);
+        const iso = combineDateTime(date, expiryPickerTime);
+        setFormData(f => ({ ...f, accountExpiresAt: iso }));
+        setFormErrors(e => ({ ...e, accountExpiresAt: '' }));
+    };
+    const handleExpiryPickerTime = (time) => {
+        setExpiryPickerTime(time);
+        const iso = combineDateTime(expiryPickerDate, time);
+        setFormData(f => ({ ...f, accountExpiresAt: iso }));
+    };
+
+    // Handlers cho picker trong expiry modal
+    const handleNewExpiryDateChange = (date) => {
+        setNewExpiryDateObj(date);
+        setNewExpiryDate(combineDateTime(date, newExpiryTimeStr));
+    };
+    const handleNewExpiryTimeChange = (time) => {
+        setNewExpiryTimeStr(time);
+        setNewExpiryDate(combineDateTime(newExpiryDateObj, time));
+    };
+
     // Mở modal gia hạn / khoá sớm tài khoản đối tác
     const openExpiryModal = (user) => {
         setExpiryTargetUser(user);
-        const current = user.accountExpiresAt
-            ? new Date(user.accountExpiresAt).toISOString().slice(0, 16)
-            : '';
-        setNewExpiryDate(current);
+        if (user.accountExpiresAt) {
+            const d = new Date(user.accountExpiresAt);
+            setNewExpiryDateObj(d);
+            setNewExpiryTimeStr(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+            setNewExpiryDate(d.toISOString());
+        } else {
+            setNewExpiryDateObj(null);
+            setNewExpiryTimeStr('23:59');
+            setNewExpiryDate('');
+        }
         setIsExpiryModalOpen(true);
     };
 
@@ -463,7 +483,7 @@ const UserManagement = () => {
         setError(null);
         setSuccessMessage(null);
         try {
-            const res = await updateUserStatus(user.id, { accountStatus: newStatus });
+            const res = await updateUserStatus(user.id, { status: newStatus });
             if (res?.success) {
                 setSuccessMessage(`${isActive ? 'Đã tạm dừng' : 'Đã kích hoạt lại'} tài khoản thành công!`);
                 fetchUsers();
@@ -538,10 +558,7 @@ const UserManagement = () => {
                 setUserLogs(res.data || []);
             }
         } catch {
-            setUserLogs([
-                { id: 1, action: 'USER_LOGIN', actor: user.email, entity: 'AUTH', createdAt: new Date(Date.now() - 3600000).toISOString() },
-                { id: 2, action: 'UPDATE_USER', actor: 'admin@smrmpts.com', entity: 'USER', createdAt: new Date(Date.now() - 7200000).toISOString() }
-            ]);
+            setUserLogs([]);
         } finally {
             setLogsLoading(false);
         }
@@ -561,24 +578,7 @@ const UserManagement = () => {
                 throw new Error();
             }
         } catch {
-            // Fallback mock detail matching API contract response
-            setSelectedUserDetail({
-                id: user.id,
-                employeeCode: user.employeeCode || 'NV' + user.id,
-                email: user.email,
-                fullName: user.fullName,
-                phoneNumber: user.phoneNumber || user.phone || '0901234567',
-                avatarUrl: user.avatarUrl || '',
-                positionTitle: 'Nhân viên kĩ thuật',
-                department: user.departments?.[0] || { id: 1, name: 'Phòng Kỹ Thuật' },
-                directManager: { id: 'mgr-mock', fullName: 'Trần Thị B' },
-                accountStatus: user.accountStatus || (user.locked ? 'locked' : 'active'),
-                employmentStatus: 'active',
-                hasFaceProfile: true,
-                createdAt: '2026-01-01T08:00:00+07:00',
-                lastLoginAt: new Date(Date.now() - 3600000).toISOString(),
-                roles: user.roles || [{ id: 3, name: 'Employee' }]
-            });
+            setSelectedUserDetail({ ...user });
         } finally {
             setDetailLoading(false);
         }
@@ -635,8 +635,8 @@ const UserManagement = () => {
         } catch {
             // Local fallback generation — headers match the real BE import contract
             // (IMPORT_ACCOUNTS_HEADERS in capstone-be/src/modules/accounts/constants/import-accounts.constants.ts)
-            const headers = 'full_name,email,department_code,role_codes,employee_code,phone_number,position_title,direct_manager_email\n';
-            const sampleData = 'Nguyễn Văn A,nguyen.a@example.com,DEPT001,EMPLOYEE,NV001,0987654321,Nhân viên,manager@example.com\n';
+            const headers = 'full_name,email,department_code,role_codes,employee_code,phone_number,position_title,direct_manager_email,license_plate\n';
+            const sampleData = 'Nguyễn Văn A,nguyen.a@example.com,DEPT001,EMPLOYEE,NV001,0987654321,Nhân viên,manager@example.com,51A-12345\n';
             const blob = new Blob(['\uFEFF' + headers + sampleData], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -801,6 +801,8 @@ const UserManagement = () => {
             plateRaw: '',
             vehicleType: 'CAR',
         });
+        setExpiryPickerDate(null);
+        setExpiryPickerTime('23:59');
         if (avatarInputRef.current) avatarInputRef.current.value = '';
         setImportFile(null);
         setImportPhotos([]);
@@ -1091,16 +1093,6 @@ const UserManagement = () => {
                                                         </svg>
                                                     </button>
                                                     <button
-                                                        onClick={() => navigate(`/business-admin/user-journey?userId=${user.id || user.uuid}`)}
-                                                        title="Xem hành trình di chuyển"
-                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
                                                         onClick={() => openEditModal(user)}
                                                         title="Chỉnh sửa thông tin"
                                                         className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
@@ -1321,13 +1313,27 @@ const UserManagement = () => {
                                         <label className={`block text-xs font-bold uppercase mb-1 ${formErrors.accountExpiresAt ? 'text-red-500' : 'text-slate-blue'}`}>
                                             Ngày hết hạn tài khoản <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="datetime-local"
-                                            value={formData.accountExpiresAt}
-                                            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                                            onChange={(e) => { setFormData({ ...formData, accountExpiresAt: e.target.value }); setFormErrors({ ...formErrors, accountExpiresAt: '' }); }}
-                                            className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.accountExpiresAt ? 'border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'} bg-white`}
-                                        />
+                                        <div className="flex gap-2">
+                                            <div className="flex-1 relative z-30">
+                                                <DatePicker
+                                                    selected={expiryPickerDate}
+                                                    onChange={handleExpiryPickerDate}
+                                                    minDate={new Date(Date.now() + 60000)}
+                                                    locale={vi}
+                                                    dateFormat="dd/MM/yyyy"
+                                                    placeholderText="DD/MM/YYYY"
+                                                    className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${formErrors.accountExpiresAt ? 'border-red-500 bg-red-50' : 'border-platinum-tint focus:border-action-blue'} bg-white`}
+                                                    wrapperClassName="w-full"
+                                                />
+                                            </div>
+                                            <div className="w-[130px]">
+                                                <TimePicker
+                                                    value={expiryPickerTime}
+                                                    onChange={handleExpiryPickerTime}
+                                                    placeholder="23:59"
+                                                />
+                                            </div>
+                                        </div>
                                         {formErrors.accountExpiresAt && <p className="text-red-500 text-xs mt-1">{formErrors.accountExpiresAt}</p>}
                                     </div>
 
@@ -1431,12 +1437,27 @@ const UserManagement = () => {
                             )}
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Hạn mới</label>
-                                <input
-                                    type="datetime-local"
-                                    value={newExpiryDate}
-                                    onChange={(e) => setNewExpiryDate(e.target.value)}
-                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
-                                />
+                                <div className="flex gap-2">
+                                    <div className="flex-1 relative z-30">
+                                        <DatePicker
+                                            selected={newExpiryDateObj}
+                                            onChange={handleNewExpiryDateChange}
+                                            minDate={new Date()}
+                                            locale={vi}
+                                            dateFormat="dd/MM/yyyy"
+                                            placeholderText="DD/MM/YYYY"
+                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                                            wrapperClassName="w-full"
+                                        />
+                                    </div>
+                                    <div className="w-[130px]">
+                                        <TimePicker
+                                            value={newExpiryTimeStr}
+                                            onChange={handleNewExpiryTimeChange}
+                                            placeholder="23:59"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                             <div className="flex gap-2 pt-2 border-t border-platinum-tint">
                                 <button
@@ -1457,7 +1478,7 @@ const UserManagement = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    disabled={expiryLoading || !newExpiryDate}
+                                    disabled={expiryLoading || !newExpiryDateObj}
                                     onClick={() => handleExpiryUpdate(false)}
                                     className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
                                 >
@@ -1916,16 +1937,24 @@ const UserManagement = () => {
                             ) : (
                                 <div className="max-h-[300px] overflow-y-auto space-y-4 pr-2">
                                     {userLogs.map((log) => (
-                                        <div key={log.id} className="flex justify-between items-start p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                            <div>
+                                        <div key={log.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray/60 space-y-1">
+                                            <div className="flex justify-between items-start gap-2">
                                                 <p className="text-xs font-bold text-midnight-indigo">
                                                     {ACTION_MAP[log.action] || log.action}
                                                 </p>
-                                                <p className="text-[10px] text-slate-blue mt-0.5">Tác nhân: {log.actor}</p>
+                                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${log.status === 'success' ? 'bg-emerald-50 text-emerald-700' : log.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                    {log.status === 'success' ? 'Thành công' : log.status === 'failed' ? 'Thất bại' : log.status || ''}
+                                                </span>
                                             </div>
-                                            <span className="text-[10px] text-slate-blue">
-                                                {new Date(log.createdAt).toLocaleString('vi-VN')}
-                                            </span>
+                                            {log.description && (
+                                                <p className="text-[10px] text-slate-blue leading-relaxed">{log.description}</p>
+                                            )}
+                                            <div className="flex justify-between items-center pt-0.5">
+                                                <p className="text-[10px] text-slate-blue">Tác nhân: {log.actorName || log.actorEmail || '—'}</p>
+                                                <span className="text-[10px] text-slate-blue">
+                                                    {log.timestamp ? new Date(log.timestamp).toLocaleString('vi-VN') : ''}
+                                                </span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -2171,17 +2200,21 @@ const BIOMETRIC_STATUS_LABELS = {
     upload_failed: { label: 'Lỗi upload ảnh (tài khoản vẫn được tạo)', color: 'bg-red-50 text-red-700' },
 };
 
-// Map action names locally
+// Map action names — keys khớp với BE (GET /audit-logs)
 const ACTION_MAP = {
-    'USER_LOGIN': 'Đăng nhập',
-    'USER_LOGOUT': 'Đăng xuất',
-    'REGISTER_DEVICE': 'Đăng ký thiết bị',
+    'LOGIN': 'Đăng nhập',
+    'LOGIN_FAILED': 'Đăng nhập thất bại',
+    'LOGOUT': 'Đăng xuất',
+    'CREATE_USER': 'Thêm tài khoản',
+    'UPDATE_USER': 'Cập nhật tài khoản',
     'LOCK_USER': 'Khóa tài khoản',
     'UNLOCK_USER': 'Mở khóa tài khoản',
-    'UPDATE_CONFIG': 'Cập nhật cấu hình',
-    'CREATE_USER': 'Tạo người dùng',
-    'UPDATE_USER': 'Cập nhật tài khoản',
     'DELETE_USER': 'Xóa tài khoản',
+    'REGISTER_DEVICE': 'Đăng ký thiết bị',
+    'UPDATE_DEVICE': 'Cập nhật thiết bị',
+    'REMOVE_DEVICE': 'Vô hiệu hóa thiết bị',
+    'EXPORT_USERS': 'Xuất tệp nhân viên',
+    'UPDATE_CONFIG': 'Cập nhật cấu hình hệ thống',
 };
 
 export default UserManagement;

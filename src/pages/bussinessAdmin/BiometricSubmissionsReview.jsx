@@ -564,7 +564,17 @@ const BiometricSubmissionsReview = () => {
                                         </td>
                                         <td className="px-4 py-3 text-slate-blue">{sub.email || sub.user?.email || ""}</td>
                                         <td className="px-4 py-3 text-slate-blue">{sub.employeeCode || ""}</td>
-                                        <td className="px-4 py-3 text-slate-blue">{sub.department?.departmentName || sub.department?.name || sub.user?.department?.name || ""}</td>
+                                        <td className="px-4 py-3 text-slate-blue">{
+                                            sub.department?.departmentName ||
+                                            sub.department?.name ||
+                                            sub.user?.department?.departmentName ||
+                                            sub.user?.department?.name ||
+                                            sub.departmentName ||
+                                            sub.user?.departmentName ||
+                                            departments.find(d => d.id === (sub.departmentId || sub.user?.departmentId))?.departmentName ||
+                                            departments.find(d => d.id === (sub.departmentId || sub.user?.departmentId))?.name ||
+                                            ""
+                                        }</td>
                                         <td className="px-4 py-3">
                                             <span className={"inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold " + ((STATUS_MAP[sub.status] || STATUS_MAP.pending_review).badge)}>
                                                 {(STATUS_MAP[sub.status] || STATUS_MAP.pending_review).label}

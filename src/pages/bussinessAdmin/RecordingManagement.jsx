@@ -13,8 +13,11 @@ import {
 } from '../../service/businessAdminServices';
 
 
+const LIMIT = 10;
+
 const RecordingManagement = () => {
-    const [recordingsList, setRecordingsList] = useState([]);
+    // allRecordings: toàn bộ recordings sau khi fetch + sort + filter (không phân trang)
+    const [allRecordings, setAllRecordings] = useState([]);
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -25,57 +28,78 @@ const RecordingManagement = () => {
     const [selectedRoom, setSelectedRoom] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
 
-    // Pagination states
+    // Client-side pagination (page trên recordings, không phải meetings)
     const [page, setPage] = useState(1);
-    const [limit] = useState(10);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalItems, setTotalItems] = useState(0);
+
+    // Computed từ allRecordings
+    const totalItems = allRecordings.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / LIMIT));
+    const recordingsList = allRecordings.slice((page - 1) * LIMIT, page * LIMIT);
 
     // Modals
-    const [previewVideo, setPreviewVideo] = useState(null); // stores recording session object
-    const [deleteTarget, setDeleteTarget] = useState(null); // stores recording session object to delete
+    const [previewVideo, setPreviewVideo] = useState(null);
+    const [deleteTarget, setDeleteTarget] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const loadRooms = useCallback(async () => {
         try {
             const res = await getRooms({ limit: 100 });
             if (res?.success) setRooms(res.data || []);
-        } catch (err) {
+        } catch {
             setError('Lỗi tải danh sách phòng.');
         }
     }, []);
 
     /**
-     * Lấy recordings qua 2 bước:
-     * 1. getMeetings() → danh sách cuộc họp
-     * 2. getMeetingMediaFiles(meetingId) → media files cho từng meeting
+     * Fetch TẤT CẢ meetings (qua nhiều trang) rồi gộp media files lại,
+     * sau đó paginate ở tầng recordings (client-side).
+     * Không dùng limit lớn vì BE có giới hạn — thay vào đó fetch song song tất cả pages.
      */
     const fetchRecordingsList = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const meetingParams = {
-                page,
-                limit,
+            const baseParams = {
+                limit: 10,
                 search: search.trim() || undefined,
                 roomId: selectedRoom || undefined,
-                status: 'completed'
+                status: 'completed',
             };
-            const meetingsRes = await getMeetings(meetingParams);
-            if (!meetingsRes?.success || !meetingsRes.data?.length) {
-                setRecordingsList([]);
-                setTotalPages(meetingsRes?.meta?.totalPages || 1);
-                setTotalItems(meetingsRes?.meta?.total || 0);
+
+            // Bước 1: fetch trang đầu để biết tổng số trang meetings
+            const firstRes = await getMeetings({ ...baseParams, page: 1 });
+            if (!firstRes?.success) {
+                setAllRecordings([]);
                 return;
             }
 
-            const meetings = meetingsRes.data;
-            setTotalPages(meetingsRes.meta?.totalPages || 1);
-            setTotalItems(meetingsRes.meta?.total || meetings.length);
+            const meetingsTotalPages = firstRes.meta?.totalPages || 1;
+            let allMeetings = firstRes.data || [];
 
-            // Lấy media files cho từng meeting
-            const mediaPromises = meetings.map(async (meeting) => {
-                try {
+            // Bước 2: fetch các trang còn lại song song (nếu có)
+            if (meetingsTotalPages > 1) {
+                const remainingPages = Array.from(
+                    { length: meetingsTotalPages - 1 },
+                    (_, i) => i + 2
+                );
+                const remainingResults = await Promise.allSettled(
+                    remainingPages.map(p => getMeetings({ ...baseParams, page: p }))
+                );
+                remainingResults.forEach(r => {
+                    if (r.status === 'fulfilled' && r.value?.success) {
+                        allMeetings = allMeetings.concat(r.value.data || []);
+                    }
+                });
+            }
+
+            if (!allMeetings.length) {
+                setAllRecordings([]);
+                return;
+            }
+
+            // Bước 3: lấy media files song song cho tất cả meetings
+            const mediaResults = await Promise.allSettled(
+                allMeetings.map(async (meeting) => {
                     const mediaRes = await getMeetingMediaFiles(meeting.id);
                     if (mediaRes?.success && mediaRes.data?.length) {
                         return mediaRes.data.map(file => ({
@@ -88,36 +112,41 @@ const RecordingManagement = () => {
                         }));
                     }
                     return [];
-                } catch {
-                    return [];
-                }
+                })
+            );
+
+            const allMedia = mediaResults
+                .filter(r => r.status === 'fulfilled')
+                .flatMap(r => r.value);
+
+            // Sắp xếp mới nhất lên đầu
+            allMedia.sort((a, b) => {
+                const da = new Date(a.meetingDate || a.createdAt || 0);
+                const db = new Date(b.meetingDate || b.createdAt || 0);
+                return db - da;
             });
 
-            const allMedia = (await Promise.all(mediaPromises)).flat();
-            // Lọc theo status hoặc ẩn nếu có
+            // Lọc theo trạng thái recording
             const filtered = statusFilter
                 ? allMedia.filter(f => {
                     if (statusFilter === 'hidden') return f.visibility === 'hidden';
+                    if (statusFilter === 'stopped') return f.status === 'stopped';
+                    if (statusFilter === 'failed') return f.status === 'failed';
                     return true;
                   })
                 : allMedia;
-            setRecordingsList(filtered);
-        } catch (err) {
+
+            setAllRecordings(filtered);
+        } catch {
             setError('Lỗi tải danh sách ghi hình từ máy chủ.');
-            setRecordingsList([]);
-            setTotalItems(0);
+            setAllRecordings([]);
         } finally {
             setLoading(false);
         }
-    }, [page, limit, search, selectedRoom, statusFilter]);
+    }, [search, selectedRoom, statusFilter]);
 
-    useEffect(() => {
-        loadRooms();
-    }, [loadRooms]);
-
-    useEffect(() => {
-        fetchRecordingsList();
-    }, [fetchRecordingsList]);
+    useEffect(() => { loadRooms(); }, [loadRooms]);
+    useEffect(() => { fetchRecordingsList(); }, [fetchRecordingsList]);
 
     // Auto-hide success message
     useEffect(() => {
@@ -295,9 +324,9 @@ const RecordingManagement = () => {
                         onChange={(e) => { setSelectedRoom(e.target.value); setPage(1); }}
                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo font-medium"
                     >
-                        <option key="all-rooms" value="">Tất cả phòng họp</option>
+                        <option value="">Tất cả phòng họp</option>
                         {rooms.map(room => (
-                            <option key={room.id} value={room.id}>{room.roomName}</option>
+                            <option key={room.id ?? room.roomId} value={room.id ?? room.roomId}>{room.roomName}</option>
                         ))}
                     </select>
 

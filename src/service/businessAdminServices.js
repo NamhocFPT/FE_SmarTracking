@@ -307,6 +307,10 @@ export const cancelMeeting = async (meetingId, reason = 'Huỷ bởi quản tr�
     return await post(`/meetings/${meetingId}/cancel`, { cancellationReason: reason });
 };
 
+export const approveMeeting = async (meetingId) => {
+    return await post(`/meetings/${meetingId}/approve`);
+};
+
 // ============================================================
 // RECORDING MANAGEMENT APIs — đã chuyển sang /media-files/*
 // ============================================================
