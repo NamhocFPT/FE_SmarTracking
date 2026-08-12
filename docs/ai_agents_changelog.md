@@ -5,6 +5,16 @@ Quy táº¯c báº¯t buá»™c: AI Agent pháº£i luÃ´n ghi log vÃ o cuá»‘i má»—i láº§n th
 
 ## Lá»‹ch sá»­ thay Ä‘á»•i
 
+### 2026-08-12 12:15
+* **TÃªn Plan / YÃªu cáº§u**: Sá»­a lá»—i tráº¯ng mÃ n hÃ¬nh quáº£n lÃ½ khu vá»±c vÃ  hoÃ n thiá»‡n Edit Modal cÃ¹ng Validation.
+* **Chi tiáº¿t thay Ä‘á»•i**:
+  * `[Cáº­p nháº­t] src/pages/systemAdmin/ZoneManagement.jsx`:
+    * Sá»­a lá»—i cÃº phÃ¡p lá»“ng hÃ m do thiáº¿u dáº¥u Ä‘Ã³ng ngoáº·c `};` táº¡i cuá»‘i hÃ m `handleEditSubmit` vÃ  xÃ³a dáº¥u Ä‘Ã³ng ngoáº·c dÆ° `};` á»Ÿ cuá»‘i file, giÃºp sá»­a triá»‡t Ä‘á»ƒ lá»—i crash lÃ m tráº¯ng trang.
+    * TÃ­ch há»£p Edit Modal hoÃ n chá»‰nh thÃ´ng qua React Portal (`createPortal`) Ä‘á»ƒ chá»‰nh sá»­a thÃ´ng tin khu vá»±c bao gá»“m: MÃ£ khu vá»±c, TÃªn khu vá»±c, Loáº¡i khu vá»±c, Tráº¡ng thÃ¡i (active/inactive), TÃ²a nhÃ , Táº§ng, MÃ´ táº£, vÃ  Metadata JSON.
+    * Bá»• sung logic kiá»ƒm tra dá»¯ liá»‡u phÃ­a Client-side cho cáº£ Create Form vÃ  Edit Form, cháº·n dá»¯ liá»‡u khÃ´ng há»£p lá»‡ vÆ°á»£t quÃ¡ giá»›i háº¡n Ä‘á»™ dÃ i kÃ½ tá»± cá»§a API (MÃ£ khu vá»±c tá»‘i Ä‘a 80, TÃªn khu vá»±c tá»‘i Ä‘a 150, TÃ²a nhÃ  tá»‘i Ä‘a 100, Táº§ng tá»‘i Ä‘a 30, MÃ´ táº£ tá»‘i Ä‘a 255 kÃ½ tá»±).
+    * Bá»• sung validation kiá»ƒm tra Ä‘á»‹nh dáº¡ng JSON há»£p lá»‡ Ä‘á»‘i vá»›i trÆ°á»ng Metadata trong Edit Modal trÆ°á»›c khi submit.
+* **Tráº¡ng thÃ¡i**: HoÃ n thÃ nh
+
 ### 2026-08-09 12:55
 * **TÃªn Plan / YÃªu cáº§u**: Tá»‘i Æ°u UI/UX - Xá»­ lÃ½ lá»—i spam API trong phÃ²ng há»p (InMeetingRoom).
 * **Chi tiáº¿t thay Ä‘á»•i**:
@@ -480,73 +490,73 @@ Quy táº¯c báº¯t buá»™c: AI Agent pháº£i luÃ´n ghi log vÃ o cuá»‘i má»—i láº§n th
  -   * * S y s t e m A d m i n   D a s h b o a r d : * *   E n l a r g e d   R e c h a r t s   P i e C h a r t   r a d i i   ( i n n e r   5 8 - > 7 0 ,   o u t e r   8 8 - > 9 5 )   a n d   s h i f t e d   c x   t o   4 0 %   t o   p r e v e n t   c e n t e r   t e x t   f r o m   b e i n g   c r o p p e d   b y   t h e   a c t i v e   s l i c e   s t r o k e .   I n c r e a s e d   f o n t   s i z e   o f   c e n t e r   t e x t   f o r   b e t t e r   c l a r i t y . 
   
  
- -   * * I n M e e t i n g : * *   T h a y   t h ¿  t h °  v i Çn   \ d o c x - p r e v i e w \   b ±n g   M i c r o s o f t   O f f i c e   V i e w e r   i f r a m e   ( \ i s M s O f f i c e \ )   Ã  h i Ãn   t h Ë  c á c   f i l e   W o r d   ( \ . d o c \ ,   \ . d o c x \ )   v à   P o w e r P o i n t   n h ±m   g i £i   q u y ¿t   l ×i   v á  g i a o   d i Çn / h i Ãn   t h Ë  s a i   n Ùi   d u n g ,   m a n g   l ¡i   t r £i   n g h i Çm   x e m   t à i   l i Çu   n h ¥t   q u á n   v à   Õn   Ën h   h ¡n . 
+ -   * * I n M e e t i n g : * *   T h a y   t h ï¿½  t h ï¿½  v i ï¿½n   \ d o c x - p r e v i e w \   b ï¿½n g   M i c r o s o f t   O f f i c e   V i e w e r   i f r a m e   ( \ i s M s O f f i c e \ )   ï¿½  h i ï¿½n   t h ï¿½  c ï¿½ c   f i l e   W o r d   ( \ . d o c \ ,   \ . d o c x \ )   v ï¿½   P o w e r P o i n t   n h ï¿½m   g i ï¿½i   q u y ï¿½t   l ï¿½i   v ï¿½  g i a o   d i ï¿½n / h i ï¿½n   t h ï¿½  s a i   n ï¿½i   d u n g ,   m a n g   l ï¿½i   t r ï¿½i   n g h i ï¿½m   x e m   t ï¿½ i   l i ï¿½u   n h ï¿½t   q u ï¿½ n   v ï¿½   ï¿½n   ï¿½n h   h ï¿½n . 
   
  
-## [2026-08-09] Tách c?t Ngày và Gi?
+## [2026-08-09] Tï¿½ch c?t Ngï¿½y vï¿½ Gi?
 
-- **Thay d?i**: Tách c?t 'Th?i di?m' (ho?c 'Th?i gian') thành 2 c?t 'Ngày' và 'Gi?' trong các danh sách.
+- **Thay d?i**: Tï¿½ch c?t 'Th?i di?m' (ho?c 'Th?i gian') thï¿½nh 2 c?t 'Ngï¿½y' vï¿½ 'Gi?' trong cï¿½c danh sï¿½ch.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/pages/systemAdmin/GateAccessManagement.jsx, src/pages/systemAdmin/AuditLogs.jsx.
-- **Tr?ng thái**: Ðã commit và push (35c4f8d).
+- **Tr?ng thï¿½i**: ï¿½ï¿½ commit vï¿½ push (35c4f8d).
 
-## [2026-08-09] C?p nh?t Nh?t ký ra/vào phòng h?p (Room Access Logs)
+## [2026-08-09] C?p nh?t Nh?t kï¿½ ra/vï¿½o phï¿½ng h?p (Room Access Logs)
 
 - **Thay d?i**: 
-  - C?p nh?t d?nh d?ng hi?n th? Ð? tin c?y (ki?m tra similarity, eliability, confidence). Nhân v?i 100 n?u giá tr? <= 1 d? luôn hi?n th? dúng % (ví d?:  .85 -> 85%).
-  - Ð?i tên c?t 'G?n cu?c h?p' thành 'Cu?c h?p'.
-  - Hi?n th? Tên cu?c h?p thay vì ID cu?c h?p n?u có th? l?y du?c d? li?u.
+  - C?p nh?t d?nh d?ng hi?n th? ï¿½? tin c?y (ki?m tra similarity, eliability, confidence). Nhï¿½n v?i 100 n?u giï¿½ tr? <= 1 d? luï¿½n hi?n th? dï¿½ng % (vï¿½ d?:  .85 -> 85%).
+  - ï¿½?i tï¿½n c?t 'G?n cu?c h?p' thï¿½nh 'Cu?c h?p'.
+  - Hi?n th? Tï¿½n cu?c h?p thay vï¿½ ID cu?c h?p n?u cï¿½ th? l?y du?c d? li?u.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/RoomAccessLogs.jsx, src/components/meeting/MeetingPresenceIVSS.jsx.
-- **Tr?ng thái**: Ðã commit và push (d41a0fe).
+- **Tr?ng thï¿½i**: ï¿½ï¿½ commit vï¿½ push (d41a0fe).
 
 ---
 
 ## [2026-08-11] Fix: JSX fragment wrapping in UserJourney.jsx
 
-- **Yêu c?u**: S?a l?i build Adjacent JSX elements must be wrapped in an enclosing tag t?i UserJourney.jsx:589.
-- **Thay d?i**: B?c hai ph?n t? JSX ngang hàng (<div> chính và <EventSnapshotModal>) trong React fragment <>...</> trong hàm eturn c?a component UserJourney.
+- **Yï¿½u c?u**: S?a l?i build Adjacent JSX elements must be wrapped in an enclosing tag t?i UserJourney.jsx:589.
+- **Thay d?i**: B?c hai ph?n t? JSX ngang hï¿½ng (<div> chï¿½nh vï¿½ <EventSnapshotModal>) trong React fragment <>...</> trong hï¿½m eturn c?a component UserJourney.
 - **T?p tin ?nh hu?ng**: src/pages/shared/UserJourney.jsx.
-- **Tr?ng thái**: Ðã hoàn thành.
+- **Tr?ng thï¿½i**: ï¿½ï¿½ hoï¿½n thï¿½nh.
 
 ---
 
 ## [2026-08-11] Fix: Avatar ngu?i tham d? hi?n th? sai trong tab Ngu?i tham d? (MeetingDetail)
 
-- **Nguyên nhân**: Hàm 
-ormalizeMeetingDetail trong c? manager/MeetingDetail.jsx và employee/MeetingDetail.jsx map danh sách participants nhung b? sót tru?ng vatarUrl/vatar_url. K?t qu? là m?i object participant sau normalize không có tru?ng avatar, khi?n component UserAvatar luôn hi?n th? ch? cái d?u tên thay vì ?nh th?t. Modal chi ti?t hi?n th? dúng vì nó g?i th?ng getUserById() và nh?n d?y d? d? li?u t? API.
-- **Thay d?i**: Thêm dòng vatarUrl: p.avatarUrl || p.avatar_url || p.user?.avatarUrl || p.user?.avatar_url || '' vào ph?n map participants trong 
+- **Nguyï¿½n nhï¿½n**: Hï¿½m 
+ormalizeMeetingDetail trong c? manager/MeetingDetail.jsx vï¿½ employee/MeetingDetail.jsx map danh sï¿½ch participants nhung b? sï¿½t tru?ng vatarUrl/vatar_url. K?t qu? lï¿½ m?i object participant sau normalize khï¿½ng cï¿½ tru?ng avatar, khi?n component UserAvatar luï¿½n hi?n th? ch? cï¿½i d?u tï¿½n thay vï¿½ ?nh th?t. Modal chi ti?t hi?n th? dï¿½ng vï¿½ nï¿½ g?i th?ng getUserById() vï¿½ nh?n d?y d? d? li?u t? API.
+- **Thay d?i**: Thï¿½m dï¿½ng vatarUrl: p.avatarUrl || p.avatar_url || p.user?.avatarUrl || p.user?.avatar_url || '' vï¿½o ph?n map participants trong 
 ormalizeMeetingDetail.
 - **T?p tin ?nh hu?ng**: src/pages/manager/MeetingDetail.jsx, src/pages/employee/MeetingDetail.jsx.
-- **Tr?ng thái**: Ðã hoàn thành.
+- **Tr?ng thï¿½i**: ï¿½ï¿½ hoï¿½n thï¿½nh.
 
 ---
 
-## [2026-08-11] Feature: Avatar + Modal chi ti?t ch? xe trong L?ch s? Ðang ký Xe
+## [2026-08-11] Feature: Avatar + Modal chi ti?t ch? xe trong L?ch s? ï¿½ang kï¿½ Xe
 
-- **Yêu c?u**: Màn hình L?ch s? Ðang ký Xe c?n hi?n th? avatar th?c trong table và m? modal chi ti?t thông tin ngu?i dùng khi click vào ch? xe, tuong t? màn hình ANPR Management.
-- **Phân tích API**: API /anpr/admin/vehicle-registrations tr? v? eg.owner ch?a thông tin ch? xe (fullName/full_name, email, phoneNumber, avatarUrl, department). Không c?n g?i thêm API ph? khi m? modal.
+- **Yï¿½u c?u**: Mï¿½n hï¿½nh L?ch s? ï¿½ang kï¿½ Xe c?n hi?n th? avatar th?c trong table vï¿½ m? modal chi ti?t thï¿½ng tin ngu?i dï¿½ng khi click vï¿½o ch? xe, tuong t? mï¿½n hï¿½nh ANPR Management.
+- **Phï¿½n tï¿½ch API**: API /anpr/admin/vehicle-registrations tr? v? eg.owner ch?a thï¿½ng tin ch? xe (fullName/full_name, email, phoneNumber, avatarUrl, department). Khï¿½ng c?n g?i thï¿½m API ph? khi m? modal.
 - **Thay d?i**:
-  - Thay icon User tinh b?ng UserAvatar component (resolve dúng avatar t? eg.owner).
-  - Tên ch? xe thành link màu xanh, click m? modal chi ti?t.
-  - Thêm 
-ormaliseOwner() d? map snake_case/camelCase v? cùng shape.
-  - Thêm modal chi ti?t (pattern createPortal gi?ng ANPRManagement.jsx) hi?n th? avatar l?n + phòng ban + email + SÐT.
-  - Import thêm UserAvatar, createPortal, icon Briefcase/Mail/Phone/X.
+  - Thay icon User tinh b?ng UserAvatar component (resolve dï¿½ng avatar t? eg.owner).
+  - Tï¿½n ch? xe thï¿½nh link mï¿½u xanh, click m? modal chi ti?t.
+  - Thï¿½m 
+ormaliseOwner() d? map snake_case/camelCase v? cï¿½ng shape.
+  - Thï¿½m modal chi ti?t (pattern createPortal gi?ng ANPRManagement.jsx) hi?n th? avatar l?n + phï¿½ng ban + email + Sï¿½T.
+  - Import thï¿½m UserAvatar, createPortal, icon Briefcase/Mail/Phone/X.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
-- **Tr?ng thái**: Ðã hoàn thành.
+- **Tr?ng thï¿½i**: ï¿½ï¿½ hoï¿½n thï¿½nh.
 
 ---
 
-## [2026-08-11] Fix: Avatar ch? xe trong VehicleRegistrations — g?i getUserById d? l?y d? li?u d?y d?
+## [2026-08-11] Fix: Avatar ch? xe trong VehicleRegistrations ï¿½ g?i getUserById d? l?y d? li?u d?y d?
 
-- **Phân tích**: Theo tài li?u YEU_CAU_BE_BOSUNG_THONG_TIN_USER_2026-08-09.md, API /anpr/admin/vehicle-registrations chua tr? v? vatarUrl trong object owner (BE chua implement). Do dó c?n g?i thêm getUserById d? l?y full user data có avatar.
+- **Phï¿½n tï¿½ch**: Theo tï¿½i li?u YEU_CAU_BE_BOSUNG_THONG_TIN_USER_2026-08-09.md, API /anpr/admin/vehicle-registrations chua tr? v? vatarUrl trong object owner (BE chua implement). Do dï¿½ c?n g?i thï¿½m getUserById d? l?y full user data cï¿½ avatar.
 - **Thay d?i**:
-  - Import thêm getUserById t? sysAdminServices.
-  - Thêm state ownerDetail và ownerDetailLoading.
+  - Import thï¿½m getUserById t? sysAdminServices.
+  - Thï¿½m state ownerDetail vï¿½ ownerDetailLoading.
   - handleOwnerClick m? modal ngay (v?i base info), r?i async fetch getUserById(userId) d? l?y avatar.
-  - Modal uu tiên ownerDetail (full, có avatar) khi có, fallback v? selectedOwner (base info t? API danh sách).
+  - Modal uu tiï¿½n ownerDetail (full, cï¿½ avatar) khi cï¿½, fallback v? selectedOwner (base info t? API danh sï¿½ch).
   - Hi?n spinner loading trong avatar slot khi dang fetch.
 - **T?p tin ?nh hu?ng**: src/pages/systemAdmin/VehicleRegistrations.jsx.
-- **Tr?ng thái**: Ðã hoàn thành.
+- **Tr?ng thï¿½i**: ï¿½ï¿½ hoï¿½n thï¿½nh.
 
 
 ---
