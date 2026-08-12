@@ -188,19 +188,25 @@ export const getRoomRealtimeStatus = async () => {
 };
 
 /**
- * FE-3: Lấy no-show case theo phòng (thay cho getNoShowStatus gọi endpoint không tồn tại)
+ * Lấy no-show case mới nhất theo phòng.
+ * status filter phải là một trong: risk | warning_sent | confirmed | released | dismissed | resolved
  * @param {string} roomId
+ * @param {string} [detectionStatus] - enum value từ NoShowDetectionStatus (tuỳ chọn)
  */
-export const getNoShowByRoom = async (roomId) => {
-    return await get(`/no-show-cases?roomId=${roomId}&status=DETECTED`);
+export const getNoShowByRoom = async (roomId, detectionStatus) => {
+    const params = { roomId, limit: 5 };
+    if (detectionStatus) params.status = detectionStatus;
+    const query = buildQuery(params);
+    return await get(`/no-show-cases${query}`);
 };
 
 export const handleNoShowCase = async (caseId, data) => {
     return await patch(`/no-show-cases/${caseId}`, data);
 };
 
-export const releaseNoShowRoom = async (caseId) => {
-    return await post(`/no-show-cases/${caseId}/release`);
+// reason là bắt buộc theo BE (@IsNotEmpty @MaxLength(500))
+export const releaseNoShowRoom = async (caseId, reason) => {
+    return await post(`/no-show-cases/${caseId}/release`, { reason });
 };
 
 export const getAllNoShowCases = async (params = {}) => {
@@ -232,6 +238,10 @@ export const updateRoom = async (roomId, data) => {
 
 export const deleteRoom = async (roomId) => {
     return await dele(`/rooms/${roomId}`);
+};
+
+export const getRoomDetail = async (roomId) => {
+    return await get(`/rooms/${roomId}`);
 };
 
 // ============================================================

@@ -2,7 +2,7 @@ import { Activity } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import { getAuditLogs } from '../../service/sysAdminServices';
+import { getAuditLogs, exportAuditLogs } from '../../service/sysAdminServices';
 
 /**
  * AuditLogs Component
@@ -152,6 +152,7 @@ const AuditLogs = () => {
     const [search, setSearch] = useState('');
     const [selectedAction, setSelectedAction] = useState('');
     const [selectedEntity, setSelectedEntity] = useState('');
+    const [selectedSeverity, setSelectedSeverity] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
@@ -170,6 +171,7 @@ const AuditLogs = () => {
             limit: pageLimit,
             action: selectedAction,
             entity: selectedEntity,
+            severity: selectedSeverity,
             startDate,
             endDate
         };
@@ -291,10 +293,12 @@ const AuditLogs = () => {
                     log.description.toLowerCase().includes(search.toLowerCase());
                 const matchAction = selectedAction === '' || log.action === selectedAction;
                 const matchEntity = selectedEntity === '' || log.entity === selectedEntity;
+                const logSev = log.severity || (log.status === 'success' ? 'info' : log.status === 'warning' ? 'warning' : 'error');
+                const matchSeverity = selectedSeverity === '' || logSev === selectedSeverity;
                 const matchStart = startDate === '' || new Date(log.timestamp) >= new Date(startDate);
                 const matchEnd = endDate === '' || new Date(log.timestamp) <= new Date(endDate + 'T23:59:59');
 
-                return matchSearch && matchAction && matchEntity && matchStart && matchEnd;
+                return matchSearch && matchAction && matchEntity && matchSeverity && matchStart && matchEnd;
             });
 
             // Pagination simulation
@@ -308,7 +312,7 @@ const AuditLogs = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedAction, selectedEntity, startDate, endDate, search]);
+    }, [selectedAction, selectedEntity, selectedSeverity, startDate, endDate, search]);
 
     useEffect(() => {
         fetchLogs(1, meta.limit);
@@ -333,6 +337,7 @@ const AuditLogs = () => {
         setSearch('');
         setSelectedAction('');
         setSelectedEntity('');
+        setSelectedSeverity('');
         setStartDate('');
         setEndDate('');
         fetchLogs(1, meta.limit);
@@ -343,12 +348,58 @@ const AuditLogs = () => {
         setIsDetailOpen(true);
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        if (!startDate || !endDate) {
+            setError('Vui lòng chọn đầy đủ khoảng thời gian (Từ ngày và Đến ngày) để xuất nhật ký.');
+            return;
+        }
+
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        if (start > end) {
+            setError('Ngày bắt đầu không được lớn hơn ngày kết thúc.');
+            return;
+        }
+
         setExporting(true);
-        setTimeout(() => {
+        setError(null);
+        setSuccessMessage(null);
+
+        try {
+            const res = await exportAuditLogs({
+                startDate,
+                endDate,
+                action: selectedAction,
+                entity: selectedEntity,
+                severity: selectedSeverity
+            });
+
+            if (res?.success && res?.isBlob) {
+                const blob = res.data;
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                const now = new Date();
+                const padStr = (n) => String(n).padStart(2, '0');
+                const stamp = `${now.getFullYear()}${padStr(now.getMonth() + 1)}${padStr(now.getDate())}-${padStr(now.getHours())}${padStr(now.getMinutes())}${padStr(now.getSeconds())}`;
+                a.download = `nhat-ky-he-thong-${stamp}.xlsx`;
+                
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                setSuccessMessage('Xuất nhật ký hệ thống ra file Excel thành công.');
+            } else {
+                throw new Error('Dữ liệu xuất không hợp lệ từ máy chủ.');
+            }
+        } catch (err) {
+            console.error('Lỗi khi xuất tệp nhật ký:', err);
+            setError(err?.error?.message || err?.message || 'Có lỗi xảy ra khi xuất tệp nhật ký.');
+        } finally {
             setExporting(false);
-            setSuccessMessage('Xuất báo cáo nhật ký hoạt động hệ thống thành công (file csv/excel).');
-        }, 1500);
+        }
     };
 
     // Helper badges styling
@@ -423,7 +474,7 @@ const AuditLogs = () => {
 
             {/* Filters panel */}
             <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-1 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     {/* Search query */}
                     <div>
                         <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tìm kiếm từ khóa</label>
@@ -452,6 +503,22 @@ const AuditLogs = () => {
                             <option value="UPDATE_DEVICE">Cập nhật thiết bị</option>
                             <option value="DEVICE_OFFLINE">Thiết bị mất mạng</option>
                             <option value="EXPORT_USERS">Xuất file Excel</option>
+                        </select>
+                    </div>
+
+                    {/* Severity Selector */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mức độ</label>
+                        <select
+                            value={selectedSeverity}
+                            onChange={(e) => setSelectedSeverity(e.target.value)}
+                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
+                        >
+                            <option value="">Tất cả mức độ</option>
+                            <option value="info">Thành công (Info)</option>
+                            <option value="warning">Cảnh báo (Warning)</option>
+                            <option value="error">Thất bại (Error)</option>
+                            <option value="critical">Nghiêm trọng (Critical)</option>
                         </select>
                     </div>
 

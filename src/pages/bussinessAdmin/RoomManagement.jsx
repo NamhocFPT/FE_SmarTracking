@@ -1,7 +1,8 @@
 import {
-    Activity, AlertCircle, CheckCircle, ChevronLeft, ChevronRight,
-    DoorOpen, Edit2, Home, List, MapPin, Mic, Monitor, Plus,
-    RefreshCw, ShieldAlert, Trash2, UserCheck, Users, Video
+    Activity, AlertCircle, ArrowLeft, Calendar, CheckCircle,
+    ChevronLeft, ChevronRight, Clock, DoorOpen, Edit2, Eye,
+    Home, List, MapPin, Mic, Monitor, Plus, RefreshCw,
+    ShieldAlert, Trash2, UserCheck, Users, Video, X
 } from 'lucide-react';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
@@ -11,7 +12,9 @@ import {
     getRooms,
     createRoom,
     updateRoom,
-    deleteRoom
+    deleteRoom,
+    getMeetings,
+    getRoomDetail
 } from '../../service/businessAdminServices';
 
 import RealtimeRoomMonitor from '../../components/security/RealtimeRoomMonitor';
@@ -26,18 +29,64 @@ const ROOM_TYPE_LABELS = {
     other: 'Khác'
 };
 
+const ADMIN_STATUS_LABELS = {
+    available: 'Sẵn sàng',
+    occupied: 'Đang họp',
+    reserved: 'Đã đặt trước',
+    maintenance: 'Bảo trì',
+    inactive: 'Không hoạt động'
+};
+
+const getNoShowBadge = (status) => {
+    switch (status) {
+        case 'risk':
+            return { label: 'Nguy cơ No-show', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+        case 'confirmed':
+            return { label: 'Xác nhận No-show', cls: 'bg-red-50 text-red-700 border-red-200' };
+        case 'warning_sent':
+            return { label: 'Đã gửi cảnh báo', cls: 'bg-orange-50 text-orange-700 border-orange-200' };
+        case 'released':
+            return { label: 'Đã giải phóng', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        case 'dismissed':
+            return { label: 'Đã bỏ qua', cls: 'bg-gray-50 text-gray-600 border-gray-200' };
+        case 'resolved':
+            return { label: 'Đã xử lý', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+        default:
+            return { label: 'Bình thường', cls: 'bg-slate-50 text-slate-500 border-slate-200' };
+    }
+};
+
+const formatTimeRange = (startStr, endStr) => {
+    if (!startStr) return '—';
+    const start = new Date(startStr);
+    const end = endStr ? new Date(endStr) : null;
+    const timeOpts = { hour: '2-digit', minute: '2-digit' };
+    const dateOpts = { day: '2-digit', month: '2-digit', year: 'numeric' };
+
+    const timePart = start.toLocaleTimeString('vi-VN', timeOpts) + (end ? ` - ${end.toLocaleTimeString('vi-VN', timeOpts)}` : '');
+    const datePart = start.toLocaleDateString('vi-VN', dateOpts);
+    return `${timePart} (${datePart})`;
+};
+
+const MEETING_STATUS_CONFIG = {
+    scheduled: { label: 'Đã lên lịch', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    in_progress: { label: 'Đang diễn ra', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    completed: { label: 'Hoàn thành', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+    cancelled: { label: 'Đã huỷ', cls: 'bg-red-50 text-red-700 border-red-200' },
+    pending: { label: 'Chờ xác nhận', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+};
+
 const STATUS_CONFIG = {
     available: { label: 'Đang trống', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    occupied:  { label: 'Đang họp',   cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-    maintenance: { label: 'Bảo trì',  cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+    occupied: { label: 'Đang họp', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    maintenance: { label: 'Bảo trì', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
 };
 
 const getStatus = (room) => room.currentStatus || room.roomStatus || 'available';
 
 const AmenityBadge = ({ active, icon: Icon, label }) => (
-    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-        active ? 'bg-blue-50 text-action-blue border-blue-200' : 'bg-gray-50 text-steel-gray border-gray-200 opacity-40'
-    }`}>
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${active ? 'bg-blue-50 text-action-blue border-blue-200' : 'bg-gray-50 text-steel-gray border-gray-200 opacity-40'
+        }`}>
         <Icon className="w-2.5 h-2.5" />
         {label}
     </span>
@@ -76,6 +125,69 @@ const RoomManagement = () => {
     const [selectedRoom, setSelectedRoom] = useState(null);
     const [formData, setFormData] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
+
+    // Chi tiết phòng
+    const [detailRoom, setDetailRoom] = useState(null);
+    const [detailTab, setDetailTab] = useState('info');
+    const [detailMeetings, setDetailMeetings] = useState([]);
+    const [detailMeetingsLoading, setDetailMeetingsLoading] = useState(false);
+    const [detailMeetingsPage, setDetailMeetingsPage] = useState(1);
+    const [detailMeetingsTotalPages, setDetailMeetingsTotalPages] = useState(1);
+    const [detailHistoryPage, setDetailHistoryPage] = useState(1);
+    const [detailHistoryTotalPages, setDetailHistoryTotalPages] = useState(1);
+    const DETAIL_LIMIT = 10;
+
+    const fetchDetailMeetings = useCallback(async (roomId, tab, page) => {
+        setDetailMeetingsLoading(true);
+        setDetailMeetings([]);
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const params = {
+                roomId,
+                page,
+                limit: DETAIL_LIMIT,
+                sortBy: 'startTime',
+                sortOrder: tab === 'upcoming' ? 'asc' : 'desc',
+                ...(tab === 'upcoming' ? { from: today } : {}),
+            };
+            const res = await getMeetings(params);
+            if (res?.success) {
+                setDetailMeetings(res.data || []);
+                const total = res.meta?.totalPages || 1;
+                if (tab === 'upcoming') setDetailMeetingsTotalPages(total);
+                else setDetailHistoryTotalPages(total);
+            }
+        } catch { /* không block UI */ }
+        finally { setDetailMeetingsLoading(false); }
+    }, [DETAIL_LIMIT]);
+
+    const openRoomDetail = async (room) => {
+        const roomId = room.id || room.roomId;
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await getRoomDetail(roomId);
+            if (res?.success && res.data) {
+                setDetailRoom(res.data);
+                setDetailTab('info');
+                setDetailMeetingsPage(1);
+                setDetailHistoryPage(1);
+                setDetailMeetings([]);
+            } else {
+                throw new Error("Không thể tải thông tin chi tiết phòng.");
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || "Lỗi tải thông tin chi tiết phòng.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!detailRoom || detailTab !== 'history') return;
+        const roomId = detailRoom.id || detailRoom.roomId;
+        fetchDetailMeetings(roomId, 'history', detailHistoryPage);
+    }, [detailRoom, detailTab, detailHistoryPage, fetchDetailMeetings]);
 
     const fetchRoomsList = useCallback(async () => {
         setLoading(true);
@@ -241,17 +353,16 @@ const RoomManagement = () => {
             {/* Tabs */}
             <div className="flex flex-wrap bg-cloud-mist/50 p-1 rounded-xl w-fit gap-0.5">
                 {[
-                    { key: 'list',     label: 'Danh sách phòng',   Icon: List,       active: 'text-action-blue' },
-                    { key: 'realtime', label: 'Giám sát trực tuyến', Icon: Activity,   active: 'text-action-blue' },
-                    { key: 'alerts',   label: 'Cảnh báo an ninh',   Icon: ShieldAlert, active: 'text-red-600' },
-                    { key: 'unmapped', label: 'Gán danh tính',      Icon: UserCheck,  active: 'text-action-blue' }
+                    { key: 'list', label: 'Danh sách phòng', Icon: List, active: 'text-action-blue' },
+                    { key: 'realtime', label: 'Giám sát trực tuyến', Icon: Activity, active: 'text-action-blue' },
+                    { key: 'alerts', label: 'Cảnh báo an ninh', Icon: ShieldAlert, active: 'text-red-600' },
+                    { key: 'unmapped', label: 'Gán danh tính', Icon: UserCheck, active: 'text-action-blue' }
                 ].map(({ key, label, Icon, active }) => (
                     <button
                         key={key}
                         onClick={() => setViewMode(key)}
-                        className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${
-                            viewMode === key ? `bg-white shadow-sm ${active}` : 'text-slate-blue hover:text-midnight-indigo'
-                        }`}
+                        className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === key ? `bg-white shadow-sm ${active}` : 'text-slate-blue hover:text-midnight-indigo'
+                            }`}
                     >
                         <Icon className="w-4 h-4" /> {label}
                     </button>
@@ -380,6 +491,13 @@ const RoomManagement = () => {
                                                     {/* Hành động */}
                                                     <td className="py-3.5 px-5 text-right">
                                                         <div className="flex items-center justify-end gap-1">
+                                                            <button
+                                                                onClick={() => openRoomDetail(room)}
+                                                                className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                                title="Xem chi tiết"
+                                                            >
+                                                                <Eye className="w-4 h-4" />
+                                                            </button>
                                                             <button
                                                                 onClick={() => handleOpenModal('edit', room)}
                                                                 className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
@@ -534,9 +652,8 @@ const RoomManagement = () => {
                                     ].map(({ key, Icon, label }) => (
                                         <label
                                             key={key}
-                                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
-                                                formData[key] ? 'border-action-blue bg-blue-50' : 'border-platinum-tint bg-white hover:bg-cloud-mist'
-                                            }`}
+                                            className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${formData[key] ? 'border-action-blue bg-blue-50' : 'border-platinum-tint bg-white hover:bg-cloud-mist'
+                                                }`}
                                         >
                                             <input
                                                 type="checkbox"
@@ -580,6 +697,269 @@ const RoomManagement = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Room Detail Modal with backdrop blur */}
+            {detailRoom && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-fade-in-up">
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <h3 className="font-bold text-midnight-indigo text-lg flex items-center gap-2">
+                                    <DoorOpen className="w-5 h-5 text-action-blue" />
+                                    {detailRoom.roomName}
+                                </h3>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${detailRoom.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                                    }`}>
+                                    {detailRoom.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
+                                </span>
+                            </div>
+                            <button onClick={() => setDetailRoom(null)} className="text-slate-blue hover:text-midnight-indigo">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content tabs navigation */}
+                        <div className="px-6 py-3 border-b border-platinum-tint bg-white flex gap-2 shrink-0">
+                            {[
+                                { key: 'info', label: 'Thông tin tĩnh & Thiết bị', Icon: Home },
+                                { key: 'realtime', label: 'Trạng thái Realtime', Icon: Activity },
+                                { key: 'upcoming', label: 'Lịch họp sắp tới', Icon: Calendar },
+                                { key: 'history', label: 'Lịch sử cuộc họp', Icon: Clock },
+                            ].map(({ key, label, Icon }) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setDetailTab(key)}
+                                    className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-colors ${detailTab === key ? 'bg-blue-50 text-action-blue border border-blue-200' : 'text-slate-blue hover:text-midnight-indigo'
+                                        }`}
+                                >
+                                    <Icon className="w-4 h-4" />{label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                            {/* Tab: Info */}
+                            {detailTab === 'info' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    {/* Info Panel */}
+                                    <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-3.5">
+                                        <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Thông tin phòng</h4>
+                                        {[
+                                            { label: 'Tên phòng', value: detailRoom.roomName },
+                                            { label: 'Mã phòng họp', value: detailRoom.roomCode || '—' },
+                                            { label: 'Loại phòng', value: ROOM_TYPE_LABELS[detailRoom.roomType] || detailRoom.roomType },
+                                            { label: 'Sức chứa tối đa', value: `${detailRoom.capacity} người` },
+                                            { label: 'Tòa nhà / Cơ sở', value: detailRoom.siteName || '—' },
+                                            { label: 'Tầng / Khu vực', value: detailRoom.areaName || '—' },
+                                            { label: 'Vị trí chi tiết', value: detailRoom.locationDescription || '—' },
+                                            { label: 'Trạng thái hành chính', value: ADMIN_STATUS_LABELS[detailRoom.administrativeStatus] || detailRoom.administrativeStatus }
+                                        ].map(({ label, value }) => (
+                                            <div key={label} className="flex justify-between text-xs">
+                                                <span className="font-bold text-slate-blue uppercase">{label}</span>
+                                                <span className="font-semibold text-midnight-indigo">{value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Equipment Panel */}
+                                    <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-4">
+                                        <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Trang thiết bị khả dụng</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {[
+                                                { key: 'hasCamera', Icon: Video, label: 'Cảm biến Camera' },
+                                                { key: 'hasMicrophone', Icon: Mic, label: 'Hệ thống Mic' },
+                                                { key: 'hasDisplay', Icon: Monitor, label: 'Màn hình hiển thị' },
+                                                { key: 'allowRecording', Icon: Video, label: 'Cho phép ghi hình' },
+                                            ].map(({ key, Icon, label }) => {
+                                                const active = detailRoom[key];
+                                                return (
+                                                    <div key={key} className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs ${active ? 'border-action-blue bg-blue-50/50' : 'border-platinum-tint bg-white'}`}>
+                                                        <Icon className={`w-4 h-4 ${active ? 'text-action-blue' : 'text-steel-gray opacity-50'}`} />
+                                                        <div>
+                                                            <p className="font-bold text-midnight-indigo leading-tight">{label}</p>
+                                                            <p className="text-[10px] text-slate-blue mt-0.5">{active ? 'Tích hợp' : 'Không có'}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tab: Realtime Status */}
+                            {detailTab === 'realtime' && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {/* Occupancy card */}
+                                        <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-4 text-center space-y-1">
+                                            <span className="block text-[10px] font-bold text-slate-blue uppercase">Hiện diện thực tế</span>
+                                            <span className="block text-2xl font-black text-midnight-indigo">
+                                                {detailRoom.occupancyStatus?.occupancyCount === null
+                                                    ? 'N/A'
+                                                    : `${detailRoom.occupancyStatus.occupancyCount} người`}
+                                            </span>
+                                            <span className="block text-[10px] text-slate-blue">
+                                                {detailRoom.occupancyStatus?.occupancyCount === null
+                                                    ? 'Chưa có thông tin cảm biến'
+                                                    : detailRoom.occupancyStatus.occupancyCount === 0
+                                                        ? 'Phòng đang trống'
+                                                        : 'Phòng đang hoạt động'}
+                                            </span>
+                                        </div>
+
+                                        {/* Last presence card */}
+                                        <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-4 text-center space-y-1">
+                                            <span className="block text-[10px] font-bold text-slate-blue uppercase">Lần cuối có người</span>
+                                            <span className="block text-sm font-bold text-midnight-indigo py-1">
+                                                {detailRoom.occupancyStatus?.lastPresenceAt
+                                                    ? new Date(detailRoom.occupancyStatus.lastPresenceAt).toLocaleTimeString('vi-VN') + ' ' + new Date(detailRoom.occupancyStatus.lastPresenceAt).toLocaleDateString('vi-VN')
+                                                    : 'Chưa ghi nhận'}
+                                            </span>
+                                            <span className="block text-[10px] text-slate-blue">Phát hiện qua cảm biến hiện diện</span>
+                                        </div>
+
+                                        {/* No-show Status card */}
+                                        <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-4 text-center space-y-1">
+                                            <span className="block text-[10px] font-bold text-slate-blue uppercase">Trạng thái No-Show</span>
+                                            <div className="mt-1">
+                                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${getNoShowBadge(detailRoom.occupancyStatus?.noShowStatus).cls
+                                                    }`}>
+                                                    {getNoShowBadge(detailRoom.occupancyStatus?.noShowStatus).label}
+                                                </span>
+                                            </div>
+                                            <span className="block text-[10px] text-slate-blue mt-1">Trạng thái phát hiện vắng mặt</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Current Booking status */}
+                                    <div className="bg-slate-50/50 rounded-xl border border-platinum-tint p-5 space-y-3">
+                                        <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2">Cuộc họp hiện tại</h4>
+                                        {detailRoom.occupancyStatus?.currentBooking ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                                <div>
+                                                    <span className="block text-slate-blue font-bold">Tên cuộc họp</span>
+                                                    <span className="text-sm font-bold text-midnight-indigo">{detailRoom.occupancyStatus.currentBooking.title}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-slate-blue font-bold">Người chủ trì</span>
+                                                    <span className="text-sm font-semibold text-midnight-indigo">{detailRoom.occupancyStatus.currentBooking.hostName || '—'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-slate-blue font-bold">Thời gian đặt trước</span>
+                                                    <span className="text-xs font-mono font-semibold text-midnight-indigo">
+                                                        {formatTimeRange(detailRoom.occupancyStatus.currentBooking.reservedStartTime, detailRoom.occupancyStatus.currentBooking.reservedEndTime)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-blue italic">Không có cuộc họp nào đang diễn ra tại phòng họp này.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tab: Upcoming bookings */}
+                            {detailTab === 'upcoming' && (
+                                <div className="border border-platinum-tint rounded-xl overflow-hidden bg-white">
+                                    <table className="w-full text-left text-xs">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-platinum-tint text-[10px] font-bold text-slate-blue uppercase">
+                                                <th className="px-4 py-2.5">Tiêu đề cuộc họp</th>
+                                                <th className="px-4 py-2.5">Thời gian họp dự kiến</th>
+                                                <th className="px-4 py-2.5">Người chủ trì</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-platinum-tint text-midnight-indigo">
+                                            {!detailRoom.upcomingBookings || detailRoom.upcomingBookings.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={3} className="px-4 py-6 text-center text-slate-blue italic">Không có lịch họp sắp tới nào được đăng ký</td>
+                                                </tr>
+                                            ) : (
+                                                detailRoom.upcomingBookings.map((bk, idx) => (
+                                                    <tr key={bk.bookingId || idx} className="hover:bg-slate-50/50">
+                                                        <td className="px-4 py-3 font-semibold">{bk.title}</td>
+                                                        <td className="px-4 py-3 font-mono">
+                                                            {formatTimeRange(bk.reservedStartTime, bk.reservedEndTime)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-blue">{bk.hostName || '—'}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {/* Tab: History */}
+                            {detailTab === 'history' && (
+                                <div className="border border-platinum-tint rounded-xl overflow-hidden bg-white">
+                                    {detailMeetingsLoading ? (
+                                        <div className="flex flex-col items-center justify-center py-12">
+                                            <div className="w-6 h-6 border-2 border-action-blue border-t-transparent rounded-full animate-spin" />
+                                            <span className="text-xs text-slate-blue mt-2">Đang tải lịch sử...</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <table className="w-full text-left text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-50 border-b border-platinum-tint text-[10px] font-bold text-slate-blue uppercase">
+                                                        <th className="px-4 py-2.5">Tiêu đề cuộc họp</th>
+                                                        <th className="px-4 py-2.5">Thời gian họp dự kiến</th>
+                                                        <th className="px-4 py-2.5">Người tổ chức</th>
+                                                        <th className="px-4 py-2.5">Trạng thái</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-platinum-tint text-midnight-indigo">
+                                                    {detailMeetings.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={4} className="px-4 py-6 text-center text-slate-blue italic">Không có lịch sử cuộc họp nào</td>
+                                                        </tr>
+                                                    ) : (
+                                                        detailMeetings.map((m, idx) => {
+                                                            const sc = MEETING_STATUS_CONFIG[m.status] || { label: m.status, cls: 'bg-gray-50 text-gray-600 border-gray-200' };
+                                                            return (
+                                                                <tr key={m.id || idx} className="hover:bg-slate-50/50">
+                                                                    <td className="px-4 py-3 font-semibold">{m.title}</td>
+                                                                    <td className="px-4 py-3 font-mono">
+                                                                        {formatTimeRange(m.startTime, m.endTime)}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-slate-blue">{m.organizerName || '—'}</td>
+                                                                    <td className="px-4 py-3">
+                                                                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${sc.cls}`}>{sc.label}</span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })
+                                                    )}
+                                                </tbody>
+                                            </table>
+
+                                            {/* History Pagination */}
+                                            {detailHistoryTotalPages > 1 && (
+                                                <div className="px-4 py-2 border-t border-platinum-tint flex items-center justify-end gap-2 bg-cloud-mist/30">
+                                                    <button onClick={() => setDetailHistoryPage(p => Math.max(p - 1, 1))} disabled={detailHistoryPage === 1}
+                                                        className="p-1 border border-platinum-tint rounded bg-white text-slate-blue disabled:opacity-40">
+                                                        <ChevronLeft className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span className="text-xs font-bold text-midnight-indigo">{detailHistoryPage} / {detailHistoryTotalPages}</span>
+                                                    <button onClick={() => setDetailHistoryPage(p => Math.min(p + 1, detailHistoryTotalPages))} disabled={detailHistoryPage === detailHistoryTotalPages}
+                                                        className="p-1 border border-platinum-tint rounded bg-white text-slate-blue disabled:opacity-40">
+                                                        <ChevronRight className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>,
                 document.body
