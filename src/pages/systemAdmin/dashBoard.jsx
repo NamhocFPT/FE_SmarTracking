@@ -592,14 +592,16 @@ const DashBoard = () => {
         // ── Audit activity hourly ─────────────────────────────────────────────
         if (auditRes.status === 'fulfilled' && auditRes.value?.success) {
             const buckets = auditRes.value.data?.buckets || [];
+            setAuditTotal(auditRes.value.data?.totalToday || 0);
             if (buckets.length > 0) {
-                const header = [{ type: 'string', label: 'Giờ' }, { type: 'number', label: 'Hoạt động' }];
-                const rows = buckets.map(b => [
-                    b.hour?.slice(0, 2) + 'h',
-                    b.count || 0,
-                ]);
+                const header = ['Giờ', 'Hoạt động'];
+                const rows = buckets.map(b => {
+                    const h = typeof b.hour === 'number'
+                        ? String(b.hour).padStart(2, '0') + 'h'
+                        : String(b.hour ?? '').slice(0, 2) + 'h';
+                    return [h, b.count ?? 0];
+                });
                 setAuditHourlyGCData([header, ...rows]);
-                setAuditTotal(auditRes.value.data?.totalToday || 0);
             }
         }
 

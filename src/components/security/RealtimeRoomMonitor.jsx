@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
     getRoomRealtimeStatus, 
@@ -7,8 +7,8 @@ import {
     releaseNoShowRoom,
     getAllNoShowCases
 } from '../../service/businessAdminServices';
-import { 
-    Activity, Users, AlertTriangle, CheckCircle, 
+import {
+    Users, AlertTriangle, CheckCircle,
     XCircle, Clock, Video, Eye, Unlock, RefreshCw,
     WifiOff, LayoutGrid
 } from 'lucide-react';
@@ -23,6 +23,12 @@ const RealtimeRoomMonitor = () => {
     // All No-Shows state
     const [allNoShows, setAllNoShows] = useState([]);
     const [isNoShowsLoading, setIsNoShowsLoading] = useState(false);
+    const [noShowPage, setNoShowPage] = useState(1);
+    const [noShowTotalPages, setNoShowTotalPages] = useState(1);
+    const [noShowHasMore, setNoShowHasMore] = useState(false);
+    const [noShowTableError, setNoShowTableError] = useState(null);
+    const noShowPageRef = useRef(1);
+    const NO_SHOW_LIMIT = 10;
 
     // Modal state for No-Show handling
     const [selectedNoShow, setSelectedNoShow] = useState(null);
@@ -32,6 +38,7 @@ const RealtimeRoomMonitor = () => {
 
     // Confirmation modal state (replaces window.confirm)
     const [confirmAction, setConfirmAction] = useState(null); // { type: 'release' | 'ignore', caseId }
+    const [releaseReason, setReleaseReason] = useState('');
 
     const fetchRealtimeStatus = useCallback(async () => {
         try {
@@ -47,19 +54,45 @@ const RealtimeRoomMonitor = () => {
         }
     }, []);
 
-    const fetchAllNoShows = useCallback(async () => {
+    const fetchAllNoShows = useCallback(async (page) => {
+        const targetPage = page ?? noShowPageRef.current;
         setIsNoShowsLoading(true);
+        setNoShowTableError(null);
         try {
-            const res = await getAllNoShowCases({ limit: 10 });
+            const res = await getAllNoShowCases({ limit: NO_SHOW_LIMIT, page: targetPage });
             if (res?.success) {
-                setAllNoShows(res.data?.items || res.data || []);
+                // BE có thể trả: array thẳng | { items, meta } | { data, meta } | { data, pagination }
+                const items = Array.isArray(res.data)
+                    ? res.data
+                    : (res.data?.items ?? res.data?.data ?? []);
+                setAllNoShows(items);
+
+                // Tính hasMore và totalPages từ meta (nhiều field name khác nhau)
+                const pag = res.data?.meta ?? res.data?.pagination ?? {};
+                const total = pag.total ?? pag.totalItems ?? pag.totalCount ?? 0;
+                const tp = pag.totalPages ?? pag.total_pages
+                    ?? (total > 0 ? Math.ceil(total / NO_SHOW_LIMIT) : 0);
+                setNoShowTotalPages(tp > 0 ? tp : 1);
+                // Fallback: nếu không có meta, dùng heuristic — nếu trả đủ limit thì còn trang sau
+                setNoShowHasMore(
+                    tp > targetPage || items.length >= NO_SHOW_LIMIT
+                );
+            } else {
+                setNoShowTableError(res?.message || 'Không thể tải danh sách vi phạm.');
             }
         } catch (err) {
             console.error(err);
+            setNoShowTableError('Lỗi kết nối khi tải danh sách vi phạm.');
         } finally {
             setIsNoShowsLoading(false);
         }
     }, []);
+
+    const changeNoShowPage = useCallback((newPage) => {
+        noShowPageRef.current = newPage;
+        setNoShowPage(newPage);
+        fetchAllNoShows(newPage);
+    }, [fetchAllNoShows]);
 
     // Initial load and polling every 10 seconds
     useEffect(() => {
@@ -80,17 +113,15 @@ const RealtimeRoomMonitor = () => {
         }
     }, [successMsg]);
 
-    /**
-     * FE-3: Dùng getNoShowByRoom(roomId) thay vì getNoShowStatus(meetingId)
-     * Lấy data[0] = case mới nhất
-     */
     const handleOpenNoShow = async (room) => {
         setSelectedNoShow(room);
         setIsProcessing(true);
         setNoShowError(null);
         setNoShowDetail(null);
+        setReleaseReason('');
         try {
-            const res = await getNoShowByRoom(room.roomId);
+            // truyền noShowStatus (= detectionStatus enum thật) để filter đúng — bỏ &status=DETECTED cũ
+            const res = await getNoShowByRoom(room.roomId, room.noShowStatus);
             if (res?.success && res.data?.length > 0) {
                 // Lấy case mới nhất — dùng field `id` làm caseId
                 const latestCase = res.data[0];
@@ -120,14 +151,15 @@ const RealtimeRoomMonitor = () => {
         if (!noShowDetail?.caseId) return;
         setIsProcessing(true);
         try {
-            const res = await releaseNoShowRoom(noShowDetail.caseId);
+            const res = await releaseNoShowRoom(noShowDetail.caseId, releaseReason.trim() || 'Giải phóng thủ công bởi quản trị viên');
             if (res?.success) {
                 setSuccessMsg(`Đã giải phóng phòng ${selectedNoShow?.roomName || ''} thành công.`);
                 setSelectedNoShow(null);
                 setNoShowDetail(null);
                 setConfirmAction(null);
                 fetchRealtimeStatus();
-                fetchAllNoShows();
+                noShowPageRef.current = 1; setNoShowPage(1);
+                fetchAllNoShows(1);
             } else {
                 throw new Error(res?.message || 'Không thể giải phóng phòng.');
             }
@@ -150,7 +182,8 @@ const RealtimeRoomMonitor = () => {
                 setNoShowDetail(null);
                 setConfirmAction(null);
                 fetchRealtimeStatus();
-                fetchAllNoShows();
+                noShowPageRef.current = 1; setNoShowPage(1);
+                fetchAllNoShows(1);
             } else {
                 throw new Error(res?.message || 'Không thể bỏ qua cảnh báo.');
             }
@@ -287,13 +320,13 @@ const RealtimeRoomMonitor = () => {
                             </div>
                             <div className="bg-white p-2 rounded-xl shadow-sm border border-platinum-tint/50 flex flex-col items-center justify-center min-w-[50px]">
                                 <Users className="w-4 h-4 text-slate-blue mb-0.5" />
-                                <span className="text-sm font-extrabold text-midnight-indigo">{room.currentOccupancy || 0}</span>
+                                <span className="text-sm font-extrabold text-midnight-indigo">{room.occupancyCount ?? 0}</span>
                             </div>
                         </div>
 
                         {room.noShowStatus && ['risk', 'warning_sent', 'confirmed'].includes(room.noShowStatus) && (
                             <button
-                                onClick={() => handleOpenNoShow({ roomId: room.roomId, roomName: room.roomName })}
+                                onClick={() => handleOpenNoShow({ roomId: room.roomId, roomName: room.roomName, noShowStatus: room.noShowStatus })}
                                 className="w-full mt-2 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
                             >
                                 <Eye className="w-4 h-4" />
@@ -326,65 +359,120 @@ const RealtimeRoomMonitor = () => {
                         <AlertTriangle className="w-4 h-4 text-red-500" />
                         Danh sách vi phạm No-show gần đây
                     </h3>
-                    <button onClick={fetchAllNoShows} className="text-xs font-semibold text-action-blue hover:text-glacier-blue transition-colors flex items-center gap-1">
+                    <button onClick={() => changeNoShowPage(noShowPage)} className="text-xs font-semibold text-action-blue hover:text-glacier-blue transition-colors flex items-center gap-1">
                         <RefreshCw className={`w-3.5 h-3.5 ${isNoShowsLoading ? 'animate-spin' : ''}`} />
                         Làm mới
                     </button>
                 </div>
+
+                {/* Table error */}
+                {noShowTableError && (
+                    <div className="px-4 py-3 bg-red-50 border-b border-red-100 text-red-700 text-xs flex items-center gap-2">
+                        <XCircle className="w-4 h-4 flex-shrink-0" />
+                        {noShowTableError}
+                    </div>
+                )}
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-cloud-mist/50 text-slate-blue text-xs uppercase">
                             <tr>
-                                <th className="px-4 py-3 font-semibold">Mã Case</th>
+                                <th className="px-4 py-3 font-semibold whitespace-nowrap">Mã Case</th>
                                 <th className="px-4 py-3 font-semibold">Phòng</th>
                                 <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                                <th className="px-4 py-3 font-semibold">Phát hiện lúc</th>
-                                <th className="px-4 py-3 font-semibold text-right">Hành động</th>
+                                <th className="px-4 py-3 font-semibold whitespace-nowrap">Ngày</th>
+                                <th className="px-4 py-3 font-semibold whitespace-nowrap">Giờ</th>
+                                <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-outline-gray">
-                            {allNoShows.length === 0 && !isNoShowsLoading && (
+                            {allNoShows.length === 0 && !isNoShowsLoading && !noShowTableError && (
                                 <tr>
-                                    <td colSpan="5" className="px-4 py-8 text-center text-slate-blue italic">Không có dữ liệu vi phạm.</td>
+                                    <td colSpan="6" className="px-4 py-8 text-center text-slate-blue italic">Không có dữ liệu vi phạm.</td>
                                 </tr>
                             )}
-                            {allNoShows.map(caseItem => (
-                                <tr key={caseItem.id} className="hover:bg-cloud-mist/20 transition-colors">
-                                    <td className="px-4 py-3 font-mono text-xs">{caseItem.id?.substring(0, 8)}...</td>
-                                    <td className="px-4 py-3 font-semibold text-midnight-indigo">{caseItem.roomName || caseItem.roomId}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${
-                                            caseItem.status === 'risk' ? 'bg-red-100 text-red-700' :
-                                            caseItem.status === 'confirmed' ? 'bg-orange-100 text-orange-700' :
-                                            caseItem.status === 'warning_sent' ? 'bg-yellow-100 text-yellow-700' :
-                                            caseItem.status === 'released' ? 'bg-green-100 text-green-700' :
-                                            caseItem.status === 'dismissed' ? 'bg-slate-200 text-slate-700' :
-                                            caseItem.status === 'resolved' ? 'bg-teal-100 text-teal-700' :
-                                            'bg-blue-100 text-blue-700'
-                                        }`}>
-                                            {caseItem.status === 'risk' ? 'Có rủi ro' :
-                                             caseItem.status === 'confirmed' ? 'Đã xác nhận' :
-                                             caseItem.status === 'warning_sent' ? 'Đã gửi cảnh báo' :
-                                             caseItem.status === 'released' ? 'Đã giải phóng' :
-                                             caseItem.status === 'dismissed' ? 'Đã bỏ qua' :
-                                             caseItem.status === 'resolved' ? 'Đã giải quyết' :
-                                             caseItem.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs">{caseItem.detectedAt ? new Date(caseItem.detectedAt).toLocaleString('vi-VN') : '—'}</td>
-                                    <td className="px-4 py-3 text-right">
-                                        <button 
-                                            onClick={() => handleOpenNoShow({ roomId: caseItem.roomId, roomName: caseItem.roomName })}
-                                            className="px-3 py-1 bg-white border border-platinum-tint hover:bg-cloud-mist rounded-lg text-xs font-semibold text-action-blue transition-colors"
-                                        >
-                                            Chi tiết
-                                        </button>
+                            {isNoShowsLoading && allNoShows.length === 0 && (
+                                <tr>
+                                    <td colSpan="6" className="px-4 py-6 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-slate-blue text-xs">
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Đang tải...
+                                        </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )}
+                            {allNoShows.map(caseItem => {
+                                const dt = caseItem.detectedAt ? new Date(caseItem.detectedAt) : null;
+                                return (
+                                    <tr key={caseItem.id} className="hover:bg-cloud-mist/20 transition-colors">
+                                        <td className="px-4 py-3 font-mono text-[10px] text-slate-blue max-w-[200px]" title={caseItem.id}>
+                                            {caseItem.id}
+                                        </td>
+                                        <td className="px-4 py-3 font-semibold text-midnight-indigo whitespace-nowrap">{caseItem.roomName || caseItem.roomId}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase whitespace-nowrap ${
+                                                caseItem.status === 'risk' ? 'bg-red-100 text-red-700' :
+                                                caseItem.status === 'confirmed' ? 'bg-orange-100 text-orange-700' :
+                                                caseItem.status === 'warning_sent' ? 'bg-yellow-100 text-yellow-700' :
+                                                caseItem.status === 'released' ? 'bg-green-100 text-green-700' :
+                                                caseItem.status === 'dismissed' ? 'bg-slate-200 text-slate-700' :
+                                                caseItem.status === 'resolved' ? 'bg-teal-100 text-teal-700' :
+                                                'bg-blue-100 text-blue-700'
+                                            }`}>
+                                                {caseItem.status === 'risk' ? 'Có rủi ro' :
+                                                 caseItem.status === 'confirmed' ? 'Đã xác nhận' :
+                                                 caseItem.status === 'warning_sent' ? 'Đã gửi cảnh báo' :
+                                                 caseItem.status === 'released' ? 'Đã giải phóng' :
+                                                 caseItem.status === 'dismissed' ? 'Đã bỏ qua' :
+                                                 caseItem.status === 'resolved' ? 'Đã giải quyết' :
+                                                 caseItem.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                                            {dt ? dt.toLocaleDateString('vi-VN') : '—'}
+                                        </td>
+                                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                                            {dt ? dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button
+                                                onClick={() => handleOpenNoShow({ roomId: caseItem.roomId, roomName: caseItem.roomName, noShowStatus: caseItem.status })}
+                                                className="px-3 py-1 bg-white border border-platinum-tint hover:bg-cloud-mist rounded-lg text-xs font-semibold text-action-blue transition-colors"
+                                            >
+                                                Chi tiết
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination — luôn hiển thị khi có data */}
+                {(allNoShows.length > 0 || noShowPage > 1) && (
+                    <div className="px-4 py-3 border-t border-outline-gray bg-cloud-mist/20 flex items-center justify-between text-xs text-slate-blue">
+                        <span>
+                            Trang <span className="font-bold text-midnight-indigo">{noShowPage}</span>
+                            {noShowTotalPages > 1 && <> / {noShowTotalPages}</>}
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => changeNoShowPage(noShowPage - 1)}
+                                disabled={noShowPage <= 1 || isNoShowsLoading}
+                                className="px-3 py-1.5 border border-platinum-tint rounded-lg font-semibold bg-white hover:bg-cloud-mist disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                ← Trước
+                            </button>
+                            <button
+                                onClick={() => changeNoShowPage(noShowPage + 1)}
+                                disabled={(!noShowHasMore && noShowPage >= noShowTotalPages) || isNoShowsLoading}
+                                className="px-3 py-1.5 border border-platinum-tint rounded-lg font-semibold bg-white hover:bg-cloud-mist disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Sau →
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ─────────── No-Show Detail Modal ─────────── */}
@@ -517,14 +605,30 @@ const RealtimeRoomMonitor = () => {
                                 <h3 className="font-bold text-midnight-indigo text-base mb-2">
                                     {confirmAction.type === 'release' ? 'Xác nhận giải phóng phòng?' : 'Xác nhận bỏ qua cảnh báo?'}
                                 </h3>
-                                <p className="text-xs text-slate-blue mb-6">
+                                <p className="text-xs text-slate-blue mb-4">
                                     {confirmAction.type === 'release'
                                         ? 'Phòng sẽ được đánh dấu trống và có thể được đặt lại bởi người khác.'
                                         : 'Cảnh báo No-show sẽ bị đánh dấu bỏ qua, không ảnh hưởng đến cuộc họp hiện tại.'}
                                 </p>
+                                {confirmAction.type === 'release' && (
+                                    <div className="mb-4 text-left">
+                                        <label className="block text-xs font-bold text-slate-blue mb-1">
+                                            Lý do giải phóng <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            rows={2}
+                                            maxLength={500}
+                                            placeholder="Nhập lý do giải phóng phòng..."
+                                            value={releaseReason}
+                                            onChange={(e) => setReleaseReason(e.target.value)}
+                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-xs text-midnight-indigo resize-none focus:outline-none focus:border-action-blue focus:ring-2 focus:ring-action-blue/10"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-0.5 text-right">{releaseReason.length}/500</p>
+                                    </div>
+                                )}
                                 <div className="flex gap-3">
                                     <button
-                                        onClick={() => setConfirmAction(null)}
+                                        onClick={() => { setConfirmAction(null); setReleaseReason(''); }}
                                         disabled={isProcessing}
                                         className="flex-1 px-4 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue bg-white hover:bg-cloud-mist disabled:opacity-50"
                                     >

@@ -1,5 +1,6 @@
-import { Settings, Camera, Plus, Trash2, Pencil } from 'lucide-react';
+import { Settings, Camera, Plus, Trash2, Pencil, X } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Pagination from '../../components/common/Pagination';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 
@@ -95,10 +96,10 @@ const SystemSettings = () => {
     ];
 
     const ROLE_LABELS = {
-        checkin_out: 'Check-in/out phòng họp',
-        zone: 'Hiện diện khu vực (Zone)',
-        headcount: 'Đếm người / Ghi hình',
-        gate: 'Cổng / ANPR',
+        checkin_out: 'Điểm danh ra/vào phòng',
+        zone: 'Hiện diện khu vực',
+        headcount: 'Đếm người',
+        gate: 'Camera cổng ra vào',
         conflict: 'Xung đột cấu hình'
     };
 
@@ -271,8 +272,8 @@ const SystemSettings = () => {
             setError('Ngưỡng phát hiện vắng mặt phải là số nguyên dương.');
             return false;
         }
-        if (Number(noShow.warningGraceMinutes) <= 0) {
-            setError('Thời gian cảnh báo phải là số nguyên dương.');
+        if (Number(noShow.warningGraceMinutes) < 0) {
+            setError('Thời gian cảnh báo không được âm.');
             return false;
         }
         if (Number(noShow.autoReleaseGraceMinutes) <= 0) {
@@ -1055,116 +1056,14 @@ const SystemSettings = () => {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h3 className="font-bold text-midnight-indigo">Ánh xạ Kênh Camera</h3>
-                                    {!channelEditor.open && (
-                                        <button
-                                            type="button"
-                                            onClick={openAddChannelEditor}
-                                            className="px-3 py-1.5 bg-action-blue text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
-                                        >
-                                            <Plus className="w-4 h-4" /> Thêm kênh
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={openAddChannelEditor}
+                                        className="px-3 py-1.5 bg-action-blue text-white rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-glacier-blue transition-colors"
+                                    >
+                                        <Plus className="w-4 h-4" /> Thêm kênh
+                                    </button>
                                 </div>
-
-                                {/* Form Thêm/Sửa theo Vai trò — chỉ hiện field thuộc đúng vai đang chọn */}
-                                {channelEditor.open && (
-                                    <div className="p-4 bg-cloud-mist/40 border border-platinum-tint rounded-xl space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1.5">
-                                                <label className="block text-xs font-bold text-slate-blue uppercase">ID Kênh</label>
-                                                <input
-                                                    type="text"
-                                                    value={channelEditor.channelId}
-                                                    onChange={(e) => handleChannelEditorFieldChange('channelId', e.target.value)}
-                                                    disabled={channelEditor.mode === 'edit'}
-                                                    placeholder="VD: 1"
-                                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue disabled:bg-cloud-mist disabled:text-slate-blue"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="block text-xs font-bold text-slate-blue uppercase">Vai trò</label>
-                                                <select
-                                                    value={channelEditor.role}
-                                                    onChange={(e) => handleChannelRoleChange(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
-                                                >
-                                                    <option value="checkin_out">{ROLE_LABELS.checkin_out}</option>
-                                                    <option value="zone">{ROLE_LABELS.zone}</option>
-                                                    <option value="headcount">{ROLE_LABELS.headcount}</option>
-                                                    <option value="gate">{ROLE_LABELS.gate}</option>
-                                                </select>
-                                            </div>
-
-                                            {/* Field theo vai trò — field không thuộc vai đang chọn thì ẩn hẳn */}
-                                            {(channelEditor.role === 'checkin_out' || channelEditor.role === 'headcount') && (
-                                                <div className="space-y-1.5">
-                                                    <label className="block text-xs font-bold text-slate-blue uppercase">Phòng</label>
-                                                    <select
-                                                        value={channelEditor.roomId}
-                                                        onChange={(e) => handleChannelEditorFieldChange('roomId', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
-                                                    >
-                                                        <option value="">-- Chọn phòng --</option>
-                                                        {rooms.map((room, idx) => (
-                                                            <option key={room.id || room.roomId || idx} value={room.id || room.roomId}>{room.roomName || room.room_name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            )}
-
-                                            {(channelEditor.role === 'checkin_out' || channelEditor.role === 'gate') && (
-                                                <div className="space-y-1.5">
-                                                    <label className="block text-xs font-bold text-slate-blue uppercase">Hướng</label>
-                                                    <select
-                                                        value={channelEditor.direction}
-                                                        onChange={(e) => handleChannelEditorFieldChange('direction', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
-                                                    >
-                                                        <option value="enter">Vào</option>
-                                                        <option value="leave">Ra</option>
-                                                    </select>
-                                                </div>
-                                            )}
-
-                                            {(channelEditor.role === 'zone' || channelEditor.role === 'gate') && (
-                                                <div className="space-y-1.5">
-                                                    <label className="block text-xs font-bold text-slate-blue uppercase">
-                                                        {channelEditor.role === 'zone' ? 'Khu vực' : 'Khu vực cổng'}
-                                                    </label>
-                                                    <select
-                                                        value={channelEditor.zoneId}
-                                                        onChange={(e) => handleChannelEditorFieldChange('zoneId', e.target.value)}
-                                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
-                                                    >
-                                                        <option value="">-- Chọn khu vực --</option>
-                                                        {zones.map((zone, idx) => (
-                                                            <option key={zone.id || idx} value={zone.id}>{zone.zoneName || zone.zone_name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex justify-end gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={closeChannelEditor}
-                                                disabled={channelActionSaving}
-                                                className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-all"
-                                            >
-                                                Hủy
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={saveChannelRow}
-                                                disabled={channelActionSaving}
-                                                className="px-4 py-2 bg-action-blue text-white hover:bg-glacier-blue rounded-xl text-xs font-semibold shadow-sm transition-all min-w-[90px]"
-                                            >
-                                                {channelActionSaving ? 'Đang lưu...' : 'Lưu'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
 
                                 {channelRows.length === 0 ? (
                                     <div className="p-8 text-center border border-platinum-tint border-dashed rounded-xl text-slate-blue text-sm">
@@ -1237,6 +1136,161 @@ const SystemSettings = () => {
                 </form>
             </div>
         </div>
+
+        {/* CHANNEL EDITOR MODAL */}
+        {channelEditor.open && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-platinum-tint flex flex-col">
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex items-center justify-between shrink-0">
+                        <h3 className="font-bold text-midnight-indigo text-base flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-action-blue" />
+                            {channelEditor.mode === 'add' ? 'Thêm kênh camera' : 'Chỉnh sửa kênh camera'}
+                        </h3>
+                        <button
+                            type="button"
+                            onClick={closeChannelEditor}
+                            disabled={channelActionSaving}
+                            className="p-1.5 text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist rounded-lg transition-colors disabled:opacity-50"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="px-6 py-5 space-y-4 overflow-y-auto">
+                        {/* Lỗi inline trong modal */}
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-blue uppercase">ID Kênh</label>
+                                <input
+                                    type="text"
+                                    value={channelEditor.channelId}
+                                    onChange={(e) => handleChannelEditorFieldChange('channelId', e.target.value)}
+                                    disabled={channelEditor.mode === 'edit'}
+                                    placeholder="VD: 1"
+                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue disabled:bg-cloud-mist disabled:text-slate-blue"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-slate-blue uppercase">Vai trò</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { v: 'checkin_out', label: ROLE_LABELS.checkin_out },
+                                    { v: 'zone',        label: ROLE_LABELS.zone },
+                                    { v: 'headcount',   label: ROLE_LABELS.headcount },
+                                    { v: 'gate',        label: ROLE_LABELS.gate }
+                                ].map(({ v, label }) => (
+                                    <button
+                                        key={v}
+                                        type="button"
+                                        onClick={() => handleChannelRoleChange(v)}
+                                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 text-left transition-all ${
+                                            channelEditor.role === v
+                                                ? 'border-action-blue bg-blue-50 text-action-blue'
+                                                : 'border-platinum-tint bg-white text-slate-blue hover:border-action-blue/40 hover:bg-cloud-mist/40'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Fields theo vai trò */}
+                        {(channelEditor.role === 'checkin_out' || channelEditor.role === 'headcount') && (
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-blue uppercase">Phòng họp</label>
+                                <select
+                                    value={channelEditor.roomId}
+                                    onChange={(e) => handleChannelEditorFieldChange('roomId', e.target.value)}
+                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
+                                >
+                                    <option value="">-- Chọn phòng --</option>
+                                    {rooms.map((room, idx) => (
+                                        <option key={room.id || room.roomId || idx} value={room.id || room.roomId}>
+                                            {room.roomName || room.room_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {(channelEditor.role === 'checkin_out' || channelEditor.role === 'gate') && (
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-blue uppercase">Hướng di chuyển</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[{ v: 'enter', label: 'Vào' }, { v: 'leave', label: 'Ra' }].map(({ v, label }) => (
+                                        <button
+                                            key={v}
+                                            type="button"
+                                            onClick={() => handleChannelEditorFieldChange('direction', v)}
+                                            className={`py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                                                channelEditor.direction === v
+                                                    ? 'border-action-blue bg-blue-50 text-action-blue'
+                                                    : 'border-platinum-tint bg-white text-slate-blue hover:border-action-blue/40'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {(channelEditor.role === 'zone' || channelEditor.role === 'gate') && (
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-blue uppercase">
+                                    {channelEditor.role === 'zone' ? 'Khu vực hiện diện' : 'Khu vực cổng'}
+                                </label>
+                                <select
+                                    value={channelEditor.zoneId}
+                                    onChange={(e) => handleChannelEditorFieldChange('zoneId', e.target.value)}
+                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium focus:outline-none focus:border-action-blue"
+                                >
+                                    <option value="">-- Chọn khu vực --</option>
+                                    {zones.map((zone, idx) => (
+                                        <option key={zone.id || idx} value={zone.id}>
+                                            {zone.zoneName || zone.zone_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-platinum-tint bg-slate-50 flex justify-end gap-3 shrink-0">
+                        <button
+                            type="button"
+                            onClick={closeChannelEditor}
+                            disabled={channelActionSaving}
+                            className="px-5 py-2 border border-platinum-tint bg-white text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            type="button"
+                            onClick={saveChannelRow}
+                            disabled={channelActionSaving}
+                            className="px-5 py-2 bg-action-blue text-white hover:bg-glacier-blue rounded-xl text-sm font-semibold shadow-sm transition-all min-w-[100px] flex items-center justify-center gap-2"
+                        >
+                            {channelActionSaving && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                            {channelActionSaving ? 'Đang lưu...' : (channelEditor.mode === 'add' ? 'Thêm kênh' : 'Lưu thay đổi')}
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
         </>
     );
 };
