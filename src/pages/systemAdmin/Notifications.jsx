@@ -51,63 +51,9 @@ const Notifications = () => {
                 throw new Error();
             }
         } catch {
-            // Local Mock Fallback
-            const mockNotifications = [
-                {
-                    id: 'noti-1',
-                    title: 'Yêu cầu phê duyệt đặt phòng mới',
-                    body: 'Nguyễn Văn A đã gửi yêu cầu đặt phòng Apollo 101 cho cuộc họp "Kick-off Dự án" vào 12/06/2026 09:00.',
-                    type: 'APPROVAL_REQUEST',
-                    read: false,
-                    createdAt: '2026-06-10T19:30:00Z'
-                },
-                {
-                    id: 'noti-2',
-                    title: 'Cảnh báo No-show tự động',
-                    body: 'Phòng Zeus 201 không phát hiện hiện diện sau 10 phút. Phòng đã tự động được giải phóng.',
-                    type: 'NO_SHOW_ALERT',
-                    read: false,
-                    createdAt: '2026-06-10T18:45:00Z'
-                },
-                {
-                    id: 'noti-3',
-                    title: 'Thiết bị mất kết nối (Offline)',
-                    body: 'Camera AI (CAM-SEM-01) tại Phòng Hội Thảo A đã mất kết nối tín hiệu heartbeat quá 5 phút.',
-                    type: 'DEVICE_FAULT',
-                    read: true,
-                    createdAt: '2026-06-10T14:20:00Z'
-                },
-                {
-                    id: 'noti-4',
-                    title: 'Mật khẩu đã được thay đổi',
-                    body: 'Tài khoản của bạn vừa được thay đổi mật khẩu đăng nhập thành công.',
-                    type: 'SECURITY_ALERT',
-                    read: true,
-                    createdAt: '2026-06-09T08:00:00Z'
-                },
-                {
-                    id: 'noti-5',
-                    title: 'Đăng ký tài khoản thành công',
-                    body: 'Chào mừng bạn đến với SmarTracking. Vui lòng cập nhật ảnh chân dung sinh trắc học.',
-                    type: 'SYSTEM_INFO',
-                    read: true,
-                    createdAt: '2026-06-01T08:00:00Z'
-                }
-            ];
-
-            let filtered = mockNotifications;
-            if (filterType === 'unread') {
-                filtered = filtered.filter(n => !n.read);
-            } else if (filterType === 'read') {
-                filtered = filtered.filter(n => n.read);
-            }
-
-            const startIndex = (page - 1) * limit;
-            const paginated = filtered.slice(startIndex, startIndex + limit);
-
-            setNotificationsList(paginated);
-            setTotalPages(Math.ceil(filtered.length / limit) || 1);
-            setTotalItems(filtered.length);
+            setNotificationsList([]);
+            setTotalPages(1);
+            setTotalItems(0);
         } finally {
             setLoading(false);
         }

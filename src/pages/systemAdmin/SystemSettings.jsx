@@ -740,9 +740,9 @@ const SystemSettings = () => {
                                     <p className="text-xs text-slate-blue mt-1">Phát hiện vắng mặt → gửi cảnh báo (luôn tự động) → chờ phản hồi → nếu bật, tự động đổi trạng thái phòng.</p>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     {/* Enable toggle */}
-                                    <div className="p-4 bg-cloud-mist/50 border border-platinum-tint/70 rounded-xl space-y-2 flex flex-col justify-between h-full">
+                                    <div className="p-4 bg-cloud-mist/50 border border-platinum-tint/70 rounded-xl flex flex-col justify-between h-full">
                                         <div>
                                             <span className="block text-xs font-bold text-slate-blue uppercase">Xử lý No-show tự động</span>
                                             <span className="text-xs text-steel-gray mt-1 block">Tự động thu hồi phòng nếu bỏ trống phòng khi đến giờ họp.</span>
@@ -764,9 +764,9 @@ const SystemSettings = () => {
                                     </div>
 
                                     {/* Detection threshold minutes */}
-                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Ngưỡng phát hiện vắng mặt</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian không check-in kể từ giờ họp trước khi bị đánh dấu no-show (phút).</span>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Thời gian không check-in kể từ giờ họp trước khi bị đánh dấu no-show (phút).</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
@@ -781,9 +781,9 @@ const SystemSettings = () => {
                                     </div>
 
                                     {/* Warning grace minutes */}
-                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian cảnh báo trước khi nhả phòng</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian gửi cảnh báo đến Host trước khi phòng bị thu hồi do no-show (phút).</span>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Thời gian gửi cảnh báo đến Host trước khi phòng bị thu hồi do no-show (phút).</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
@@ -798,9 +798,9 @@ const SystemSettings = () => {
                                     </div>
 
                                     {/* Auto-release grace minutes */}
-                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian chờ phản hồi</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Thời gian cho phép Host xác nhận trước khi nhả phòng (phút). <span className="italic">Cần đủ dài để người tổ chức có cơ hội thực sự phản hồi cảnh báo trước khi phòng bị thu hồi.</span></span>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Thời gian cho phép Host xác nhận trước khi nhả phòng (phút). <span className="italic">Cần đủ dài để người tổ chức có cơ hội thực sự phản hồi cảnh báo trước khi phòng bị thu hồi.</span></span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
@@ -815,9 +815,9 @@ const SystemSettings = () => {
                                     </div>
 
                                     {/* Presence confirm seconds */}
-                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian có mặt tối thiểu để xác nhận tham dự</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Số giây cảm biến phát hiện có mặt liên tục trước khi hệ thống xác nhận check-in.</span>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Số giây cảm biến phát hiện có mặt liên tục trước khi hệ thống xác nhận check-in.</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
@@ -832,9 +832,9 @@ const SystemSettings = () => {
                                     </div>
 
                                     {/* Presence noise tolerance seconds */}
-                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl space-y-2">
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
                                         <label className="block text-xs font-bold text-slate-blue uppercase">Độ trễ chấp nhận nhiễu cảm biến</label>
-                                        <span className="text-xs text-steel-gray mt-0.5 block">Khoảng thời gian cảm biến mất tín hiệu ngắn được coi là nhiễu và không làm gián đoạn xác nhận có mặt (giây).</span>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Khoảng thời gian cảm biến mất tín hiệu ngắn được coi là nhiễu và không làm gián đoạn xác nhận có mặt (giây).</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
