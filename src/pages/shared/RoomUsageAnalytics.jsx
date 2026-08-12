@@ -104,7 +104,7 @@ const RoomUsageAnalytics = () => {
         ]
         : [];
 
-    const noShowRanking = (noShowData?.byRoom || [])
+    const noShowRanking = (noShowData?.ranking?.items || [])
         .slice()
         .sort((a, b) => (b.noShowRate || 0) - (a.noShowRate || 0))
         .slice(0, 8);
@@ -413,7 +413,7 @@ const RoomUsageAnalytics = () => {
                                     <XAxis type="number" tickLine={false} axisLine={false} style={{ fontSize: 9, fill: '#64748b' }} unit="%" domain={[0, 'auto']} />
                                     <YAxis
                                         type="category"
-                                        dataKey="roomName"
+                                        dataKey="name"
                                         tickLine={false}
                                         axisLine={false}
                                         style={{ fontSize: 9, fill: '#64748b' }}
@@ -452,22 +452,22 @@ const RoomUsageAnalytics = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <MetricBlock
                             label="Tỷ lệ sử dụng"
-                            value={utilizationData?.utilizationRate != null ? `${utilizationData.utilizationRate}%` : (utilizationRate != null ? `${utilizationRate}%` : '—')}
+                            value={utilizationData?.summary?.reservationUtilizationRate?.current != null ? `${utilizationData.summary.reservationUtilizationRate.current}%` : (utilizationRate != null ? `${utilizationRate}%` : '—')}
                             sub="Đặt / giờ mở cửa"
                         />
                         <MetricBlock
                             label="Giờ đặt trước"
-                            value={utilizationData?.bookedHours != null ? `${utilizationData.bookedHours}h` : (data?.summary?.totalBookedHours != null ? `${data.summary.totalBookedHours}h` : '—')}
+                            value={utilizationData?.summary?.bookedHours?.current != null ? `${utilizationData.summary.bookedHours.current}h` : (data?.summary?.totalBookedHours != null ? `${data.summary.totalBookedHours}h` : '—')}
                         />
                         <MetricBlock
                             label="Giờ dùng thực tế"
-                            value={utilizationData?.actualUsedHours != null ? `${utilizationData.actualUsedHours}h` : (data?.summary?.actualUsedHours != null ? `${data.summary.actualUsedHours}h` : '—')}
+                            value={utilizationData?.summary?.actualHours?.current != null ? `${utilizationData.summary.actualHours.current}h` : (data?.summary?.actualUsedHours != null ? `${data.summary.actualUsedHours}h` : '—')}
                         />
                         <MetricBlock
                             label="Giờ mở cửa khả dụng"
-                            value={utilizationData?.availableHours != null ? `${utilizationData.availableHours}h` : '—'}
-                            sub="Cần BE bổ sung"
-                            dimSub={!utilizationData?.availableHours}
+                            value={utilizationData?.summary?.availableHours?.current != null ? `${utilizationData.summary.availableHours.current}h` : '—'}
+                            sub={utilizationData?.summary?.availableHours?.current == null ? 'Chưa có dữ liệu' : undefined}
+                            dimSub={utilizationData?.summary?.availableHours?.current == null}
                         />
                     </div>
                 </div>

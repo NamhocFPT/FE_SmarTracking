@@ -1,4 +1,5 @@
 import { Users, RefreshCw } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
@@ -35,6 +36,14 @@ import {
     buildPartnerFormData,
 } from '../../constants/partnerAccount';
 
+
+const VEHICLE_PLATE_STATUS_LABELS = {
+    pending_commit: { label: 'Hợp lệ, chờ xác nhận', color: 'bg-amber-50 text-amber-700' },
+    attached: { label: 'Đã đăng ký biển số', color: 'bg-blue-50 text-action-blue' },
+    invalid_plate: { label: 'Sai định dạng biển số', color: 'bg-red-50 text-red-700' },
+    duplicate_plate: { label: 'Biển số đã được đăng ký', color: 'bg-orange-50 text-orange-700' },
+    attach_failed: { label: 'Lỗi đăng ký (tài khoản vẫn tạo thành công)', color: 'bg-red-50 text-red-700' },
+};
 
 /**
  * UserManagement Component
@@ -124,12 +133,16 @@ const UserManagement = () => {
 
     const [importFile, setImportFile] = useState(null);
     const [importPhotos, setImportPhotos] = useState([]); // File[], filename = employee_code
+    const [importPhotosZip, setImportPhotosZip] = useState(null); // single .zip file
     const [biometricConsentChecked, setBiometricConsentChecked] = useState(false);
     const [importing, setImporting] = useState(false);
     const [importStep, setImportStep] = useState(1); // 1 = Preview, 2 = Commit, 3 = Done
     const [isDragging, setIsDragging] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]); // failed/invalid rows: { row, email, status, reason }
     const [importResults, setImportResults] = useState([]); // full results[] from last import, used for biometricStatus display
+    const [excelEmployeeCodes, setExcelEmployeeCodes] = useState([]); // employee_code values parsed from Excel client-side
+    const [unmatchedPhotos, setUnmatchedPhotos] = useState([]); // photo filenames (no ext) not found in excelEmployeeCodes
+    const [employeesWithoutPhoto, setEmployeesWithoutPhoto] = useState([]); // employee codes with no matching photo file
 
     // Load filter options (Departments, Roles)
     const loadFilterData = useCallback(async () => {
@@ -571,6 +584,40 @@ const UserManagement = () => {
         }
     };
 
+    // Parse employee_code column from Excel file client-side for biometric photo validation
+    const parseExcelForEmployeeCodes = useCallback((file) => {
+        if (!file) { setExcelEmployeeCodes([]); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                if (rows.length < 2) { setExcelEmployeeCodes([]); return; }
+                const headers = rows[0].map(h => String(h).trim().toLowerCase());
+                const codeIdx = headers.indexOf('employee_code');
+                if (codeIdx === -1) { setExcelEmployeeCodes([]); return; }
+                const codes = rows.slice(1).map(row => String(row[codeIdx] || '').trim()).filter(Boolean);
+                setExcelEmployeeCodes(codes);
+            } catch { setExcelEmployeeCodes([]); }
+        };
+        reader.readAsArrayBuffer(file);
+    }, []);
+
+    // Recompute unmatched photos & employees without photo whenever photos or codes change
+    useEffect(() => {
+        if (!importPhotos.length || !excelEmployeeCodes.length) {
+            setUnmatchedPhotos([]);
+            setEmployeesWithoutPhoto([]);
+            return;
+        }
+        const photoBaseNames = importPhotos.map(f => f.name.replace(/\.[^.]+$/, '').toLowerCase());
+        const codeSet = new Set(excelEmployeeCodes.map(c => c.toLowerCase()));
+        const photoSet = new Set(photoBaseNames);
+        setUnmatchedPhotos(photoBaseNames.filter(n => !codeSet.has(n)));
+        setEmployeesWithoutPhoto(excelEmployeeCodes.filter(c => !photoSet.has(c.toLowerCase())));
+    }, [importPhotos, excelEmployeeCodes]);
+
     // Download template excel (UC-ACC-02)
     const handleDownloadTemplate = async () => {
         setError(null);
@@ -651,8 +698,16 @@ const UserManagement = () => {
                 fd.append('commit', 'false');
             }
 
-            importPhotos.forEach(photo => fd.append('photos', photo, photo.name));
-            if (importPhotos.length > 0) {
+            // Exclude photos whose filename doesn't match any employee_code in the Excel
+            const codeSet = new Set(excelEmployeeCodes.map(c => c.toLowerCase()));
+            const photosToSend = excelEmployeeCodes.length > 0
+                ? importPhotos.filter(f => codeSet.has(f.name.replace(/\.[^.]+$/, '').toLowerCase()))
+                : importPhotos;
+            photosToSend.forEach(photo => fd.append('photos', photo, photo.name));
+            if (importPhotosZip) {
+                fd.append('photosZip', importPhotosZip, importPhotosZip.name);
+            }
+            if (importPhotos.length > 0 || importPhotosZip) {
                 fd.append('biometricConsentConfirmed', 'true');
             }
 
@@ -680,7 +735,7 @@ const UserManagement = () => {
                         + (failedRows.length > 0 ? ` Bỏ qua ${failedRows.length} dòng bị lỗi.` : '')
                     );
 
-                    if (failedRows.length === 0 && importPhotos.length === 0) {
+                    if (failedRows.length === 0 && importPhotos.length === 0 && !importPhotosZip) {
                         setIsImportModalOpen(false);
                     } else {
                         setImportStep(3); // Keep modal open to show final status
@@ -749,6 +804,7 @@ const UserManagement = () => {
         if (avatarInputRef.current) avatarInputRef.current.value = '';
         setImportFile(null);
         setImportPhotos([]);
+        setImportPhotosZip(null);
         setBiometricConsentChecked(false);
         setValidationErrors([]);
         setImportResults([]);
@@ -1546,7 +1602,9 @@ const UserManagement = () => {
                                     setIsDragging(false);
                                     if (importStep > 1) return;
                                     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                        setImportFile(e.dataTransfer.files[0]);
+                                        const f = e.dataTransfer.files[0];
+                                        setImportFile(f);
+                                        parseExcelForEmployeeCodes(f);
                                         setValidationErrors([]);
                                         setImportResults([]);
                                         setImportStep(1);
@@ -1559,7 +1617,9 @@ const UserManagement = () => {
                                     accept=".xlsx, .xls, .csv"
                                     disabled={importStep > 1}
                                     onChange={(e) => {
-                                        setImportFile(e.target.files[0]);
+                                        const f = e.target.files[0] || null;
+                                        setImportFile(f);
+                                        parseExcelForEmployeeCodes(f);
                                         setValidationErrors([]);
                                         setImportResults([]);
                                         setImportStep(1);
@@ -1585,30 +1645,63 @@ const UserManagement = () => {
                             {/* Biometric photos (optional) — filenames must match employee_code */}
                             <div className="border border-platinum-tint rounded-2xl p-4 space-y-3 bg-cloud-mist/20">
                                 <div>
-                                    <label htmlFor="biometric-photos-upload" className="text-xs font-bold text-midnight-indigo cursor-pointer">
-                                        Ảnh sinh trắc học (tùy chọn)
-                                    </label>
-                                    <p className="text-[10px] text-slate-blue mt-0.5">
-                                        Đặt tên file = mã nhân viên trong Excel (vd: EMP001.jpg). Backend sẽ tự khớp ảnh với dòng tương ứng.
+                                    <p className="text-xs font-bold text-midnight-indigo">
+                                        Ảnh sinh trắc học — cho tất cả nhân viên trong file Excel
+                                        <span className="ml-1.5 text-[10px] font-semibold text-steel-gray bg-slate-100 px-1.5 py-0.5 rounded-full">Tùy chọn</span>
+                                    </p>
+                                    <p className="text-[10px] text-slate-blue mt-1.5 leading-relaxed">
+                                        Mỗi ảnh tương ứng với <strong>1 nhân viên</strong> trong danh sách Excel.
+                                        Đặt tên file <strong>= mã nhân viên</strong> (cột <code className="bg-slate-100 px-1 rounded">employee_code</code>) để hệ thống tự ghép đúng người.
+                                        <br />
+                                        Ví dụ: <code className="bg-slate-100 px-1 rounded">EMP001.jpg</code>, <code className="bg-slate-100 px-1 rounded">EMP002.png</code>
                                     </p>
                                 </div>
-                                <input
-                                    type="file"
-                                    multiple
-                                    accept="image/jpeg,image/png,image/webp"
-                                    onChange={(e) => {
-                                        setImportPhotos(Array.from(e.target.files || []));
-                                        setImportResults([]);
-                                    }}
-                                    className="hidden"
-                                    id="biometric-photos-upload"
-                                />
-                                <label
-                                    htmlFor="biometric-photos-upload"
-                                    className="inline-flex items-center px-3 py-1.5 border border-platinum-tint bg-white text-xs font-semibold text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg cursor-pointer transition-colors"
-                                >
-                                    Chọn ảnh...
-                                </label>
+
+                                {/* Option A: multiple individual photos */}
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept="image/jpeg,image/png,image/webp"
+                                        onChange={(e) => {
+                                            setImportPhotos(Array.from(e.target.files || []));
+                                            setImportResults([]);
+                                        }}
+                                        className="hidden"
+                                        id="biometric-photos-upload"
+                                    />
+                                    <label
+                                        htmlFor="biometric-photos-upload"
+                                        className="inline-flex items-center px-3 py-1.5 border border-platinum-tint bg-white text-xs font-semibold text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        Chọn ảnh rời...
+                                    </label>
+
+                                    <span className="text-[10px] text-steel-gray font-semibold">hoặc</span>
+
+                                    {/* Option B: single .zip */}
+                                    <input
+                                        type="file"
+                                        accept=".zip"
+                                        onChange={(e) => {
+                                            setImportPhotosZip(e.target.files[0] || null);
+                                            setImportResults([]);
+                                        }}
+                                        className="hidden"
+                                        id="biometric-zip-upload"
+                                    />
+                                    <label
+                                        htmlFor="biometric-zip-upload"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-platinum-tint bg-white text-xs font-semibold text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
+                                        </svg>
+                                        Nộp file .zip...
+                                    </label>
+                                </div>
+
+                                {/* Selected individual photos */}
                                 {importPhotos.length > 0 && (
                                     <div className="flex flex-wrap gap-1.5">
                                         {importPhotos.map((photo, idx) => (
@@ -1618,14 +1711,70 @@ const UserManagement = () => {
                                                     type="button"
                                                     onClick={() => setImportPhotos(prev => prev.filter((_, i) => i !== idx))}
                                                     className="text-steel-gray hover:text-red-500"
-                                                >
-                                                    ×
-                                                </button>
+                                                >×</button>
                                             </span>
                                         ))}
                                     </div>
                                 )}
-                                {importPhotos.length > 0 && (
+
+                                {/* Selected .zip file */}
+                                {importPhotosZip && (
+                                    <div className="flex items-center gap-2 bg-white border border-action-blue/30 rounded-lg px-3 py-2">
+                                        <svg className="w-4 h-4 text-action-blue shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
+                                        </svg>
+                                        <span className="text-[11px] font-mono text-midnight-indigo flex-1 truncate">{importPhotosZip.name}</span>
+                                        <span className="text-[10px] text-slate-blue shrink-0">{(importPhotosZip.size / 1024 / 1024).toFixed(1)} MB</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setImportPhotosZip(null)}
+                                            className="text-steel-gray hover:text-red-500 shrink-0"
+                                        >×</button>
+                                    </div>
+                                )}
+
+                                {/* Unmatched photos warning — filenames not found in Excel employee_code */}
+                                {unmatchedPhotos.length > 0 && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
+                                        <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                            </svg>
+                                            {unmatchedPhotos.length} ảnh không khớp mã nhân viên — sẽ bị loại bỏ khi nộp
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {unmatchedPhotos.map((name, i) => (
+                                                <span key={i} className="font-mono text-[10px] bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded line-through">
+                                                    {name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-amber-600">Tên ảnh phải khớp đúng với cột <code className="bg-amber-100 px-0.5 rounded">employee_code</code> trong file Excel.</p>
+                                    </div>
+                                )}
+
+                                {/* Employees without matching photo */}
+                                {employeesWithoutPhoto.length > 0 && importPhotos.length > 0 && (
+                                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
+                                        <p className="text-xs font-bold text-red-700 flex items-center gap-1.5">
+                                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
+                                            </svg>
+                                            {employeesWithoutPhoto.length} nhân viên chưa có ảnh sinh trắc — vẫn được tạo tài khoản, nhưng chưa có khuôn mặt
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {employeesWithoutPhoto.map((code, i) => (
+                                                <span key={i} className="font-mono text-[10px] bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 rounded">
+                                                    {code}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-red-500">Bổ sung ảnh tên <code className="bg-red-100 px-0.5 rounded">{employeesWithoutPhoto[0]}.jpg</code> (hoặc .png, .webp) để ghép sinh trắc học cho nhân viên này.</p>
+                                    </div>
+                                )}
+
+                                {/* Consent checkbox — shown when any biometric source is chosen */}
+                                {(importPhotos.length > 0 || importPhotosZip) && (
                                     <label className="flex items-start gap-2 text-xs text-midnight-indigo font-medium cursor-pointer pt-1 border-t border-platinum-tint/60">
                                         <input
                                             type="checkbox"
@@ -1685,6 +1834,29 @@ const UserManagement = () => {
                                 </div>
                             )}
 
+                            {/* Vehicle plate results — only shown when any row has vehiclePlateStatus */}
+                            {importResults.some(r => r.vehiclePlateStatus) && (
+                                <div className="space-y-2 max-h-[180px] overflow-y-auto bg-cloud-mist/30 border border-platinum-tint rounded-xl p-3.5">
+                                    <h4 className="text-xs font-bold text-midnight-indigo uppercase tracking-wide">Kết quả đăng ký biển số xe:</h4>
+                                    <div className="divide-y divide-platinum-tint/50">
+                                        {importResults.filter(r => r.vehiclePlateStatus).map((r, idx) => {
+                                            const meta = VEHICLE_PLATE_STATUS_LABELS[r.vehiclePlateStatus] || { label: r.vehiclePlateStatus, color: 'bg-slate-100 text-slate-600' };
+                                            return (
+                                                <div key={idx} className="py-2 flex items-center justify-between text-xs gap-3">
+                                                    <span className="font-bold text-midnight-indigo bg-white border border-platinum-tint px-1.5 py-0.5 rounded">
+                                                        Dòng {r.row}
+                                                    </span>
+                                                    <span className="flex-1 text-slate-blue font-mono truncate">{r.email}</span>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${meta.color}`}>
+                                                        {meta.label}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
                                 <button
                                     type="button"
@@ -1696,7 +1868,7 @@ const UserManagement = () => {
                                 {importStep === 1 && (
                                     <button
                                         type="submit"
-                                        disabled={!importFile || importing || (importPhotos.length > 0 && !biometricConsentChecked)}
+                                        disabled={!importFile || importing || ((importPhotos.length > 0 || importPhotosZip) && !biometricConsentChecked)}
                                         className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
                                     >
                                         {importing ? 'Đang xác thực...' : 'Xác thực tệp'}
@@ -1705,7 +1877,7 @@ const UserManagement = () => {
                                 {importStep === 2 && (
                                     <button
                                         type="submit"
-                                        disabled={importing || (importPhotos.length > 0 && !biometricConsentChecked)}
+                                        disabled={importing || ((importPhotos.length > 0 || importPhotosZip) && !biometricConsentChecked)}
                                         className={`px-4 py-2 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 ${validationErrors.length > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-action-blue hover:bg-glacier-blue'
                                             }`}
                                     >
