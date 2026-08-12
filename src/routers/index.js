@@ -261,34 +261,7 @@ export const router = [
                 path: 'my-vehicles',
                 element: <MyVehicles />
             },
-            {
-                path: 'anpr-management',
-                element: <ANPRManagement />
-            },
-            {
-                path: 'zones',
-                element: <ZoneManagement />
-            },
-            {
-                path: 'gate-access',
-                element: <GateAccessManagement />
-            },
-            {
-                path: 'room-access-logs',
-                element: <RoomAccessLogs />
-            },
-            {
-                path: 'user-journey',
-                element: <UserJourney />
-            },
-            {
-                path: 'person-control-list',
-                element: <PersonControlList />
-            },
-            {
-                path: 'vehicle-control-list',
-                element: <VehicleControlList />
-            },
+
 
             {
                 path: 'meeting/:id',

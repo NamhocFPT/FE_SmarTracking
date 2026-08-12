@@ -6,7 +6,6 @@ import BiometricReminderModal from '../../../components/biometric/BiometricRemin
 import UserAvatar from '../../../components/common/UserAvatar';
 import ChangePasswordModal from '../../../components/auth/ChangePasswordModal';
 import NotificationBell from '../../../components/common/NotificationBell';
-import { buildDynamicNavigation, filterStaticNavigation } from '../../../utils/buildDynamicNavigation';
 import {
     Home,
     Calendar,
@@ -69,10 +68,6 @@ const STATIC_NAVIGATION_ITEMS = [
         icon: Shield,
         children: [
             { label: 'Ghi hình', to: '/business-admin/recordings', icon: Video },
-            { label: 'Khu vực giám sát', to: '/business-admin/zones', icon: Map },
-            { label: 'Hành trình khuôn viên', to: '/business-admin/user-journey', icon: MapPin },
-            { label: 'Kiểm soát ra vào cổng', to: '/business-admin/anpr-management', icon: Car },
-            { label: 'Danh sách biển số kiểm soát', to: '/business-admin/vehicle-control-list', icon: ClipboardList },
             { label: 'Cảnh báo an ninh', to: '/business-admin/security-alerts', icon: AlertTriangle },
         ],
     },
@@ -103,7 +98,7 @@ const BusinessAdminLayout = () => {
     const navRef = useRef(null);
     const navigate = useNavigate();
 
-    const navigationItems = [...filterStaticNavigation(STATIC_NAVIGATION_ITEMS), ...buildDynamicNavigation('business-admin')];
+    const navigationItems = STATIC_NAVIGATION_ITEMS;
 
     // Load user info from localStorage
     useEffect(() => {
