@@ -33,6 +33,17 @@ export const getAttendanceAnalytics = async (params = {}) => {
 };
 
 /**
+ * UC-150-ext: Danh sách nhân sự kèm thống kê đúng giờ/muộn/vắng (có phân trang).
+ * Dùng cho Manager view (per-user trong phòng ban) và Business Admin modal.
+ * @param {object} params - { preset, from, to, departmentId, page, limit, sortBy }
+ * @returns {Promise<object>} { items[], total, page, limit, totalPages }
+ */
+export const getAttendanceUserStats = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/analytics/attendance/on-time-rate/users${query}`);
+};
+
+/**
  * UC-156: Thống kê tỷ lệ no-show theo phòng
  * @param {object} params - { from, to, roomId, groupBy }
  * @returns {Promise<object>} response envelope
