@@ -1,13 +1,18 @@
-import { Building } from 'lucide-react';
+import { Building, RefreshCw, Power, Lock } from 'lucide-react';
+import { PARTNER_DEPARTMENT_ID } from '../../constants/partnerAccount';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
 import UserAvatar from '../../components/common/UserAvatar';
+import { hasPermission } from '../../utils/permissionUtils';
 import {
     getDepartments,
+    getDepartmentById,
     createDepartment,
     updateDepartment,
+    deactivateDepartment,
+    reactivateDepartment,
     getUsers,
     createUser,
     updateUser,
@@ -28,6 +33,7 @@ import {
 const DepartmentManagement = () => {
     // Org States
     const [departmentsList, setDepartmentsList] = useState([]);
+    const [allActiveDepartments, setAllActiveDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [confirm, setConfirm] = useState(null);
@@ -103,6 +109,14 @@ const DepartmentManagement = () => {
     }, [loadRoles]);
 
     // Load Departments
+    // Chuẩn hoá dept object: BE trả departmentName, FE render dùng name
+    const normalizeDept = (d) => ({
+        ...d,
+        id: d.id || d.departmentId,
+        name: d.departmentName || d.name || '',
+        memberCount: d.memberCount ?? d.usersCount ?? d._count?.users ?? 0,
+    });
+
     const fetchDepartments = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -114,7 +128,7 @@ const DepartmentManagement = () => {
             };
             const res = await getDepartments(params);
             if (res?.success) {
-                setDepartmentsList(res.data || []);
+                setDepartmentsList((res.data || []).map(normalizeDept));
                 setTotalPages(res.meta?.totalPages || 1);
                 setTotalDepartments(res.meta?.total || (res.data?.length || 0));
             } else {
@@ -146,9 +160,24 @@ const DepartmentManagement = () => {
         }
     }, [page, limit, search]);
 
+    const fetchAllActiveDepartments = useCallback(async () => {
+        try {
+            const res = await getDepartments({ limit: 100 });
+            if (res?.success) {
+                const activeDepts = (res.data || [])
+                    .map(normalizeDept)
+                    .filter(d => d.isActive !== false);
+                setAllActiveDepartments(activeDepts);
+            }
+        } catch (err) {
+            console.error('Không thể load tất cả phòng ban:', err);
+        }
+    }, []);
+
     useEffect(() => {
         fetchDepartments();
-    }, [fetchDepartments]);
+        fetchAllActiveDepartments();
+    }, [fetchDepartments, fetchAllActiveDepartments]);
 
     // Fetch members belonging to a department with pagination
     const fetchDepartmentMembers = useCallback(async (deptId, pageNum = 1) => {
@@ -227,13 +256,20 @@ const DepartmentManagement = () => {
         setIsCreateModalOpen(true);
     };
 
-    const openEditModal = (dept) => {
+    const openEditModal = async (dept) => {
         setSelectedDept(dept);
-        setFormData({
-            name: dept.name,
-            description: dept.description || ''
-        });
+        setFormData({ name: dept.name, description: dept.description || '' });
         setIsEditModalOpen(true);
+        try {
+            const res = await getDepartmentById(dept.id);
+            if (res?.success && res.data) {
+                const fresh = normalizeDept(res.data);
+                setSelectedDept(fresh);
+                setFormData({ name: fresh.name, description: fresh.description || '' });
+            }
+        } catch {
+            // giữ nguyên data từ list nếu fetch thất bại
+        }
     };
 
     // Handle Create Submit (Department)
@@ -244,13 +280,13 @@ const DepartmentManagement = () => {
         try {
             const res = await createDepartment({
                 departmentName: formData.name,
-                name: formData.name,
                 description: formData.description
             });
             if (res?.success) {
                 setSuccessMessage('Tạo phòng ban mới thành công!');
                 setIsCreateModalOpen(false);
                 fetchDepartments();
+                fetchAllActiveDepartments();
                 resetForm();
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi tạo phòng ban.');
@@ -268,19 +304,81 @@ const DepartmentManagement = () => {
         try {
             const res = await updateDepartment(selectedDept.id, {
                 departmentName: formData.name,
-                name: formData.name,
                 description: formData.description
             });
             if (res?.success) {
                 setSuccessMessage('Cập nhật thông tin phòng ban thành công!');
                 setIsEditModalOpen(false);
                 fetchDepartments();
+                fetchAllActiveDepartments();
                 resetForm();
             } else {
                 setError(res?.message || 'Có lỗi xảy ra khi cập nhật.');
             }
         } catch (err) {
             setError(err?.message || err?.error?.message || 'Không thể cập nhật phòng ban. Vui lòng thử lại.');
+        }
+    };
+
+    const handleDeptError = (err) => {
+        const errorData = err?.error || err;
+        const code = errorData?.code;
+        const details = errorData?.details || {};
+        
+        if (code === 'PARTNER_DEPARTMENT_PROTECTED') {
+            setError('Không thể vô hiệu hóa phòng ban Đối tác cố định của hệ thống.');
+        } else if (code === 'DEPARTMENT_HAS_ACTIVE_CHILDREN') {
+            setError(`Không thể vô hiệu hóa vì còn ${details.childDepartmentIds?.length || ''} phòng ban con đang hoạt động.`);
+        } else if (code === 'DEPARTMENT_HAS_ACTIVE_MEMBERS') {
+            setError(`Không thể vô hiệu hóa vì còn ${details.activeMemberCount || ''} nhân viên đang hoạt động trực thuộc.`);
+        } else if (code === 'DEPARTMENT_ALREADY_INACTIVE') {
+            setError('Phòng ban này đã bị vô hiệu hóa từ trước.');
+        } else if (code === 'DEPARTMENT_ALREADY_ACTIVE') {
+            setError('Phòng ban này đang hoạt động, không cần kích hoạt lại.');
+        } else if (code === 'PARENT_DEPARTMENT_INACTIVE') {
+            setError(`Không thể kích hoạt lại vì phòng ban cha đang bị vô hiệu hóa.`);
+        } else {
+            setError(err?.message || errorData?.message || 'Thao tác thất bại.');
+        }
+    };
+
+    const handleDeactivateDept = async (dept) => {
+        setError(null);
+        setSuccessMessage(null);
+        setConfirm({
+            message: `Bạn có chắc chắn muốn vô hiệu hóa phòng ban "${dept.name}"? Việc này sẽ tạm ngắt hoạt động của phòng ban trên hệ thống.`,
+            confirmLabel: 'Vô hiệu hóa',
+            onConfirm: async () => {
+                try {
+                    const res = await deactivateDepartment(dept.id);
+                    if (res?.success) {
+                        setSuccessMessage(`Đã vô hiệu hóa phòng ban "${dept.name}" thành công.`);
+                        fetchDepartments();
+                        fetchAllActiveDepartments();
+                    } else {
+                        handleDeptError(res);
+                    }
+                } catch (err) {
+                    handleDeptError(err);
+                }
+            }
+        });
+    };
+
+    const handleReactivateDept = async (dept) => {
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await reactivateDepartment(dept.id);
+            if (res?.success) {
+                setSuccessMessage(`Đã kích hoạt lại phòng ban "${dept.name}" thành công.`);
+                fetchDepartments();
+                fetchAllActiveDepartments();
+            } else {
+                handleDeptError(res);
+            }
+        } catch (err) {
+            handleDeptError(err);
         }
     };
 
@@ -558,6 +656,7 @@ const DepartmentManagement = () => {
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Phòng ban</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Mô tả chi tiết</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Thành viên</th>
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Trạng thái</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Ngày tạo lập</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase text-right">Hành động</th>
                                 </tr>
@@ -565,7 +664,7 @@ const DepartmentManagement = () => {
                             <tbody>
                                 {departmentsList.length === 0 ? (
                                     <tr>
-                                        <td colSpan="5" className="py-12 text-center text-slate-blue text-sm">
+                                        <td colSpan="6" className="py-12 text-center text-slate-blue text-sm">
                                             Không tìm thấy phòng ban nào phù hợp.
                                         </td>
                                     </tr>
@@ -598,6 +697,16 @@ const DepartmentManagement = () => {
                                                     {dept.memberCount || 0} nhân sự
                                                 </button>
                                             </td>
+                                            <td className="py-4 px-6">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                                    dept.isActive !== false
+                                                        ? 'bg-green-50 text-green-700'
+                                                        : 'bg-slate-100 text-slate-500'
+                                                }`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${dept.isActive !== false ? 'bg-green-500' : 'bg-slate-400'}`} />
+                                                    {dept.isActive !== false ? 'Hoạt động' : 'Vô hiệu hóa'}
+                                                </span>
+                                            </td>
                                             <td className="py-4 px-6 text-sm text-slate-blue">
                                                 {dept.createdAt ? new Date(dept.createdAt).toLocaleDateString('vi-VN') : '---'}
                                             </td>
@@ -611,7 +720,27 @@ const DepartmentManagement = () => {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
                                                 </button>
-
+                                                {dept.id === PARTNER_DEPARTMENT_ID ? (
+                                                    <span title="Phòng ban hệ thống, không thể vô hiệu hóa" className="inline-flex p-1.5 rounded-lg text-slate-300 cursor-not-allowed">
+                                                        <Lock className="w-4 h-4" />
+                                                    </span>
+                                                ) : dept.isActive !== false ? (
+                                                    <button
+                                                        onClick={() => handleDeactivateDept(dept)}
+                                                        title="Vô hiệu hóa phòng ban"
+                                                        className="inline-flex p-1.5 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                                                    >
+                                                        <Power className="w-4 h-4" />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleReactivateDept(dept)}
+                                                        title="Kích hoạt lại phòng ban"
+                                                        className="inline-flex p-1.5 rounded-lg text-green-600 hover:text-green-800 hover:bg-green-50 transition-colors"
+                                                    >
+                                                        <RefreshCw className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -1092,12 +1221,27 @@ const DepartmentManagement = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Phòng ban</label>
-                                <input
-                                    type="text"
-                                    disabled
-                                    value={selectedDept?.name || ''}
-                                    className="w-full px-3 py-2 border border-platinum-tint/50 bg-cloud-mist rounded-xl text-sm text-slate-blue cursor-not-allowed focus:outline-none"
-                                />
+                                {hasPermission('accounts.user.update') ? (
+                                    <select
+                                        value={userFormData.departmentId}
+                                        onChange={(e) => setUserFormData({ ...userFormData, departmentId: e.target.value })}
+                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white text-midnight-indigo font-medium"
+                                    >
+                                        <option value={selectedDept?.id || ''}>{selectedDept?.name || 'Chọn phòng ban'}</option>
+                                        {allActiveDepartments
+                                            .filter(d => d.id !== selectedDept?.id)
+                                            .map(d => (
+                                                <option key={d.id} value={d.id}>{d.name}</option>
+                                            ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        disabled
+                                        value={selectedDept?.name || ''}
+                                        className="w-full px-3 py-2 border border-platinum-tint/50 bg-cloud-mist rounded-xl text-sm text-slate-blue cursor-not-allowed focus:outline-none"
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Vai trò (Role)</label>
