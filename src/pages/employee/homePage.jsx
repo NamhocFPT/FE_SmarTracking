@@ -224,71 +224,87 @@ const EmployeeHomePage = () => {
                         className="space-y-8"
                     >
                         {/* Quick Status Bar */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
-                                    <Clock className="w-6 h-6" />
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Card: Họp trong ngày */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center shrink-0">
+                                    <Clock className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Họp trong ngày</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">
-                                        {campusSummaryLoading ? '...' : (campusSummary?.meetingsToday ?? 0)} cuộc họp
-                                    </h3>
-                                </div>
-                            </div>
-
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <ShieldAlert className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Yêu cầu ghi hình</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">{pendingConsents} yêu cầu chờ duyệt</h3>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Họp trong ngày</p>
+                                    <p className="text-2xl font-extrabold text-midnight-indigo leading-tight mt-1">
+                                        {campusSummaryLoading ? '—' : (campusSummary?.meetingsToday ?? 0)}
+                                    </p>
+                                    <p className="text-[11px] text-slate-blue leading-none mt-0.5">cuộc họp</p>
                                 </div>
                             </div>
 
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <LogIn className="w-6 h-6" />
+                            {/* Card: Yêu cầu ghi hình */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                    <ShieldAlert className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Lượt vào cổng hôm nay</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">
-                                        {campusSummaryLoading ? '...' : (() => {
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Ghi hình chờ duyệt</p>
+                                    <p className="text-2xl font-extrabold text-midnight-indigo leading-tight mt-1">{pendingConsents}</p>
+                                    <p className="text-[11px] text-slate-blue leading-none mt-0.5">yêu cầu</p>
+                                </div>
+                            </div>
+
+                            {/* Card: Lượt vào cổng */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                    <LogIn className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Vào cổng hôm nay</p>
+                                    <p className="text-2xl font-extrabold text-midnight-indigo leading-tight mt-1">
+                                        {campusSummaryLoading ? '—' : (() => {
                                             const g = campusSummary?.gateAccessToday;
                                             if (g == null) return 0;
                                             if (typeof g === 'number') return g;
                                             if (Array.isArray(g)) return g.length;
                                             if (typeof g === 'object') return g.count ?? g.total ?? g.value ?? 1;
                                             return 0;
-                                        })()} lượt
-                                    </h3>
+                                        })()}
+                                    </p>
+                                    <p className="text-[11px] text-slate-blue leading-none mt-0.5">lượt</p>
                                 </div>
                             </div>
 
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                                    <Car className="w-6 h-6" />
+                            {/* Card: Phương tiện */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                    <Car className="w-5 h-5" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Trạng thái phương tiện của tôi</h4>
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Phương tiện</p>
                                     {campusSummaryLoading ? (
-                                        <h3 className="text-xl font-bold text-midnight-indigo">...</h3>
+                                        <p className="text-2xl font-extrabold text-midnight-indigo leading-tight mt-1">—</p>
                                     ) : campusSummary?.vehicleStatus ? (
-                                        <h3 className="text-base font-bold text-midnight-indigo truncate">
-                                            {campusSummary.vehicleStatus.plateNumber}
-                                            <span className={`ml-2 text-[11px] font-bold px-2 py-0.5 rounded-full ${campusSummary.vehicleStatus.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        <>
+                                            <p className="text-base font-extrabold text-midnight-indigo font-mono leading-tight mt-1 truncate">
+                                                {campusSummary.vehicleStatus.plateNumber}
+                                            </p>
+                                            <span className={`mt-1 inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                campusSummary.vehicleStatus.status === 'active'
+                                                    ? 'bg-emerald-50 text-emerald-700'
+                                                    : 'bg-gray-100 text-gray-500'
+                                            }`}>
                                                 {campusSummary.vehicleStatus.status === 'active' ? 'Đang hoạt động' : 'Tạm dừng'}
                                             </span>
-                                        </h3>
+                                        </>
                                     ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate('/employee/my-vehicles')}
-                                            className="text-sm font-bold text-action-blue hover:underline"
-                                        >
-                                            Chưa đăng ký xe — Đăng ký ngay
-                                        </button>
+                                        <>
+                                            <p className="text-sm font-bold text-steel-gray leading-tight mt-1">Chưa đăng ký</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate('/employee/my-vehicles')}
+                                                className="mt-0.5 text-[11px] font-bold text-action-blue hover:underline leading-none"
+                                            >
+                                                Đăng ký ngay →
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>

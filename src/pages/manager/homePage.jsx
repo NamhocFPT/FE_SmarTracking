@@ -469,41 +469,50 @@ const ManagerHomePage = () => {
                         className="space-y-8"
                     >
                         {/* Quick Status Bar */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
-                                    <Sliders className="w-6 h-6" />
+                        <div className="grid grid-cols-3 gap-4">
+                            {/* Card: Chờ phê duyệt */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center shrink-0">
+                                    <Sliders className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Chờ phê duyệt</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">{pendingRequests.length} yêu cầu</h3>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Chờ phê duyệt</p>
+                                    <p className="text-2xl font-extrabold text-midnight-indigo leading-tight mt-1">{pendingRequests.length}</p>
+                                    <p className="text-[11px] text-slate-blue leading-none mt-0.5">yêu cầu</p>
                                 </div>
                             </div>
 
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
-                                    <Calendar className="w-6 h-6" />
+                            {/* Card: Tỷ lệ đúng giờ */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center shrink-0">
+                                    <Calendar className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Tỷ lệ đúng giờ tuần này</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">
-                                        {campusSummaryLoading ? '...' : `${campusSummary?.onTimeRateThisWeek?.rate ?? 0}%`}
-                                    </h3>
-                                    {!campusSummaryLoading && campusSummary?.onTimeRateThisWeek?.sampleSize < 5 && (
-                                        <p className="text-[11px] text-slate-blue mt-0.5">Trên {campusSummary.onTimeRateThisWeek.sampleSize} mẫu (số liệu còn ít)</p>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Đúng giờ tuần này</p>
+                                    <p className="text-2xl font-extrabold text-midnight-indigo leading-tight mt-1">
+                                        {campusSummaryLoading ? '—' : `${campusSummary?.onTimeRateThisWeek?.rate ?? 0}%`}
+                                    </p>
+                                    {!campusSummaryLoading && (campusSummary?.onTimeRateThisWeek?.sampleSize ?? 0) < 5 ? (
+                                        <p className="text-[10px] text-amber-600 leading-none mt-0.5">
+                                            {campusSummary?.onTimeRateThisWeek?.sampleSize ?? 0} chấm công — chưa đủ dữ liệu
+                                        </p>
+                                    ) : (
+                                        <p className="text-[11px] text-slate-blue leading-none mt-0.5">tỷ lệ đúng giờ</p>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <CheckCircle2 className="w-6 h-6" />
+                            {/* Card: Phòng ban phụ trách */}
+                            <div className="bg-white px-4 py-4 rounded-2xl border border-platinum-tint shadow-sm flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                    <CheckCircle2 className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-blue uppercase">Phòng ban phụ trách</h4>
-                                    <h3 className="text-lg font-bold text-midnight-indigo truncate max-w-[200px]" title={departmentName}>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wide leading-none">Phòng ban phụ trách</p>
+                                    <p className="text-base font-extrabold text-midnight-indigo leading-tight mt-1 truncate" title={departmentName}>
                                         {departmentName}
-                                    </h3>
+                                    </p>
+                                    <p className="text-[11px] text-slate-blue leading-none mt-0.5">phòng ban</p>
                                 </div>
                             </div>
                         </div>
