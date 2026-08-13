@@ -26,7 +26,7 @@ import {
  * Includes:
  * 1. List View with full filters & actions (Edit, Unregister)
  * 2. Visual Map View detailing rooms and their active device health status
- * 3. Validation for IP and MAC address inputs
+ * 3. Validation for IP address inputs
  */
 const DeviceManagement = () => {
     // States
@@ -109,7 +109,6 @@ const DeviceManagement = () => {
         deviceType: 'ip_camera',
         roomId: '',
         ipAddress: '',
-        macAddress: '',
         agentVersion: 'v1.0.0'
     });
 
@@ -153,15 +152,9 @@ const DeviceManagement = () => {
         }
     }, [error]);
 
-    // Format IP / MAC Address Validation Checkers
     const validateIP = (ip) => {
         const ipPattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
         return ipPattern.test(ip);
-    };
-
-    const validateMAC = (mac) => {
-        const macPattern = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-        return macPattern.test(mac);
     };
 
     // Form handlers
@@ -172,7 +165,6 @@ const DeviceManagement = () => {
             deviceType: 'ip_camera',
             roomId: '',
             ipAddress: '',
-            macAddress: '',
             agentVersion: 'v1.0.0'
         });
         setIsRegisterModalOpen(true);
@@ -186,7 +178,6 @@ const DeviceManagement = () => {
             deviceType: device.device_type || 'ip_camera',
             roomId: device.room_id || '',
             ipAddress: device.ip_address || '',
-            macAddress: device.mac_address || '',
             agentVersion: device.agent_version || 'v1.0.0'
         });
         setIsEditModalOpen(true);
@@ -202,11 +193,6 @@ const DeviceManagement = () => {
             setError('Địa chỉ IP không đúng định dạng. Ví dụ: 192.168.1.10');
             return;
         }
-        if (!validateMAC(formData.macAddress)) {
-            setError('Địa chỉ MAC không đúng định dạng. Ví dụ: AA:BB:CC:DD:EE:FF');
-            return;
-        }
-
         setSubmitting(true);
         try {
             const payload = {
@@ -214,7 +200,6 @@ const DeviceManagement = () => {
                 device_name: formData.deviceName,
                 device_type: formData.deviceType,
                 ip_address: formData.ipAddress || undefined,
-                mac_address: formData.macAddress || undefined,
                 metadata_json: {
                     agent_version: formData.agentVersion || 'v1.0.0'
                 }
@@ -244,17 +229,11 @@ const DeviceManagement = () => {
             setError('Địa chỉ IP không đúng định dạng. Ví dụ: 192.168.1.10');
             return;
         }
-        if (!validateMAC(formData.macAddress)) {
-            setError('Địa chỉ MAC không đúng định dạng. Ví dụ: AA:BB:CC:DD:EE:FF');
-            return;
-        }
-
         setSubmitting(true);
         try {
             const updatePayload = {
                 device_name: formData.deviceName,
                 ip_address: formData.ipAddress || undefined,
-                mac_address: formData.macAddress || undefined
             };
             const res = await updateDevice(selectedDevice.id, updatePayload);
             if (res?.success) {
@@ -815,9 +794,6 @@ const DeviceManagement = () => {
                                                         </svg>
                                                         <div className="min-w-0">
                                                             <p className="text-[11px] font-mono font-semibold text-midnight-indigo">{device.ip_address}</p>
-                                                            {device.mac_address && (
-                                                                <p className="text-[10px] font-mono text-steel-gray mt-0.5">{device.mac_address}</p>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1045,17 +1021,6 @@ const DeviceManagement = () => {
                                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ MAC</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.macAddress}
-                                        onChange={(e) => setFormData({...formData, macAddress: e.target.value})}
-                                        placeholder="AA:BB:CC:DD:EE:FF"
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
-                                    />
-                                </div>
                             </div>
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
                                 <button
@@ -1107,15 +1072,9 @@ const DeviceManagement = () => {
                                     <span className="text-[10px] text-slate-blue ml-2">(không thể đổi sau khi tạo)</span>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ IP</label>
-                                    <input type="text" required value={formData.ipAddress} onChange={(e) => setFormData({...formData, ipAddress: e.target.value})} placeholder="192.168.1.50" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ MAC</label>
-                                    <input type="text" required value={formData.macAddress} onChange={(e) => setFormData({...formData, macAddress: e.target.value})} placeholder="AA:BB:CC:DD:EE:FF" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
-                                </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ IP</label>
+                                <input type="text" required value={formData.ipAddress} onChange={(e) => setFormData({...formData, ipAddress: e.target.value})} placeholder="192.168.1.50" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                             </div>
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
                                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors">Hủy</button>
