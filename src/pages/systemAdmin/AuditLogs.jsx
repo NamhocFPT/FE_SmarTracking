@@ -2,7 +2,8 @@ import { Activity } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import { getAuditLogs, exportAuditLogs } from '../../service/sysAdminServices';
+import UserAvatar from '../../components/common/UserAvatar';
+import { getAuditLogs, exportAuditLogs, getUserById } from '../../service/sysAdminServices';
 
 /**
  * AuditLogs Component
@@ -30,8 +31,7 @@ const ACTION_TRANSLATIONS = {
 const formatActionName = (action) => {
     if (!action) return '';
     if (ACTION_TRANSLATIONS[action]) return ACTION_TRANSLATIONS[action];
-    
-    // Fallback translation rules for unknown actions
+
     let formatted = action.toLowerCase().replace(/_/g, ' ');
     formatted = formatted.replace('view detail', 'Xem chi tiết')
                          .replace('read analytics', 'Xem thống kê')
@@ -39,8 +39,7 @@ const formatActionName = (action) => {
                          .replace('create', 'Tạo mới')
                          .replace('update', 'Cập nhật')
                          .replace('delete', 'Xóa');
-                         
-    // Capitalize first letter
+
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
@@ -156,10 +155,15 @@ const AuditLogs = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    // Detail Modal states
+    // Log detail modal
     const [selectedLog, setSelectedLog] = useState(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
+
+    // Actor user detail modal
+    const [isActorDetailOpen, setIsActorDetailOpen] = useState(false);
+    const [selectedActorUser, setSelectedActorUser] = useState(null);
+    const [actorDetailLoading, setActorDetailLoading] = useState(false);
 
     // Load data
     const fetchLogs = useCallback(async (pageNumber = 1, pageLimit = 10) => {
@@ -185,130 +189,8 @@ const AuditLogs = () => {
                 throw new Error('Fallback to mock data');
             }
         } catch {
-            // Mock Fallbacks for offline development
-            const mockLogs = [
-                {
-                    id: 'log-1',
-                    timestamp: new Date(Date.now() - 600000).toISOString(),
-                    actorEmail: 'admin@smartracking.fpt.edu.vn',
-                    actorName: 'Nguyen Van Admin',
-                    action: 'LOGIN',
-                    entity: 'auth',
-                    ipAddress: '192.168.1.15',
-                    status: 'success',
-                    description: 'Đăng nhập hệ thống thành công qua trang Web.',
-                    payload: { browser: 'Chrome/125.0', os: 'Windows 11', sessionLifeMinutes: 120 }
-                },
-                {
-                    id: 'log-2',
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    actorEmail: 'admin@smartracking.fpt.edu.vn',
-                    actorName: 'Nguyen Van Admin',
-                    action: 'CREATE_USER',
-                    entity: 'users',
-                    ipAddress: '192.168.1.15',
-                    status: 'success',
-                    description: 'Tạo tài khoản nhân viên mới: tran.thi.b@smartracking.fpt.edu.vn',
-                    payload: {
-                        input: { email: 'tran.thi.b@smartracking.fpt.edu.vn', fullName: 'Trần Thị B', roleId: 'manager' },
-                        before: null,
-                        after: { id: 102, email: 'tran.thi.b@smartracking.fpt.edu.vn', accountStatus: 'active', roles: ['manager'] }
-                    }
-                },
-                {
-                    id: 'log-3',
-                    timestamp: new Date(Date.now() - 7200000).toISOString(),
-                    actorEmail: 'admin@smartracking.fpt.edu.vn',
-                    actorName: 'Nguyen Van Admin',
-                    action: 'LOCK_USER',
-                    entity: 'users',
-                    ipAddress: '192.168.1.15',
-                    status: 'success',
-                    description: 'Tạm khóa tài khoản: le.van.c@smartracking.fpt.edu.vn',
-                    payload: {
-                        reason: 'Vi phạm quy định bảo mật',
-                        lockedUntil: new Date(Date.now() + 86400000).toISOString(),
-                        before: { id: 105, email: 'le.van.c@smartracking.fpt.edu.vn', accountStatus: 'active' },
-                        after: { id: 105, email: 'le.van.c@smartracking.fpt.edu.vn', accountStatus: 'locked', lockedUntil: '2026-06-11T01:00:00Z' }
-                    }
-                },
-                {
-                    id: 'log-4',
-                    timestamp: new Date(Date.now() - 14400000).toISOString(),
-                    actorEmail: 'system-job',
-                    actorName: 'Cron Engine',
-                    action: 'DEVICE_OFFLINE',
-                    entity: 'iot-devices',
-                    ipAddress: '127.0.0.1',
-                    status: 'warning',
-                    description: 'Mất kết nối với Camera AI: CAM-SEM-01 tại phòng Hội Thảo A.',
-                    payload: { deviceCode: 'CAM-SEM-01', lastSeen: new Date(Date.now() - 18000000).toISOString(), retryCount: 3 }
-                },
-                {
-                    id: 'log-5',
-                    timestamp: new Date(Date.now() - 86400000).toISOString(),
-                    actorEmail: 'admin@smartracking.fpt.edu.vn',
-                    actorName: 'Nguyen Van Admin',
-                    action: 'UPDATE_DEVICE',
-                    entity: 'iot-devices',
-                    ipAddress: '192.168.1.15',
-                    status: 'success',
-                    description: 'Cập nhật địa chỉ IP của thiết bị CAM-VIP-01.',
-                    payload: {
-                        before: { deviceCode: 'CAM-VIP-01', ipAddress: '192.168.1.9' },
-                        after: { deviceCode: 'CAM-VIP-01', ipAddress: '192.168.1.10' }
-                    }
-                },
-                {
-                    id: 'log-6',
-                    timestamp: new Date(Date.now() - 172800000).toISOString(),
-                    actorEmail: 'tran.thi.b@smartracking.fpt.edu.vn',
-                    actorName: 'Trần Thị B',
-                    action: 'EXPORT_USERS',
-                    entity: 'users',
-                    ipAddress: '192.168.2.33',
-                    status: 'success',
-                    description: 'Xuất danh sách nhân viên ra file Excel.',
-                    payload: { filtersUsed: { departmentId: 'HR', status: 'active' }, rowCount: 45 }
-                },
-                {
-                    id: 'log-7',
-                    timestamp: new Date(Date.now() - 259200000).toISOString(),
-                    actorEmail: 'le.van.c@smartracking.fpt.edu.vn',
-                    actorName: 'Lê Văn C',
-                    action: 'LOGIN_FAILED',
-                    entity: 'auth',
-                    ipAddress: '14.226.43.111',
-                    status: 'failed',
-                    description: 'Đăng nhập thất bại: Sai mật khẩu quá 5 lần.',
-                    payload: { email: 'le.van.c@smartracking.fpt.edu.vn', reason: 'PASSWORD_INCORRECT', attempts: 5 }
-                }
-            ];
-
-            // Local filter logic simulation
-            const filtered = mockLogs.filter(log => {
-                const matchSearch = search.trim() === '' ||
-                    log.actorEmail.toLowerCase().includes(search.toLowerCase()) ||
-                    log.actorName.toLowerCase().includes(search.toLowerCase()) ||
-                    log.description.toLowerCase().includes(search.toLowerCase());
-                const matchAction = selectedAction === '' || log.action === selectedAction;
-                const matchEntity = selectedEntity === '' || log.entity === selectedEntity;
-                const logSev = log.severity || (log.status === 'success' ? 'info' : log.status === 'warning' ? 'warning' : 'error');
-                const matchSeverity = selectedSeverity === '' || logSev === selectedSeverity;
-                const matchStart = startDate === '' || new Date(log.timestamp) >= new Date(startDate);
-                const matchEnd = endDate === '' || new Date(log.timestamp) <= new Date(endDate + 'T23:59:59');
-
-                return matchSearch && matchAction && matchEntity && matchSeverity && matchStart && matchEnd;
-            });
-
-            // Pagination simulation
-            const total = filtered.length;
-            const totalPages = Math.ceil(total / pageLimit) || 1;
-            const startIndex = (pageNumber - 1) * pageLimit;
-            const paginatedData = filtered.slice(startIndex, startIndex + pageLimit);
-
-            setLogsList(paginatedData);
-            setMeta({ page: pageNumber, limit: pageLimit, total, totalPages });
+            setLogsList([]);
+            setMeta({ page: pageNumber, limit: pageLimit, total: 0, totalPages: 1 });
         } finally {
             setLoading(false);
         }
@@ -348,6 +230,23 @@ const AuditLogs = () => {
         setIsDetailOpen(true);
     };
 
+    // Mở modal chi tiết người dùng — gọi GET /users/:actorUserId
+    const handleOpenActorDetail = async (log) => {
+        const actorId = log.actorUserId || log.actorId;
+        if (!actorId) return;
+        setSelectedActorUser(null);
+        setActorDetailLoading(true);
+        setIsActorDetailOpen(true);
+        try {
+            const res = await getUserById(actorId);
+            if (res?.success) setSelectedActorUser(res.data);
+        } catch {
+            // giữ modal mở, hiện skeleton hoặc thông báo lỗi
+        } finally {
+            setActorDetailLoading(false);
+        }
+    };
+
     const handleExport = async () => {
         if (!startDate || !endDate) {
             setError('Vui lòng chọn đầy đủ khoảng thời gian (Từ ngày và Đến ngày) để xuất nhật ký.');
@@ -379,17 +278,17 @@ const AuditLogs = () => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                
+
                 const now = new Date();
                 const padStr = (n) => String(n).padStart(2, '0');
                 const stamp = `${now.getFullYear()}${padStr(now.getMonth() + 1)}${padStr(now.getDate())}-${padStr(now.getHours())}${padStr(now.getMinutes())}${padStr(now.getSeconds())}`;
                 a.download = `nhat-ky-he-thong-${stamp}.xlsx`;
-                
+
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
-                
+
                 setSuccessMessage('Xuất nhật ký hệ thống ra file Excel thành công.');
             } else {
                 throw new Error('Dữ liệu xuất không hợp lệ từ máy chủ.');
@@ -419,12 +318,8 @@ const AuditLogs = () => {
     };
 
     const getStatusBadge = (status) => {
-        if (status === 'success') {
-            return 'bg-green-100 text-green-800';
-        }
-        if (status === 'warning') {
-            return 'bg-amber-100 text-amber-800';
-        }
+        if (status === 'success') return 'bg-green-100 text-green-800';
+        if (status === 'warning') return 'bg-amber-100 text-amber-800';
         return 'bg-red-100 text-red-800';
     };
 
@@ -580,8 +475,7 @@ const AuditLogs = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-cloud-mist/55 text-slate-blue text-xs font-bold uppercase border-b border-platinum-tint/70">
-                                    <th className="py-4 px-6">Ngày</th>
-                                    <th className="py-4 px-6">Giờ</th>
+                                    <th className="py-4 px-6">Thời gian</th>
                                     <th className="py-4 px-6">Tài khoản</th>
                                     <th className="py-4 px-6">Hành động</th>
                                     <th className="py-4 px-6">Phân hệ</th>
@@ -600,16 +494,49 @@ const AuditLogs = () => {
                                 ) : (
                                     logsList.map(log => (
                                         <tr key={log.id} className="hover:bg-cloud-mist/30 transition-colors">
-                                            <td className="py-4 px-6 font-medium text-midnight-indigo whitespace-nowrap font-mono text-xs">
-                                                {formatTimestamp(log.createdAt || log.timestamp).split(' ')[1]}
+                                            {/* Thời gian — gộp ngày + giờ */}
+                                            <td className="py-4 px-6 whitespace-nowrap">
+                                                <div className="font-mono text-xs font-semibold text-midnight-indigo">
+                                                    {formatTimestamp(log.createdAt || log.timestamp).split(' ')[0]}
+                                                </div>
+                                                <div className="font-mono text-[11px] text-slate-blue">
+                                                    {formatTimestamp(log.createdAt || log.timestamp).split(' ')[1]}
+                                                </div>
                                             </td>
-                                            <td className="py-4 px-6 font-medium text-midnight-indigo whitespace-nowrap font-mono text-xs">
-                                                {formatTimestamp(log.createdAt || log.timestamp).split(' ')[0]}
-                                            </td>
+
+                                            {/* Tài khoản — avatar + tên có thể click */}
                                             <td className="py-4 px-6">
-                                                <div className="font-semibold text-midnight-indigo">{log.actorName}</div>
-                                                <div className="text-xs text-slate-blue font-mono">{log.actorEmail || log.actorUserId || '-'}</div>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={() => handleOpenActorDetail(log)}
+                                                        className="shrink-0 focus:outline-none"
+                                                        title="Xem hồ sơ người dùng"
+                                                        disabled={!(log.actorUserId || log.actorId)}
+                                                    >
+                                                        <UserAvatar
+                                                            user={{
+                                                                fullName: log.actorName,
+                                                                email: log.actorEmail,
+                                                                avatarUrl: log.actorAvatarUrl || null
+                                                            }}
+                                                            className="w-9 h-9 rounded-full font-bold text-sm"
+                                                        />
+                                                    </button>
+                                                    <div>
+                                                        <button
+                                                            onClick={() => handleOpenActorDetail(log)}
+                                                            disabled={!(log.actorUserId || log.actorId)}
+                                                            className="font-semibold text-midnight-indigo hover:text-action-blue hover:underline text-left text-sm leading-tight disabled:cursor-default disabled:no-underline disabled:hover:text-midnight-indigo"
+                                                        >
+                                                            {log.actorName || 'Hệ thống'}
+                                                        </button>
+                                                        <div className="text-xs text-slate-blue font-mono mt-0.5">
+                                                            {log.actorEmail || '-'}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
+
                                             <td className="py-4 px-6">
                                                 <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${getActionBadge(log.actionType || log.action)}`}>
                                                     {formatActionName(log.actionType || log.action)}
@@ -630,6 +557,7 @@ const AuditLogs = () => {
                                                 <button
                                                     onClick={() => handleOpenDetail(log)}
                                                     className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                    title="Xem chi tiết nhật ký"
                                                 >
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -688,7 +616,7 @@ const AuditLogs = () => {
                 )}
             </div>
 
-            {/* DETAIL JSON MODAL */}
+            {/* DETAIL LOG MODAL */}
             {isDetailOpen && selectedLog && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-2xl w-full overflow-hidden animate-fade-in-up">
@@ -720,7 +648,7 @@ const AuditLogs = () => {
                                     <span className="text-sm font-semibold text-midnight-indigo">{selectedLog.actorName} ({selectedLog.actorEmail || selectedLog.actorUserId || 'Hệ thống'})</span>
                                 </div>
                                 <div>
-                                    <span className="block text-slate-blue font-bold uppercase tracking-wider">Phân hệ chuyên môn / Thao tác</span>
+                                    <span className="block text-slate-blue font-bold uppercase tracking-wider">Phân hệ / Thao tác</span>
                                     <span className="text-sm font-semibold text-midnight-indigo uppercase font-mono">
                                         {ENTITY_TRANSLATIONS[selectedLog.entityType || selectedLog.entity] || (selectedLog.entityType || selectedLog.entity)} / {formatActionName(selectedLog.actionType || selectedLog.action)}
                                     </span>
@@ -750,6 +678,123 @@ const AuditLogs = () => {
                                 Đóng cửa sổ
                             </button>
                         </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ACTOR USER DETAIL MODAL */}
+            {isActorDetailOpen && createPortal(
+                <div
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4"
+                    onClick={(e) => { if (e.target === e.currentTarget) setIsActorDetailOpen(false); }}
+                >
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full overflow-hidden animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                            <h3 className="font-bold text-midnight-indigo">Chi tiết hồ sơ tài khoản</h3>
+                            <button onClick={() => setIsActorDetailOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {actorDetailLoading || !selectedActorUser ? (
+                            <div className="p-12 flex flex-col items-center justify-center">
+                                <div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"></div>
+                                <p className="mt-4 text-slate-blue text-sm">Đang tải thông tin tài khoản...</p>
+                            </div>
+                        ) : (
+                            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                                {/* Avatar header */}
+                                <div className="flex items-center gap-4 bg-cloud-mist/55 p-4 rounded-xl border border-platinum-tint/50">
+                                    <UserAvatar
+                                        user={selectedActorUser}
+                                        className="w-16 h-16 rounded-full shrink-0 font-extrabold text-xl"
+                                    />
+                                    <div>
+                                        <h4 className="text-lg font-bold text-midnight-indigo leading-tight">{selectedActorUser.fullName}</h4>
+                                        <p className="text-sm text-slate-blue mt-0.5">{selectedActorUser.email}</p>
+                                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                                            {selectedActorUser.roles?.map((r, idx) => (
+                                                <span key={idx} className="text-[10px] px-2 py-0.5 bg-blue-50 text-action-blue rounded-full font-bold">
+                                                    {typeof r === 'string' ? r : (r.roleName || r.name || r.roleCode || r.code)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    {/* Thông tin cá nhân */}
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-bold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint/60 pb-1.5">Thông tin cá nhân</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Mã nhân viên:</span>
+                                                <span className="font-semibold text-midnight-indigo">{selectedActorUser.employeeCode || 'Chưa thiết lập'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Số điện thoại:</span>
+                                                <span className="font-semibold text-midnight-indigo">{selectedActorUser.phoneNumber || selectedActorUser.phone || 'Chưa cung cấp'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Cấu trúc tổ chức */}
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-bold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint/60 pb-1.5">Cấu trúc tổ chức</h4>
+                                        <div className="space-y-2 text-sm">
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Phòng ban:</span>
+                                                <span className="font-semibold text-midnight-indigo">
+                                                    {selectedActorUser.department?.departmentName
+                                                        || selectedActorUser.department?.name
+                                                        || selectedActorUser.departments?.[0]?.departmentName
+                                                        || selectedActorUser.departments?.[0]?.name
+                                                        || 'Chưa phân bổ'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Chức danh:</span>
+                                                <span className="font-semibold text-midnight-indigo">{selectedActorUser.positionTitle || 'Chưa thiết lập'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Thông tin hệ thống */}
+                                    <div className="md:col-span-2 space-y-3">
+                                        <h4 className="text-xs font-bold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint/60 pb-1.5">Thông tin hệ thống</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Trạng thái:</span>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${
+                                                    selectedActorUser.accountStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                                }`}>
+                                                    {selectedActorUser.accountStatus === 'active' ? 'Hoạt động' : 'Bị khóa'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Đăng nhập cuối:</span>
+                                                <span className="font-semibold text-midnight-indigo block mt-1">
+                                                    {selectedActorUser.lastLoginAt
+                                                        ? new Date(selectedActorUser.lastLoginAt).toLocaleString('vi-VN')
+                                                        : 'Chưa có thông tin'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-blue block text-xs">Hồ sơ khuôn mặt:</span>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${
+                                                    selectedActorUser.hasFaceProfile ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                                                }`}>
+                                                    {selectedActorUser.hasFaceProfile ? 'Đã đăng ký' : 'Chưa đăng ký'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>,
                 document.body

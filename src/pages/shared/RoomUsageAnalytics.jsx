@@ -1,5 +1,6 @@
 import { AlertTriangle, BarChart3, Building2, ChevronRight, FileText, Info, TrendingUp, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, BarChart, Bar, Cell,
@@ -473,9 +474,11 @@ const RoomUsageAnalytics = () => {
                 </div>
             )}
 
-            {/* Room Detail Modal */}
-            {selectedRoomId && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
+            {/* Room Detail Modal — rendered via portal so fixed covers full viewport regardless of ancestor transforms */}
+            {selectedRoomId && ReactDOM.createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4"
+                    onClick={(e) => { if (e.target === e.currentTarget) setSelectedRoomId(null); }}
+                >
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <h3 className="font-bold text-midnight-indigo flex items-center gap-2">
@@ -590,7 +593,7 @@ const RoomUsageAnalytics = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             <ExportReportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} />
         </div>

@@ -71,6 +71,7 @@ const DepartmentManagement = () => {
 
     // User management modal control states
     const [isUserCreateModalOpen, setIsUserCreateModalOpen] = useState(false);
+    const [createUserError, setCreateUserError] = useState(null);
     const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
     const [isUserLogsModalOpen, setIsUserLogsModalOpen] = useState(false);
     const [isUserDetailModalOpen, setIsUserDetailModalOpen] = useState(false);
@@ -135,26 +136,9 @@ const DepartmentManagement = () => {
                 throw new Error('API request failed');
             }
         } catch (err) {
-            // Mock preview filtering fallback
-            const mockDepts = [
-                { id: 1, name: 'Phòng Kỹ Thuật', description: 'Phát triển phần mềm, tích hợp và vận hành hệ thống camera IoT.', memberCount: 15, createdAt: '2026-01-05T08:00:00Z' },
-                { id: 2, name: 'Phòng Hành Chính', description: 'Quản lý nhân sự, cơ sở vật chất và tiếp đón khách hàng.', memberCount: 8, createdAt: '2026-01-10T09:30:00Z' },
-                { id: 3, name: 'Ban Giám Đốc', description: 'Định hướng chiến lược điều hành hoạt động của doanh nghiệp.', memberCount: 3, createdAt: '2026-01-01T08:00:00Z' },
-                { id: 4, name: 'Phòng Phát triển Phần mềm', description: 'Nghiên cứu và triển khai sản phẩm trí tuệ nhân tạo SmarTracking.', memberCount: 12, createdAt: '2026-01-12T10:00:00Z' }
-            ];
-
-            let filtered = mockDepts;
-            if (search.trim()) {
-                const s = search.toLowerCase();
-                filtered = filtered.filter(d => 
-                    d.name.toLowerCase().includes(s) || 
-                    (d.description && d.description.toLowerCase().includes(s))
-                );
-            }
-
-            setDepartmentsList(filtered);
+            setDepartmentsList([]);
             setTotalPages(1);
-            setTotalDepartments(filtered.length);
+            setTotalDepartments(0);
         } finally {
             setLoading(false);
         }
@@ -196,27 +180,9 @@ const DepartmentManagement = () => {
                 throw new Error('Failed to load users');
             }
         } catch {
-            // Fallback mock users matching chosen department
-            const mockUsers = [
-                { id: 101, email: 'hoang.nam@smrmpts.com', fullName: 'Nguyễn Hoàng Nam', phone: '0912345678', locked: false, roles: [{ id: 1, name: 'System Admin' }], departments: [{ id: 3, name: 'Ban Giám Đốc' }] },
-                { id: 102, email: 'thanh.thao@smrmpts.com', fullName: 'Lê Thị Thanh Thảo', phone: '0987654321', locked: false, roles: [{ id: 2, name: 'Business Admin' }], departments: [{ id: 2, name: 'Phòng Hành Chính' }] },
-                { id: 103, email: 'minh.tuan@smrmpts.com', fullName: 'Trần Minh Tuấn', phone: '0905556677', locked: true, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 1, name: 'Phòng Kỹ Thuật' }] },
-                { id: 104, email: 'quoc.anh@smrmpts.com', fullName: 'Phạm Quốc Anh', phone: '0933445566', locked: false, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 1, name: 'Phòng Kỹ Thuật' }] },
-                { id: 105, email: 'van.a@smrmpts.com', fullName: 'Nguyễn Văn A', phone: '0988776655', locked: false, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 4, name: 'Phòng Phát triển Phần mềm' }] },
-                { id: 106, email: 'van.b@smrmpts.com', fullName: 'Nguyễn Văn B', phone: '0988776656', locked: false, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 1, name: 'Phòng Kỹ Thuật' }] },
-                { id: 107, email: 'van.c@smrmpts.com', fullName: 'Nguyễn Văn C', phone: '0988776657', locked: false, roles: [{ id: 3, name: 'Employee' }], departments: [{ id: 1, name: 'Phòng Kỹ Thuật' }] }
-            ];
-            // Filter by selected department ID
-            const filtered = mockUsers.filter(u => u.departments.some(d => d.id === Number(deptId)));
-            
-            // Client-side pagination for mock fallback
-            const startIndex = (pageNum - 1) * membersLimit;
-            const endIndex = startIndex + membersLimit;
-            const paginated = filtered.slice(startIndex, endIndex);
-
-            setMembersList(paginated);
-            setMembersTotalPages(Math.ceil(filtered.length / membersLimit) || 1);
-            setMembersTotalCount(filtered.length);
+            setMembersList([]);
+            setMembersTotalPages(1);
+            setMembersTotalCount(0);
         } finally {
             setMembersLoading(false);
         }
@@ -409,6 +375,7 @@ const DepartmentManagement = () => {
 
     const openUserCreateModal = () => {
         resetUserForm();
+        setCreateUserError(null);
         setIsUserCreateModalOpen(true);
     };
 
@@ -426,14 +393,13 @@ const DepartmentManagement = () => {
 
     const handleUserCreateSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
-        setSuccessMessage(null);
+        setCreateUserError(null);
         try {
             const res = await createUser({
                 email: userFormData.email,
                 fullName: userFormData.fullName,
                 phoneNumber: userFormData.phone,
-                departmentId: userFormData.departmentId ? Number(userFormData.departmentId) : null,
+                departmentId: selectedDept ? Number(selectedDept.id) : null,
                 roleIds: userFormData.roleIds.map(Number)
             });
             if (res?.success) {
@@ -442,10 +408,10 @@ const DepartmentManagement = () => {
                 fetchDepartmentMembers(selectedDept.id, 1);
                 fetchDepartments();
             } else {
-                setError(res?.message || 'Có lỗi xảy ra khi tạo tài khoản.');
+                setCreateUserError(res?.message || 'Có lỗi xảy ra khi tạo tài khoản.');
             }
         } catch (err) {
-            setError(err?.message || err?.error?.message || 'Không thể tạo tài khoản. Vui lòng thử lại.');
+            setCreateUserError(err?.message || err?.error?.message || 'Không thể tạo tài khoản. Vui lòng thử lại.');
         }
     };
 
@@ -526,10 +492,7 @@ const DepartmentManagement = () => {
                 setUserLogs(res.data || []);
             }
         } catch {
-            setUserLogs([
-                { id: 1, action: 'USER_LOGIN', actor: user.email, entity: 'AUTH', createdAt: new Date(Date.now() - 3600000).toISOString() },
-                { id: 2, action: 'UPDATE_USER', actor: 'admin@smrmpts.com', entity: 'USER', createdAt: new Date(Date.now() - 7200000).toISOString() }
-            ]);
+            setUserLogs([]);
         } finally {
             setLogsLoading(false);
         }
@@ -1073,14 +1036,6 @@ const DepartmentManagement = () => {
                                 </div>
                             )}
 
-                            <div className="pt-4 flex justify-end border-t border-platinum-tint mt-5">
-                                <button
-                                    onClick={() => setIsMembersModalOpen(false)}
-                                    className="px-4 py-2 bg-midnight-indigo text-white hover:bg-midnight-indigo/90 rounded-xl text-sm font-semibold transition-colors"
-                                >
-                                    Đóng
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>,
@@ -1089,10 +1044,13 @@ const DepartmentManagement = () => {
 
             {/* INTEGRATED USER CREATE MODAL */}
             {isUserCreateModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
-                            <h3 className="font-bold text-midnight-indigo text-base">Tạo người dùng mới</h3>
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo text-base">Thêm người dùng</h3>
+                                <p className="text-xs text-slate-blue mt-0.5">Phòng ban: <span className="font-semibold text-action-blue">{selectedDept?.name}</span></p>
+                            </div>
                             <button onClick={() => setIsUserCreateModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -1100,8 +1058,16 @@ const DepartmentManagement = () => {
                             </button>
                         </div>
                         <form onSubmit={handleUserCreateSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+                            {createUserError && (
+                                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    {createUserError}
+                                </div>
+                            )}
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Họ và Tên</label>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Họ và Tên <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
                                     required
@@ -1112,13 +1078,13 @@ const DepartmentManagement = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Email</label>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Email <span className="text-red-500">*</span></label>
                                 <input
                                     type="email"
                                     required
                                     value={userFormData.email}
                                     onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
-                                    placeholder="email@smrmpts.com"
+                                    placeholder="example@company.com"
                                     className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                                 />
                             </div>
@@ -1142,7 +1108,7 @@ const DepartmentManagement = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Gán vai trò (Role)</label>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Vai trò (Role)</label>
                                 <div className="space-y-2 mt-1">
                                     {roles.map(r => (
                                         <label key={r.id} className="flex items-center gap-2 text-sm text-midnight-indigo font-medium cursor-pointer">
@@ -1305,16 +1271,24 @@ const DepartmentManagement = () => {
                             ) : (
                                 <div className="max-h-[300px] overflow-y-auto space-y-4 pr-2">
                                     {userLogs.map((log) => (
-                                        <div key={log.id} className="flex justify-between items-start p-3 bg-cloud-mist rounded-xl border border-outline-gray/60">
-                                            <div>
+                                        <div key={log.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray/60 space-y-1">
+                                            <div className="flex justify-between items-start gap-2">
                                                 <p className="text-xs font-bold text-midnight-indigo">
                                                     {ACTION_MAP[log.action] || log.action}
                                                 </p>
-                                                <p className="text-[10px] text-slate-blue mt-0.5">Tác nhân: {log.actor}</p>
+                                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${log.status === 'success' ? 'bg-emerald-50 text-emerald-700' : log.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                    {log.status === 'success' ? 'Thành công' : log.status === 'failed' ? 'Thất bại' : log.status || ''}
+                                                </span>
                                             </div>
-                                            <span className="text-[10px] text-slate-blue">
-                                                {new Date(log.createdAt).toLocaleString('vi-VN')}
-                                            </span>
+                                            {log.description && (
+                                                <p className="text-[10px] text-slate-blue leading-relaxed">{log.description}</p>
+                                            )}
+                                            <div className="flex justify-between items-center pt-0.5">
+                                                <p className="text-[10px] text-slate-blue">Tác nhân: {log.actorName || log.actorEmail || '—'}</p>
+                                                <span className="text-[10px] text-slate-blue">
+                                                    {log.timestamp ? new Date(log.timestamp).toLocaleString('vi-VN') : ''}
+                                                </span>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -1510,17 +1484,21 @@ const DepartmentManagement = () => {
     );
 };
 
-// Map action names locally
+// Map action names — keys khớp với BE (GET /audit-logs)
 const ACTION_MAP = {
-    'USER_LOGIN': 'Đăng nhập',
-    'USER_LOGOUT': 'Đăng xuất',
-    'REGISTER_DEVICE': 'Đăng ký thiết bị',
+    'LOGIN': 'Đăng nhập',
+    'LOGIN_FAILED': 'Đăng nhập thất bại',
+    'LOGOUT': 'Đăng xuất',
+    'CREATE_USER': 'Thêm tài khoản',
+    'UPDATE_USER': 'Cập nhật tài khoản',
     'LOCK_USER': 'Khóa tài khoản',
     'UNLOCK_USER': 'Mở khóa tài khoản',
-    'UPDATE_CONFIG': 'Cập nhật cấu hình',
-    'CREATE_USER': 'Tạo người dùng',
-    'UPDATE_USER': 'Cập nhật tài khoản',
     'DELETE_USER': 'Xóa tài khoản',
+    'REGISTER_DEVICE': 'Đăng ký thiết bị',
+    'UPDATE_DEVICE': 'Cập nhật thiết bị',
+    'REMOVE_DEVICE': 'Vô hiệu hóa thiết bị',
+    'EXPORT_USERS': 'Xuất tệp nhân viên',
+    'UPDATE_CONFIG': 'Cập nhật cấu hình hệ thống',
 };
 
 export default DepartmentManagement;

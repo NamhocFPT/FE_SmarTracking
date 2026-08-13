@@ -25,6 +25,7 @@ import { getZones } from '../../service/zoneServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getVehicleControlList } from '../../service/anprService';
 import { getBusinessAdminSummary } from '../../service/campusService';
+import { get } from '../../utils/request';
 import DashboardBanner from '../../components/common/DashboardBanner';
 
 // ─── Design tokens (Sky Blueprint — mirrored from sysadmin) ──────────────────
@@ -261,6 +262,8 @@ const KpiTile = ({ icon: Icon, label, value, sub, subColor, iconColor = D.cyan, 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const DashBoard = () => {
+    const userStr = localStorage.getItem('user');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
     const [activeTab, setActiveTab] = useState('overview');
     const [lastUpdated, setLastUpdated] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
@@ -295,7 +298,7 @@ const DashBoard = () => {
     const [activeAttIdx,     setActiveAttIdx]     = useState(null);
     const [meetingsTrend,    setMeetingsTrend]    = useState([]);
     const [statusBreakdown,  setStatusBreakdown]  = useState([]);
-    const [avgDuration,      setAvgDuration]      = useState({ averageMinutes: 0 });
+    const [avgDuration,      setAvgDuration]      = useState({});
     const [cancelRateStats,  setCancelRateStats]  = useState({ cancelRate: 0 });
     const [noShowTrend,      setNoShowTrend]      = useState([]);
     const [isExporting,      setIsExporting]      = useState(false);
@@ -307,11 +310,7 @@ const DashBoard = () => {
     useEffect(() => {
         getDepartments({ limit: 100 })
             .then(r => { if (r?.success) setDepartmentsList(r.data || []); })
-            .catch(() => setDepartmentsList([
-                { id: 'dept-1', departmentName: 'Phòng Công nghệ thông tin' },
-                { id: 'dept-2', departmentName: 'Phòng Nhân sự' },
-                { id: 'dept-3', departmentName: 'Phòng Kinh doanh' },
-            ]));
+            .catch(() => setDepartmentsList([]));
     }, []);
 
     // ── Fetch campus / security data ──────────────────────────────────────────
@@ -363,11 +362,7 @@ const DashBoard = () => {
             alertsNew = alertsRes.value.meta?.total || (alertsRes.value.data || []).length;
             setRecentAlerts((alertsRes.value.data || []).slice(0, 5));
         } else {
-            setRecentAlerts([
-                { id: 'a-1', alert_type: 'intrusion', severity: 'high', zone_name: 'Cổng phụ B', created_at: new Date(Date.now() - 900000).toISOString() },
-                { id: 'a-2', alert_type: 'vehicle_control_match', severity: 'critical', zone_name: 'Cổng chính', created_at: new Date(Date.now() - 1800000).toISOString() },
-            ]);
-            alertsNew = 2;
+            setRecentAlerts([]);
         }
 
         setKpi({ gateEventsToday: gateToday, alertsNew, zonesActive, zonesTotal, devicesOnline: online, devicesTotal: devList.length, devicesOffline: offline, vehicleHitsToday: vehicleHits });
@@ -435,30 +430,25 @@ const DashBoard = () => {
                 getMeetingStatusBreakdown(params),
                 getAverageMeetingDuration(params),
                 getMeetingCancelRate(params),
-                getNoShowStats(params),
+                getNoShowStats({ ...params, rankBy: 'room' }),
             ]);
 
         if (overviewRes.status === 'fulfilled' && overviewRes.value?.success) {
             setStats(overviewRes.value.data);
         } else {
-            setStats({ meetingCount: 145, activeRooms: 12, utilizationRate: 68.5, noShowRate: 7.2, onTimeRate: 85.3 });
+            setStats({ meetingCount: 0, activeRooms: 0, utilizationRate: 0, noShowRate: 0, onTimeRate: 0 });
         }
 
         if (roomRes.status === 'fulfilled' && roomRes.value?.success) {
             const rooms = roomRes.value.data?.rooms || [];
             setRoomStats(rooms.slice(0, 8).map(r => ({
                 name: (r.roomName || r.room_name || '').replace(/^Phòng\s+/i, '') || '—',
-                rate: +(parseFloat(r.utilizationRate || 0).toFixed(1)),
+                rate: +(parseFloat(r.reservationUtilizationRate || 0).toFixed(1)),
                 bookedHours: r.bookedHours || 0,
                 actualHours: r.actualHours || 0,
             })));
         } else {
-            setRoomStats([
-                { name: 'Apollo 101', rate: 82.0, bookedHours: 120, actualHours: 98.4 },
-                { name: 'Athena 102', rate: 74.5, bookedHours: 90,  actualHours: 67.1 },
-                { name: 'Zeus 201',   rate: 58.0, bookedHours: 110, actualHours: 63.8 },
-                { name: 'Hermes 302', rate: 45.2, bookedHours: 80,  actualHours: 36.2 },
-            ]);
+            setRoomStats([]);
         }
 
         if (attendanceRes.status === 'fulfilled' && attendanceRes.value?.success) {
@@ -472,57 +462,37 @@ const DashBoard = () => {
                 { name: 'Vắng mặt', value: absent, color: D.red },
             ].filter(d => d.value > 0));
         } else {
-            setAttendanceData([
-                { name: 'Đúng giờ', value: 142, color: D.green },
-                { name: 'Đến muộn', value: 24,  color: D.amber },
-                { name: 'Vắng mặt', value: 15,  color: D.red },
-            ]);
+            setAttendanceData([]);
         }
 
         if (trendRes.status === 'fulfilled' && trendRes.value?.success) {
             setMeetingsTrend(trendRes.value.data?.series || []);
         } else {
-            setMeetingsTrend([
-                { period: 'Tuần 22', count: 32, utilizationRate: 60.5 },
-                { period: 'Tuần 23', count: 38, utilizationRate: 64.2 },
-                { period: 'Tuần 24', count: 45, utilizationRate: 68.5 },
-                { period: 'Tuần 25', count: 42, utilizationRate: 65.0 },
-                { period: 'Tuần 26', count: 48, utilizationRate: 72.3 },
-            ]);
+            setMeetingsTrend([]);
         }
 
         if (breakdownRes.status === 'fulfilled' && breakdownRes.value?.success) {
             setStatusBreakdown(breakdownRes.value.data?.items || []);
         } else {
-            setStatusBreakdown([
-                { status: 'Hoàn thành', count: 98, percentage: 67.6 },
-                { status: 'Lên lịch',   count: 30, percentage: 20.7 },
-                { status: 'Hủy bỏ',     count: 15, percentage: 10.3 },
-                { status: 'Đang họp',   count: 2,  percentage: 1.4  },
-            ]);
+            setStatusBreakdown([]);
         }
 
         if (durationRes.status === 'fulfilled' && durationRes.value?.success) {
-            setAvgDuration(durationRes.value.data);
+            setAvgDuration(durationRes.value.data?.summary ?? {});
         } else {
-            setAvgDuration({ averageMinutes: 72.5 });
+            setAvgDuration({});
         }
 
         if (cancelRes.status === 'fulfilled' && cancelRes.value?.success) {
             setCancelRateStats(cancelRes.value.data);
         } else {
-            setCancelRateStats({ cancelRate: 10.3 });
+            setCancelRateStats({ cancelRate: 0 });
         }
 
         if (noShowRes.status === 'fulfilled' && noShowRes.value?.success) {
-            setNoShowTrend(noShowRes.value.data?.byRoom || []);
+            setNoShowTrend(noShowRes.value.data?.ranking?.items || []);
         } else {
-            setNoShowTrend([
-                { roomName: 'Phòng Apollo 101', noShowRate: 8.0 },
-                { roomName: 'Phòng Athena 102', noShowRate: 5.5 },
-                { roomName: 'Phòng Zeus 201',   noShowRate: 10.2 },
-                { roomName: 'Phòng Hermes 302', noShowRate: 4.8 },
-            ]);
+            setNoShowTrend([]);
         }
 
         setMeetLoading(false);
@@ -531,23 +501,49 @@ const DashBoard = () => {
     useEffect(() => { fetchCampusData(); }, [fetchCampusData]);
     useEffect(() => { fetchMeetingData(); }, [fetchMeetingData]);
 
-    // Export handler
+    // Export handler — 3 bước: submit job → poll đến completed → download file
     const handleExport = async (e) => {
         e.preventDefault();
         setIsExporting(true); setFormError(null); setSuccessMsg(null);
         try {
+            // Bước 1: Submit job (BE trả 202 + jobId)
             const res = await exportMeetingActivity({
                 from: fromDate, to: toDate, format: exportForm.format,
                 scope: { departmentId: selectedDept || null, roomId: null, organizerId: null },
-                sections: exportForm.sections, delivery: exportForm.delivery,
+                sections: exportForm.sections, delivery: 'download',
             });
-            if (res?.success) {
-                setSuccessMsg(`Yêu cầu xuất báo cáo thành công! Mã tiến trình: ${res.data?.jobId || 'N/A'}`);
-            } else {
+            if (!res?.success) {
                 setFormError(res?.message || 'Không thể tạo yêu cầu xuất báo cáo.');
+                return;
+            }
+            const jobId = res.data?.jobId;
+            if (!jobId) { setFormError('Không nhận được mã tiến trình từ server.'); return; }
+
+            setSuccessMsg('Đang tạo báo cáo, vui lòng chờ...');
+
+            // Bước 2: Poll /background-jobs/:jobId mỗi 2 giây, tối đa 60 giây
+            let fileId = null;
+            for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 2000));
+                const job = await get(`/background-jobs/${jobId}`);
+                const status = job?.data?.status;
+                if (status === 'completed') { fileId = job.data.outputFileId; break; }
+                if (status === 'failed') throw new Error(job.data?.errorMessage || 'Tạo báo cáo thất bại.');
+            }
+            if (!fileId) { setFormError('Hết thời gian chờ (60 giây). Vui lòng thử lại.'); return; }
+
+            // Bước 3: Lấy downloadUrl và mở file
+            setSuccessMsg('Đang chuẩn bị tải file...');
+            const media = await get(`/media-files/${fileId}`);
+            const url = media?.data?.downloadUrl;
+            if (url) {
+                window.open(url, '_blank');
+                setSuccessMsg('Báo cáo đã được tải xuống thành công!');
+            } else {
+                setFormError('Không lấy được đường dẫn tải file. Vui lòng thử lại.');
             }
         } catch (err) {
-            setFormError(err?.message || 'Lỗi khi gửi yêu cầu. Vui lòng thử lại.');
+            setFormError(err?.message || 'Lỗi khi tạo báo cáo. Vui lòng thử lại.');
         } finally {
             setIsExporting(false);
         }
@@ -582,7 +578,7 @@ const DashBoard = () => {
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 50, fontSize: 11, fontWeight: 700, background: `${D.blue}12`, color: D.blue, border: `1px solid ${D.blue}30`, marginBottom: 8 }}>
                             <Activity style={{ width: 13, height: 13 }} /> Business Admin
                         </span>
-                        <h1 style={{ fontSize: 22, fontWeight: 800, color: D.text, letterSpacing: '-0.5px' }}>Bảng điều khiển</h1>
+                        <h1 style={{ fontSize: 22, fontWeight: 800, color: D.text, letterSpacing: '-0.5px' }}>Xin chào, {currentUser?.fullName || 'Quản trị nghiệp vụ'} 👋</h1>
                         <p style={{ fontSize: 12, color: D.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                             {lastUpdated ? (
                                 <>
@@ -787,7 +783,7 @@ const DashBoard = () => {
 
                     {/* Meeting KPI tiles */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <KpiTile delay={0}   icon={Calendar}      label="Tổng cuộc họp"           value={meetLoading ? '—' : stats.meetingCount}    sub={`TB: ${avgDuration.averageMinutes}m · Huỷ: ${cancelRateStats.cancelRate}%`} iconColor={D.blue} />
+                        <KpiTile delay={0}   icon={Calendar}      label="Tổng cuộc họp"           value={meetLoading ? '—' : stats.meetingCount}    sub={`TB: ${avgDuration.actualAverageMinutes ?? avgDuration.plannedAverageMinutes ?? 0}m · Huỷ: ${cancelRateStats.cancelRate ?? 0}%`} iconColor={D.blue} />
                         <KpiTile delay={60}  icon={TrendingUp}    label="Hiệu suất phòng"           value={meetLoading ? '—' : `${stats.utilizationRate}%`} sub="Sử dụng trung bình" iconColor={D.purple} />
                         <KpiTile delay={120} icon={Clock}         label="Tham gia đúng giờ"         value={meetLoading ? '—' : `${stats.onTimeRate}%`}  sub="↑ Đạt chỉ tiêu tốt" iconColor={D.green} subColor="#059669" />
                         <KpiTile delay={180} icon={AlertTriangle} label="Tỷ lệ đặt phòng vắng mặt" value={meetLoading ? '—' : `${stats.noShowRate}%`}   sub="Phòng tự giải phóng" iconColor={D.red} />
@@ -905,13 +901,13 @@ const DashBoard = () => {
                                 return (
                                     <div className="space-y-4 pt-2">
                                         {noShowTrend.map(room => (
-                                            <div key={room.roomName} className="space-y-1.5">
+                                            <div key={room.id ?? room.name} className="space-y-1.5">
                                                 <div className="flex justify-between text-xs font-semibold">
-                                                    <span style={{ color: D.text }}>{room.roomName}</span>
+                                                    <span style={{ color: D.text }}>{room.name}</span>
                                                     <span style={{ color: D.red }}>{room.noShowRate}%</span>
                                                 </div>
                                                 <div style={{ width: '100%', background: D.borderSub, height: 6, borderRadius: 99, overflow: 'hidden' }}>
-                                                    <div style={{ width: `${Math.min(room.noShowRate * 8, 100)}%`, height: '100%', background: D.red, borderRadius: 99, transition: 'width 1s cubic-bezier(.22,1,.36,1)' }} />
+                                                    <div style={{ width: `${Math.min(room.noShowRate, 100)}%`, height: '100%', background: D.red, borderRadius: 99, transition: 'width 1s cubic-bezier(.22,1,.36,1)' }} />
                                                 </div>
                                             </div>
                                         ))}
@@ -924,41 +920,16 @@ const DashBoard = () => {
                         <ScrollReveal delay={200}>
                             <div style={{ background: '#fff', border: `1px solid ${D.border}`, borderRadius: 16, padding: '20px', boxShadow: D.shadow, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 20 }}>
                                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${D.blue} 0%, ${D.blue}44 50%, transparent 100%)` }} />
-                                <div>
-                                    <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, marginBottom: 12 }}>Thao tác tài khoản</h3>
-                                    <div className="space-y-2">
-                                        {[
-                                            { to: '/business-admin/users', icon: Plus,  label: 'Thêm mới tài khoản',    bg: `${D.blue}12`,   color: D.blue },
-                                            { to: '/business-admin/users', icon: Users, label: 'Danh sách & Phân quyền', bg: `${D.purple}12`, color: D.purple },
-                                        ].map(item => (
-                                            <Link key={item.label} to={item.to}
-                                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 10, border: `1px solid ${D.border}`, textDecoration: 'none', transition: 'all 0.2s' }}
-                                                onMouseEnter={e => { e.currentTarget.style.borderColor = item.color + '50'; e.currentTarget.style.background = item.bg; }}
-                                                onMouseLeave={e => { e.currentTarget.style.borderColor = D.border; e.currentTarget.style.background = 'transparent'; }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                    <div style={{ width: 30, height: 30, borderRadius: 8, background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <item.icon style={{ width: 15, height: 15, color: item.color }} />
-                                                    </div>
-                                                    <span style={{ fontSize: 12, fontWeight: 700, color: D.text }}>{item.label}</span>
-                                                </div>
-                                                <ChevronRight style={{ width: 14, height: 14, color: D.muted }} />
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </div>
-
                                 {/* Export form */}
                                 <form onSubmit={handleExport} className="space-y-3">
                                     <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <Sliders style={{ width: 15, height: 15, color: D.blue }} /> Xuất báo cáo (UC-158)
+                                        <Sliders style={{ width: 15, height: 15, color: D.blue }} /> Xuất báo cáo
                                     </h3>
                                     {formError && <p style={{ fontSize: 12, color: D.red }}>{formError}</p>}
                                     {successMsg && <p style={{ fontSize: 12, color: D.green }}>{successMsg}</p>}
                                     <div className="grid grid-cols-2 gap-3">
                                         {[
                                             { key: 'format',   label: 'Định dạng', options: [{ v: 'xlsx', l: 'Excel (.xlsx)' }, { v: 'pdf', l: 'PDF (.pdf)' }] },
-                                            { key: 'delivery', label: 'Nhận qua',  options: [{ v: 'download', l: 'Tải xuống' }, { v: 'email', l: 'Email' }] },
                                         ].map(f => (
                                             <div key={f.key}>
                                                 <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: D.muted, textTransform: 'uppercase', marginBottom: 4 }}>{f.label}</label>

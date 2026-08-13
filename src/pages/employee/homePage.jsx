@@ -1,17 +1,11 @@
-import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, LogIn, PlusCircle, ShieldAlert, TrendingUp, Video } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, LogIn, PlusCircle, ShieldAlert, Video } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell
-} from 'recharts';
 
 import DashboardBanner from '../../components/common/DashboardBanner';
 import { getEmployeeSummary } from '../../service/campusService';
 import { getMySchedule } from '../../service/employeeServices';
-
-const COLORS = ['#006BFF', '#FFAE00', '#FF3B30'];
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -30,7 +24,6 @@ const EmployeeHomePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [successToast, setSuccessToast] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
     useEffect(() => {
         if (location.state?.successMessage) {
             setSuccessToast(location.state.successMessage);
@@ -52,25 +45,16 @@ const EmployeeHomePage = () => {
 
     // Overview states
     const [upcomingMeetings, setUpcomingMeetings] = useState([]);
-    const [quickStats, setQuickStats] = useState({
-        pendingConsents: 0,
-        meetingsToday: 0
-    });
 
     // Campus summary (CDB-RS-001: GET /campus-dashboard/employee-summary)
     const [campusSummary, setCampusSummary] = useState(null);
     const [campusSummaryLoading, setCampusSummaryLoading] = useState(true);
 
-    // Analytics states (from former dashboard)
-    const [analyticsLoading, setAnalyticsLoading] = useState(false);
-    const [personalStats, setPersonalStats] = useState({
-        totalMeetings: 0,
-        attendanceRate: 0,
-        avgDuration: 0,
-        recordingSessions: 0
-    });
-    const [attendanceBreakdown, setAttendanceBreakdown] = useState([]);
-    const [meetingsTrend, setMeetingsTrend] = useState([]);
+    // Derived: count meetings needing recording consent from real meetings list
+    const pendingConsents = useMemo(
+        () => upcomingMeetings.filter(m => m.recordingEnabled && m.consentStatus === 'PENDING').length,
+        [upcomingMeetings]
+    );
 
     // Load campus dashboard summary (gate access, vehicle status, meetings today)
     useEffect(() => {
@@ -93,11 +77,6 @@ const EmployeeHomePage = () => {
 
     // Load Overview Data
     useEffect(() => {
-        setQuickStats({
-            pendingConsents: 1,
-            meetingsToday: 2
-        });
-
         let isMounted = true;
         const now = new Date();
 
@@ -139,7 +118,7 @@ const EmployeeHomePage = () => {
             from: formatFullTimestamp(now, false),      // "2026-08-03T00:00:00+07:00"
             to: formatFullTimestamp(nextWeek, true),     // "2026-08-10T23:59:59+07:00"
             view: 'month',
-            status: statusFilter ? [statusFilter, statusFilter] : ['scheduled', 'in_progress']
+            status: ['scheduled', 'in_progress']
         })
             .then(res => {
                 if (isMounted && res?.success && res.data) {
@@ -175,44 +154,10 @@ const EmployeeHomePage = () => {
         return () => { isMounted = false; };
     }, []);
 
-    // Load Analytics Data when tab switches to 'analytics'
-    useEffect(() => {
-        if (activeTab === 'analytics') {
-            setAnalyticsLoading(true);
-            const timer = setTimeout(() => {
-                setPersonalStats({
-                    totalMeetings: 18,
-                    attendanceRate: 94.4,
-                    avgDuration: 55,
-                    recordingSessions: 5
-                });
-
-                setAttendanceBreakdown([
-                    { name: 'Đúng giờ', count: 16 },
-                    { name: 'Đi muộn', count: 1 },
-                    { name: 'Vắng mặt', count: 1 }
-                ]);
-
-                setMeetingsTrend([
-                    { period: 'Tuần 22', count: 3, hours: 2.5 },
-                    { period: 'Tuần 23', count: 4, hours: 3.5 },
-                    { period: 'Tuần 24', count: 6, hours: 5.5 },
-                    { period: 'Tuần 25', count: 5, hours: 4.8 }
-                ]);
-
-                setAnalyticsLoading(false);
-            }, 500);
-            return () => clearTimeout(timer);
-        }
-    }, [activeTab]);
-
     const handleConsent = (meetingId, granted) => {
         setUpcomingMeetings(prev =>
             prev.map(m => m.id === meetingId ? { ...m, consentStatus: granted ? 'GRANTED' : 'REJECTED' } : m)
         );
-        if (granted) {
-            setQuickStats(prev => ({ ...prev, pendingConsents: Math.max(0, prev.pendingConsents - 1) }));
-        }
     };
 
     return (
@@ -287,7 +232,7 @@ const EmployeeHomePage = () => {
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-blue uppercase">Họp trong ngày</h4>
                                     <h3 className="text-xl font-bold text-midnight-indigo">
-                                        {campusSummaryLoading ? '...' : (campusSummary?.meetingsToday ?? quickStats.meetingsToday)} cuộc họp
+                                        {campusSummaryLoading ? '...' : (campusSummary?.meetingsToday ?? 0)} cuộc họp
                                     </h3>
                                 </div>
                             </div>
@@ -298,7 +243,7 @@ const EmployeeHomePage = () => {
                                 </div>
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-blue uppercase">Yêu cầu ghi hình</h4>
-                                    <h3 className="text-xl font-bold text-midnight-indigo">{quickStats.pendingConsents} yêu cầu chờ duyệt</h3>
+                                    <h3 className="text-xl font-bold text-midnight-indigo">{pendingConsents} yêu cầu chờ duyệt</h3>
                                 </div>
                             </div>
 
@@ -397,7 +342,7 @@ const EmployeeHomePage = () => {
                                 </div>
 
                                 <div
-                                    onClick={() => setActiveTab('analytics')}
+                                    onClick={() => navigate('/employee/recordings')}
                                     className="group bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
                                     <div className="flex justify-between items-start mb-4">
@@ -555,142 +500,23 @@ const EmployeeHomePage = () => {
                         transition={{ duration: 0.2 }}
                         className="space-y-8"
                     >
-                        {analyticsLoading ? (
-                            <div className="flex flex-col items-center justify-center min-h-[400px]">
-                                <div className="w-10 h-10 border-4 border-action-blue border-t-transparent rounded-full animate-spin" />
-                                <p className="mt-3 text-slate-blue text-sm font-semibold">Đang tải phân tích cá nhân...</p>
+                        <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-2xl border border-platinum-tint shadow-sm p-10 text-center">
+                            <div className="w-16 h-16 bg-cloud-mist rounded-full flex items-center justify-center mb-4">
+                                <BarChart2 className="w-8 h-8 text-slate-blue/50" />
                             </div>
-                        ) : (
-                            <>
-                                {/* Stats Cards */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold text-slate-blue">Tổng cuộc họp</span>
-                                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
-                                                <Calendar className="w-5 h-5" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <h3 className="text-2xl font-bold text-midnight-indigo">{personalStats.totalMeetings} cuộc</h3>
-                                            <p className="text-xs text-slate-blue mt-1">Trong 30 ngày qua</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold text-slate-blue">Tỉ lệ tham gia</span>
-                                            <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center">
-                                                <Award className="w-5 h-5" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <h3 className="text-2xl font-bold text-green-700">{personalStats.attendanceRate}%</h3>
-                                            <p className="text-xs text-slate-blue mt-1">Mục tiêu chuyên cần: &gt;90%</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold text-slate-blue">Thời gian họp trung bình</span>
-                                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                                                <Clock className="w-5 h-5" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <h3 className="text-2xl font-bold text-midnight-indigo">{personalStats.avgDuration} phút</h3>
-                                            <p className="text-xs text-slate-blue mt-1">Mỗi phiên thảo luận</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold text-slate-blue">Video lưu trữ</span>
-                                            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                                <Video className="w-5 h-5" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <h3 className="text-2xl font-bold text-midnight-indigo">{personalStats.recordingSessions} bản ghi</h3>
-                                            <p className="text-xs text-slate-blue mt-1">Tải về hoặc phát lại</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Charts Section */}
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                    {/* Meetings trend over weeks */}
-                                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm">
-                                        <div>
-                                            <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                                                <TrendingUp className="w-4 h-4 text-action-blue" />
-                                                Xu hướng tham gia họp theo tuần
-                                            </h2>
-                                            <p className="text-xs text-slate-blue">Theo dõi tần suất họp và tổng số giờ họp cá nhân</p>
-                                        </div>
-                                        <div className="h-[250px] w-full mt-4">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={meetingsTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                                    <defs>
-                                                        <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="#006BFF" stopOpacity={0.3} />
-                                                            <stop offset="95%" stopColor="#006BFF" stopOpacity={0} />
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#E7EDF6" vertical={false} />
-                                                    <XAxis dataKey="period" stroke="#8795A5" fontSize={11} tickLine={false} />
-                                                    <YAxis stroke="#8795A5" fontSize={11} tickLine={false} />
-                                                    <Tooltip />
-                                                    <Area type="monotone" dataKey="hours" stroke="#006BFF" strokeWidth={2} fillOpacity={1} fill="url(#colorHours)" name="Số giờ họp (h)" />
-                                                </AreaChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </div>
-
-                                    {/* Attendance rate donut chart */}
-                                    <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm flex flex-col justify-between">
-                                        <div>
-                                            <h2 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
-                                                <BarChart2 className="w-4 h-4 text-royal-amethyst" />
-                                                Tình trạng chuyên cần
-                                            </h2>
-                                            <p className="text-xs text-slate-blue">Phân tích tình trạng điểm danh các cuộc họp</p>
-                                        </div>
-                                        <div className="h-[180px] w-full relative flex items-center justify-center my-2">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={attendanceBreakdown}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={50}
-                                                        outerRadius={65}
-                                                        paddingAngle={3}
-                                                        dataKey="count"
-                                                    >
-                                                        {attendanceBreakdown.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-1 text-[11px] pt-2 border-t border-platinum-tint/60">
-                                            {attendanceBreakdown.map((item, idx) => (
-                                                <div key={item.name} className="flex flex-col items-center">
-                                                    <span className="flex items-center gap-1.5 font-semibold text-slate-blue">
-                                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                                                        {item.name}
-                                                    </span>
-                                                    <span className="text-sm font-bold text-midnight-indigo mt-0.5">{item.count} lần</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                            <h3 className="text-base font-bold text-midnight-indigo mb-2">Thống kê cá nhân chưa khả dụng</h3>
+                            <p className="text-sm text-slate-blue max-w-sm leading-relaxed">
+                                API thống kê tham dự cá nhân đang được phát triển. Để xem bản ghi cuộc họp, hãy truy cập trang Recordings.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/employee/recordings')}
+                                className="mt-6 px-5 py-2.5 bg-action-blue text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2"
+                            >
+                                <Video className="w-4 h-4" />
+                                Xem bản ghi cuộc họp
+                            </button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

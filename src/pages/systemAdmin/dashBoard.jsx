@@ -400,6 +400,8 @@ const KpiTile = ({ icon: Icon, label, value, sub, subColor, iconColor = D.cyan, 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const DashBoard = () => {
+    const userStr = localStorage.getItem('user');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
     const [loading, setLoading] = useState(true);
     const [error,   setError]   = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
@@ -667,7 +669,7 @@ const DashBoard = () => {
                             Tổng quan hệ thống
                         </span>
                         <h1 style={{ fontSize: 22, fontWeight: 800, color: D.text, letterSpacing: '-0.5px' }}>
-                            Bảng điều khiển
+                            Xin chào, {currentUser?.fullName || 'Quản trị hệ thống'} 👋
                         </h1>
                         <p style={{ fontSize: 12, color: D.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                             {lastUpdated ? (

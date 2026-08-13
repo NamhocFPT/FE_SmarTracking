@@ -1,4 +1,4 @@
-import { BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Home, MapPin, PieChart, PlusCircle, Shield } from 'lucide-react';
+import { BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Home, MapPin, PlusCircle, Shield } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -72,11 +72,6 @@ const STATIC_NAVIGATION_ITEMS = [
         isDropdown: true,
         icon: BarChart2,
         children: [
-            {
-                label: 'Hiệu suất phòng họp',
-                to: '/manager/room-analytics',
-                icon: PieChart,
-            },
             {
                 label: 'Tỷ lệ đúng giờ',
                 to: '/manager/attendance-analytics',
