@@ -128,12 +128,13 @@ export const deleteUser = async (userId) => {
 };
 
 /**
- * UC-ACC-07: Xem lịch sử hoạt động của user
- * BE đúng: GET /audit-logs?userId= (không còn /users/:userId/audit-logs)
+ * UC-ACC-07: Xem lịch sử hoạt động của user theo đối tượng bị tác động
+ * BE Option B: GET /users/:userId/audit-logs (entity_type='users' AND entity_id=userId)
+ * Permission: audit.users.read (BUSINESS_ADMIN + SYSTEM_ADMIN)
  */
 export const getUserAuditLogs = async (userId, params = {}) => {
-    const query = buildQuery({ ...params, userId });
-    return await get(`/audit-logs${query}`);
+    const query = buildQuery(params);
+    return await get(`/users/${userId}/audit-logs${query}`);
 };
 
 /**
@@ -144,8 +145,16 @@ export const importUsers = async (formData) => {
     return await post('/users/import', formData);
 };
 
+export const importPartnerUsers = async (formData) => {
+    return await post('/users/import-partners', formData);
+};
+
 export const getImportTemplate = async () => {
     return await get('/users/import/template');
+};
+
+export const getPartnerImportTemplate = async () => {
+    return await get('/users/import-partners/template');
 };
 
 export const exportUsers = async (params = {}) => {

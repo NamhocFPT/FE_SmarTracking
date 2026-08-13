@@ -1940,15 +1940,12 @@ const UserManagement = () => {
                                         <div key={log.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray/60 space-y-1">
                                             <div className="flex justify-between items-start gap-2">
                                                 <p className="text-xs font-bold text-midnight-indigo">
-                                                    {ACTION_MAP[log.action] || log.action}
+                                                    {log.description || ACTION_MAP[log.action] || log.action}
                                                 </p>
                                                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${log.status === 'success' ? 'bg-emerald-50 text-emerald-700' : log.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
                                                     {log.status === 'success' ? 'Thành công' : log.status === 'failed' ? 'Thất bại' : log.status || ''}
                                                 </span>
                                             </div>
-                                            {log.description && (
-                                                <p className="text-[10px] text-slate-blue leading-relaxed">{log.description}</p>
-                                            )}
                                             <div className="flex justify-between items-center pt-0.5">
                                                 <p className="text-[10px] text-slate-blue">Tác nhân: {log.actorName || log.actorEmail || '—'}</p>
                                                 <span className="text-[10px] text-slate-blue">
@@ -2200,8 +2197,20 @@ const BIOMETRIC_STATUS_LABELS = {
     upload_failed: { label: 'Lỗi upload ảnh (tài khoản vẫn được tạo)', color: 'bg-red-50 text-red-700' },
 };
 
-// Map action names — keys khớp với BE (GET /audit-logs)
+// Map action codes — khớp với mã thực tế BE ghi trong GET /users/:id/audit-logs
 const ACTION_MAP = {
+    // Tài khoản (mã mới từ BE Option B)
+    'ACCOUNT_CREATE': 'Thêm tài khoản',
+    'account.partner.create': 'Tạo tài khoản đối tác',
+    'ACCOUNT_UPDATE': 'Cập nhật tài khoản',
+    'ACCOUNT_LOCK': 'Khóa tài khoản',
+    'ACCOUNT_UNLOCK': 'Mở khóa tài khoản',
+    'ACCOUNT_DELETE': 'Xóa tài khoản',
+    'ACCOUNT_ROLE_UPDATE': 'Đổi vai trò',
+    'ACCOUNT_STATUS_UPDATE': 'Cập nhật trạng thái',
+    'account.partner.extend': 'Gia hạn tài khoản đối tác',
+    'view_detail': 'Xem chi tiết',
+    // Legacy codes (fallback phòng trường hợp BE chưa migrate đồng bộ)
     'LOGIN': 'Đăng nhập',
     'LOGIN_FAILED': 'Đăng nhập thất bại',
     'LOGOUT': 'Đăng xuất',
@@ -2211,8 +2220,6 @@ const ACTION_MAP = {
     'UNLOCK_USER': 'Mở khóa tài khoản',
     'DELETE_USER': 'Xóa tài khoản',
     'REGISTER_DEVICE': 'Đăng ký thiết bị',
-    'UPDATE_DEVICE': 'Cập nhật thiết bị',
-    'REMOVE_DEVICE': 'Vô hiệu hóa thiết bị',
     'EXPORT_USERS': 'Xuất tệp nhân viên',
     'UPDATE_CONFIG': 'Cập nhật cấu hình hệ thống',
 };

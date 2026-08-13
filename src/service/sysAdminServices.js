@@ -151,15 +151,16 @@ export const deleteUser = async (userId) => {
 };
 
 /**
- * UC-ACC-07: Xem lịch sử hoạt động của user
- * BE đúng: GET /audit-logs?userId= (không còn /users/:userId/audit-logs)
+ * UC-ACC-07: Xem lịch sử hoạt động của user theo đối tượng bị tác động
+ * BE Option B: GET /users/:userId/audit-logs (entity_type='users' AND entity_id=userId)
+ * Permission: audit.users.read (BUSINESS_ADMIN + SYSTEM_ADMIN)
  * @param {number|string} userId
  * @param {object} params - { page, limit }
  * @returns {Promise<object>} response envelope
  */
 export const getUserAuditLogs = async (userId, params = {}) => {
-    const query = buildQuery({ ...params, userId });
-    return await get(`/audit-logs${query}`);
+    const query = buildQuery(params);
+    return await get(`/users/${userId}/audit-logs${query}`);
 };
 
 /**
@@ -250,6 +251,7 @@ const mapAuditLogParams = (params) => {
     if (params.actionType) mapped.actionType = params.actionType;
     if (params.entityType) mapped.entityType = params.entityType;
     if (params.userId) mapped.userId = params.userId;
+    if (params.search) mapped.q = params.search;
 
     return mapped;
 };
@@ -274,6 +276,10 @@ export const exportAuditLogs = async (params = {}) => {
     const mappedParams = mapAuditLogParams(params);
     const query = buildQuery(mappedParams);
     return await get(`/audit-logs/export${query}`, { responseType: 'blob' });
+};
+
+export const getAuditLogActionTypes = async () => {
+    return await get('/audit-logs/action-types');
 };
 
 // ============================================================
