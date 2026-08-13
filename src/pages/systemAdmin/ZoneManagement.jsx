@@ -13,11 +13,8 @@ import ThumbnailImage from '../../components/common/ThumbnailImage';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const getTodayVN = () => {
-    const d = new Date();
-    const vn = new Date(d.getTime() + (7 * 60 + d.getTimezoneOffset()) * 60 * 1000);
-    return vn.toISOString().slice(0, 10);
-};
+const getTodayVN = () =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 
 const fmtEventTime = (iso) => {
     if (!iso) return '—';
