@@ -5,6 +5,8 @@ import {
     getUserPresence,
     getMeetingPresenceReport
 } from '../../service/managerServices';
+import ThumbnailImage from '../common/ThumbnailImage';
+import EventSnapshotModal from '../security/EventSnapshotModal';
 import {
     Users,
     Clock,
@@ -98,6 +100,12 @@ const UserDetailModal = ({ user, meetingId, meetingStartTime, meetingEndTime, on
     const [error, setError] = useState(null);
     const [timeline, setTimeline] = useState(null);
 
+    // States for snapshot fullscreen viewing
+    const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [snapshotEventIds, setSnapshotEventIds] = useState([]);
+    const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+    const [logPage, setLogPage] = useState(1);
+
     useEffect(() => {
         const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
         document.addEventListener('keydown', handleKey);
@@ -119,6 +127,11 @@ const UserDetailModal = ({ user, meetingId, meetingStartTime, meetingEndTime, on
             .catch((err) => setError(err.message || 'Lỗi khi tải tiến trình.'))
             .finally(() => setLoading(false));
     }, [meetingId, user.userId]);
+
+    const logItemsPerPage = 5;
+    const events = timeline?.timeline?.events || [];
+    const logTotalPages = Math.ceil(events.length / logItemsPerPage);
+    const currentEvents = events.slice((logPage - 1) * logItemsPerPage, logPage * logItemsPerPage);
 
     const isPresent = user.durationMs > 0;
     const ratio = ((user.presentRatio ?? 0) * 100).toFixed(1);
@@ -268,47 +281,110 @@ const UserDetailModal = ({ user, meetingId, meetingStartTime, meetingEndTime, on
 
                             {/* Events table */}
                             <div className="space-y-2">
-                                <h4 className="text-xs font-bold text-slate-blue uppercase tracking-wide">Chi tiết các mốc quét camera</h4>
-                                <div className="border border-platinum-tint rounded-xl overflow-hidden">
-                                    <div className="max-h-48 overflow-y-auto">
-                                        <table className="w-full text-left text-xs border-collapse">
-                                            <thead className="sticky top-0">
-                                                <tr className="bg-cloud-mist border-b border-platinum-tint text-slate-blue font-bold">
-                                                    <th className="p-3">Thời điểm</th>
-                                                    <th className="p-3">Hướng di chuyển</th>
-                                                    <th className="p-3">Độ tin cậy nhận diện</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {timeline?.timeline?.events?.length > 0 ? (
-                                                    timeline.timeline.events.map((ev, idx) => (
-                                                        <tr key={idx} className="border-b border-platinum-tint hover:bg-cloud-mist/30">
-                                                            <td className="p-3 font-medium text-midnight-indigo">{formatVietnameseTime(ev.at)}</td>
-                                                            <td className="p-3">
-                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                                    ev.direction === 'enter' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-xs font-bold text-slate-blue uppercase tracking-wide">Chi tiết các mốc quét camera</h4>
+                                    {logTotalPages > 1 && (
+                                        <span className="text-[10px] text-slate-blue font-bold">Trang {logPage}/{logTotalPages}</span>
+                                    )}
+                                </div>
+                                <div className="border border-platinum-tint rounded-xl overflow-hidden bg-white shadow-sm">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-cloud-mist/50 border-b border-platinum-tint text-slate-blue font-bold text-center">
+                                                <th className="p-3 text-left">Thời điểm</th>
+                                                <th className="p-3 text-center">Hướng di chuyển</th>
+                                                <th className="p-3 text-center">Ảnh camera</th>
+                                                <th className="p-3 text-center">Độ tin cậy nhận diện</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {currentEvents.length > 0 ? (
+                                                currentEvents.map((ev, idx) => {
+                                                    const simValue = ev.similarity != null ? (ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity) : null;
+                                                    return (
+                                                        <tr key={idx} className="border-b border-platinum-tint hover:bg-cloud-mist/20 text-center transition-colors">
+                                                            <td className="p-3 text-left font-medium text-midnight-indigo">{formatVietnameseTime(ev.at)}</td>
+                                                            <td className="p-3 text-center">
+                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                                                    ev.direction === 'enter'
+                                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                        : 'bg-amber-50 text-amber-700 border-amber-200'
                                                                 }`}>
-                                                                    {ev.direction === 'enter' ? '▲ Vào phòng' : '▼ Ra khỏi phòng'}
+                                                                    <span className={`w-1.5 h-1.5 rounded-full ${ev.direction === 'enter' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                                    {ev.direction === 'enter' ? 'Vào phòng' : 'Ra khỏi phòng'}
                                                                 </span>
                                                             </td>
-                                                            <td className="p-3 font-mono text-slate-600 font-medium">
-                                                                {ev.similarity != null
-                                                                    ? `${(ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity).toFixed(0)}%`
-                                                                    : '—'}
+                                                            <td className="p-3 text-center">
+                                                                {ev.id ? (
+                                                                    <div className="w-16 h-10 overflow-hidden rounded border border-slate-200 mx-auto flex items-center justify-center bg-slate-50 transition-all hover:scale-105">
+                                                                        <ThumbnailImage
+                                                                            eventId={ev.id}
+                                                                            className="w-full h-full object-cover border-0"
+                                                                            onClick={() => {
+                                                                                const evImages = events.map(e => e.id).filter(Boolean);
+                                                                                setSnapshotEventIds(evImages);
+                                                                                setSnapshotEventId(ev.id);
+                                                                                setIsSnapshotOpen(true);
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-slate-400 font-medium italic">Không ảnh</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3 text-center">
+                                                                {simValue !== null ? (
+                                                                    <span className={`inline-flex px-2 py-0.5 rounded font-bold text-[10px] border ${
+                                                                        simValue >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                                        simValue >= 50 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                        'bg-red-50 text-red-700 border-red-200'
+                                                                    }`}>
+                                                                        {simValue.toFixed(0)}%
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 font-medium">—</span>
+                                                                )}
                                                             </td>
                                                         </tr>
-                                                    ))
-                                                ) : (
-                                                    <tr>
-                                                        <td colSpan="3" className="p-6 text-center text-slate-blue italic text-[11px]">
-                                                            Không ghi nhận sự kiện quẹt camera nào.
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="4" className="p-8 text-center text-slate-blue italic text-[11px] bg-slate-50/55">
+                                                        Không ghi nhận sự kiện quẹt camera nào.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
+                                
+                                {/* Inner Log Pagination */}
+                                {logTotalPages > 1 && (
+                                    <div className="flex justify-between items-center pt-2 px-1">
+                                        <span className="text-[10px] text-slate-blue font-bold">
+                                            Hiển thị {(logPage - 1) * logItemsPerPage + 1}–{Math.min(logPage * logItemsPerPage, events.length)} trong {events.length} mốc quét
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                disabled={logPage === 1}
+                                                onClick={() => setLogPage(p => p - 1)}
+                                                className="px-2 py-1 text-[10px] border border-platinum-tint rounded-lg hover:bg-cloud-mist disabled:opacity-40 text-slate-blue transition-colors font-bold"
+                                            >
+                                                ‹ Trước
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={logPage === logTotalPages}
+                                                onClick={() => setLogPage(p => p + 1)}
+                                                className="px-2 py-1 text-[10px] border border-platinum-tint rounded-lg hover:bg-cloud-mist disabled:opacity-40 text-slate-blue transition-colors font-bold"
+                                            >
+                                                Sau ›
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
@@ -323,6 +399,92 @@ const UserDetailModal = ({ user, meetingId, meetingStartTime, meetingEndTime, on
                         Đóng
                     </button>
                 </div>
+            </div>
+
+            {/* Event Snapshot Modal for viewing fullscreen camera images */}
+            <EventSnapshotModal
+                isOpen={isSnapshotOpen}
+                onClose={() => setIsSnapshotOpen(false)}
+                eventId={snapshotEventId}
+                eventIds={snapshotEventIds}
+            />
+        </div>,
+        document.body
+    );
+};
+
+// ─── User Profile Modal ─────────────────────────────────────────────────────
+
+const UserProfileModal = ({ user, onClose }) => {
+    useEffect(() => {
+        const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handleKey);
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.removeEventListener('keydown', handleKey);
+            document.body.style.overflow = '';
+        };
+    }, [onClose]);
+
+    return createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={onClose}
+            />
+
+            {/* Modal Container */}
+            <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-platinum-tint flex flex-col animate-in fade-in zoom-in-95 duration-200 p-6 items-center text-center">
+                {/* Close button */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-cloud-mist text-slate-blue hover:text-midnight-indigo transition-colors"
+                >
+                    <X className="w-4.5 h-4.5" />
+                </button>
+
+                {/* Profile Avatar */}
+                <div className="mt-4 mb-4">
+                    <Avatar user={user} size="lg" />
+                </div>
+
+                {/* Profile Info */}
+                <h3 className="text-base font-bold text-midnight-indigo">{user.fullName || 'Chưa rõ'}</h3>
+                
+                <div className="w-full mt-4 space-y-3 text-left border-t border-platinum-tint pt-4">
+                    {user.employeeCode && (
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-blue font-semibold">Mã nhân viên:</span>
+                            <span className="font-bold text-midnight-indigo font-mono bg-slate-100 px-2 py-0.5 rounded">{user.employeeCode}</span>
+                        </div>
+                    )}
+                    
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-blue font-semibold">Phòng ban:</span>
+                        <span className="font-bold text-midnight-indigo">{user.departmentName || 'Chưa cập nhật'}</span>
+                    </div>
+
+                    {user.email && (
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-blue font-semibold">Email:</span>
+                            <a href={`mailto:${user.email}`} className="font-bold text-action-blue hover:underline">{user.email}</a>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-blue font-semibold">Mã ID hệ thống:</span>
+                        <span className="font-medium text-slate-500 font-mono select-all text-[10px]" title={user.userId}>{user.userId?.substring(0, 8)}...</span>
+                    </div>
+                </div>
+
+                {/* Action button */}
+                <button
+                    onClick={onClose}
+                    className="w-full mt-6 py-2 bg-midnight-indigo text-white font-bold rounded-xl text-xs hover:bg-midnight-indigo/90 transition-colors"
+                >
+                    Đóng
+                </button>
             </div>
         </div>,
         document.body
@@ -340,6 +502,7 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
     const [sortOrder, setSortOrder] = useState('asc');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [profileUser, setProfileUser] = useState(null);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
 
@@ -582,10 +745,16 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                                         >
                                             {/* Avatar + Name */}
                                             <td className="p-3.5">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar user={user} size="md" />
+                                                <div 
+                                                    className="flex items-center gap-3 cursor-pointer group"
+                                                    onClick={() => setProfileUser(user)}
+                                                    title="Bấm để xem thông tin nhân sự"
+                                                >
+                                                    <div className="transition-transform duration-200 group-hover:scale-105">
+                                                        <Avatar user={user} size="md" />
+                                                    </div>
                                                     <div className="min-w-0">
-                                                        <p className="font-semibold text-midnight-indigo truncate max-w-[140px]">{displayName}</p>
+                                                        <p className="font-semibold text-midnight-indigo group-hover:text-action-blue group-hover:underline truncate max-w-[140px] transition-all">{displayName}</p>
                                                         {user.email && <p className="text-[10px] text-slate-blue truncate max-w-[140px]">{user.email}</p>}
                                                         {user.departmentName && <p className="text-[10px] text-slate-blue/80">{user.departmentName}</p>}
                                                     </div>
@@ -702,6 +871,14 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                     meetingStartTime={meetingStartTime}
                     meetingEndTime={meetingEndTime}
                     onClose={() => setSelectedUser(null)}
+                />
+            )}
+
+            {/* User profile modal */}
+            {profileUser && (
+                <UserProfileModal
+                    user={profileUser}
+                    onClose={() => setProfileUser(null)}
                 />
             )}
         </div>
