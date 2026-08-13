@@ -1,6 +1,6 @@
 import { Users, RefreshCw } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import ImportAccountsModal from '../../components/user/ImportAccountsModal';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -23,11 +23,9 @@ import {
     updateUserStatus,
     deleteUser,
     getUserAuditLogs,
-    importUsers,
     getDepartments,
     getRoles,
     exportUsers,
-    getImportTemplate,
     getUserById,
     resyncUserPortrait,
 } from '../../service/businessAdminServices';
@@ -41,13 +39,6 @@ import {
 } from '../../constants/partnerAccount';
 
 
-const VEHICLE_PLATE_STATUS_LABELS = {
-    pending_commit: { label: 'Hợp lệ, chờ xác nhận', color: 'bg-amber-50 text-amber-700' },
-    attached: { label: 'Đã đăng ký biển số', color: 'bg-blue-50 text-action-blue' },
-    invalid_plate: { label: 'Sai định dạng biển số', color: 'bg-red-50 text-red-700' },
-    duplicate_plate: { label: 'Biển số đã được đăng ký', color: 'bg-orange-50 text-orange-700' },
-    attach_failed: { label: 'Lỗi đăng ký (tài khoản vẫn tạo thành công)', color: 'bg-red-50 text-red-700' },
-};
 
 /**
  * UserManagement Component
@@ -143,18 +134,6 @@ const UserManagement = () => {
 
     const [formErrors, setFormErrors] = useState({});
 
-    const [importFile, setImportFile] = useState(null);
-    const [importPhotos, setImportPhotos] = useState([]); // File[], filename = employee_code
-    const [importPhotosZip, setImportPhotosZip] = useState(null); // single .zip file
-    const [biometricConsentChecked, setBiometricConsentChecked] = useState(false);
-    const [importing, setImporting] = useState(false);
-    const [importStep, setImportStep] = useState(1); // 1 = Preview, 2 = Commit, 3 = Done
-    const [isDragging, setIsDragging] = useState(false);
-    const [validationErrors, setValidationErrors] = useState([]); // failed/invalid rows: { row, email, status, reason }
-    const [importResults, setImportResults] = useState([]); // full results[] from last import, used for biometricStatus display
-    const [excelEmployeeCodes, setExcelEmployeeCodes] = useState([]); // employee_code values parsed from Excel client-side
-    const [unmatchedPhotos, setUnmatchedPhotos] = useState([]); // photo filenames (no ext) not found in excelEmployeeCodes
-    const [employeesWithoutPhoto, setEmployeesWithoutPhoto] = useState([]); // employee codes with no matching photo file
 
     // Load filter options (Departments, Roles)
     const loadFilterData = useCallback(async () => {
@@ -584,72 +563,6 @@ const UserManagement = () => {
         }
     };
 
-    // Parse employee_code column from Excel file client-side for biometric photo validation
-    const parseExcelForEmployeeCodes = useCallback((file) => {
-        if (!file) { setExcelEmployeeCodes([]); return; }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const wb = XLSX.read(e.target.result, { type: 'array' });
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                if (rows.length < 2) { setExcelEmployeeCodes([]); return; }
-                const headers = rows[0].map(h => String(h).trim().toLowerCase());
-                const codeIdx = headers.indexOf('employee_code');
-                if (codeIdx === -1) { setExcelEmployeeCodes([]); return; }
-                const codes = rows.slice(1).map(row => String(row[codeIdx] || '').trim()).filter(Boolean);
-                setExcelEmployeeCodes(codes);
-            } catch { setExcelEmployeeCodes([]); }
-        };
-        reader.readAsArrayBuffer(file);
-    }, []);
-
-    // Recompute unmatched photos & employees without photo whenever photos or codes change
-    useEffect(() => {
-        if (!importPhotos.length || !excelEmployeeCodes.length) {
-            setUnmatchedPhotos([]);
-            setEmployeesWithoutPhoto([]);
-            return;
-        }
-        const photoBaseNames = importPhotos.map(f => f.name.replace(/\.[^.]+$/, '').toLowerCase());
-        const codeSet = new Set(excelEmployeeCodes.map(c => c.toLowerCase()));
-        const photoSet = new Set(photoBaseNames);
-        setUnmatchedPhotos(photoBaseNames.filter(n => !codeSet.has(n)));
-        setEmployeesWithoutPhoto(excelEmployeeCodes.filter(c => !photoSet.has(c.toLowerCase())));
-    }, [importPhotos, excelEmployeeCodes]);
-
-    // Download template excel (UC-ACC-02)
-    const handleDownloadTemplate = async () => {
-        setError(null);
-        try {
-            const res = await getImportTemplate();
-            if (!res?.isBlob || !res.data) throw new Error('Phản hồi không phải là file Excel');
-            const url = window.URL.createObjectURL(res.data);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'User_Import_Template.xlsx');
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        } catch {
-            // Local fallback generation — headers match the real BE import contract
-            // (IMPORT_ACCOUNTS_HEADERS in capstone-be/src/modules/accounts/constants/import-accounts.constants.ts)
-            const headers = 'full_name,email,department_code,role_codes,employee_code,phone_number,position_title,direct_manager_email,license_plate\n';
-            const sampleData = 'Nguyễn Văn A,nguyen.a@example.com,DEPT001,EMPLOYEE,NV001,0987654321,Nhân viên,manager@example.com,51A-12345\n';
-            const blob = new Blob(['\uFEFF' + headers + sampleData], { type: 'text/csv;charset=utf-8;' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'User_Import_Template_Mau.csv');
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            setSuccessMessage('Tải tệp mẫu thành công (định dạng CSV).');
-        }
-    };
-
     // Excel Export download — GET /users/export (accounts.user.export), trả file XLSX toàn bộ danh sách
     const handleExportExcel = async () => {
         setError(null);
@@ -671,86 +584,6 @@ const UserManagement = () => {
             throw new Error('Phản hồi không hợp lệ');
         } catch (err) {
             setError(err?.error?.message || err?.message || 'Lỗi khi xuất dữ liệu.');
-        }
-    };
-
-    // Import from excel submit
-    const handleImportSubmit = async (e) => {
-        e.preventDefault();
-        if (!importFile) return;
-        setImporting(true);
-        setError(null);
-        setSuccessMessage(null);
-        // Only clear validation/results if we are at step 1, otherwise we need them for step 2
-        if (importStep === 1) {
-            setValidationErrors([]);
-            setImportResults([]);
-        }
-
-        try {
-            const fd = new FormData();
-            fd.append('file', importFile);
-
-            const isCommit = importStep === 2;
-            if (isCommit) {
-                fd.append('commit', 'true');
-            } else {
-                fd.append('commit', 'false');
-            }
-
-            // Exclude photos whose filename doesn't match any employee_code in the Excel
-            const codeSet = new Set(excelEmployeeCodes.map(c => c.toLowerCase()));
-            const photosToSend = excelEmployeeCodes.length > 0
-                ? importPhotos.filter(f => codeSet.has(f.name.replace(/\.[^.]+$/, '').toLowerCase()))
-                : importPhotos;
-            photosToSend.forEach(photo => fd.append('photos', photo, photo.name));
-            if (importPhotosZip) {
-                fd.append('photosZip', importPhotosZip, importPhotosZip.name);
-            }
-            if (importPhotos.length > 0 || importPhotosZip) {
-                fd.append('biometricConsentConfirmed', 'true');
-            }
-
-            const res = await importUsers(fd);
-            if (res?.success && res.data) {
-                const report = res.data;
-                const results = report.results || [];
-                const failedRows = results.filter(r => r.status === 'failed' || r.status === 'invalid');
-
-                setValidationErrors(failedRows);
-                setImportResults(results);
-
-                if (!isCommit) {
-                    // Step 1: Preview completed
-                    if (failedRows.length > 0) {
-                        setSuccessMessage(`Xác thực hoàn tất. Có ${failedRows.length} dòng lỗi cần chú ý.`);
-                    } else {
-                        setSuccessMessage(`Xác thực thành công. ${report.successCount ?? 0} tài khoản hợp lệ, sẵn sàng nhập.`);
-                    }
-                    setImportStep(2);
-                } else {
-                    // Step 2: Commit completed
-                    setSuccessMessage(
-                        `Đã tạo ${report.successCount ?? 0}/${report.totalRows ?? 0} tài khoản thành công.`
-                        + (failedRows.length > 0 ? ` Bỏ qua ${failedRows.length} dòng bị lỗi.` : '')
-                    );
-
-                    if (failedRows.length === 0 && importPhotos.length === 0 && !importPhotosZip) {
-                        setIsImportModalOpen(false);
-                    } else {
-                        setImportStep(3); // Keep modal open to show final status
-                    }
-                    fetchUsers();
-                }
-            } else {
-                setError(res?.message || 'Tệp import không hợp lệ. Vui lòng kiểm tra lại định dạng file.');
-                setImportStep(1); // Reset to step 1 on error
-            }
-        } catch (err) {
-            setError(err?.error?.message || err?.message || 'Lỗi khi tải lên tệp import. Vui lòng thử lại.');
-            setImportStep(1);
-        } finally {
-            setImporting(false);
         }
     };
 
@@ -804,14 +637,6 @@ const UserManagement = () => {
         setExpiryPickerDate(null);
         setExpiryPickerTime('23:59');
         if (avatarInputRef.current) avatarInputRef.current.value = '';
-        setImportFile(null);
-        setImportPhotos([]);
-        setImportPhotosZip(null);
-        setBiometricConsentChecked(false);
-        setValidationErrors([]);
-        setImportResults([]);
-        setImportStep(1);
-        setIsDragging(false);
     };
 
     const handleRoleCheckboxChange = (roleId) => {
@@ -1583,334 +1408,13 @@ const UserManagement = () => {
                 document.body
             )}
 
-            {/* IMPORT MODAL (WITH ERROR FEEDBACK & TEMPLATE DOWNLOAD) */}
-            {isImportModalOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full overflow-hidden animate-fade-in-up">
-                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
-                            <div>
-                                <h3 className="font-bold text-midnight-indigo">Nhập tài khoản từ Excel</h3>
-                                <p className="text-[10px] text-slate-blue mt-0.5">Thêm nhanh nhiều người dùng cùng lúc</p>
-                            </div>
-                            <button onClick={() => setIsImportModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        <form onSubmit={handleImportSubmit} className="p-6 space-y-4">
-                            <div className="flex items-center justify-between bg-blue-50/50 border border-action-blue/20 p-3 rounded-xl">
-                                <span className="text-xs font-medium text-midnight-indigo">Cần tệp định dạng chuẩn?</span>
-                                <button
-                                    type="button"
-                                    onClick={handleDownloadTemplate}
-                                    className="text-xs font-bold text-action-blue hover:underline flex items-center gap-1"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Tải tệp mẫu
-                                </button>
-                            </div>
+            {/* IMPORT MODAL — 2-tab component */}
+            <ImportAccountsModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={fetchUsers}
+            />
 
-                            <div
-                                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${isDragging ? 'border-action-blue bg-blue-50/50' : 'border-platinum-tint hover:border-action-blue'
-                                    } ${importStep > 1 ? 'opacity-60 pointer-events-none' : ''}`}
-                                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    setIsDragging(false);
-                                    if (importStep > 1) return;
-                                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                        const f = e.dataTransfer.files[0];
-                                        setImportFile(f);
-                                        parseExcelForEmployeeCodes(f);
-                                        setValidationErrors([]);
-                                        setImportResults([]);
-                                        setImportStep(1);
-                                    }
-                                }}
-                            >
-                                <input
-                                    type="file"
-                                    required={importStep === 1}
-                                    accept=".xlsx, .xls, .csv"
-                                    disabled={importStep > 1}
-                                    onChange={(e) => {
-                                        const f = e.target.files[0] || null;
-                                        setImportFile(f);
-                                        parseExcelForEmployeeCodes(f);
-                                        setValidationErrors([]);
-                                        setImportResults([]);
-                                        setImportStep(1);
-                                    }}
-                                    className="hidden"
-                                    id="excel-file-upload"
-                                />
-                                <label htmlFor="excel-file-upload" className={`block ${importStep === 1 ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                                    <svg className={`w-8 h-8 mx-auto mb-2 ${importFile ? 'text-action-blue' : 'text-steel-gray'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 13h6m-3-3v6m-9 1V4a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                                    </svg>
-                                    <span className="text-sm font-bold text-midnight-indigo block mb-1">
-                                        {importFile ? importFile.name : 'Nhấp hoặc Kéo thả tệp .xlsx, .csv vào đây'}
-                                    </span>
-                                    {importFile && (
-                                        <span className="text-xs text-slate-blue block">
-                                            {(importFile.size / 1024).toFixed(1)} KB
-                                        </span>
-                                    )}
-                                </label>
-                            </div>
-
-                            {/* Biometric photos (optional) — filenames must match employee_code */}
-                            <div className="border border-platinum-tint rounded-2xl p-4 space-y-3 bg-cloud-mist/20">
-                                <div>
-                                    <p className="text-xs font-bold text-midnight-indigo">
-                                        Ảnh sinh trắc học — cho tất cả nhân viên trong file Excel
-                                        <span className="ml-1.5 text-[10px] font-semibold text-steel-gray bg-slate-100 px-1.5 py-0.5 rounded-full">Tùy chọn</span>
-                                    </p>
-                                    <p className="text-[10px] text-slate-blue mt-1.5 leading-relaxed">
-                                        Mỗi ảnh tương ứng với <strong>1 nhân viên</strong> trong danh sách Excel.
-                                        Đặt tên file <strong>= mã nhân viên</strong> (cột <code className="bg-slate-100 px-1 rounded">employee_code</code>) để hệ thống tự ghép đúng người.
-                                        <br />
-                                        Ví dụ: <code className="bg-slate-100 px-1 rounded">EMP001.jpg</code>, <code className="bg-slate-100 px-1 rounded">EMP002.png</code>
-                                    </p>
-                                </div>
-
-                                {/* Option A: multiple individual photos */}
-                                <div className="flex items-center gap-3 flex-wrap">
-                                    <input
-                                        type="file"
-                                        multiple
-                                        accept="image/jpeg,image/png,image/webp"
-                                        onChange={(e) => {
-                                            setImportPhotos(Array.from(e.target.files || []));
-                                            setImportResults([]);
-                                        }}
-                                        className="hidden"
-                                        id="biometric-photos-upload"
-                                    />
-                                    <label
-                                        htmlFor="biometric-photos-upload"
-                                        className="inline-flex items-center px-3 py-1.5 border border-platinum-tint bg-white text-xs font-semibold text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg cursor-pointer transition-colors"
-                                    >
-                                        Chọn ảnh rời...
-                                    </label>
-
-                                    <span className="text-[10px] text-steel-gray font-semibold">hoặc</span>
-
-                                    {/* Option B: single .zip */}
-                                    <input
-                                        type="file"
-                                        accept=".zip"
-                                        onChange={(e) => {
-                                            setImportPhotosZip(e.target.files[0] || null);
-                                            setImportResults([]);
-                                        }}
-                                        className="hidden"
-                                        id="biometric-zip-upload"
-                                    />
-                                    <label
-                                        htmlFor="biometric-zip-upload"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-platinum-tint bg-white text-xs font-semibold text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg cursor-pointer transition-colors"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
-                                        </svg>
-                                        Nộp file .zip...
-                                    </label>
-                                </div>
-
-                                {/* Selected individual photos */}
-                                {importPhotos.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {importPhotos.map((photo, idx) => (
-                                            <span key={idx} className="inline-flex items-center gap-1 text-[10px] font-mono bg-white border border-platinum-tint px-1.5 py-0.5 rounded text-slate-blue">
-                                                {photo.name}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setImportPhotos(prev => prev.filter((_, i) => i !== idx))}
-                                                    className="text-steel-gray hover:text-red-500"
-                                                >×</button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Selected .zip file */}
-                                {importPhotosZip && (
-                                    <div className="flex items-center gap-2 bg-white border border-action-blue/30 rounded-lg px-3 py-2">
-                                        <svg className="w-4 h-4 text-action-blue shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
-                                        </svg>
-                                        <span className="text-[11px] font-mono text-midnight-indigo flex-1 truncate">{importPhotosZip.name}</span>
-                                        <span className="text-[10px] text-slate-blue shrink-0">{(importPhotosZip.size / 1024 / 1024).toFixed(1)} MB</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setImportPhotosZip(null)}
-                                            className="text-steel-gray hover:text-red-500 shrink-0"
-                                        >×</button>
-                                    </div>
-                                )}
-
-                                {/* Unmatched photos warning — filenames not found in Excel employee_code */}
-                                {unmatchedPhotos.length > 0 && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
-                                        <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
-                                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                                            </svg>
-                                            {unmatchedPhotos.length} ảnh không khớp mã nhân viên — sẽ bị loại bỏ khi nộp
-                                        </p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {unmatchedPhotos.map((name, i) => (
-                                                <span key={i} className="font-mono text-[10px] bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded line-through">
-                                                    {name}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <p className="text-[10px] text-amber-600">Tên ảnh phải khớp đúng với cột <code className="bg-amber-100 px-0.5 rounded">employee_code</code> trong file Excel.</p>
-                                    </div>
-                                )}
-
-                                {/* Employees without matching photo */}
-                                {employeesWithoutPhoto.length > 0 && importPhotos.length > 0 && (
-                                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1.5">
-                                        <p className="text-xs font-bold text-red-700 flex items-center gap-1.5">
-                                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
-                                            </svg>
-                                            {employeesWithoutPhoto.length} nhân viên chưa có ảnh sinh trắc — vẫn được tạo tài khoản, nhưng chưa có khuôn mặt
-                                        </p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {employeesWithoutPhoto.map((code, i) => (
-                                                <span key={i} className="font-mono text-[10px] bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.5 rounded">
-                                                    {code}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <p className="text-[10px] text-red-500">Bổ sung ảnh tên <code className="bg-red-100 px-0.5 rounded">{employeesWithoutPhoto[0]}.jpg</code> (hoặc .png, .webp) để ghép sinh trắc học cho nhân viên này.</p>
-                                    </div>
-                                )}
-
-                                {/* Consent checkbox — shown when any biometric source is chosen */}
-                                {(importPhotos.length > 0 || importPhotosZip) && (
-                                    <label className="flex items-start gap-2 text-xs text-midnight-indigo font-medium cursor-pointer pt-1 border-t border-platinum-tint/60">
-                                        <input
-                                            type="checkbox"
-                                            checked={biometricConsentChecked}
-                                            onChange={(e) => setBiometricConsentChecked(e.target.checked)}
-                                            className="mt-0.5 rounded text-action-blue focus:ring-action-blue"
-                                        />
-                                        <span>Tôi xác nhận đã có sự đồng ý của (các) nhân viên cho việc dùng ảnh vào mục đích sinh trắc học (FaceGate).</span>
-                                    </label>
-                                )}
-                            </div>
-
-                            {/* Formatting Errors List */}
-                            {validationErrors.length > 0 && (
-                                <div className="space-y-2 max-h-[180px] overflow-y-auto bg-red-50 border border-red-200 rounded-xl p-3.5">
-                                    <h4 className="text-xs font-bold text-red-700 uppercase tracking-wide">Chi tiết các dòng bị lỗi:</h4>
-                                    <div className="divide-y divide-red-200/50">
-                                        {validationErrors.map((err, idx) => (
-                                            <div key={idx} className="py-2 flex items-start justify-between text-xs gap-3">
-                                                <span className="font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                                                    Dòng {err.row}
-                                                </span>
-                                                <span className="flex-1 text-red-600 font-medium">
-                                                    {IMPORT_ROW_REASON_LABELS[err.reason] || err.reason || 'Lỗi không xác định'}
-                                                </span>
-                                                {err.email && (
-                                                    <span className="text-[10px] bg-red-200/60 px-1.5 py-0.5 rounded text-red-800 font-mono">
-                                                        {err.email}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Biometric attach results — only shown when photos were sent with this import */}
-                            {importResults.some(r => r.biometricStatus) && (
-                                <div className="space-y-2 max-h-[180px] overflow-y-auto bg-cloud-mist/30 border border-platinum-tint rounded-xl p-3.5">
-                                    <h4 className="text-xs font-bold text-midnight-indigo uppercase tracking-wide">Kết quả đính kèm ảnh sinh trắc học:</h4>
-                                    <div className="divide-y divide-platinum-tint/50">
-                                        {importResults.filter(r => r.biometricStatus).map((r, idx) => {
-                                            const meta = BIOMETRIC_STATUS_LABELS[r.biometricStatus] || { label: r.biometricStatus, color: 'bg-slate-100 text-slate-600' };
-                                            return (
-                                                <div key={idx} className="py-2 flex items-center justify-between text-xs gap-3">
-                                                    <span className="font-bold text-midnight-indigo bg-white border border-platinum-tint px-1.5 py-0.5 rounded">
-                                                        Dòng {r.row}
-                                                    </span>
-                                                    <span className="flex-1 text-slate-blue font-mono truncate">{r.email}</span>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${meta.color}`}>
-                                                        {meta.label}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Vehicle plate results — only shown when any row has vehiclePlateStatus */}
-                            {importResults.some(r => r.vehiclePlateStatus) && (
-                                <div className="space-y-2 max-h-[180px] overflow-y-auto bg-cloud-mist/30 border border-platinum-tint rounded-xl p-3.5">
-                                    <h4 className="text-xs font-bold text-midnight-indigo uppercase tracking-wide">Kết quả đăng ký biển số xe:</h4>
-                                    <div className="divide-y divide-platinum-tint/50">
-                                        {importResults.filter(r => r.vehiclePlateStatus).map((r, idx) => {
-                                            const meta = VEHICLE_PLATE_STATUS_LABELS[r.vehiclePlateStatus] || { label: r.vehiclePlateStatus, color: 'bg-slate-100 text-slate-600' };
-                                            return (
-                                                <div key={idx} className="py-2 flex items-center justify-between text-xs gap-3">
-                                                    <span className="font-bold text-midnight-indigo bg-white border border-platinum-tint px-1.5 py-0.5 rounded">
-                                                        Dòng {r.row}
-                                                    </span>
-                                                    <span className="flex-1 text-slate-blue font-mono truncate">{r.email}</span>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${meta.color}`}>
-                                                        {meta.label}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsImportModalOpen(false)}
-                                    className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors"
-                                >
-                                    Đóng
-                                </button>
-                                {importStep === 1 && (
-                                    <button
-                                        type="submit"
-                                        disabled={!importFile || importing || ((importPhotos.length > 0 || importPhotosZip) && !biometricConsentChecked)}
-                                        className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50"
-                                    >
-                                        {importing ? 'Đang xác thực...' : 'Xác thực tệp'}
-                                    </button>
-                                )}
-                                {importStep === 2 && (
-                                    <button
-                                        type="submit"
-                                        disabled={importing || ((importPhotos.length > 0 || importPhotosZip) && !biometricConsentChecked)}
-                                        className={`px-4 py-2 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 ${validationErrors.length > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-action-blue hover:bg-glacier-blue'
-                                            }`}
-                                    >
-                                        {importing ? 'Đang xử lý...' : validationErrors.length > 0 ? 'Bỏ qua lỗi & Nhập hợp lệ' : 'Xác nhận Nhập'}
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-                </div>,
-                document.body
-            )}
 
             {/* USER LOGS MODAL */}
             {isLogsModalOpen && selectedUser && createPortal(
@@ -2173,29 +1677,8 @@ const UserManagement = () => {
 
 // Row-level import failure reasons — see ImportAccountRowReason in
 // capstone-be/src/modules/accounts/constants/import-accounts.constants.ts
-const IMPORT_ROW_REASON_LABELS = {
-    MISSING_REQUIRED_FIELD: 'Thiếu trường bắt buộc',
-    INVALID_EMAIL: 'Email không đúng định dạng',
-    DUPLICATE_IN_FILE: 'Trùng lặp trong tệp',
-    EMAIL_ALREADY_EXISTS: 'Email đã tồn tại trong hệ thống',
-    EMPLOYEE_CODE_ALREADY_EXISTS: 'Mã nhân viên đã tồn tại',
-    DEPARTMENT_NOT_FOUND: 'Không tìm thấy phòng ban',
-    ROLE_NOT_FOUND: 'Không tìm thấy vai trò',
-    MANAGER_NOT_FOUND: 'Không tìm thấy quản lý trực tiếp',
-};
 
-// Per-row biometricStatus returned by POST /users/import when `photos` is sent
-// (BE contract — chưa push lên repo tại thời điểm tích hợp, xem
-// BAO_CAO_LOI_IMPORT_USER_VA_TINH_NANG_SINH_TRAC_HOC_2026-08-05.md mục "Tính năng mới").
-const BIOMETRIC_STATUS_LABELS = {
-    not_provided: { label: 'Không có ảnh khớp', color: 'bg-slate-100 text-slate-600' },
-    pending_commit: { label: 'Chờ xác nhận tạo', color: 'bg-amber-50 text-amber-700' },
-    attached: { label: 'Đã tải lên, chờ duyệt', color: 'bg-blue-50 text-action-blue' },
-    role_exempt: { label: 'Role không cần sinh trắc học', color: 'bg-slate-100 text-slate-600' },
-    invalid_image: { label: 'Ảnh không hợp lệ', color: 'bg-red-50 text-red-700' },
-    file_too_large: { label: 'Ảnh vượt quá 5MB', color: 'bg-red-50 text-red-700' },
-    upload_failed: { label: 'Lỗi upload ảnh (tài khoản vẫn được tạo)', color: 'bg-red-50 text-red-700' },
-};
+
 
 // Map action codes — khớp với mã thực tế BE ghi trong GET /users/:id/audit-logs
 const ACTION_MAP = {
