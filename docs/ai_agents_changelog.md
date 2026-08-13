@@ -5,19 +5,42 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
-### 2026-08-13 22:55
-* **Tên Plan / Yêu cầu**: Loại bỏ các thông tin liên quan đến địa chỉ MAC
+### 2026-08-14 02:00
+* **Tên Plan / Yêu cầu**: Tích hợp màn hình Hành trình khuôn viên, Tái cấu trúc Navbar và Tối ưu hóa Trang chủ Nhân viên & Trưởng phòng
 * **Chi tiết thay đổi**:
-  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
-    * Xóa bỏ mô tả kiểm tra định dạng địa chỉ MAC trong comment header của Component.
-  * `[Cập nhật] src/service/sysAdminServices.js`:
-    * Xóa tham số `macAddress` khỏi mô tả comment của API `registerDevice`.
-  * `[Cập nhật] src/pages/systemAdmin/AuditLogs.jsx`:
-    * Loại bỏ cấu hình dịch từ khóa `macAddress` (`Địa chỉ MAC`) trong danh sách từ khóa dịch `TRANSLATED_KEYS` của Nhật ký hệ thống.
-  * `[Cập nhật] src/docs/AGENTS.md`:
-    * Loại bỏ ví dụ "MAC" khỏi danh sách các từ viết tắt kỹ thuật ngoại lệ không được dịch trong quy tắc ngôn ngữ.
-  * `[Cập nhật] src/docs/FE_PLAN_Camera_Endpoints.md`:
-    * Loại bỏ trường `mac_address` và mô tả tham số liên quan đến địa chỉ MAC trong tài liệu thiết kế tích hợp API.
+  * `[Cập nhật] src/pages/shared/UserJourney.jsx`:
+    * Bổ sung thuộc tính `isSelfOnly` kiểm tra vai trò của người dùng hiện tại (Nhân viên và Trưởng phòng).
+    * Khi `isSelfOnly` là true, tự động tải hành trình của chính tài khoản đó bằng cách lấy thông tin từ local storage, đồng thời ẩn giao diện tìm kiếm và dropdown chọn nhân viên để đảm bảo bảo mật và cá nhân hóa.
+    * Việt hóa và tinh chỉnh nội dung mô tả tiêu đề cho trường hợp xem hành trình cá nhân.
+  * `[Cập nhật] src/routers/index.js`:
+    * Thêm đường dẫn `user-journey` và `meeting-approvals` liên kết với các component tương ứng dưới nhóm route bảo vệ của Nhân viên (Employee).
+  * `[Cập nhật] src/pages/employee/layout/EmployeeLayout.jsx`:
+    * Import các icon `MapPin` và `FileCheck` từ `lucide-react`.
+    * Tái cấu trúc menu: Tích hợp mục "Phê duyệt cuộc họp" vào trong dropdown "Cuộc họp" với thuộc tính `requiredPermission: 'meeting_request.read'` để đảm bảo hiển thị đúng quyền hạn.
+    * Bổ sung mục "Hành trình" vào danh sách điều hướng.
+  * `[Cập nhật] src/pages/manager/layout/ManagerLayout.jsx`:
+    * Tích hợp mục "Phê duyệt cuộc họp" vào trong dropdown "Cuộc họp", đồng thời loại bỏ nhóm dropdown "Phê duyệt" cũ.
+    * Loại bỏ menu dropdown "Giám sát" và đưa liên kết "Hành trình" ra trực tiếp ở cấp cao nhất của thanh điều hướng (top-level navigation).
+    * Dọn dẹp các icon import không sử dụng (`CheckSquare`, `Shield`).
+  * `[Cập nhật] src/pages/employee/homePage.jsx`:
+    * Loại bỏ hoàn toàn card "Ghi hình chờ duyệt" (do thông tin này không tồn tại / không áp dụng với vai trò Nhân viên bình thường).
+    * Tái thiết kế lại grid layout hiển thị các thẻ overview dashboard thành 3 cột cân đối (`md:grid-cols-3`).
+    * Dọn dẹp biến state `pendingConsents`.
+  * `[Cập nhật] src/pages/employee/Recordings.jsx`:
+    * Thay đổi giá trị bộ lọc `status` khi gọi `getMySchedule` từ mảng trùng lặp `['completed', 'completed']` thành `'completed'` dạng chuỗi đơn, ngăn chặn tạo tham số trùng lặp trên URL dẫn đến lỗi 400 Bad Request ở Backend.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 23:30
+* **Tên Plan / Yêu cầu**: Cập nhật nút tài liệu dạng Text thành Biên bản cuộc họp đã ban hành
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/employeeServices.js`:
+    * Thêm API `getMeetingMinutesByMeetingId` để lấy biên bản cuộc họp theo `meetingId`.
+  * `[Cập nhật] src/pages/employee/Recordings.jsx`:
+    * Tích hợp `getMeetingMinutesByMeetingId` để kiểm tra trạng thái ban hành của biên bản cuộc họp (`status === 'published'`).
+    * Thay đổi nút "Text" thành "Biên bản" với hành vi chỉ hoạt động (không bị vô hiệu hóa) khi biên bản cuộc họp đã được ban hành chính thức.
+    * Khi click nút "Biên bản", thực hiện điều hướng đến trang chi tiết cuộc họp kèm tham số `tab=minutes` để tự động mở tab Biên bản.
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx` & `src/pages/manager/MeetingDetail.jsx`:
+    * Sử dụng `useSearchParams` để đọc tham số `tab` từ URL và kích hoạt tab tương ứng (mặc định là `transcript`).
 * **Trạng thái**: Hoàn thành
 
 ### 2026-08-13 22:25

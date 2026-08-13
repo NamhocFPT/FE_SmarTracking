@@ -415,8 +415,8 @@ File: `src/modules/iot/controllers/iot-devices.controller.ts`
 | GET | `/iot-devices` | `iot.device.read` | `page, limit, status?, device_type?, room_id?, search?` | list |
 | GET | `/iot-devices/status-summary` | `iot.device.read` | — | Tổng hợp số lượng online/offline/disabled |
 | GET | `/iot-devices/:id` | `iot.device.read` | — | detail |
-| POST | `/iot-devices` | `iot_devices:create` | `{ device_name (required), device_code (required), device_type, ip_address?, mac_address?, metadata_json? }` | 201 |
-| PATCH | `/iot-devices/:id` | `iot.device.update` | `{ device_name?, ip_address?, mac_address?, network_identifier? }` (whitelist field, `null` để clear) | 200 |
+| POST | `/iot-devices` | `iot_devices:create` | `{ device_name (required), device_code (required), device_type, ip_address?, metadata_json? }` | 201 |
+| PATCH | `/iot-devices/:id` | `iot.device.update` | `{ device_name?, ip_address?, network_identifier? }` (whitelist field, `null` để clear) | 200 |
 | POST | `/iot-devices/probe-status` | `iot.device.probe` | — | Chủ động ping kiểm tra online/offline |
 | POST | `/iot-devices/:id/assign-room` | `iot_devices:assign_room` | `{ room_id (required) }` | 200 |
 | PATCH | `/iot-devices/:id/rtsp-config` | `iot_devices:configure_rtsp` | `{ rtsp_enabled?, rtsp_protocol (rtsp\|rtsps), rtsp_host, rtsp_port? (1-65535), rtsp_path (bắt đầu bằng '/'), rtsp_username?, rtsp_password? (mã hoá AES-256-GCM khi lưu DB), stream_profile? }` | 200 — password không trả lại plaintext |
