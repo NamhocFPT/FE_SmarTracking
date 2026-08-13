@@ -258,8 +258,8 @@ const EmployeeOnTimeAnalytics = () => {
             });
             if (res?.success && res.data) {
                 setMemberStats(res.data.items || []);
-                setMemberTotalPages(res.data.totalPages || 1);
-                setMemberTotal(res.data.total || 0);
+                setMemberTotalPages(res.meta?.totalPages ?? res.data.totalPages ?? 1);
+                setMemberTotal(res.meta?.total ?? res.data.total ?? 0);
             } else {
                 throw new Error('no data');
             }
@@ -294,8 +294,8 @@ const EmployeeOnTimeAnalytics = () => {
             });
             if (res?.success && res.data) {
                 setModalMembers(res.data.items || []);
-                setModalTotalPages(res.data.totalPages || 1);
-                setModalTotal(res.data.total || 0);
+                setModalTotalPages(res.meta?.totalPages ?? res.data.totalPages ?? 1);
+                setModalTotal(res.meta?.total ?? res.data.total ?? 0);
             } else {
                 throw new Error('no data');
             }
@@ -559,7 +559,7 @@ const EmployeeOnTimeAnalytics = () => {
                                                     <span className="text-slate-blue font-mono truncate block max-w-[180px]">{member.email}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-slate-blue font-semibold tabular-nums">
-                                                    {member.totalRequired}
+                                                    {member.totalMeetings ?? member.totalRequired}
                                                 </td>
                                                 <td className="px-4 py-3 text-right tabular-nums">
                                                     <span className={`font-bold ${member.lateCount > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
