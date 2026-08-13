@@ -288,6 +288,9 @@ const BookMeeting = () => {
     }, [searchEmail, defaultSuggestions]);
 
     const selectedRoom = availableRooms.find(r => (r.id || r.roomId) === selectedRoomId);
+    const roomHasCamera = !!(selectedRoom?.hasCamera || selectedRoom?.has_camera || selectedRoom?.allowRecording || selectedRoom?.allow_recording);
+    const roomHasMic = !!(selectedRoom?.hasMicrophone || selectedRoom?.has_microphone);
+    const roomAllowsRecording = roomHasCamera || roomHasMic;
 
     const getMeetingDurationMinutes = () => {
         if (!startStr || !endStr || !startTime || !endTime) return 0;
@@ -356,6 +359,9 @@ const BookMeeting = () => {
     const handleSelectRoom = (room) => {
         setSelectedRoomId(room.id || room.roomId);
         setCapacityOverrideConfirmed(false);
+        setRecordingEnabled(false);
+        setAudioRecordingEnabled(false);
+        setPdpaConsent(false);
     };
 
     const handleAddAgenda = () => {
@@ -1237,33 +1243,6 @@ const BookMeeting = () => {
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Loại cuộc họp</label>
-                                            <select
-                                                value={meetingType}
-                                                onChange={(e) => setMeetingType(e.target.value)}
-                                                className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
-                                            >
-                                                <option value="normal">Thông thường</option>
-                                                <option value="training">Đào tạo</option>
-                                                <option value="interview">Phỏng vấn</option>
-                                                <option value="emergency">Khẩn cấp</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Hình thức họp</label>
-                                            <select
-                                                value={meetingMode}
-                                                onChange={(e) => setMeetingMode(e.target.value)}
-                                                className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
-                                            >
-                                                <option value="offline">Trực tiếp (Offline)</option>
-                                                <option value="online">Trực tuyến (Online)</option>
-                                                <option value="hybrid">Kết hợp (Hybrid)</option>
-                                            </select>
-                                        </div>
-                                    </div>
 
 
 
@@ -1761,13 +1740,15 @@ const BookMeeting = () => {
                                     </div>
                                 </div>
 
-                                {/* Security & Recording Config */}
+                                {/* Security & Recording Config — chỉ hiển thị nếu phòng có thiết bị ghi âm/hình */}
+                                {roomAllowsRecording && (
                                 <div className="bg-white p-6 rounded-2xl border border-platinum-tint shadow-sm space-y-4">
                                     <h3 className="font-bold text-sm text-midnight-indigo uppercase tracking-wider flex items-center gap-2 pb-3 border-b border-cloud-mist">
                                         <Video className="w-4 h-4 text-red-600" /> Cấu hình ghi âm & hình
                                     </h3>
 
-                                    {/* Video Recording */}
+                                    {/* Video Recording — chỉ khi phòng có camera */}
+                                    {roomHasCamera && (
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Video className="w-4 h-4 text-slate-blue" />
@@ -1786,9 +1767,11 @@ const BookMeeting = () => {
                                             <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
                                         </label>
                                     </div>
+                                    )}
 
-                                    {/* Audio Recording */}
-                                    <div className="flex items-center justify-between pt-2 border-t border-platinum-tint/40">
+                                    {/* Audio Recording — chỉ khi phòng có microphone */}
+                                    {roomHasMic && (
+                                    <div className={`flex items-center justify-between ${roomHasCamera ? 'pt-2 border-t border-platinum-tint/40' : ''}`}>
                                         <div className="flex items-center gap-2">
                                             <Mic className="w-4 h-4 text-slate-blue" />
                                             <span className="text-sm font-semibold text-midnight-indigo">Ghi âm cuộc họp</span>
@@ -1806,6 +1789,7 @@ const BookMeeting = () => {
                                             <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
                                         </label>
                                     </div>
+                                    )}
 
                                     {/* PDPA Consent */}
                                     <AnimatePresence>
@@ -1838,6 +1822,7 @@ const BookMeeting = () => {
                                         )}
                                     </AnimatePresence>
                                 </div>
+                                )}
 
                                 {/* Step 2 Actions */}
                                 <div className="space-y-3">
