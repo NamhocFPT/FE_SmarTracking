@@ -180,6 +180,9 @@ const AlertRules = () => {
         if (formData.channels.length === 0) {
             errors.channels = 'Vui lòng chọn ít nhất 1 kênh thông báo.';
         }
+        if (!formData.zone_id) {
+            errors.zone_id = 'Vui lòng chọn khu vực áp dụng.';
+        }
 
         if (formData.allow_from || formData.allow_to) {
             if (!formData.allow_from || !formData.allow_to) {
@@ -568,17 +571,19 @@ const AlertRules = () => {
                                 )}
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Khu vực áp dụng</label>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1.5">Khu vực áp dụng <span className="text-red-500">*</span></label>
                                     <select
+                                        required
                                         value={formData.zone_id}
                                         onChange={(e) => handleFormChange('zone_id', e.target.value)}
-                                        className="w-full px-4 py-2.5 bg-slate-50 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue focus:bg-white transition-colors"
+                                        className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-sm focus:outline-none focus:bg-white transition-colors ${formErrors.zone_id ? 'border-red-500 focus:border-red-500' : 'border-platinum-tint focus:border-action-blue'}`}
                                     >
-                                        <option value="">Toàn hệ thống (Mọi khu vực)</option>
+                                        <option value="" disabled>-- Chọn khu vực áp dụng --</option>
                                         {(formData.alert_type === 'intrusion' ? intrusionZones : zones).map(z => (
                                             <option key={z.id} value={z.id}>{z.zone_name}</option>
                                         ))}
                                     </select>
+                                    {formErrors.zone_id && <p className="text-red-500 text-xs mt-1.5">{formErrors.zone_id}</p>}
                                     {formData.alert_type === 'intrusion' && (
                                         <p className="text-[10px] text-slate-400 mt-1.5">
                                             Chỉ hiển thị khu vực loại hành lang, sảnh, bãi đỗ xe — phòng họp và cổng ra vào không áp dụng cho cảnh báo xâm nhập.
