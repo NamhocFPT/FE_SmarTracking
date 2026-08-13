@@ -5,6 +5,21 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 22:55
+* **Tên Plan / Yêu cầu**: Loại bỏ các thông tin liên quan đến địa chỉ MAC
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Xóa bỏ mô tả kiểm tra định dạng địa chỉ MAC trong comment header của Component.
+  * `[Cập nhật] src/service/sysAdminServices.js`:
+    * Xóa tham số `macAddress` khỏi mô tả comment của API `registerDevice`.
+  * `[Cập nhật] src/pages/systemAdmin/AuditLogs.jsx`:
+    * Loại bỏ cấu hình dịch từ khóa `macAddress` (`Địa chỉ MAC`) trong danh sách từ khóa dịch `TRANSLATED_KEYS` của Nhật ký hệ thống.
+  * `[Cập nhật] src/docs/AGENTS.md`:
+    * Loại bỏ ví dụ "MAC" khỏi danh sách các từ viết tắt kỹ thuật ngoại lệ không được dịch trong quy tắc ngôn ngữ.
+  * `[Cập nhật] src/docs/FE_PLAN_Camera_Endpoints.md`:
+    * Loại bỏ trường `mac_address` và mô tả tham số liên quan đến địa chỉ MAC trong tài liệu thiết kế tích hợp API.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 22:25
 * **Tên Plan / Yêu cầu**: Hoàn thiện chức năng Thống kê chuyên cần cá nhân của Nhân viên và nâng cấp giao diện Quản lý thiết bị
 * **Chi tiết thay đổi**:
