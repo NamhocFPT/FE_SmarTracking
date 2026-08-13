@@ -1,4 +1,4 @@
-import { BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Home, MapPin, PlusCircle, Shield } from 'lucide-react';
+import { Activity, BarChart2, Calendar, CheckSquare, ChevronDown, Clock, FileCheck, Home, MapPin, PlusCircle, Shield } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -76,6 +76,11 @@ const STATIC_NAVIGATION_ITEMS = [
                 label: 'Tỷ lệ đúng giờ',
                 to: '/manager/attendance-analytics',
                 icon: Clock,
+            },
+            {
+                label: 'Chuyên cần phòng ban',
+                to: '/manager/meeting-attendance',
+                icon: Activity,
             },
         ],
     },

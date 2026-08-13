@@ -615,7 +615,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         };
         const onNoShowAlert = (data) => {
             if (data?.kind === 'warning') {
-                setNoShowWarning({ caseId: data.caseId, kind: 'warning' });
+                setNoShowWarning({ caseId: data.noShowCaseId, kind: 'warning' });
             } else if (data?.kind === 'released') {
                 setNoShowWarning({ kind: 'released' });
             }
@@ -1075,7 +1075,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         try {
             await patch(`/no-show-cases/${caseId}`, { detectionStatus: 'dismissed' });
         } catch (err) {
-            // fire-and-forget — clear banner regardless
+            showToast('Không thể xác nhận, vui lòng thử lại.', 'error');
         }
         setNoShowWarning(null);
     };

@@ -5,6 +5,29 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 16:18
+* **Tên Plan / Yêu cầu**: Khắc phục lỗi 404 console khi gọi API lấy transcript của cuộc họp chưa có dữ liệu.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/transcription/TranscriptViewer.jsx`: Thay đổi cơ chế thăm dò (polling) trong `fetchJobs` và `checkStatus`. Sử dụng cơ chế trả về các trạng thái hành động `'poll'`, `'fetch'`, `'empty'`. Ngăn chặn việc tự động gọi API `getTranscript` khi danh sách job trống (`jobs.length === 0`), tránh tạo request lỗi 404 trên browser console.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 15:07
+* **Tên Plan / Yêu cầu**: Tách commit các chức năng đã hoàn thiện và push code.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/DepartmentManagement.jsx`: Thêm trường Mã phòng ban (`departmentCode`) vào form tạo và bảng danh sách. Cập nhật `ACTION_MAP`.
+  * `[Cập nhật] src/pages/bussinessAdmin/UserManagement.jsx`: Cập nhật `ACTION_MAP` và hiển thị `log.description` trong lịch sử hoạt động.
+  * `[Cập nhật] src/pages/shared/EmployeeOnTimeAnalytics.jsx`: Cập nhật cấu trúc phân trang từ `res.meta` và đổi tên trường thống kê.
+  * `[Cập nhật] src/pages/systemAdmin/AuditLogs.jsx`: Cải thiện hiển thị chi tiết nhật ký hệ thống và cập nhật `ACTION_MAP`.
+  * `[Cập nhật] src/service/businessAdminServices.js` & `src/service/sysAdminServices.js`: Thay đổi endpoint lấy log hoạt động thành `/users/:userId/audit-logs`, thêm API import tài khoản đối tác.
+  * `[Tạo mới] src/components/user/ImportAccountsModal.jsx`: Thêm modal hỗ trợ tải lên tệp Excel import tài khoản đối tác/nhân viên.
+  * `[Tạo mới] src/pages/manager/MeetingAttendance.jsx` & `src/pages/shared/MeetingAttendanceAdmin.jsx`: Thêm trang "Chuyên cần phòng ban" xem thời lượng tham dự cuộc họp.
+  * `[Cập nhật] src/components/meeting/MeetingPresenceIVSS.jsx` & `src/pages/employee/MeetingDetail.jsx`: Tích hợp biểu đồ timeline thời lượng tham dự cuộc họp.
+  * `[Cập nhật] src/pages/manager/layout/ManagerLayout.jsx`, `src/pages/bussinessAdmin/layout/BusinessAdminLayout.jsx`, `src/pages/systemAdmin/layout/SystemAdminLayout.jsx`: Thêm menu Chuyên cần phòng ban vào Sidebar.
+  * `[Cập nhật] src/routers/index.js`: Cấu hình routing cho trang Chuyên cần phòng ban.
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`: Sửa định dạng `caseId` cảnh báo No-Show thành `noShowCaseId` và thêm thông báo lỗi khi xác nhận thất bại.
+  * `[Xóa] UC_COMPLETION_PLAN.md`: Xóa tài liệu kế hoạch cũ đã lỗi thời.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 03:36
 * **Tên Plan / Yêu cầu**: Tái cấu trúc và sửa đổi phong cách hiển thị Modal Chi tiết lượt vi phạm (Security Alerts).
 * **Chi tiết thay đổi**:

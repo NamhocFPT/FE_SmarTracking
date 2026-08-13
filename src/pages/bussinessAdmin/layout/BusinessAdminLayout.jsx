@@ -7,6 +7,7 @@ import ChangePasswordModal from '../../../components/auth/ChangePasswordModal';
 import BusinessAdminSidebar from './BusinessAdminSidebar';
 import { RiMenuLine } from 'react-icons/ri';
 import {
+    Activity,
     Home,
     Calendar,
     Layers,
@@ -56,6 +57,7 @@ const STATIC_NAVIGATION_ITEMS = [
         children: [
             { label: 'Hiệu suất phòng họp', to: '/business-admin/room-analytics', icon: PieChart },
             { label: 'Tỷ lệ đúng giờ', to: '/business-admin/attendance-analytics', icon: Clock },
+            { label: 'Chuyên cần phòng ban', to: '/business-admin/meeting-attendance', icon: Activity },
         ],
     },
 ];

@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity, AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { removeInternalParticipant, removeExternalParticipant } from '../../serv
 import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from '../../utils/toast';
+import { getUserPresence } from '../../service/managerServices';
 
 // BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval
 // khiến 2 trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã hủy".
@@ -115,6 +116,9 @@ const EmployeeMeetingDetail = () => {
     const [audioPage, setAudioPage] = useState(1);
     const audioItemsPerPage = 5;
     const [activeRightTab, setActiveRightTab] = useState('transcript');
+    const [presenceData, setPresenceData] = useState(null);
+    const [presenceLoading, setPresenceLoading] = useState(false);
+    const [presenceError, setPresenceError] = useState(null);
 
     /**
      * Chuẩn hoá DTO lồng nhau từ API GET /meetings/:id
@@ -725,6 +729,47 @@ const EmployeeMeetingDetail = () => {
     const canJoin = meeting.status === 'scheduled' || meeting.status === 'in_progress';
     const isCompleted = meeting.status === 'completed';
 
+    const meetingStartTime = meeting.startTime || meeting.start_time;
+    const meetingEndTime = meeting.endTime || meeting.end_time;
+
+    const formatPresenceDuration = (ms) => {
+        if (!ms || ms <= 0) return '0 giây';
+        const totalSec = Math.floor(ms / 1000);
+        const h = Math.floor(totalSec / 3600);
+        const min = Math.floor((totalSec % 3600) / 60);
+        const sec = totalSec % 60;
+        if (h > 0) return `${h} giờ ${min} phút`;
+        if (min > 0) return `${min} phút ${sec} giây`;
+        return `${sec} giây`;
+    };
+
+    const formatPresenceTime = (isoString) => {
+        if (!isoString) return '—';
+        try {
+            return new Date(isoString).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+        } catch { return '—'; }
+    };
+
+    const handleOpenPresenceTab = async () => {
+        setActiveRightTab('presence');
+        if (presenceData || presenceLoading) return;
+        if (!currentUser?.id || !meeting?.id) return;
+        setPresenceLoading(true);
+        setPresenceError(null);
+        try {
+            const res = await getUserPresence(meeting.id, currentUser.id);
+            if (res?.success && res.data) {
+                setPresenceData(res.data);
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không có dữ liệu hiện diện từ IVSS.');
+            }
+        } catch (err) {
+            setPresenceError(err.message || 'Lỗi khi tải dữ liệu thời lượng tham dự.');
+        } finally {
+            setPresenceLoading(false);
+        }
+    };
+
     // removed mock filteredTranscript
 
     let isBefore15Min = false;
@@ -1220,9 +1265,178 @@ const EmployeeMeetingDetail = () => {
                         >
                             Biên bản (AI)
                         </button>
+                        {isCompleted && (
+                            <button
+                                onClick={handleOpenPresenceTab}
+                                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'presence' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
+                            >
+                                Thời lượng tham dự
+                            </button>
+                        )}
                     </div>
 
-                    {activeRightTab === 'transcript' ? (
+                    {activeRightTab === 'presence' ? (
+                        <div className="space-y-4">
+                            {presenceLoading ? (
+                                <div className="bg-white rounded-2xl border border-platinum-tint p-8 flex flex-col items-center gap-3 animate-pulse">
+                                    <div className="w-8 h-8 border-2 border-action-blue border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-xs text-slate-blue font-semibold">Đang tải dữ liệu từ IVSS...</span>
+                                </div>
+                            ) : presenceError ? (
+                                <div className="bg-red-50 border border-red-200 rounded-2xl p-6 flex flex-col items-center gap-3 text-center">
+                                    <AlertTriangle className="w-8 h-8 text-red-500" />
+                                    <p className="text-xs text-red-700 font-semibold">{presenceError}</p>
+                                    <button
+                                        onClick={async () => {
+                                        setPresenceData(null); setPresenceError(null);
+                                        setPresenceLoading(true);
+                                        try {
+                                            const res = await getUserPresence(meeting.id, currentUser.id);
+                                            if (res?.success && res.data) setPresenceData(res.data);
+                                            else throw new Error(res?.error?.message || res?.message || 'Không có dữ liệu hiện diện từ IVSS.');
+                                        } catch (err) { setPresenceError(err.message || 'Lỗi khi tải dữ liệu.'); }
+                                        finally { setPresenceLoading(false); }
+                                    }}
+                                        className="text-xs font-bold text-action-blue hover:underline"
+                                    >
+                                        Thử lại
+                                    </button>
+                                </div>
+                            ) : presenceData ? (
+                                <div className="space-y-4">
+                                    {/* Summary cards */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="bg-white rounded-2xl border border-platinum-tint p-4 flex items-center justify-between shadow-sm">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Thời gian có mặt</span>
+                                                <div className="text-lg font-bold text-midnight-indigo">{formatPresenceDuration(presenceData.duration?.durationMs)}</div>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                                <Clock className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-2xl border border-platinum-tint p-4 flex items-center justify-between shadow-sm">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Tỉ lệ tham dự</span>
+                                                <div className="text-lg font-bold text-midnight-indigo">{((presenceData.duration?.presentRatio || 0) * 100).toFixed(1)}%</div>
+                                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, (presenceData.duration?.presentRatio || 0) * 100)}%` }}></div>
+                                                </div>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
+                                                <Activity className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-2xl border border-platinum-tint p-4 flex items-center justify-between shadow-sm">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Số lần ghi nhận</span>
+                                                <div className="text-lg font-bold text-midnight-indigo">{presenceData.duration?.segmentCount || 0} <span className="text-xs font-medium text-slate-blue">đoạn</span></div>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                                <Users className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Timeline visualization */}
+                                    <div className="bg-white rounded-2xl border border-platinum-tint p-5 shadow-sm space-y-4">
+                                        <h4 className="text-xs font-bold text-slate-blue uppercase tracking-wide">Biểu đồ trục thời gian họp</h4>
+                                        {meetingStartTime && meetingEndTime ? (
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center text-[10px] text-slate-blue font-bold pb-2 border-b border-platinum-tint">
+                                                    <span>Bắt đầu: {formatPresenceTime(meetingStartTime)}</span>
+                                                    <span>Kết thúc: {formatPresenceTime(meetingEndTime)}</span>
+                                                </div>
+                                                <div className="relative h-8 bg-slate-100 rounded-lg border border-platinum-tint overflow-hidden mt-2">
+                                                    {presenceData.timeline?.segments?.map((seg, idx) => {
+                                                        const startMs = new Date(meetingStartTime).getTime();
+                                                        const endMs = new Date(meetingEndTime).getTime();
+                                                        const meetingLength = endMs - startMs;
+                                                        if (meetingLength <= 0) return null;
+                                                        const left = Math.max(0, Math.min(100, ((new Date(seg.start).getTime() - startMs) / meetingLength) * 100));
+                                                        const width = Math.max(0.5, Math.min(100 - left, ((new Date(seg.end).getTime() - new Date(seg.start).getTime()) / meetingLength) * 100));
+                                                        return (
+                                                            <div key={idx} style={{ left: `${left}%`, width: `${width}%` }}
+                                                                className="absolute top-0 bottom-0 bg-emerald-500/80 border-x border-emerald-600/30 group cursor-pointer"
+                                                                title={`Có mặt: ${formatPresenceTime(seg.start)} - ${formatPresenceTime(seg.end)}`}>
+                                                                <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-1.5 bg-slate-900 text-white text-[9.5px] rounded-lg shadow-md whitespace-nowrap z-10">
+                                                                    Có mặt: {formatPresenceTime(seg.start)} – {formatPresenceTime(seg.end)}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {presenceData.timeline?.events?.map((ev, idx) => {
+                                                        const startMs = new Date(meetingStartTime).getTime();
+                                                        const endMs = new Date(meetingEndTime).getTime();
+                                                        const meetingLength = endMs - startMs;
+                                                        if (meetingLength <= 0) return null;
+                                                        const left = Math.max(0, Math.min(100, ((new Date(ev.at).getTime() - startMs) / meetingLength) * 100));
+                                                        const isEnter = ev.direction === 'enter';
+                                                        return (
+                                                            <div key={idx} style={{ left: `${left}%` }}
+                                                                className="absolute top-0 bottom-0 w-0.5 z-20 group cursor-pointer">
+                                                                <div className={`w-px h-full ${isEnter ? 'bg-emerald-600' : 'bg-amber-600'}`}></div>
+                                                                <span className={`absolute -top-1.5 -translate-x-1/2 text-[9px] font-bold ${isEnter ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                                                    {isEnter ? '▲' : '▼'}
+                                                                </span>
+                                                                <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 p-1.5 bg-slate-900 text-white text-[9.5px] rounded-lg shadow-md whitespace-nowrap z-30">
+                                                                    {isEnter ? 'VÀO CỬA' : 'RA CỬA'}: {formatPresenceTime(ev.at)}
+                                                                    {ev.similarity != null ? ` (Độ khớp: ${(ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity).toFixed(0)}%)` : ''}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="flex flex-wrap gap-4 mt-2 text-[10.5px] text-slate-blue font-semibold">
+                                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-emerald-500/80 border border-emerald-600/20 rounded"></span>Thời gian có mặt</span>
+                                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-slate-100 border border-platinum-tint rounded"></span>Thời gian vắng mặt</span>
+                                                    <span className="flex items-center gap-1"><span className="text-emerald-700 font-bold">▲</span>Vào phòng</span>
+                                                    <span className="flex items-center gap-1"><span className="text-amber-700 font-bold">▼</span>Ra khỏi phòng</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-blue italic">Không có thông tin thời gian cuộc họp để hiển thị biểu đồ.</p>
+                                        )}
+                                    </div>
+
+                                    {/* Event log */}
+                                    {presenceData.timeline?.events?.length > 0 && (
+                                        <div className="bg-white rounded-2xl border border-platinum-tint p-5 shadow-sm space-y-3">
+                                            <h4 className="text-xs font-bold text-slate-blue uppercase tracking-wide">Chi tiết các mốc quét camera</h4>
+                                            <div className="border border-outline-gray rounded-xl overflow-hidden">
+                                                <div className="max-h-48 overflow-y-auto">
+                                                    <table className="w-full text-left text-xs border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold sticky top-0">
+                                                                <th className="p-2.5">Thời điểm</th>
+                                                                <th className="p-2.5">Sự kiện</th>
+                                                                <th className="p-2.5">Độ tin cậy</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {presenceData.timeline.events.map((ev, idx) => (
+                                                                <tr key={idx} className="border-b border-outline-gray hover:bg-cloud-mist/30">
+                                                                    <td className="p-2.5 font-medium text-midnight-indigo">{formatPresenceTime(ev.at)}</td>
+                                                                    <td className="p-2.5">
+                                                                        <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold ${ev.direction === 'enter' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                                                            {ev.direction === 'enter' ? '▲ Vào phòng' : '▼ Ra khỏi phòng'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-2.5 font-mono text-slate-600">
+                                                                        {ev.similarity != null ? `${(ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity).toFixed(0)}%` : '—'}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : activeRightTab === 'transcript' ? (
                         isCompleted ? (
                             <div className="space-y-6">
                                 {/* Nút Upload Audio dành cho Host / Organizer */}

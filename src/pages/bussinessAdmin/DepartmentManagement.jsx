@@ -50,9 +50,12 @@ const DepartmentManagement = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedDept, setSelectedDept] = useState(null);
+    const [createDeptError, setCreateDeptError] = useState(null);
+    const [deptCodeInlineError, setDeptCodeInlineError] = useState(null);
 
     // Org Form inputs states
     const [formData, setFormData] = useState({
+        departmentCode: '',
         name: '',
         description: ''
     });
@@ -210,11 +213,16 @@ const DepartmentManagement = () => {
         }
     }, [error]);
 
+    const generateDeptCode = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const rand = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        return `PB-${rand}`;
+    };
+
     const resetForm = () => {
-        setFormData({
-            name: '',
-            description: ''
-        });
+        setFormData({ departmentCode: generateDeptCode(), name: '', description: '' });
+        setCreateDeptError(null);
+        setDeptCodeInlineError(null);
     };
 
     const openCreateModal = () => {
@@ -224,14 +232,22 @@ const DepartmentManagement = () => {
 
     const openEditModal = async (dept) => {
         setSelectedDept(dept);
-        setFormData({ name: dept.name, description: dept.description || '' });
+        setFormData({
+            name: dept.name,
+            description: dept.description || '',
+            departmentCode: dept.departmentCode || dept.code || '',
+        });
         setIsEditModalOpen(true);
         try {
             const res = await getDepartmentById(dept.id);
             if (res?.success && res.data) {
                 const fresh = normalizeDept(res.data);
                 setSelectedDept(fresh);
-                setFormData({ name: fresh.name, description: fresh.description || '' });
+                setFormData({
+                    name: fresh.name,
+                    description: fresh.description || '',
+                    departmentCode: fresh.departmentCode || fresh.code || '',
+                });
             }
         } catch {
             // giữ nguyên data từ list nếu fetch thất bại
@@ -241,10 +257,23 @@ const DepartmentManagement = () => {
     // Handle Create Submit (Department)
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
+        setCreateDeptError(null);
+        setDeptCodeInlineError(null);
         setSuccessMessage(null);
+
+        const code = formData.departmentCode.trim();
+        if (!code) {
+            setDeptCodeInlineError('Mã phòng ban là bắt buộc');
+            return;
+        }
+        if (!/^[A-Z0-9][A-Z0-9_-]{1,49}$/.test(code)) {
+            setDeptCodeInlineError('Mã phòng ban chỉ chấp nhận chữ in hoa (A-Z), số (0-9), gạch dưới (_) và gạch ngang (-)');
+            return;
+        }
+
         try {
             const res = await createDepartment({
+                departmentCode: code,
                 departmentName: formData.name,
                 description: formData.description
             });
@@ -255,10 +284,18 @@ const DepartmentManagement = () => {
                 fetchAllActiveDepartments();
                 resetForm();
             } else {
-                setError(res?.message || 'Có lỗi xảy ra khi tạo phòng ban.');
+                const messages = Array.isArray(res?.message)
+                    ? res.message
+                    : [res?.message || 'Có lỗi xảy ra khi tạo phòng ban.'];
+                const dupeMsg = messages.find(m => typeof m === 'string' && m.includes('đã được sử dụng'));
+                if (dupeMsg) {
+                    setDeptCodeInlineError(dupeMsg);
+                } else {
+                    setCreateDeptError(messages.join(' • '));
+                }
             }
         } catch (err) {
-            setError(err?.message || err?.error?.message || 'Không thể tạo phòng ban. Vui lòng thử lại.');
+            setCreateDeptError(err?.message || err?.error?.message || 'Không thể tạo phòng ban. Vui lòng thử lại.');
         }
     };
 
@@ -616,6 +653,7 @@ const DepartmentManagement = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-platinum-tint bg-cloud-mist/50">
+                                    <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Mã</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Phòng ban</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Mô tả chi tiết</th>
                                     <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Thành viên</th>
@@ -627,13 +665,18 @@ const DepartmentManagement = () => {
                             <tbody>
                                 {departmentsList.length === 0 ? (
                                     <tr>
-                                        <td colSpan="6" className="py-12 text-center text-slate-blue text-sm">
+                                        <td colSpan="7" className="py-12 text-center text-slate-blue text-sm">
                                             Không tìm thấy phòng ban nào phù hợp.
                                         </td>
                                     </tr>
                                 ) : (
                                     departmentsList.map((dept) => (
                                         <tr key={dept.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
+                                            <td className="py-4 px-6">
+                                                <span className="font-mono text-xs font-bold px-2 py-1 bg-slate-100 text-slate-600 rounded-md whitespace-nowrap">
+                                                    {dept.departmentCode || '—'}
+                                                </span>
+                                            </td>
                                             <td className="py-4 px-6">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-9 h-9 rounded-lg bg-blue-50 text-action-blue flex items-center justify-center font-bold text-sm">
@@ -755,16 +798,58 @@ const DepartmentManagement = () => {
                             </button>
                         </div>
                         <form onSubmit={handleCreateSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+                            {createDeptError && (
+                                <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span className="whitespace-pre-line">{createDeptError}</span>
+                                </div>
+                            )}
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên phòng ban</label>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">
+                                    Tên phòng ban <span className="text-red-500">*</span>
+                                </label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
                                     placeholder="Ví dụ: Phòng Nghiên cứu và Phát triển"
                                     className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1 flex items-center gap-2">
+                                    Mã phòng ban <span className="text-red-500">*</span>
+                                    <span className="text-[10px] font-normal normal-case text-action-blue bg-blue-50 px-1.5 py-0.5 rounded">Tự động</span>
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.departmentCode}
+                                        onChange={(e) => {
+                                            setDeptCodeInlineError(null);
+                                            setFormData(f => ({ ...f, departmentCode: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') }));
+                                        }}
+                                        placeholder="PB-XXXX"
+                                        className={`flex-1 px-3 py-2 border rounded-xl text-sm font-mono focus:outline-none ${deptCodeInlineError ? 'border-red-400 focus:border-red-500' : 'border-platinum-tint focus:border-action-blue'}`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => { setDeptCodeInlineError(null); setFormData(f => ({ ...f, departmentCode: generateDeptCode() })); }}
+                                        className="px-3 py-2 border border-platinum-tint rounded-xl text-xs font-semibold text-slate-blue hover:bg-cloud-mist transition-colors whitespace-nowrap"
+                                        title="Tạo mã ngẫu nhiên mới"
+                                    >
+                                        Tạo lại
+                                    </button>
+                                </div>
+                                {deptCodeInlineError ? (
+                                    <p className="mt-1 text-xs text-red-600">{deptCodeInlineError}</p>
+                                ) : (
+                                    <p className="mt-1 text-[11px] text-slate-blue">Mã ngẫu nhiên, có thể chỉnh thủ công. Chỉ A-Z, 0-9, _ và -.</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mô tả hoạt động</label>
@@ -810,6 +895,16 @@ const DepartmentManagement = () => {
                             </button>
                         </div>
                         <form onSubmit={handleEditSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã phòng ban</label>
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={formData.departmentCode || '—'}
+                                    className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-cloud-mist text-slate-blue cursor-not-allowed font-mono"
+                                />
+                                <p className="text-[10px] text-slate-blue mt-1">Mã phòng ban không thể thay đổi sau khi tạo.</p>
+                            </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên phòng ban</label>
                                 <input
@@ -1274,15 +1369,12 @@ const DepartmentManagement = () => {
                                         <div key={log.id} className="p-3 bg-cloud-mist rounded-xl border border-outline-gray/60 space-y-1">
                                             <div className="flex justify-between items-start gap-2">
                                                 <p className="text-xs font-bold text-midnight-indigo">
-                                                    {ACTION_MAP[log.action] || log.action}
+                                                    {log.description || ACTION_MAP[log.action] || log.action}
                                                 </p>
                                                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${log.status === 'success' ? 'bg-emerald-50 text-emerald-700' : log.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
                                                     {log.status === 'success' ? 'Thành công' : log.status === 'failed' ? 'Thất bại' : log.status || ''}
                                                 </span>
                                             </div>
-                                            {log.description && (
-                                                <p className="text-[10px] text-slate-blue leading-relaxed">{log.description}</p>
-                                            )}
                                             <div className="flex justify-between items-center pt-0.5">
                                                 <p className="text-[10px] text-slate-blue">Tác nhân: {log.actorName || log.actorEmail || '—'}</p>
                                                 <span className="text-[10px] text-slate-blue">
@@ -1484,8 +1576,20 @@ const DepartmentManagement = () => {
     );
 };
 
-// Map action names — keys khớp với BE (GET /audit-logs)
+// Map action codes — khớp với mã thực tế BE ghi trong GET /users/:id/audit-logs
 const ACTION_MAP = {
+    // Tài khoản (mã mới từ BE Option B)
+    'ACCOUNT_CREATE': 'Thêm tài khoản',
+    'account.partner.create': 'Tạo tài khoản đối tác',
+    'ACCOUNT_UPDATE': 'Cập nhật tài khoản',
+    'ACCOUNT_LOCK': 'Khóa tài khoản',
+    'ACCOUNT_UNLOCK': 'Mở khóa tài khoản',
+    'ACCOUNT_DELETE': 'Xóa tài khoản',
+    'ACCOUNT_ROLE_UPDATE': 'Đổi vai trò',
+    'ACCOUNT_STATUS_UPDATE': 'Cập nhật trạng thái',
+    'account.partner.extend': 'Gia hạn tài khoản đối tác',
+    'view_detail': 'Xem chi tiết',
+    // Legacy codes (fallback phòng trường hợp BE chưa migrate đồng bộ)
     'LOGIN': 'Đăng nhập',
     'LOGIN_FAILED': 'Đăng nhập thất bại',
     'LOGOUT': 'Đăng xuất',
@@ -1495,8 +1599,6 @@ const ACTION_MAP = {
     'UNLOCK_USER': 'Mở khóa tài khoản',
     'DELETE_USER': 'Xóa tài khoản',
     'REGISTER_DEVICE': 'Đăng ký thiết bị',
-    'UPDATE_DEVICE': 'Cập nhật thiết bị',
-    'REMOVE_DEVICE': 'Vô hiệu hóa thiết bị',
     'EXPORT_USERS': 'Xuất tệp nhân viên',
     'UPDATE_CONFIG': 'Cập nhật cấu hình hệ thống',
 };

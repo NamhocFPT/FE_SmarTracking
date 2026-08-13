@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
 import UserAvatar from '../../components/common/UserAvatar';
-import { getAuditLogs, exportAuditLogs, getUserById } from '../../service/sysAdminServices';
+import { getAuditLogs, exportAuditLogs, getUserById, getAuditLogActionTypes } from '../../service/sysAdminServices';
 
 /**
  * AuditLogs Component
@@ -141,6 +141,8 @@ const renderPayloadDetails = (payload) => {
 
 const AuditLogs = () => {
     // States
+    const today = new Date().toISOString().slice(0, 10);
+
     const [logsList, setLogsList] = useState([]);
     const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
     const [loading, setLoading] = useState(true);
@@ -155,6 +157,9 @@ const AuditLogs = () => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
+    // Dynamic action types from BE
+    const [actionTypes, setActionTypes] = useState([]);
+
     // Log detail modal
     const [selectedLog, setSelectedLog] = useState(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -165,6 +170,13 @@ const AuditLogs = () => {
     const [selectedActorUser, setSelectedActorUser] = useState(null);
     const [actorDetailLoading, setActorDetailLoading] = useState(false);
 
+    // Load action types once on mount
+    useEffect(() => {
+        getAuditLogActionTypes()
+            .then((res) => { if (res?.success) setActionTypes(res.data || []); })
+            .catch(() => {});
+    }, []);
+
     // Load data
     const fetchLogs = useCallback(async (pageNumber = 1, pageLimit = 10) => {
         setLoading(true);
@@ -173,11 +185,12 @@ const AuditLogs = () => {
         const params = {
             page: pageNumber,
             limit: pageLimit,
-            action: selectedAction,
-            entity: selectedEntity,
-            severity: selectedSeverity,
-            startDate,
-            endDate
+            search: search.trim() || undefined,
+            action: selectedAction || undefined,
+            entity: selectedEntity || undefined,
+            severity: selectedSeverity || undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
         };
 
         try {
@@ -391,13 +404,11 @@ const AuditLogs = () => {
                             className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                         >
                             <option value="">Tất cả hành động</option>
-                            <option value="LOGIN">Đăng nhập (LOGIN)</option>
-                            <option value="LOGIN_FAILED">Đăng nhập lỗi</option>
-                            <option value="CREATE_USER">Tạo tài khoản</option>
-                            <option value="LOCK_USER">Khóa tài khoản</option>
-                            <option value="UPDATE_DEVICE">Cập nhật thiết bị</option>
-                            <option value="DEVICE_OFFLINE">Thiết bị mất mạng</option>
-                            <option value="EXPORT_USERS">Xuất file Excel</option>
+                            {actionTypes.map((at) => (
+                                <option key={at.actionType} value={at.actionType}>
+                                    {formatActionName(at.actionType)} ({at.count})
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -423,8 +434,13 @@ const AuditLogs = () => {
                         <input
                             type="date"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-slate-blue"
+                            max={endDate || today}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setStartDate(val);
+                                if (endDate && val > endDate) setEndDate('');
+                            }}
+                            className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-action-blue text-slate-blue ${startDate && endDate && startDate > endDate ? 'border-red-400 bg-red-50' : 'border-platinum-tint'}`}
                         />
                     </div>
 
@@ -434,9 +450,18 @@ const AuditLogs = () => {
                         <input
                             type="date"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-slate-blue"
+                            min={startDate || undefined}
+                            max={today}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setEndDate(val);
+                                if (startDate && val < startDate) setStartDate('');
+                            }}
+                            className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-action-blue text-slate-blue ${startDate && endDate && startDate > endDate ? 'border-red-400 bg-red-50' : 'border-platinum-tint'}`}
                         />
+                        {startDate && endDate && startDate > endDate && (
+                            <p className="text-[10px] text-red-500 font-semibold mt-1">Ngày kết thúc phải sau ngày bắt đầu</p>
+                        )}
                     </div>
                 </div>
 
@@ -530,9 +555,11 @@ const AuditLogs = () => {
                                                         >
                                                             {log.actorName || 'Hệ thống'}
                                                         </button>
-                                                        <div className="text-xs text-slate-blue font-mono mt-0.5">
-                                                            {log.actorEmail || '-'}
-                                                        </div>
+                                                        {log.actorEmail && (
+                                                            <div className="text-xs text-slate-blue font-mono mt-0.5">
+                                                                {log.actorEmail}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -618,64 +645,96 @@ const AuditLogs = () => {
 
             {/* DETAIL LOG MODAL */}
             {isDetailOpen && selectedLog && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
+                <div
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4"
+                    onClick={(e) => { if (e.target === e.currentTarget) setIsDetailOpen(false); }}
+                >
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-2xl w-full overflow-hidden animate-fade-in-up">
-                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
-                            <div>
-                                <h3 className="font-bold text-midnight-indigo">Chi tiết nhật ký hoạt động</h3>
-                                <p className="text-xs text-slate-blue mt-0.5">ID: {selectedLog.id}</p>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-start justify-between bg-cloud-mist/50 gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${getActionBadge(selectedLog.actionType || selectedLog.action).replace('border', '').replace(/border-\S+/g, '')}`}>
+                                    <Activity className="w-4.5 h-4.5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-midnight-indigo text-base leading-tight">Chi tiết nhật ký hoạt động</h3>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${getActionBadge(selectedLog.actionType || selectedLog.action)}`}>
+                                            {formatActionName(selectedLog.actionType || selectedLog.action)}
+                                        </span>
+                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusBadge(selectedLog.severity || selectedLog.status)}`}>
+                                            {(selectedLog.severity === 'info' || selectedLog.status === 'success') ? 'Thành công' : (selectedLog.severity === 'warning' || selectedLog.status === 'warning') ? 'Cảnh báo' : 'Thất bại'}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                            <button onClick={() => setIsDetailOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
+                            <button
+                                onClick={() => setIsDetailOpen(false)}
+                                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors"
+                            >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                            {/* Metadata */}
-                            <div className="grid grid-cols-2 gap-4 text-xs">
-                                <div>
-                                    <span className="block text-slate-blue font-bold uppercase tracking-wider">Thời gian ghi nhận</span>
+                        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+                            {/* Row 1: Thời gian + IP */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="bg-cloud-mist/40 rounded-xl p-3.5 border border-platinum-tint/60">
+                                    <span className="block text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Thời gian ghi nhận</span>
                                     <span className="text-sm font-semibold text-midnight-indigo font-mono">{formatTimestamp(selectedLog.createdAt || selectedLog.timestamp)}</span>
                                 </div>
-                                <div>
-                                    <span className="block text-slate-blue font-bold uppercase tracking-wider">Địa chỉ IP thao tác</span>
-                                    <span className="text-sm font-semibold text-midnight-indigo font-mono">{selectedLog.ipAddress || '-'}</span>
+                                <div className="bg-cloud-mist/40 rounded-xl p-3.5 border border-platinum-tint/60">
+                                    <span className="block text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Địa chỉ IP thao tác</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo font-mono">{selectedLog.ipAddress || '—'}</span>
                                 </div>
-                                <div>
-                                    <span className="block text-slate-blue font-bold uppercase tracking-wider">Tài khoản thực hiện</span>
-                                    <span className="text-sm font-semibold text-midnight-indigo">{selectedLog.actorName} ({selectedLog.actorEmail || selectedLog.actorUserId || 'Hệ thống'})</span>
+                            </div>
+
+                            {/* Row 2: Tài khoản + Phân hệ */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="bg-cloud-mist/40 rounded-xl p-3.5 border border-platinum-tint/60">
+                                    <span className="block text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Tài khoản thực hiện</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo">{selectedLog.actorName || 'Hệ thống'}</span>
+                                    {selectedLog.actorEmail && (
+                                        <span className="block text-xs text-slate-blue font-mono mt-0.5">{selectedLog.actorEmail}</span>
+                                    )}
                                 </div>
-                                <div>
-                                    <span className="block text-slate-blue font-bold uppercase tracking-wider">Phân hệ / Thao tác</span>
-                                    <span className="text-sm font-semibold text-midnight-indigo uppercase font-mono">
-                                        {ENTITY_TRANSLATIONS[selectedLog.entityType || selectedLog.entity] || (selectedLog.entityType || selectedLog.entity)} / {formatActionName(selectedLog.actionType || selectedLog.action)}
+                                <div className="bg-cloud-mist/40 rounded-xl p-3.5 border border-platinum-tint/60">
+                                    <span className="block text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Phân hệ</span>
+                                    <span className="text-sm font-semibold text-midnight-indigo">
+                                        {ENTITY_TRANSLATIONS[selectedLog.entityType || selectedLog.entity] || (selectedLog.entityType || selectedLog.entity) || '—'}
                                     </span>
                                 </div>
                             </div>
 
                             {/* Description */}
-                            <div className="bg-cloud-mist/40 p-4 rounded-xl border border-outline-gray/50">
-                                <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1">Mô tả hành động</span>
-                                <p className="text-sm text-midnight-indigo font-medium">{selectedLog.description || 'Không có thông tin mô tả cho hành động này.'}</p>
-                            </div>
-
-                            {/* Raw JSON details formatted */}
-                            <div className="border border-platinum-tint/70 p-4 rounded-2xl bg-white shadow-sm-1">
-                                <span className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-3 pb-2 border-b border-platinum-tint/50">Chi tiết thay đổi thông tin hệ thống</span>
-                                <div className="space-y-1">
-                                    {renderPayloadDetails(selectedLog.payload || { info: "Không có dữ liệu thay đổi chi tiết" })}
+                            {selectedLog.description && (
+                                <div className="rounded-xl border border-outline-gray/50 p-4 bg-white">
+                                    <span className="block text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-2">Mô tả hành động</span>
+                                    <p className="text-sm text-midnight-indigo leading-relaxed">{selectedLog.description}</p>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Payload */}
+                            {selectedLog.payload && Object.keys(selectedLog.payload).length > 0 && (
+                                <div className="border border-platinum-tint/70 rounded-2xl overflow-hidden">
+                                    <div className="px-4 py-3 bg-cloud-mist/40 border-b border-platinum-tint/50">
+                                        <span className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">Chi tiết thay đổi thông tin hệ thống</span>
+                                    </div>
+                                    <div className="p-4 space-y-1">
+                                        {renderPayloadDetails(selectedLog.payload)}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end">
+                        <div className="px-6 py-3.5 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end">
                             <button
                                 onClick={() => setIsDetailOpen(false)}
-                                className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
+                                className="px-5 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
                             >
-                                Đóng cửa sổ
+                                Đóng
                             </button>
                         </div>
                     </div>
