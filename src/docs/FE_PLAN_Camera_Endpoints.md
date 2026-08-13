@@ -56,7 +56,6 @@ Query: `?page&pageSize&status&deviceType&roomId&search`
       "device_type": "face_terminal",   // face_terminal | ip_camera | ivss
       "room_id": "uuid | null",
       "ip_address": "192.168.1.222 | null",
-      "mac_address": "string | null",
       "status": "active",               // active | disabled
       "health_status": "online",        // online | offline | unknown
       "last_seen_at": "ISO | null",     // mất heartbeat → cũ dần
@@ -75,13 +74,13 @@ Query: `?page&pageSize&status&deviceType&roomId&search`
 Trả về **một** object như phần tử ở trên.
 
 #### `POST /iot-devices` — tạo thiết bị
-Body: `{ device_name, device_code, device_type, ip_address?, mac_address?, room_id? }` → trả object thiết bị vừa tạo.
+Body: `{ device_name, device_code, device_type, ip_address?, room_id? }` → trả object thiết bị vừa tạo.
 
 #### `POST /iot-devices/:id/assign-room` — gán phòng
 Body: `{ room_id }` → trả thiết bị đã cập nhật (`room_id` mới).
 
 #### `PATCH /iot-devices/:id` — cập nhật thông tin
-Body: các field cho phép sửa (`device_name`, `ip_address`, `mac_address`…) → trả object đã cập nhật.
+Body: các field cho phép sửa (`device_name`, `ip_address`…) → trả object đã cập nhật.
 
 #### `PATCH /iot-devices/:id/rtsp-config` — cấu hình RTSP (IP camera)
 Body: `{ rtsp_url }` (dạng `rtsp://user:pass@host:554/...`) → trả `{ success, message, data: { id, status } }`.
