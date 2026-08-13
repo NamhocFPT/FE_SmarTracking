@@ -44,20 +44,21 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
 
                 if (hasProcessing) {
                     setStatus('processing');
-                    return true; // continue polling
+                    return 'poll'; // continue polling
                 } else if (currentJobs.length > 0) {
-                    setStatus('ready');
-                    return false; // stop polling, fetch transcript
+                    setStatus('loading');
+                    return 'fetch'; // stop polling, fetch transcript
                 } else {
                     setStatus('empty');
-                    return false;
+                    return 'empty';
                 }
             }
         } catch (err) {
             // Ignore if 404/empty
             setStatus('empty');
+            return 'empty';
         }
-        return false;
+        return 'empty';
     }, [meetingId]);
 
     const fetchTranscript = useCallback(async () => {
@@ -85,11 +86,11 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
         let cancelled = false;
         let timeoutId;
         const checkStatus = async () => {
-            const shouldPoll = await fetchJobs();
+            const action = await fetchJobs();
             if (cancelled) return;
-            if (shouldPoll) {
+            if (action === 'poll') {
                 timeoutId = setTimeout(checkStatus, 3000); // poll every 3s
-            } else if (status !== 'error') {
+            } else if (action === 'fetch') {
                 fetchTranscript();
             }
         };

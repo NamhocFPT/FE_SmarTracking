@@ -5,6 +5,12 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 16:18
+* **Tên Plan / Yêu cầu**: Khắc phục lỗi 404 console khi gọi API lấy transcript của cuộc họp chưa có dữ liệu.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/transcription/TranscriptViewer.jsx`: Thay đổi cơ chế thăm dò (polling) trong `fetchJobs` và `checkStatus`. Sử dụng cơ chế trả về các trạng thái hành động `'poll'`, `'fetch'`, `'empty'`. Ngăn chặn việc tự động gọi API `getTranscript` khi danh sách job trống (`jobs.length === 0`), tránh tạo request lỗi 404 trên browser console.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 15:07
 * **Tên Plan / Yêu cầu**: Tách commit các chức năng đã hoàn thiện và push code.
 * **Chi tiết thay đổi**:
