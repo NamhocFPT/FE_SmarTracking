@@ -5,6 +5,15 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 19:25
+* **Tên Plan / Yêu cầu**: Thay đổi thiết kế Lối tắt chức năng nhanh cho Nhân viên (Employee)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/homePage.jsx`:
+    * Thêm import icon `User` từ `lucide-react`.
+    * Loại bỏ lối tắt trùng lặp "Đặt phòng họp nhanh" và lối tắt không chính xác "Lịch sử điểm danh".
+    * Thiết kế lại 4 lối tắt chức năng nhanh gồm: Đăng ký họp (`/employee/book`), Lịch họp cá nhân (`/employee/schedule`), Đăng ký khuôn mặt (`/employee/face-register`), và Bản ghi & Tài liệu (`/employee/recordings`) với các gradient màu sắc, mô tả và liên kết điều hướng chuẩn xác.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 17:52
 * **Tên Plan / Yêu cầu**: Phân trang và nâng cấp giao diện cho bảng "Chi tiết các mốc quét camera".
 * **Chi tiết thay đổi**:
