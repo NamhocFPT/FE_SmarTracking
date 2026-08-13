@@ -5,6 +5,35 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 22:15
+* **Tên Plan / Yêu cầu**: Tách commit và push code cho các tính năng đã hoàn thành
+* **Chi tiết thay đổi**:
+  * `[Tạo mới] src/docs/PLAN_BE_personal_attendance_stats.md`:
+    * Tạo tài liệu kế hoạch Backend về tính năng Thống kê chuyên cần cá nhân (Employee Personal Stats) và API `GET /analytics/attendance/on-time-rate/me`.
+  * `[Cập nhật] src/pages/employee/homePage.jsx` & `src/pages/manager/homePage.jsx`:
+    * Nâng cấp giao diện Lối tắt / Trạng thái nhanh (Quick Status Bar) thành dạng lưới 3 cột có kích thước nhỏ gọn, layout hiện đại, typography rõ ràng và icon trực quan.
+  * `[Cập nhật] src/pages/shared/EmployeeOnTimeAnalytics.jsx`:
+    * Thay đổi hiển thị bảng Thống kê thành viên: thay cột tỷ lệ đi muộn và số lượt đi muộn thô bằng các cột chi tiết "Đúng giờ", "Đến muộn", "Vắng mặt" (có badge màu sắc) và "Tổng bắt buộc".
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Di chuyển nút "Gán phòng" lên đầu danh sách hành động.
+    * Đổi tên hiển thị và cấu hình từ "Face Terminal" sang "Face Server".
+    * Xóa bỏ dropdown chọn phòng trực tiếp trong modal tạo mới (bắt buộc gán sau khi tạo qua nút Gán phòng).
+    * Khóa dropdown "Loại thiết bị" khi chỉnh sửa (chỉ hiển thị nhãn đọc) và loại bỏ nút Xóa thiết bị khỏi danh sách.
+  * `[Cập nhật] src/pages/systemAdmin/RoomAccessLogs.jsx` & `src/pages/systemAdmin/ZoneManagement.jsx`:
+    * Đồng bộ nhãn trạng thái "Chưa khớp (unmatched)" hiển thị thành "Người lạ" màu đỏ kèm icon cảnh báo tương ứng.
+    * Thiết kế lại danh sách sự kiện truy cập khu vực (ZoneAccessLogCard) từ dạng danh sách dọc thành dạng lưới thẻ (3 cột) hiển thị ThumbnailImage 16:9 toàn chiều rộng kèm overlay thời gian.
+    * Loại bỏ các phần liên quan đến Occupancy / Đếm người (cột, chỉ số KPI đỉnh Occupancy) trong ZoneTimelineCard để đơn giản hóa giao diện.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 19:55
+* **Tên Plan / Yêu cầu**: Loại bỏ "Toàn hệ thống" và bắt buộc chọn khu vực trong Quy tắc cảnh báo
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/AlertRules.jsx`:
+    * Loại bỏ tùy chọn "Toàn hệ thống (Mọi khu vực)" khỏi dropdown select "Khu vực áp dụng" trong modal tạo/sửa quy tắc.
+    * Thay thế bằng placeholder mặc định bị vô hiệu hóa "-- Chọn khu vực áp dụng --" và đánh dấu trường này là bắt buộc (`required`).
+    * Thêm kiểm tra validation ở `handleSubmit` và hiển thị thông báo lỗi nếu chưa chọn khu vực.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 19:25
 * **Tên Plan / Yêu cầu**: Thay đổi thiết kế Lối tắt chức năng nhanh cho Nhân viên (Employee)
 * **Chi tiết thay đổi**:
