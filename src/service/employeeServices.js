@@ -169,6 +169,11 @@ export const getMeetingMediaFiles = async (meetingId) => {
     return await get(`/meetings/${meetingId}/media-files`);
 };
 
+export const getMeetingMinutesByMeetingId = async (meetingId) => {
+    const query = buildQuery({ meetingId, limit: 1 });
+    return await get(`/meeting-minutes${query}`);
+};
+
 /**
  * UC-SM-02: Chỉnh sửa cuộc họp
  */
