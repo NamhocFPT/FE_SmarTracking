@@ -5,6 +5,19 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 22:25
+* **Tên Plan / Yêu cầu**: Hoàn thiện chức năng Thống kê chuyên cần cá nhân của Nhân viên và nâng cấp giao diện Quản lý thiết bị
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/employeeServices.js`:
+    * Thêm API `getMyAttendanceStats` gọi endpoint `GET /analytics/attendance/on-time-rate/me` để lấy thống kê chuyên cần cá nhân.
+  * `[Cập nhật] src/pages/employee/homePage.jsx`:
+    * Tích hợp tab "Thống kê" sử dụng API thống kê chuyên cần cá nhân.
+    * Thêm hiển thị 4 thẻ KPI (Lượt tham dự, Đúng giờ, Đi muộn, Vắng mặt), biểu đồ tròn (phân bố trạng thái chuyên cần), danh sách 5 lần đi muộn gần nhất và biểu đồ cột (xu hướng chuyên cần).
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Nâng cấp toàn diện danh sách thiết bị từ dạng bảng (table) sang dạng lưới thẻ (card grid) 3 cột hiển thị sinh động theo tông màu thương hiệu của từng loại thiết bị.
+    * Cải thiện bộ lọc thu gọn, hiển thị số lượng thiết bị, xử lý trạng thái rỗng (empty state) và phân trang theo dạng lưới thẻ.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 22:15
 * **Tên Plan / Yêu cầu**: Tách commit và push code cho các tính năng đã hoàn thành
 * **Chi tiết thay đổi**:
