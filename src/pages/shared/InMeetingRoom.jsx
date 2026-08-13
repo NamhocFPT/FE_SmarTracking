@@ -230,6 +230,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [extensionModal, setExtensionModal] = useState({ isOpen: false, minutes: 15, reason: '' });
     const [pendingExtensions, setPendingExtensions] = useState([]);
     const [noShowWarning, setNoShowWarning] = useState(null);
+    const [meetingTimeLeft, setMeetingTimeLeft] = useState(null); // seconds until scheduled end
+    const [meetingOverdue, setMeetingOverdue] = useState(false);  // true when past end time
     const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
     const [isManualAttendanceExpanded, setIsManualAttendanceExpanded] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -363,6 +365,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 // Luôn cập nhật status từ API để tránh cache cũ giữ 'scheduled'
                 // khi host đã bắt đầu họp sớm — không cập nhật thì participant bị kẹt ở lobby
                 if (baseMeeting.status) savedState.status = baseMeeting.status;
+                if (baseMeeting.endTime) savedState.endTime = baseMeeting.endTime;
                 savedState.title = baseMeeting.title || savedState.title;
                 savedState.roomName = baseMeeting.room?.room_name || baseMeeting.room?.roomName || savedState.roomName;
                 savedState.room = baseMeeting.room || savedState.room || null;
@@ -425,6 +428,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 }
                 initial.hostId = hostId;
                 initial.status = baseMeeting.status || initial.status;
+                initial.endTime = baseMeeting.endTime || null;
 
                 initial.host = apiHost?.fullName || apiHost?.full_name || baseMeeting.hostName ||
                     (typeof baseMeeting.host === 'string' ? baseMeeting.host : initial.host);
@@ -439,6 +443,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         isMuted: false,
                         isSpeaking: false,
                         isBot: false,
+                        isPresent: false,
                     });
                 }
 
@@ -453,6 +458,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             isMuted: false,
                             isSpeaking: false,
                             isBot: true,
+                            isPresent: false,
                         });
                     }
                 });
@@ -468,6 +474,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             isMuted: false,
                             isSpeaking: false,
                             isBot: false,
+                            isPresent: false,
                         });
                     }
                 });
@@ -590,11 +597,17 @@ const InMeetingRoom = ({ isPublic = false }) => {
         const cleanup = subscribeToMeeting(id);
         const s = getSocket();
 
-        const onSessionStarted = () => setMeetingState(prev => {
-            const next = { ...prev, status: 'in_progress' };
-            localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
-            return next;
-        });
+        const onSessionStarted = (data) => {
+            setMeetingState(prev => {
+                const next = {
+                    ...prev,
+                    status: 'in_progress',
+                    ...(data?.scheduledEndTime ? { endTime: data.scheduledEndTime } : {}),
+                };
+                localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
+                return next;
+            });
+        };
         const onSessionEnded = () => setMeetingState(prev => ({ ...prev, status: 'completed' }));
         const onAgendaPresented = (payload) => setPresentedFile(payload);
         const onAgendaPresentStopped = () => setPresentedFile(null);
@@ -620,6 +633,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 setNoShowWarning({ kind: 'released' });
             }
         };
+        const onTimeWarning = (payload) => {
+            const { warningLevel, remainingMinutes, nextBooking } = payload || {};
+            if (warningLevel === 'overdue') {
+                setMeetingOverdue(true);
+                showToast('Cuộc họp đã hết giờ. Vui lòng kết thúc để giải phóng phòng.', 'error');
+            } else if (warningLevel === 'urgent' || remainingMinutes <= 5) {
+                showToast(`Còn ${remainingMinutes} phút — cuộc họp sắp kết thúc!`, 'error');
+            } else {
+                showToast(`Còn ${remainingMinutes} phút trước khi kết thúc cuộc họp.`, 'warning');
+            }
+            if (nextBooking?.reservedStartTime) {
+                const nextStart = new Date(nextBooking.reservedStartTime)
+                    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                showToast(`Lưu ý: Phòng có lịch họp tiếp theo lúc ${nextStart}.`, 'info');
+            }
+        };
 
         s.on('meeting.session.started', onSessionStarted);
         s.on('meeting.session.ended', onSessionEnded);
@@ -628,6 +657,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         s.on('meeting.extension_request.created', onExtensionCreated);
         s.on('agenda:changed', onAgendaChanged);
         s.on('meeting.noshow.alert', onNoShowAlert);
+        s.on('meeting.time.warning', onTimeWarning);
 
         return () => {
             s.off('meeting.session.started', onSessionStarted);
@@ -637,6 +667,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
             s.off('meeting.extension_request.created', onExtensionCreated);
             s.off('agenda:changed', onAgendaChanged);
             s.off('meeting.noshow.alert', onNoShowAlert);
+            s.off('meeting.time.warning', onTimeWarning);
             cleanup();
         };
     }, [meetingState?.status, id]);
@@ -724,6 +755,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const isHost = meetingState?.hostId === myParticipantId;
 
+    // FE-MB: Countdown đến scheduled end time
+    useEffect(() => {
+        if (!meetingState?.endTime || meetingState?.status !== 'in_progress') {
+            setMeetingTimeLeft(null);
+            return;
+        }
+        const tick = () => {
+            const left = Math.floor((new Date(meetingState.endTime) - Date.now()) / 1000);
+            setMeetingTimeLeft(left);
+            if (left <= 0) setMeetingOverdue(true);
+        };
+        tick();
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+    }, [meetingState?.endTime, meetingState?.status]);
+
     useEffect(() => {
         if (!meetingState || meetingState.status !== 'in_progress') return;
         const countdown = setInterval(() => {
@@ -789,8 +836,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 exists.avatarUrl = resolveAvatarUrl(currentUser) || exists.avatarUrl;
                 exists.role = userRole;
                 exists.isMuted = !isMicOn;
+                exists.isPresent = true;
             } else {
-                list.push({ id: myParticipantId, fullName: selectedName, avatarUrl: resolveAvatarUrl(currentUser), role: userRole, isMuted: !isMicOn, isSpeaking: false, isBot: false });
+                list.push({ id: myParticipantId, fullName: selectedName, avatarUrl: resolveAvatarUrl(currentUser), role: userRole, isMuted: !isMicOn, isSpeaking: false, isBot: false, isPresent: true });
             }
             const next = { ...prev, participants: list };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
@@ -1145,7 +1193,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const confirmLeave = () => {
         setMeetingState(prev => {
-            const next = { ...prev, participants: prev.participants.filter(p => p.id !== myParticipantId) };
+            const next = { ...prev, participants: prev.participants.map(p => p.id === myParticipantId ? { ...p, isPresent: false } : p) };
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
             return next;
         });
@@ -1153,9 +1201,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     // ─── Computed ─────────────────────────────────────────────────────
-    // Show ALL participants (internal + external guests) regardless of attendance status
+    // Only show participants who have actively joined (isPresent) + admitted external guests
     const activeGridParticipants = [
-        ...(meetingState.participants || []),
+        ...(meetingState.participants || []).filter(p => p.isPresent),
         ...admittedGuests.map(g => ({
             id: g.externalParticipantId,
             fullName: g.fullName || g.externalName || 'Khách ngoài',
@@ -1178,6 +1226,48 @@ const InMeetingRoom = ({ isPublic = false }) => {
     return (
         <div className="fixed inset-0 z-[100] bg-cloud-mist text-midnight-indigo flex flex-col overflow-hidden">
             <style dangerouslySetInnerHTML={{ __html: customStyles }} />
+
+            {/* FE-MC: OVERDUE MODAL — chỉ hiện cho host khi meeting hết giờ */}
+            {isHost && meetingOverdue && meetingState?.status === 'in_progress' && (
+                <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center border border-red-100">
+                        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle className="w-8 h-8 text-red-600" />
+                        </div>
+                        <h2 className="text-lg font-bold text-midnight-indigo mb-1">Cuộc họp đã hết giờ</h2>
+                        <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                            Vui lòng kết thúc để giải phóng phòng cho lịch sử dụng tiếp theo.
+                        </p>
+                        <button
+                            onClick={handleEndMeeting}
+                            disabled={actionLoading}
+                            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {actionLoading ? (
+                                <><Loader className="w-4 h-4 animate-spin" /> Đang kết thúc...</>
+                            ) : (
+                                'Kết thúc & Giải phóng phòng'
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* FE-MB: COUNTDOWN BANNER — hiện khi còn ≤ 10 phút */}
+            {meetingTimeLeft !== null && meetingTimeLeft <= 600 && meetingState?.status === 'in_progress' && (
+                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-2.5 rounded-full shadow-lg font-bold text-sm pointer-events-none select-none
+                    ${meetingTimeLeft <= 0
+                        ? 'bg-red-600 text-white'
+                        : meetingTimeLeft <= 300
+                            ? 'bg-red-500 text-white animate-pulse'
+                            : 'bg-amber-500 text-white'}`}
+                >
+                    <IoTime className="w-4 h-4 shrink-0" />
+                    {meetingTimeLeft > 0
+                        ? `Còn ${Math.floor(meetingTimeLeft / 60)}:${String(meetingTimeLeft % 60).padStart(2, '0')} — sắp hết giờ họp`
+                        : 'Cuộc họp đã hết giờ'}
+                </div>
+            )}
 
             {/* HEADER */}
             <header className="h-14 border-b border-platinum-tint bg-white px-5 flex items-center justify-between z-10 shadow-sm">
@@ -1856,31 +1946,6 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                 </button>
                                             </div>
                                         )}
-                                    </div>
-                                </div>
-
-                                {/* Tương tác */}
-                                <div className="bg-white border border-platinum-tint rounded-xl overflow-hidden">
-                                    <div className="px-3 py-2.5 border-b border-platinum-tint bg-cloud-mist">
-                                        <h4 className="text-[10px] font-extrabold text-midnight-indigo uppercase tracking-wider">Kiểm soát tương tác</h4>
-                                    </div>
-                                    <div className="p-3 space-y-2">
-                                        <button
-                                            onClick={handleHostMuteAll}
-                                            className="w-full py-2 bg-cloud-mist hover:bg-pale-gray text-midnight-indigo border border-platinum-tint rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                                        >
-                                            <VolumeX className="w-3.5 h-3.5" /> Tắt tiếng tất cả
-                                        </button>
-                                        <button
-                                            onClick={handleHostToggleLockReactions}
-                                            className={`w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border ${meetingState.reactionsLocked
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                                : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                                                }`}
-                                        >
-                                            <Smile className="w-3.5 h-3.5" />
-                                            {meetingState.reactionsLocked ? 'Mở khóa cảm xúc' : 'Khóa cảm xúc'}
-                                        </button>
                                     </div>
                                 </div>
 
