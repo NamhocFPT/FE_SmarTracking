@@ -544,6 +544,17 @@ const DeviceManagement = () => {
         'occupancy_sensor':'Cảm biến đếm người',
         'display':         'Màn hình hiển thị',
     };
+    const DEVICE_CONFIG = {
+        'ip_camera':        { label: 'Camera AI',     accentBar: 'bg-blue-400',    border: 'border-blue-100',    badgeBg: 'bg-blue-50',    badgeText: 'text-blue-700'    },
+        'door_camera':      { label: 'Camera vào/ra', accentBar: 'bg-violet-400',  border: 'border-violet-100',  badgeBg: 'bg-violet-50',  badgeText: 'text-violet-700'  },
+        'room_camera':      { label: 'Camera phòng',  accentBar: 'bg-indigo-400',  border: 'border-indigo-100',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-700'  },
+        'face_server':      { label: 'Face Server',   accentBar: 'bg-emerald-400', border: 'border-emerald-100', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-700' },
+        'microphone':       { label: 'Micro',         accentBar: 'bg-orange-400',  border: 'border-orange-100',  badgeBg: 'bg-orange-50',  badgeText: 'text-orange-700'  },
+        'capture_agent':    { label: 'Capture Agent', accentBar: 'bg-sky-400',     border: 'border-sky-100',     badgeBg: 'bg-sky-50',     badgeText: 'text-sky-700'     },
+        'occupancy_sensor': { label: 'Cảm biến',      accentBar: 'bg-rose-400',    border: 'border-rose-100',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-700'    },
+        'display':          { label: 'Màn hình',      accentBar: 'bg-amber-400',   border: 'border-amber-100',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700'   },
+    };
+    const DEVICE_CFG_DEFAULT = { label: 'Thiết bị', accentBar: 'bg-slate-400', border: 'border-platinum-tint', badgeBg: 'bg-slate-50', badgeText: 'text-steel-gray' };
 
     // Filtered list
     const filteredDevices = devicesList.filter(device => {
@@ -647,7 +658,7 @@ const DeviceManagement = () => {
             )}
 
 
-            {/* Render Tab Contents */}
+            {/* Device cards / loading */}
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-platinum-tint shadow-sm-1">
                     <div className="w-10 h-10 border-4 border-action-blue/20 border-t-action-blue rounded-full animate-spin"></div>
@@ -655,54 +666,48 @@ const DeviceManagement = () => {
                 </div>
             ) : (
                 <>
-                    {/* Filters controls */}
-                    <div className="bg-white p-4 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="relative flex-1 max-w-md">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-blue">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {/* Filter bar */}
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-1 p-4 flex flex-col sm:flex-row gap-3 sm:items-center">
+                        <div className="relative flex-1 min-w-0">
+                            <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-steel-gray">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </span>
                             <input
                                 type="text"
-                                placeholder="Tìm kiếm theo Tên, Mã hoặc IP..."
+                                placeholder="Tìm theo tên, mã thiết bị hoặc địa chỉ IP..."
                                 value={search}
                                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                                className="pl-10 pr-4 py-2 w-full border border-platinum-tint rounded-xl text-sm text-midnight-indigo placeholder:text-steel-gray focus:outline-none focus:border-action-blue"
+                                className="pl-9 pr-4 py-2 w-full border border-platinum-tint rounded-xl text-sm text-midnight-indigo placeholder:text-steel-gray focus:outline-none focus:border-action-blue"
                             />
                         </div>
-
-                        <div className="flex flex-wrap gap-3">
-                            {/* Room Filter */}
+                        <div className="flex flex-wrap gap-2 shrink-0">
                             <select
                                 value={selectedRoomId}
                                 onChange={(e) => { setSelectedRoomId(e.target.value); setPage(1); }}
                                 className="px-3 py-2 border border-platinum-tint rounded-xl text-sm text-slate-blue focus:outline-none focus:border-action-blue bg-white"
                             >
-                                <option value="">Tất cả phòng họp</option>
+                                <option value="">Tất cả phòng</option>
                                 {rooms.map(room => (
                                     <option key={room.id} value={room.id}>{room.roomName}</option>
                                 ))}
                             </select>
-
-                            {/* Type Filter */}
                             <select
                                 value={selectedType}
                                 onChange={(e) => { setSelectedType(e.target.value); setPage(1); }}
                                 className="px-3 py-2 border border-platinum-tint rounded-xl text-sm text-slate-blue focus:outline-none focus:border-action-blue bg-white"
                             >
-                                <option value="">Tất cả loại thiết bị</option>
+                                <option value="">Tất cả loại</option>
                                 <option value="ip_camera">Camera AI</option>
-                                <option value="door_camera">Camera kiểm soát vào/ra</option>
-                                <option value="room_camera">Camera phòng họp</option>
-                                <option value="face_server">Máy chủ Face Server</option>
-                                <option value="microphone">Micro ghi âm</option>
+                                <option value="door_camera">Camera vào/ra</option>
+                                <option value="room_camera">Camera phòng</option>
+                                <option value="face_server">Face Server</option>
+                                <option value="microphone">Micro</option>
                                 <option value="capture_agent">Capture Agent</option>
-                                <option value="occupancy_sensor">Cảm biến đếm người</option>
-                                <option value="display">Màn hình hiển thị</option>
+                                <option value="occupancy_sensor">Cảm biến</option>
+                                <option value="display">Màn hình</option>
                             </select>
-
-                            {/* Status Filter */}
                             <select
                                 value={selectedStatus}
                                 onChange={(e) => { setSelectedStatus(e.target.value); setPage(1); }}
@@ -711,100 +716,119 @@ const DeviceManagement = () => {
                                 <option value="">Tất cả trạng thái</option>
                                 <option value="online">Online</option>
                                 <option value="offline">Offline</option>
+                                <option value="disabled">Vô hiệu</option>
                             </select>
                         </div>
+                        {filteredDevices.length > 0 && (
+                            <span className="text-xs text-steel-gray shrink-0 font-semibold tabular-nums">
+                                {filteredDevices.length} thiết bị
+                            </span>
+                        )}
                     </div>
 
-                    {/* Table List Card */}
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-1 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-platinum-tint bg-cloud-mist/50">
-                                        <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Mã / Tên thiết bị</th>
-                                        <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Chủng loại</th>
-                                        <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Thông số kết nối</th>
-                                        <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Phòng gán</th>
-                                        <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase">Sức khỏe</th>
-                                        <th className="py-4 px-6 text-xs font-bold text-slate-blue uppercase text-right">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredDevices.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="6" className="py-12 text-center text-slate-blue text-sm">
-                                                Không tìm thấy thiết bị nào phù hợp bộ lọc.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        paginatedDevices.map(device => {
-                                            const assignedRoom = rooms.find(r => r.roomId === device.room_id);
-                                            return (
-                                                <tr key={device.id} className="border-b border-platinum-tint/40 hover:bg-cloud-mist/30 transition-colors">
-                                                    <td className="py-4 px-6">
-                                                        <h4 className="text-sm font-bold text-midnight-indigo leading-tight">{device.device_name}</h4>
-                                                        <p className="text-[10px] text-steel-gray mt-1 font-mono">{device.device_code}</p>
-                                                    </td>
-                                                    <td className="py-4 px-6 text-sm text-slate-blue font-medium">
-                                                        {TYPE_MAP[device.device_type] || device.device_type}
-                                                    </td>
-                                                    <td className="py-4 px-6">
-                                                        <div className="text-xs text-midnight-indigo font-mono">IP: {device.ip_address}</div>
-                                                        <div className="text-[10px] text-slate-blue mt-0.5 font-mono">MAC: {device.mac_address}</div>
-                                                    </td>
-                                                    <td className="py-4 px-6">
+                    {/* Empty state */}
+                    {filteredDevices.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-platinum-tint shadow-sm-1">
+                            <div className="w-14 h-14 rounded-2xl bg-cloud-mist flex items-center justify-center mb-4">
+                                <Cpu className="w-7 h-7 text-steel-gray" />
+                            </div>
+                            <p className="text-midnight-indigo font-semibold text-sm">Không tìm thấy thiết bị</p>
+                            <p className="text-steel-gray text-xs mt-1">Thử thay đổi bộ lọc hoặc đăng ký thiết bị mới.</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Card grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {paginatedDevices.map(device => {
+                                    const cfg = DEVICE_CONFIG[device.device_type] || DEVICE_CFG_DEFAULT;
+                                    const assignedRoom = rooms.find(r => r.roomId === device.room_id);
+                                    return (
+                                        <div key={device.id} className={`bg-white rounded-2xl border ${cfg.border} shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col`}>
+                                            {/* Accent strip */}
+                                            <div className={`${cfg.accentBar} h-[3px] shrink-0`} />
+
+                                            <div className="p-5 flex flex-col gap-3.5 flex-1">
+                                                {/* Row: type badge + status */}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase ${cfg.badgeBg} ${cfg.badgeText}`}>
+                                                        {cfg.label}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <span className="relative flex h-2 w-2">
+                                                            {device.status === 'online' && (
+                                                                <>
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                                </>
+                                                            )}
+                                                            {device.status === 'offline' && (
+                                                                <>
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                                                </>
+                                                            )}
+                                                            {device.status === 'disabled' && (
+                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-400"></span>
+                                                            )}
+                                                            {device.status === 'maintenance' && (
+                                                                <>
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                                                </>
+                                                            )}
+                                                        </span>
+                                                        <span className={`text-[11px] font-bold ${
+                                                            device.status === 'online' ? 'text-green-600' :
+                                                            device.status === 'disabled' ? 'text-gray-400' :
+                                                            device.status === 'maintenance' ? 'text-amber-600' :
+                                                            'text-red-500'
+                                                        }`}>
+                                                            {device.status === 'online' ? 'ONLINE' :
+                                                             device.status === 'disabled' ? 'VÔ HIỆU' :
+                                                             device.status === 'maintenance' ? 'BẢO TRÌ' :
+                                                             'OFFLINE'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Name + code */}
+                                                <div>
+                                                    <h3 className="text-[15px] font-bold text-midnight-indigo leading-snug line-clamp-1">{device.device_name}</h3>
+                                                    <p className="mt-0.5 text-[10px] font-mono text-steel-gray tracking-wider">{device.device_code}</p>
+                                                </div>
+
+                                                {/* Room + Network */}
+                                                <div className="border-t border-platinum-tint pt-3 space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <svg className="w-3.5 h-3.5 text-steel-gray shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                        </svg>
                                                         {assignedRoom ? (
-                                                            <span className="inline-flex text-[10px] px-2 py-0.5 bg-blue-50 text-glacier-blue rounded-full font-bold">
-                                                                {assignedRoom.roomName}
-                                                            </span>
+                                                            <span className="text-xs font-semibold text-midnight-indigo truncate">{assignedRoom.roomName}</span>
                                                         ) : (
-                                                            <span className="text-xs text-steel-gray">Chưa gán phòng</span>
+                                                            <span className="text-xs text-steel-gray italic">Chưa gán phòng</span>
                                                         )}
-                                                    </td>
-                                                    <td className="py-4 px-6">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="relative flex h-2 w-2">
-                                                                {device.status === 'online' && (
-                                                                    <>
-                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                                                    </>
-                                                                )}
-                                                                {device.status === 'offline' && (
-                                                                    <>
-                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                                                    </>
-                                                                )}
-                                                                {device.status === 'disabled' && (
-                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-400"></span>
-                                                                )}
-                                                                {device.status === 'maintenance' && (
-                                                                    <>
-                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                                                    </>
-                                                                )}
-                                                            </span>
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                                                device.status === 'online' ? 'bg-green-50 text-green-700' :
-                                                                device.status === 'disabled' ? 'bg-gray-100 text-gray-700' :
-                                                                device.status === 'maintenance' ? 'bg-amber-50 text-amber-700' :
-                                                                'bg-red-50 text-red-700'
-                                                            }`}>
-                                                                {device.status === 'online' ? 'ONLINE' :
-                                                                 device.status === 'disabled' ? 'VÔ HIỆU' :
-                                                                 device.status === 'maintenance' ? 'BẢO TRÌ' :
-                                                                 'OFFLINE'}
-                                                            </span>
+                                                    </div>
+                                                    <div className="flex items-start gap-2">
+                                                        <svg className="w-3.5 h-3.5 text-steel-gray shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                                                        </svg>
+                                                        <div className="min-w-0">
+                                                            <p className="text-[11px] font-mono font-semibold text-midnight-indigo">{device.ip_address}</p>
+                                                            {device.mac_address && (
+                                                                <p className="text-[10px] font-mono text-steel-gray mt-0.5">{device.mac_address}</p>
+                                                            )}
                                                         </div>
-                                                    </td>
-                                                    <td className="py-4 px-6 text-right space-x-1.5 whitespace-nowrap">
-                                                        {/* FE-BF: Gán phòng lên đầu */}
+                                                    </div>
+                                                </div>
+
+                                                {/* Actions */}
+                                                <div className="border-t border-platinum-tint pt-3 flex items-center justify-between gap-2 mt-auto">
+                                                    <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.room_id || ''); setIsAssignRoomModalOpen(true); }}
                                                             title="Gán phòng"
-                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                                                            className="p-2 rounded-lg text-steel-gray hover:text-teal-600 hover:bg-teal-50 transition-colors"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -813,7 +837,7 @@ const DeviceManagement = () => {
                                                         <button
                                                             onClick={() => handleCheckAvailability(device)}
                                                             title="Kiểm tra kết nối (Ping)"
-                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-green-600 hover:bg-green-50 transition-colors"
+                                                            className="p-2 rounded-lg text-steel-gray hover:text-green-600 hover:bg-green-50 transition-colors"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -822,34 +846,24 @@ const DeviceManagement = () => {
                                                         {device.device_type === 'face_server' && (
                                                             <>
                                                             {!device.metadata_json?.face_server_config ? (
-                                                                // Chưa cấu hình → chỉ hiện nút Configure
                                                                 <button
                                                                     onClick={() => handleOpenFaceConfig(device)}
                                                                     title="Cấu hình Face Server lần đầu"
-                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
                                                                 >
-                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
                                                                     </svg>
-                                                                    Cấu hình
+                                                                    Config
                                                                 </button>
                                                             ) : (
-                                                                // Đã cấu hình → hiện Rotate + Revoke
                                                                 <>
-                                                                <button
-                                                                    onClick={() => handleRotateToken(device)}
-                                                                    title="Tạo lại Token (Rotate)"
-                                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                                                                >
+                                                                <button onClick={() => handleRotateToken(device)} title="Tạo lại Token" className="p-2 rounded-lg text-steel-gray hover:text-amber-600 hover:bg-amber-50 transition-colors">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                                     </svg>
                                                                 </button>
-                                                                <button
-                                                                    onClick={() => handleRevokeToken(device)}
-                                                                    title="Thu hồi Token (Revoke)"
-                                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                                >
+                                                                <button onClick={() => handleRevokeToken(device)} title="Thu hồi Token" className="p-2 rounded-lg text-steel-gray hover:text-red-600 hover:bg-red-50 transition-colors">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                                                     </svg>
@@ -860,11 +874,7 @@ const DeviceManagement = () => {
                                                         )}
                                                         {['ip_camera', 'door_camera', 'room_camera'].includes(device.device_type) && (
                                                             <>
-                                                            <button
-                                                                onClick={() => handleAiConfigOpen(device)}
-                                                                title="Cấu hình AI Camera"
-                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                                            >
+                                                            <button onClick={() => handleAiConfigOpen(device)} title="Cấu hình AI Camera" className="p-2 rounded-lg text-steel-gray hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                                                 </svg>
@@ -884,7 +894,7 @@ const DeviceManagement = () => {
                                                                     setIsRtspModalOpen(true);
                                                                 }}
                                                                 title="Cấu hình RTSP"
-                                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                                                                className="p-2 rounded-lg text-steel-gray hover:text-purple-600 hover:bg-purple-50 transition-colors"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -892,10 +902,12 @@ const DeviceManagement = () => {
                                                             </button>
                                                             </>
                                                         )}
+                                                    </div>
+                                                    <div className="flex items-center gap-0.5">
                                                         <button
                                                             onClick={() => toggleDeviceStatus(device)}
-                                                            title={device.status === 'online' ? "Ngừng kích hoạt" : "Kích hoạt lại"}
-                                                            className={`inline-flex p-1.5 rounded-lg transition-colors ${device.status === 'online' ? 'text-slate-blue hover:text-orange-600 hover:bg-orange-50' : 'text-slate-blue hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                                            title={device.status === 'online' ? 'Ngừng kích hoạt' : 'Kích hoạt lại'}
+                                                            className={`p-2 rounded-lg transition-colors ${device.status === 'online' ? 'text-steel-gray hover:text-orange-600 hover:bg-orange-50' : 'text-steel-gray hover:text-emerald-600 hover:bg-emerald-50'}`}
                                                         >
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -903,67 +915,63 @@ const DeviceManagement = () => {
                                                         </button>
                                                         <button
                                                             onClick={() => openEditModal(device)}
-                                                            title="Cấu hình thiết bị"
-                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                            title="Chỉnh sửa thiết bị"
+                                                            className="p-2 rounded-lg text-steel-gray hover:text-action-blue hover:bg-blue-50 transition-colors"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                             </svg>
                                                         </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Pagination footer */}
-                        {filteredDevices.length > 0 && (
-                            <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-slate-blue font-medium">Số dòng hiển thị:</span>
-                                    <select
-                                        value={limit}
-                                        onChange={(e) => {
-                                            setLimit(Number(e.target.value));
-                                            setPage(1);
-                                        }}
-                                        className="px-2 py-1 border border-platinum-tint rounded-lg text-xs text-slate-blue focus:outline-none focus:border-action-blue bg-white font-semibold"
-                                    >
-                                        <option value={10}>10 dòng</option>
-                                        <option value={20}>20 dòng</option>
-                                        <option value={50}>50 dòng</option>
-                                    </select>
-                                    <span className="text-xs text-slate-blue">
-                                        Hiển thị {(page - 1) * limit + 1} - {Math.min(page * limit, filteredDevices.length)} trên {filteredDevices.length} thiết bị
-                                    </span>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        disabled={page <= 1}
-                                        onClick={() => setPage(page - 1)}
-                                        className="px-3 py-1.5 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        Trước
-                                    </button>
-                                    <span className="px-3 py-1.5 text-xs font-bold text-midnight-indigo">
-                                        Trang {page} / {totalPages}
-                                    </span>
-                                    <button
-                                        disabled={page >= totalPages}
-                                        onClick={() => setPage(page + 1)}
-                                        className="px-3 py-1.5 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        Sau
-                                    </button>
-                                </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        )}
-                    </div>
+
+                            {/* Pagination */}
+                            {filteredDevices.length > limit && (
+                                <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-1 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-blue font-medium">Số thẻ:</span>
+                                        <select
+                                            value={limit}
+                                            onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                                            className="px-2 py-1 border border-platinum-tint rounded-lg text-xs text-slate-blue focus:outline-none focus:border-action-blue bg-white font-semibold"
+                                        >
+                                            <option value={9}>9</option>
+                                            <option value={12}>12</option>
+                                            <option value={24}>24</option>
+                                        </select>
+                                        <span className="text-xs text-slate-blue tabular-nums">
+                                            {(page - 1) * limit + 1}–{Math.min(page * limit, filteredDevices.length)} / {filteredDevices.length}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            disabled={page <= 1}
+                                            onClick={() => setPage(page - 1)}
+                                            className="px-3 py-1.5 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            Trước
+                                        </button>
+                                        <span className="px-3 py-1.5 text-xs font-bold text-midnight-indigo tabular-nums">
+                                            {page} / {totalPages}
+                                        </span>
+                                        <button
+                                            disabled={page >= totalPages}
+                                            onClick={() => setPage(page + 1)}
+                                            className="px-3 py-1.5 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            Sau
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </>
             )}
 
