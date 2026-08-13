@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react';
 import Login from '../pages/auth/login/login';
 import ForgotPassword from '../pages/auth/forgotpassword/forgotpassword';
 import VerifyOTP from '../pages/auth/forgotpassword/vertifyOTP';
@@ -62,6 +63,9 @@ import InMeetingRoom from '../pages/shared/InMeetingRoom';
 import LegalAndSupport from '../pages/public/LegalAndSupport';
 import GuestJoin from '../pages/guest/GuestJoin';
 import GuestMeeting from '../pages/guest/GuestMeeting';
+
+// Lazy-loaded to break circular dependency with minutesServices import chain
+const DocumentArchive = React.lazy(() => import('../pages/bussinessAdmin/DocumentArchive'));
 
 export const router = [
     // ========== Auth Routes (public) ==========
@@ -248,6 +252,10 @@ export const router = [
                 element: <BusinessRecordingManagement />
             },
             {
+                path: 'documents',
+                element: <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"/></div>}><DocumentArchive /></Suspense>
+            },
+            {
                 path: 'biometric-submissions',
                 element: <BiometricSubmissionsReview />
             },
@@ -416,6 +424,14 @@ export const router = [
             {
                 path: 'recordings',
                 element: <EmployeeRecordings />
+            },
+            {
+                path: 'meeting-approvals',
+                element: <ManagerMeetingApprovals />
+            },
+            {
+                path: 'user-journey',
+                element: <UserJourney />
             },
             {
                 path: 'my-vehicles',

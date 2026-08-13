@@ -46,9 +46,54 @@ const formatDuration = (ms) => {
 const UserJourney = () => {
     const [searchParams, setSearchParams] = useSearchParams();
 
+    const localUser = React.useMemo(() => {
+        try {
+            const userStr = localStorage.getItem('user');
+            return userStr ? JSON.parse(userStr) : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const isSelfOnly = React.useMemo(() => {
+        if (!localUser) return true;
+        const isAdmin = localUser.roles?.some(r =>
+            ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes((r.roleCode || r.role_code || '').toUpperCase())
+        );
+        return !isAdmin;
+    }, [localUser]);
+
     const [users, setUsers] = useState([]);
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedUser, setSelectedUser] = useState(() => {
+        try {
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+            if (user) {
+                const isAdmin = user.roles?.some(r =>
+                    ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes((r.roleCode || r.role_code || '').toUpperCase())
+                );
+                if (!isAdmin) {
+                    return user;
+                }
+            }
+        } catch {}
+        return null;
+    });
+    const [searchQuery, setSearchQuery] = useState(() => {
+        try {
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+            if (user) {
+                const isAdmin = user.roles?.some(r =>
+                    ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes((r.roleCode || r.role_code || '').toUpperCase())
+                );
+                if (!isAdmin) {
+                    return user.fullName || '';
+                }
+            }
+        } catch {}
+        return '';
+    });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [usersLoading, setUsersLoading] = useState(false);
 
@@ -70,21 +115,24 @@ const UserJourney = () => {
 
     /* fetch users for dropdown search — no auto-select logic here */
     const fetchUsers = useCallback(async (query = '') => {
+        if (isSelfOnly) return;
         setUsersLoading(true);
         try {
             const res = await getUsers({ search: query || undefined, limit: 15 });
             if (res?.success) setUsers(res.data || []);
         } catch (_) { /* ignore */ }
         finally { setUsersLoading(false); }
-    }, []);
+    }, [isSelfOnly]);
 
     useEffect(() => {
+        if (isSelfOnly) return;
         const t = setTimeout(() => fetchUsers(searchQuery), 300);
         return () => clearTimeout(t);
-    }, [searchQuery, fetchUsers]);
+    }, [searchQuery, fetchUsers, isSelfOnly]);
 
     /* auto-select user from URL — runs once per urlUserId, never re-runs after clear */
     useEffect(() => {
+        if (isSelfOnly) return;
         if (!urlUserId || autoLoadedRef.current) return;
         autoLoadedRef.current = true;
         (async () => {
@@ -105,7 +153,7 @@ const UserJourney = () => {
             } catch (_) { /* ignore */ }
         })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [urlUserId]);
+    }, [urlUserId, isSelfOnly]);
 
     useEffect(() => {
         const handler = (e) => {
@@ -303,7 +351,11 @@ const UserJourney = () => {
                             Hành trình
                         </span>
                         <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Hành trình khuôn viên</h1>
-                        <p className="text-slate-blue text-sm mt-0.5">Theo dõi lịch trình hoạt động tổng hợp của một nhân viên trong ngày.</p>
+                        <p className="text-slate-blue text-sm mt-0.5">
+                            {isSelfOnly 
+                                ? 'Theo dõi lịch trình hoạt động tổng hợp của bạn trong ngày.' 
+                                : 'Theo dõi lịch trình hoạt động tổng hợp của một nhân viên trong ngày.'}
+                        </p>
                     </div>
                 </div>
                 {selectedUser && (
@@ -322,78 +374,100 @@ const UserJourney = () => {
             <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                    {/* User search */}
-                    <div className="space-y-1.5 relative" ref={dropdownRef}>
-                        <label className="text-xs font-bold text-slate-blue uppercase tracking-wider block">Chọn Nhân viên *</label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-blue">
-                                <User className="w-4 h-4" />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Nhập tên, email hoặc mã nhân viên..."
-                                value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    setIsDropdownOpen(true);
-                                    if (selectedUser && selectedUser.fullName !== e.target.value)
-                                        setSelectedUser(null);
-                                }}
-                                onFocus={() => setIsDropdownOpen(true)}
-                                className="w-full pl-9 pr-9 py-2.5 bg-cloud-mist border border-platinum-tint rounded-xl text-sm text-midnight-indigo focus:ring-2 focus:ring-action-blue/20 focus:border-action-blue outline-none transition-all"
-                            />
-                            {searchQuery && (
-                                <button
-                                    onClick={() => {
-                                        setSearchQuery('');
-                                        setSelectedUser(null);
-                                        setJourneyData(null);
-                                        autoLoadedRef.current = false;
-                                        setSearchParams({});
-                                    }}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-blue hover:text-midnight-indigo text-xs font-medium"
-                                >
-                                    Xóa
-                                </button>
-                            )}
-                        </div>
-                        {isDropdownOpen && (
-                            <div className="absolute z-20 w-full mt-1.5 bg-white border border-platinum-tint rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-platinum-tint/40">
-                                {usersLoading && users.length === 0 ? (
-                                    <div className="p-4 text-center text-xs text-slate-blue flex items-center justify-center gap-2">
-                                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-action-blue" />
-                                        Đang tìm kiếm...
+                    {/* User search / Display own user profile */}
+                    {isSelfOnly ? (
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-blue uppercase tracking-wider block">Nhân sự</label>
+                            <div className="flex items-center gap-3 bg-cloud-mist border border-platinum-tint rounded-xl px-4 py-2 flex-1 min-h-[46px]">
+                                <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 text-action-blue flex items-center justify-center font-bold text-xs shrink-0">
+                                    {(localUser?.fullName || 'N').charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-sm font-bold text-midnight-indigo flex items-center gap-1.5">
+                                        {localUser?.fullName}
+                                        {(localUser?.employeeCode || localUser?.employee_code) && (
+                                            <span className="text-[10px] font-mono font-bold text-slate-blue bg-white px-1.5 py-0.5 rounded border border-platinum-tint">
+                                                {localUser?.employeeCode || localUser?.employee_code}
+                                            </span>
+                                        )}
                                     </div>
-                                ) : users.length === 0 ? (
-                                    <div className="p-4 text-center text-xs text-slate-blue">Không tìm thấy nhân viên nào</div>
-                                ) : (
-                                    users.map((u) => {
-                                        const isSel = selectedUser && (selectedUser.id === u.id || selectedUser.uuid === u.uuid);
-                                        return (
-                                            <div
-                                                key={u.id || u.uuid}
-                                                onClick={() => { setSelectedUser(u); setSearchQuery(u.fullName); setIsDropdownOpen(false); }}
-                                                className={`px-4 py-2.5 hover:bg-cloud-mist cursor-pointer flex items-center justify-between transition-colors ${isSel ? 'bg-blue-50/50' : ''}`}
-                                            >
-                                                <div>
-                                                    <div className="text-sm font-bold text-midnight-indigo flex items-center gap-2">
-                                                        {u.fullName}
-                                                        {(u.employeeCode || u.employee_code) && (
-                                                            <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint">
-                                                                {u.employeeCode || u.employee_code}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs text-slate-blue mt-0.5">{u.email}</div>
-                                                </div>
-                                                {isSel && <Check className="w-4 h-4 text-action-blue" />}
-                                            </div>
-                                        );
-                                    })
+                                    <div className="text-[11px] text-slate-blue truncate">{localUser?.email}</div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-1.5 relative" ref={dropdownRef}>
+                            <label className="text-xs font-bold text-slate-blue uppercase tracking-wider block">Chọn Nhân viên *</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-blue">
+                                    <User className="w-4 h-4" />
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Nhập tên, email hoặc mã nhân viên..."
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setIsDropdownOpen(true);
+                                        if (selectedUser && selectedUser.fullName !== e.target.value)
+                                            setSelectedUser(null);
+                                    }}
+                                    onFocus={() => setIsDropdownOpen(true)}
+                                    className="w-full pl-9 pr-9 py-2.5 bg-cloud-mist border border-platinum-tint rounded-xl text-sm text-midnight-indigo focus:ring-2 focus:ring-action-blue/20 focus:border-action-blue outline-none transition-all"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            setSelectedUser(null);
+                                            setJourneyData(null);
+                                            autoLoadedRef.current = false;
+                                            setSearchParams({});
+                                        }}
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-blue hover:text-midnight-indigo text-xs font-medium"
+                                    >
+                                        Xóa
+                                    </button>
                                 )}
                             </div>
-                        )}
-                    </div>
+                            {isDropdownOpen && (
+                                <div className="absolute z-20 w-full mt-1.5 bg-white border border-platinum-tint rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-platinum-tint/40">
+                                    {usersLoading && users.length === 0 ? (
+                                        <div className="p-4 text-center text-xs text-slate-blue flex items-center justify-center gap-2">
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-action-blue" />
+                                            Đang tìm kiếm...
+                                        </div>
+                                    ) : users.length === 0 ? (
+                                        <div className="p-4 text-center text-xs text-slate-blue">Không tìm thấy nhân viên nào</div>
+                                    ) : (
+                                        users.map((u) => {
+                                            const isSel = selectedUser && (selectedUser.id === u.id || selectedUser.uuid === u.uuid);
+                                            return (
+                                                <div
+                                                    key={u.id || u.uuid}
+                                                    onClick={() => { setSelectedUser(u); setSearchQuery(u.fullName); setIsDropdownOpen(false); }}
+                                                    className={`px-4 py-2.5 hover:bg-cloud-mist cursor-pointer flex items-center justify-between transition-colors ${isSel ? 'bg-blue-50/50' : ''}`}
+                                                >
+                                                    <div>
+                                                        <div className="text-sm font-bold text-midnight-indigo flex items-center gap-2">
+                                                            {u.fullName}
+                                                            {(u.employeeCode || u.employee_code) && (
+                                                                <span className="text-[10px] font-mono font-bold text-slate-blue bg-cloud-mist px-1.5 py-0.5 rounded border border-platinum-tint">
+                                                                    {u.employeeCode || u.employee_code}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-slate-blue mt-0.5">{u.email}</div>
+                                                    </div>
+                                                    {isSel && <Check className="w-4 h-4 text-action-blue" />}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Date picker */}
                     <div className="space-y-1.5">
