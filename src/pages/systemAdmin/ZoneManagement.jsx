@@ -42,7 +42,7 @@ const ZoneStatusBadge = ({ isStranger, matchState }) => {
     if (isStranger)
         return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
     if (matchState && matchState !== 'matched')
-        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 whitespace-nowrap"><ShieldQuestion className="w-2.5 h-2.5" />Chưa khớp</span>;
+        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><ShieldCheck className="w-2.5 h-2.5" />Khớp</span>;
 };
 
@@ -82,7 +82,10 @@ const ZoneAccessLogCard = ({ zoneId }) => {
             const res = await getZoneAccessLog(zoneId, date, { page, limit: ZONE_LOG_LIMIT });
             if (res?.success && res.data) {
                 const evList = res.data.events || res.data.items || [];
-                setEvents(evList);
+                const sorted = [...evList].sort((a, b) =>
+                    new Date(b.eventTime || b.timestamp) - new Date(a.eventTime || a.timestamp)
+                );
+                setEvents(sorted);
                 const pag = res.data.pagination || {};
                 const tp = pag.totalPages ?? Math.max(1, Math.ceil((pag.total ?? evList.length) / ZONE_LOG_LIMIT));
                 setTotalPages(tp);
@@ -119,7 +122,7 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                         <div className="flex items-center gap-1.5">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">{total} sự kiện</span>
                             {matchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">{matchedCount} khớp</span>}
-                            {unmatchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">{unmatchedCount} chưa khớp</span>}
+                            {unmatchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700">{unmatchedCount} lượt người lạ</span>}
                         </div>
                     )}
                 </div>
@@ -152,62 +155,77 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                 </div>
             )}
 
-            {/* Event list */}
-            <div className="divide-y divide-platinum-tint">
+            {/* Event grid */}
+            <div className="p-4">
                 {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-3 px-5 py-3 animate-pulse">
-                            <div className="w-16 h-9 bg-slate-100 rounded-lg flex-shrink-0" />
-                            <div className="flex-1 space-y-1.5">
-                                <div className="h-3 bg-slate-100 rounded w-32" />
-                                <div className="h-2.5 bg-slate-100 rounded w-20" />
+                    <div className="grid grid-cols-3 gap-2.5">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="rounded-xl border border-platinum-tint overflow-hidden animate-pulse">
+                                <div className="w-full aspect-video bg-slate-100" />
+                                <div className="p-3 space-y-2">
+                                    <div className="h-3 bg-slate-100 rounded w-3/4" />
+                                    <div className="flex gap-1.5 mt-1">
+                                        <div className="h-4 w-10 bg-slate-100 rounded-full" />
+                                        <div className="h-4 w-14 bg-slate-100 rounded-full" />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="h-5 w-12 bg-slate-100 rounded-full" />
-                        </div>
-                    ))
+                        ))}
+                    </div>
                 ) : events.length === 0 ? (
                     <div className="py-10 text-center text-slate-400">
                         <History className="w-8 h-8 mx-auto mb-2 opacity-30" />
                         <p className="text-xs">Không có sự kiện nào trong ngày này</p>
                     </div>
                 ) : (
-                    events.map((ev) => {
-                        const time = fmtEventTime(ev.eventTime || ev.timestamp);
-                        const name = ev.fullName || (ev.isStranger ? 'Người lạ' : 'Không nhận diện được');
-                        const isUnmatched = !ev.isStranger && ev.matchState && ev.matchState !== 'matched';
-                        const rowBg = ev.isStranger
-                            ? 'bg-red-50/60 border-l-2 border-l-red-400'
-                            : isUnmatched
-                                ? 'bg-amber-50/40 border-l-2 border-l-amber-300'
-                                : '';
-                        return (
-                            <div key={ev.id} className={`flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50/60 transition-colors ${rowBg}`}>
-                                {/* Thumbnail */}
-                                <ThumbnailImage
-                                    eventId={ev.id}
-                                    onClick={() => openSnapshot(ev.id)}
-                                    className="w-16 aspect-video rounded-lg flex-shrink-0"
-                                />
-                                {/* Identity */}
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-xs font-bold truncate ${ev.isStranger ? 'text-red-700' : 'text-midnight-indigo'}`}>{name}</p>
-                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{time}</p>
+                    <div className="grid grid-cols-3 gap-2.5">
+                        {events.map((ev) => {
+                            const time = fmtEventTime(ev.eventTime || ev.timestamp);
+                            const name = ev.fullName || (ev.isStranger ? 'Người lạ' : 'Không nhận diện được');
+                            const isUnmatched = !ev.isStranger && ev.matchState && ev.matchState !== 'matched';
+                            const cardStyle = ev.isStranger
+                                ? 'border-red-300 ring-1 ring-red-200'
+                                : isUnmatched
+                                    ? 'border-amber-300 ring-1 ring-amber-200'
+                                    : 'border-platinum-tint';
+                            return (
+                                <div key={ev.id} className={`rounded-xl border overflow-hidden bg-white hover:shadow-md transition-shadow ${cardStyle}`}>
+                                    {/* Thumbnail — full width, 16:9 */}
+                                    <div className="relative w-full">
+                                        <ThumbnailImage
+                                            eventId={ev.id}
+                                            onClick={() => openSnapshot(ev.id)}
+                                            className="w-full aspect-video cursor-pointer"
+                                        />
+                                        {/* Time overlay */}
+                                        <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono leading-none">
+                                            {time}
+                                        </span>
+                                        {/* Direction badge overlay */}
+                                        <span className="absolute top-1.5 right-1.5">
+                                            <ZoneDirectionBadge direction={ev.direction} />
+                                        </span>
+                                    </div>
+                                    {/* Info row */}
+                                    <div className="px-3 py-2.5 flex items-center justify-between gap-2">
+                                        <p className={`text-xs font-bold truncate ${ev.isStranger ? 'text-red-700' : 'text-midnight-indigo'}`}>
+                                            {name}
+                                        </p>
+                                        <ZoneStatusBadge isStranger={ev.isStranger} matchState={ev.matchState} />
+                                    </div>
                                 </div>
-                                {/* Badges */}
-                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                    <ZoneDirectionBadge direction={ev.direction} />
-                                    <ZoneStatusBadge isStranger={ev.isStranger} matchState={ev.matchState} />
-                                </div>
-                            </div>
-                        );
-                    })
+                            );
+                        })}
+                    </div>
                 )}
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {!loading && events.length > 0 && (
                 <div className="px-5 py-3 border-t border-platinum-tint flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">Trang {page}/{totalPages}</span>
+                    <span className="text-[10px] text-slate-400">
+                        Trang {page}/{totalPages} · {total} sự kiện
+                    </span>
                     <div className="flex items-center gap-1">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -216,6 +234,7 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                         >
                             <ChevronLeft className="w-3.5 h-3.5" />
                         </button>
+                        <span className="text-[10px] font-semibold text-midnight-indigo px-1">{page}</span>
                         <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages || loading}
@@ -266,11 +285,6 @@ const EVENT_TYPE_BADGE = {
     disappear: (
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 text-slate-600 border border-slate-200 whitespace-nowrap">
             <X className="w-2.5 h-2.5" />Rời đi
-        </span>
-    ),
-    count: (
-        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
-            <Users className="w-2.5 h-2.5" />Đếm người
         </span>
     ),
 };
@@ -326,23 +340,18 @@ const ZoneTimelineCard = ({ zoneId }) => {
     const hourlyData = useMemo(() => {
         if (!data?.events?.length) return [];
         const buckets = Array.from({ length: 24 }, (_, h) => ({
-            hour: h, appear: 0, disappear: 0, maxOccupancy: 0,
+            hour: h, appear: 0, disappear: 0,
         }));
         data.events.forEach(ev => {
             const h = toVnHour(ev.eventTime);
             if (ev.eventType === 'appear') buckets[h].appear++;
             if (ev.eventType === 'disappear') buckets[h].disappear++;
-            if (ev.eventType === 'count' && ev.occupancyCount != null) {
-                buckets[h].maxOccupancy = Math.max(buckets[h].maxOccupancy, ev.occupancyCount);
-            }
         });
         return buckets;
     }, [data]);
 
     const appearTotal = useMemo(() => data?.events?.filter(e => e.eventType === 'appear').length ?? 0, [data]);
-    const countEvents = useMemo(() => (data?.events ?? []).filter(e => e.eventType === 'count'), [data]);
-    const maxOccupancy = useMemo(() => countEvents.length ? Math.max(...countEvents.map(e => e.occupancyCount ?? 0)) : null, [countEvents]);
-    const recentEvents = useMemo(() => [...(data?.events ?? [])].reverse().slice(0, 30), [data]);
+    const recentEvents = useMemo(() => [...(data?.events ?? [])].filter(e => e.eventType !== 'count').reverse().slice(0, 30), [data]);
     const hasChart = hourlyData.some(b => b.appear > 0 || b.disappear > 0);
 
     return (
@@ -351,7 +360,7 @@ const ZoneTimelineCard = ({ zoneId }) => {
             <div className="px-5 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-sm font-bold text-slate-blue uppercase tracking-wider flex items-center gap-2">
                     <Activity className="w-4 h-4 text-action-blue" />
-                    Timeline Hiện Diện
+                    Dòng thời gian hiện diện
                 </h3>
                 <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
@@ -404,7 +413,7 @@ const ZoneTimelineCard = ({ zoneId }) => {
             ) : (
                 <div className="p-5 space-y-5">
                     {/* KPI chips */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2.5">
                         <div className="bg-cloud-mist/40 rounded-xl p-3 text-center">
                             <p className="text-[10px] text-slate-blue font-medium uppercase">Tổng sự kiện</p>
                             <p className="text-lg font-bold text-midnight-indigo mt-0.5">{data.events.length}</p>
@@ -412,12 +421,6 @@ const ZoneTimelineCard = ({ zoneId }) => {
                         <div className="bg-blue-50 rounded-xl p-3 text-center">
                             <p className="text-[10px] text-blue-600 font-medium uppercase">Lượt xuất hiện</p>
                             <p className="text-lg font-bold text-blue-700 mt-0.5">{appearTotal}</p>
-                        </div>
-                        <div className={`rounded-xl p-3 text-center ${maxOccupancy !== null ? 'bg-purple-50' : 'bg-cloud-mist/40'}`}>
-                            <p className={`text-[10px] font-medium uppercase ${maxOccupancy !== null ? 'text-purple-600' : 'text-slate-blue'}`}>Đỉnh Occupancy</p>
-                            <p className={`text-lg font-bold mt-0.5 ${maxOccupancy !== null ? 'text-purple-700' : 'text-steel-gray'}`}>
-                                {maxOccupancy !== null ? `${maxOccupancy} người` : '—'}
-                            </p>
                         </div>
                     </div>
 
@@ -484,7 +487,6 @@ const ZoneTimelineCard = ({ zoneId }) => {
                                     <tr className="bg-slate-50 border-b border-platinum-tint text-[10px] font-bold text-slate-blue uppercase">
                                         <th className="px-3 py-2">Thời điểm</th>
                                         <th className="px-3 py-2">Loại</th>
-                                        <th className="px-3 py-2 text-center">Occupancy</th>
                                         <th className="px-3 py-2">Danh tính</th>
                                     </tr>
                                 </thead>
@@ -499,15 +501,12 @@ const ZoneTimelineCard = ({ zoneId }) => {
                                                     <span className="text-[10px] text-slate-blue">{ev.eventType}</span>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-2 text-center">
-                                                {ev.occupancyCount != null ? (
-                                                    <span className="font-bold text-purple-700">{ev.occupancyCount}</span>
-                                                ) : (
-                                                    <span className="text-steel-gray">—</span>
-                                                )}
-                                            </td>
                                             <td className="px-3 py-2">
-                                                {ev.userId ? (
+                                                {(ev.isStranger || (ev.matchState && ev.matchState !== 'matched')) ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] text-red-700 font-medium">
+                                                        <AlertTriangle className="w-2.5 h-2.5" />Người lạ
+                                                    </span>
+                                                ) : ev.userId ? (
                                                     <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
                                                         <CheckCircle className="w-2.5 h-2.5" />Đã nhận dạng
                                                     </span>
@@ -989,7 +988,7 @@ const ZoneManagement = () => {
                                         }`}
                                     >
                                         <Activity className="w-3.5 h-3.5" />
-                                        Timeline Hiện Diện
+                                        Dòng thời gian
                                     </button>
                                 </div>
 
@@ -1158,7 +1157,7 @@ const ZoneManagement = () => {
                                         <p className="text-xs font-mono text-slate-400 mt-0.5">{selectedZone.zone_code || selectedZone.id}</p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                <div className="grid grid-cols-3 gap-2.5 pt-2">
                                     <div className="bg-cloud-mist/40 rounded-xl p-3">
                                         <p className="text-[10px] font-bold text-slate-blue uppercase tracking-wider mb-1">Loại khu vực</p>
                                         <p className="text-sm font-semibold text-midnight-indigo">
