@@ -271,26 +271,6 @@ const DeviceManagement = () => {
         }
     };
 
-    // Unregister / Delete Device (UC-IOT-03) — uses custom confirm modal
-    const handleDeleteDevice = (device) => {
-        setConfirmModal({
-            title: 'Xác nhận gỡ đăng ký thiết bị',
-            message: `Bạn có chắc chắn muốn gỡ bỏ hoàn toàn thiết bị ${device.device_code}? Hành động này không thể hoàn tác.`,
-            type: 'danger',
-            onConfirm: async () => {
-                setError(null);
-                setSuccessMessage(null);
-                try {
-                    // BE doesn't support delete IoT device
-                    throw new Error('Hệ thống không hỗ trợ xóa thiết bị. Vui lòng vô hiệu hóa thay vì xóa.');
-                } catch (err) {
-                    setError(err?.error?.message || err?.message || 'Không thể gỡ bỏ thiết bị.');
-                }
-                setConfirmModal(null);
-            }
-        });
-    };
-
     const toggleDeviceStatus = (device) => {
         const isOnline = device.status === 'online';
         setConfirmModal({
@@ -510,7 +490,7 @@ const DeviceManagement = () => {
             } else {
                 const errCode = res?.error?.code || '';
                 if (errCode === 'DEVICE_ROOM_ASSIGNMENT_REQUIRED') throw new Error('Cần gán phòng cho thiết bị trước khi cấu hình.');
-                else if (errCode === 'DEVICE_TYPE_NOT_FACE_SERVER') throw new Error('Thiết bị này không phải Face Terminal.');
+                else if (errCode === 'DEVICE_TYPE_NOT_FACE_SERVER') throw new Error('Thiết bị này không phải Face Server.');
                 else throw new Error(res?.error?.message || res?.message || 'Không thể cấu hình thiết bị.');
             }
         } catch (err) {
@@ -559,7 +539,6 @@ const DeviceManagement = () => {
         'door_camera':     'Camera kiểm soát vào/ra',
         'room_camera':     'Camera phòng họp',
         'face_server':     'Máy chủ Face Server',
-        'face_terminal':   'Face Terminal (điểm danh)',
         'microphone':      'Micro ghi âm',
         'capture_agent':   'Capture Agent',
         'occupancy_sensor':'Cảm biến đếm người',
@@ -593,7 +572,7 @@ const DeviceManagement = () => {
                     </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý thiết bị IoT</h1>
                     <p className="text-slate-blue text-sm mt-1">
-                        Khai báo, giám sát tình trạng sức khỏe kết nối và điều phối RTSP stream cho camera/face terminal.
+                        Khai báo, giám sát tình trạng sức khỏe kết nối và điều phối RTSP stream cho camera/face server.
                     </p>
                 </div>
                 <button
@@ -717,7 +696,6 @@ const DeviceManagement = () => {
                                 <option value="door_camera">Camera kiểm soát vào/ra</option>
                                 <option value="room_camera">Camera phòng họp</option>
                                 <option value="face_server">Máy chủ Face Server</option>
-                                <option value="face_terminal">Face Terminal (điểm danh)</option>
                                 <option value="microphone">Micro ghi âm</option>
                                 <option value="capture_agent">Capture Agent</option>
                                 <option value="occupancy_sensor">Cảm biến đếm người</option>
@@ -822,6 +800,16 @@ const DeviceManagement = () => {
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-6 text-right space-x-1.5 whitespace-nowrap">
+                                                        {/* FE-BF: Gán phòng lên đầu */}
+                                                        <button
+                                                            onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.room_id || ''); setIsAssignRoomModalOpen(true); }}
+                                                            title="Gán phòng"
+                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                            </svg>
+                                                        </button>
                                                         <button
                                                             onClick={() => handleCheckAvailability(device)}
                                                             title="Kiểm tra kết nối (Ping)"
@@ -837,7 +825,7 @@ const DeviceManagement = () => {
                                                                 // Chưa cấu hình → chỉ hiện nút Configure
                                                                 <button
                                                                     onClick={() => handleOpenFaceConfig(device)}
-                                                                    title="Cấu hình Face Terminal lần đầu"
+                                                                    title="Cấu hình Face Server lần đầu"
                                                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
                                                                 >
                                                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -905,15 +893,6 @@ const DeviceManagement = () => {
                                                             </>
                                                         )}
                                                         <button
-                                                            onClick={() => { setAssignRoomDeviceId(device.id); setAssignRoomValue(device.room_id || ''); setIsAssignRoomModalOpen(true); }}
-                                                            title="Gán phòng"
-                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-teal-600 hover:bg-teal-50 transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                            </svg>
-                                                        </button>
-                                                        <button
                                                             onClick={() => toggleDeviceStatus(device)}
                                                             title={device.status === 'online' ? "Ngừng kích hoạt" : "Kích hoạt lại"}
                                                             className={`inline-flex p-1.5 rounded-lg transition-colors ${device.status === 'online' ? 'text-slate-blue hover:text-orange-600 hover:bg-orange-50' : 'text-slate-blue hover:text-emerald-600 hover:bg-emerald-50'}`}
@@ -930,15 +909,6 @@ const DeviceManagement = () => {
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            </svg>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteDevice(device)}
-                                                            title="Gỡ đăng ký thiết bị"
-                                                            className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                             </svg>
                                                         </button>
                                                     </td>
@@ -1045,27 +1015,16 @@ const DeviceManagement = () => {
                                         <option value="door_camera">Camera kiểm soát vào/ra</option>
                                         <option value="room_camera">Camera phòng họp</option>
                                         <option value="face_server">Máy chủ Face Server</option>
-                                        <option value="face_terminal">Face Terminal (điểm danh)</option>
                                         <option value="microphone">Micro ghi âm</option>
                                         <option value="capture_agent">Capture Agent</option>
                                         <option value="occupancy_sensor">Cảm biến đếm người</option>
                                         <option value="display">Màn hình hiển thị</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Phòng họp gán</label>
-                                    <select
-                                        value={formData.roomId}
-                                        onChange={(e) => setFormData({...formData, roomId: e.target.value})}
-                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
-                                    >
-                                        <option value="">Chọn phòng họp...</option>
-                                        {rooms.map(room => (
-                                            <option key={room.id} value={room.id}>{room.roomName}</option>
-                                        ))}
-                                    </select>
-                                </div>
                             </div>
+                            <p className="text-[10px] text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                                Gán phòng cho thiết bị sau khi tạo — dùng nút <strong>Gán phòng</strong> (icon tòa nhà) trong danh sách.
+                            </p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ IP</label>
@@ -1133,27 +1092,11 @@ const DeviceManagement = () => {
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tên thiết bị</label>
                                 <input type="text" required value={formData.deviceName} onChange={(e) => setFormData({...formData, deviceName: e.target.value})} placeholder="Ví dụ: Camera chính Phòng 101" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại thiết bị</label>
-                                    <select value={formData.deviceType} onChange={(e) => setFormData({...formData, deviceType: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
-                                        <option value="ip_camera">Camera AI</option>
-                                        <option value="door_camera">Camera kiểm soát vào/ra</option>
-                                        <option value="room_camera">Camera phòng họp</option>
-                                        <option value="face_server">Máy chủ Face Server</option>
-                                        <option value="face_terminal">Face Terminal (điểm danh)</option>
-                                        <option value="microphone">Micro ghi âm</option>
-                                        <option value="capture_agent">Capture Agent</option>
-                                        <option value="occupancy_sensor">Cảm biến đếm người</option>
-                                        <option value="display">Màn hình hiển thị</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Phòng họp gán</label>
-                                    <select value={formData.roomId} onChange={(e) => setFormData({...formData, roomId: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white">
-                                        <option value="">Chọn phòng họp...</option>
-                                        {rooms.map(room => (<option key={room.id} value={room.id}>{room.roomName}</option>))}
-                                    </select>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Loại thiết bị</label>
+                                <div className="px-3 py-2 border border-platinum-tint bg-cloud-mist rounded-xl text-sm text-steel-gray flex items-center justify-between">
+                                    <span>{TYPE_MAP[formData.deviceType] || formData.deviceType}</span>
+                                    <span className="text-[10px] text-slate-blue ml-2">(không thể đổi sau khi tạo)</span>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -1269,7 +1212,7 @@ const DeviceManagement = () => {
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                             </div>
                             <h2 className="text-lg font-bold text-amber-900">
-                                {tokenModalData.urls ? 'Cấu hình Face Terminal thành công' : 'Token mới đã được tạo'}
+                                {tokenModalData.urls ? 'Cấu hình Face Server thành công' : 'Token mới đã được tạo'}
                             </h2>
                             <p className="text-xs text-amber-700 mt-1">Thiết bị: {tokenModalData.deviceName}</p>
                         </div>
@@ -1407,7 +1350,7 @@ const DeviceManagement = () => {
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
-                                <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình Face Terminal lần đầu</h3>
+                                <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình Face Server lần đầu</h3>
                                 <p className="text-[10px] text-slate-blue mt-0.5">{faceConfigDevice.device_name} · {faceConfigDevice.device_code}</p>
                             </div>
                             <button onClick={() => setIsFaceConfigModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
