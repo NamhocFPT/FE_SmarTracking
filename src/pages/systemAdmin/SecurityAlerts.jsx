@@ -13,6 +13,101 @@ import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import Pagination from '../../components/common/Pagination';
 
+// Extract all valid event snapshot IDs from an alert's payload and source
+const getAlertImages = (alert) => {
+    if (!alert) return [];
+    const occurrences = alert.payload_json?.occurrences || [];
+    const ids = occurrences.map(occ => occ.sourceEventId).filter(Boolean);
+    if (alert.source_event_id && !ids.includes(alert.source_event_id)) {
+        ids.unshift(alert.source_event_id);
+    }
+    return ids;
+};
+
+// Stack component to display stacked event snapshots
+const AlertImagesStack = ({ alert, onClick }) => {
+    const ids = getAlertImages(alert);
+
+    if (ids.length === 0) {
+        return (
+            <div className="w-32 md:w-40 aspect-video bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200 mx-auto select-none">
+                <ImageIcon className="w-4.5 h-4.5 text-slate-400" />
+                <span className="text-[8px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Không ảnh</span>
+            </div>
+        );
+    }
+
+    if (ids.length === 1) {
+        return (
+            <div className="relative w-32 md:w-40 aspect-video mx-auto">
+                <ThumbnailImage
+                    eventId={ids[0]}
+                    onClick={onClick}
+                    className="w-full h-full object-cover rounded-lg"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div 
+            onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) onClick();
+            }}
+            className="relative w-32 md:w-40 aspect-video mx-auto cursor-pointer group select-none"
+        >
+            {/* Third photo (bottom-most) */}
+            {ids.length > 2 && (
+                <div 
+                    className="absolute inset-0 rounded-lg shadow-sm transition-all duration-300 group-hover:-translate-y-2 group-hover:translate-x-2 group-hover:rotate-[6deg]"
+                    style={{
+                        transform: 'translate(8px, -8px) rotate(4deg)',
+                        zIndex: 10,
+                        opacity: 0.7
+                    }}
+                >
+                    <ThumbnailImage
+                        eventId={ids[2]}
+                        className="w-full h-full object-cover rounded-lg border-0 pointer-events-none"
+                    />
+                </div>
+            )}
+            
+            {/* Second photo (middle) */}
+            <div 
+                className="absolute inset-0 rounded-lg shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:rotate-[3deg]"
+                style={{
+                    transform: 'translate(4px, -4px) rotate(-3deg)',
+                    zIndex: 20,
+                    opacity: 0.9
+                }}
+            >
+                <ThumbnailImage
+                    eventId={ids[1]}
+                    className="w-full h-full object-cover rounded-lg border-0 pointer-events-none"
+                />
+            </div>
+
+            {/* Top photo (main) */}
+            <div 
+                className="absolute inset-0 bg-white rounded-lg shadow-md transition-all duration-300 group-hover:-translate-y-0.5 group-hover:rotate-0 z-30 overflow-hidden"
+            >
+                <ThumbnailImage
+                    eventId={ids[0]}
+                    className="w-full h-full object-cover rounded-lg pointer-events-none"
+                />
+                
+                {/* Count badge */}
+                <div className="absolute bottom-1.5 right-1.5 bg-slate-950/80 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md border border-white/10">
+                    <ImageIcon className="w-3.5 h-3.5 text-white/90" />
+                    <span>{ids.length}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SecurityAlerts = () => {
     const [alerts, setAlerts] = useState([]);
     const [zones, setZones] = useState([]);
@@ -39,6 +134,7 @@ const SecurityAlerts = () => {
     const [resolutionNote, setResolutionNote] = useState('');
 
     const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [snapshotEventIds, setSnapshotEventIds] = useState([]);
     const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
 
     const [isExportOpen, setIsExportOpen] = useState(false);
@@ -396,22 +492,15 @@ const SecurityAlerts = () => {
                                             </p>
                                         </td>
                                         <td className="p-4 text-center">
-                                            {alert.source_event_id ? (
-                                                <div className="inline-flex justify-center items-center">
-                                                    <ThumbnailImage
-                                                        eventId={alert.source_event_id}
-                                                        onClick={() => {
-                                                            setSnapshotEventId(alert.source_event_id);
-                                                            setIsSnapshotOpen(true);
-                                                        }}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="w-32 md:w-40 aspect-video bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200 mx-auto">
-                                                    <ImageIcon className="w-4 h-4 text-slate-400" />
-                                                    <span className="text-[8px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Không ảnh</span>
-                                                </div>
-                                            )}
+                                            <AlertImagesStack
+                                                alert={alert}
+                                                onClick={() => {
+                                                    const images = getAlertImages(alert);
+                                                    setSnapshotEventIds(images);
+                                                    setSnapshotEventId(alert.source_event_id || images[0] || null);
+                                                    setIsSnapshotOpen(true);
+                                                }}
+                                            />
                                         </td>
                                         {/* Loại */}
                                         <td className="p-4 text-center">
@@ -572,6 +661,9 @@ const SecurityAlerts = () => {
                                                     eventId={occ.sourceEventId}
                                                     className="w-full h-full object-cover rounded-lg aspect-square border-0"
                                                     onClick={() => {
+                                                        const occurrences = occurrencesModal.alert?.payload_json?.occurrences || [];
+                                                        const occImages = occurrences.map(o => o.sourceEventId).filter(Boolean);
+                                                        setSnapshotEventIds(occImages);
                                                         setSnapshotEventId(occ.sourceEventId);
                                                         setIsSnapshotOpen(true);
                                                     }}
@@ -674,6 +766,7 @@ const SecurityAlerts = () => {
                 isOpen={isSnapshotOpen}
                 onClose={() => setIsSnapshotOpen(false)}
                 eventId={snapshotEventId}
+                eventIds={snapshotEventIds}
             />
 
             <ExportReportModal

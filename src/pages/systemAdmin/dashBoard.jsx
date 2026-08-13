@@ -455,8 +455,8 @@ const DashBoard = () => {
                 to:   todayEnd.toISOString(),
             }),
             getAttendanceAnalytics({
-                from: monthStart.toISOString(),
-                to:   todayEnd.toISOString(),
+                from: monthStart.toISOString().split('T')[0],
+                to:   todayEnd.toISOString().split('T')[0],
             }),
             getSecurityAlertsDailyTrend({ days: 7 }),
             getAuditActivityHourly(),

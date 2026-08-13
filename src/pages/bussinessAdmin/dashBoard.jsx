@@ -419,7 +419,7 @@ const DashBoard = () => {
         const params = { from: fromDate, to: toDate, departmentId: selectedDept || undefined };
         const monthStart = new Date(); monthStart.setDate(1);
         const monthEnd   = new Date(); monthEnd.setHours(23, 59, 59, 999);
-        const attParams  = { from: monthStart.toISOString(), to: monthEnd.toISOString() };
+        const attParams  = { from: monthStart.toISOString().split('T')[0], to: monthEnd.toISOString().split('T')[0] };
 
         const [overviewRes, roomRes, attendanceRes, trendRes, breakdownRes, durationRes, cancelRes, noShowRes] =
             await Promise.allSettled([

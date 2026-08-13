@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import {
@@ -217,9 +217,7 @@ const PhotoMatchCard = ({ matched, unmatched, missing, isRequired, keyLabel }) =
 
 /** BE biometric/plate result rows */
 const ResultRows = ({ results, statusMap, title }) => {
-    const rows = results.filter(r => r[Object.keys(statusMap)[0] !== undefined ? Object.keys(statusMap)[0] : '']);
-    // Detect which key to read from results
-    const statusKey = title.includes('biometric') || title.includes('sinh trắc') ? 'biometricStatus' : 'vehiclePlateStatus';
+    const statusKey = title.includes('sinh trắc') ? 'biometricStatus' : 'vehiclePlateStatus';
     const relevant = results.filter(r => r[statusKey]);
     if (!relevant.length) return null;
     return (

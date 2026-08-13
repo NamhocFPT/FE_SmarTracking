@@ -20,6 +20,8 @@ import ParticipantDetailModal from '../../components/meeting/ParticipantDetailMo
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from '../../utils/toast';
 import { getUserPresence } from '../../service/managerServices';
+import ThumbnailImage from '../../components/common/ThumbnailImage';
+import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 
 // BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval
 // khiến 2 trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã hủy".
@@ -119,6 +121,12 @@ const EmployeeMeetingDetail = () => {
     const [presenceData, setPresenceData] = useState(null);
     const [presenceLoading, setPresenceLoading] = useState(false);
     const [presenceError, setPresenceError] = useState(null);
+
+    // States for snapshot fullscreen viewing
+    const [snapshotEventId, setSnapshotEventId] = useState(null);
+    const [snapshotEventIds, setSnapshotEventIds] = useState([]);
+    const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
+    const [logPage, setLogPage] = useState(1);
 
     /**
      * Chuẩn hoá DTO lồng nhau từ API GET /meetings/:id
@@ -1400,39 +1408,113 @@ const EmployeeMeetingDetail = () => {
                                     </div>
 
                                     {/* Event log */}
-                                    {presenceData.timeline?.events?.length > 0 && (
-                                        <div className="bg-white rounded-2xl border border-platinum-tint p-5 shadow-sm space-y-3">
-                                            <h4 className="text-xs font-bold text-slate-blue uppercase tracking-wide">Chi tiết các mốc quét camera</h4>
-                                            <div className="border border-outline-gray rounded-xl overflow-hidden">
-                                                <div className="max-h-48 overflow-y-auto">
-                                                    <table className="w-full text-left text-xs border-collapse">
+                                    {presenceData.timeline?.events?.length > 0 && (() => {
+                                        const logItemsPerPage = 5;
+                                        const employeeEvents = presenceData.timeline.events || [];
+                                        const logTotalPages = Math.ceil(employeeEvents.length / logItemsPerPage);
+                                        const currentEmployeeEvents = employeeEvents.slice((logPage - 1) * logItemsPerPage, logPage * logItemsPerPage);
+                                        
+                                        return (
+                                            <div className="bg-white rounded-2xl border border-platinum-tint p-5 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="text-xs font-bold text-slate-blue uppercase tracking-wide">Chi tiết các mốc quét camera</h4>
+                                                    {logTotalPages > 1 && (
+                                                        <span className="text-[10px] text-slate-blue font-bold">Trang {logPage}/{logTotalPages}</span>
+                                                    )}
+                                                </div>
+                                                <div className="border border-outline-gray rounded-xl overflow-hidden bg-white shadow-sm">
+                                                    <table className="w-full text-left text-xs border-collapse text-center">
                                                         <thead>
                                                             <tr className="bg-cloud-mist border-b border-outline-gray text-slate-blue font-bold sticky top-0">
-                                                                <th className="p-2.5">Thời điểm</th>
-                                                                <th className="p-2.5">Sự kiện</th>
-                                                                <th className="p-2.5">Độ tin cậy</th>
+                                                                <th className="p-2.5 text-left">Thời điểm</th>
+                                                                <th className="p-2.5 text-center">Sự kiện</th>
+                                                                <th className="p-2.5 text-center">Ảnh camera</th>
+                                                                <th className="p-2.5 text-center">Độ tin cậy</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {presenceData.timeline.events.map((ev, idx) => (
-                                                                <tr key={idx} className="border-b border-outline-gray hover:bg-cloud-mist/30">
-                                                                    <td className="p-2.5 font-medium text-midnight-indigo">{formatPresenceTime(ev.at)}</td>
-                                                                    <td className="p-2.5">
-                                                                        <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold ${ev.direction === 'enter' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                                                                            {ev.direction === 'enter' ? '▲ Vào phòng' : '▼ Ra khỏi phòng'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="p-2.5 font-mono text-slate-600">
-                                                                        {ev.similarity != null ? `${(ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity).toFixed(0)}%` : '—'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
+                                                            {currentEmployeeEvents.map((ev, idx) => {
+                                                                const simValue = ev.similarity != null ? (ev.similarity <= 1 ? ev.similarity * 100 : ev.similarity) : null;
+                                                                return (
+                                                                    <tr key={idx} className="border-b border-outline-gray hover:bg-cloud-mist/30">
+                                                                        <td className="p-2.5 text-left font-medium text-midnight-indigo">{formatPresenceTime(ev.at)}</td>
+                                                                        <td className="p-2.5 text-center">
+                                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                                                                ev.direction === 'enter'
+                                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                            }`}>
+                                                                                <span className={`w-1.5 h-1.5 rounded-full ${ev.direction === 'enter' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                                                {ev.direction === 'enter' ? 'Vào phòng' : 'Ra khỏi phòng'}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="p-2.5 text-center">
+                                                                            {ev.id ? (
+                                                                                <div className="w-16 h-10 overflow-hidden rounded border border-slate-200 mx-auto flex items-center justify-center bg-slate-50 transition-all hover:scale-105">
+                                                                                    <ThumbnailImage
+                                                                                        eventId={ev.id}
+                                                                                        className="w-full h-full object-cover border-0"
+                                                                                        onClick={() => {
+                                                                                            const evImages = employeeEvents.map(e => e.id).filter(Boolean);
+                                                                                            setSnapshotEventIds(evImages);
+                                                                                            setSnapshotEventId(ev.id);
+                                                                                            setIsSnapshotOpen(true);
+                                                                                        }}
+                                                                                    />
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className="text-[10px] text-slate-400 font-medium italic">Không ảnh</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-2.5 text-center">
+                                                                            {simValue !== null ? (
+                                                                                <span className={`inline-flex px-2 py-0.5 rounded font-bold text-[10px] border ${
+                                                                                    simValue >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                                                    simValue >= 50 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                                    'bg-red-50 text-red-700 border-red-200'
+                                                                                }`}>
+                                                                                    {simValue.toFixed(0)}%
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-slate-400 font-medium">—</span>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>
+                                                
+                                                {/* Inner Log Pagination */}
+                                                {logTotalPages > 1 && (
+                                                    <div className="flex justify-between items-center pt-2 px-1">
+                                                        <span className="text-[10px] text-slate-blue font-bold">
+                                                            Hiển thị {(logPage - 1) * logItemsPerPage + 1}–{Math.min(logPage * logItemsPerPage, employeeEvents.length)} trong {employeeEvents.length} mốc quét
+                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                disabled={logPage === 1}
+                                                                onClick={() => setLogPage(p => p - 1)}
+                                                                className="px-2 py-1 text-[10px] border border-platinum-tint rounded-lg hover:bg-cloud-mist disabled:opacity-40 text-slate-blue transition-colors font-bold"
+                                                            >
+                                                                ‹ Trước
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={logPage === logTotalPages}
+                                                                onClick={() => setLogPage(p => p + 1)}
+                                                                className="px-2 py-1 text-[10px] border border-platinum-tint rounded-lg hover:bg-cloud-mist disabled:opacity-40 text-slate-blue transition-colors font-bold"
+                                                            >
+                                                                Sau ›
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             ) : null}
                         </div>
@@ -2071,6 +2153,14 @@ const EmployeeMeetingDetail = () => {
                     </motion.div>
                 </div>
             )}
+
+            {/* Event Snapshot Modal for viewing fullscreen camera images */}
+            <EventSnapshotModal
+                isOpen={isSnapshotOpen}
+                onClose={() => setIsSnapshotOpen(false)}
+                eventId={snapshotEventId}
+                eventIds={snapshotEventIds}
+            />
         </>
     );
 };

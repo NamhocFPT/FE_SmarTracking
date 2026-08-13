@@ -5,6 +5,56 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-13 19:25
+* **Tên Plan / Yêu cầu**: Thay đổi thiết kế Lối tắt chức năng nhanh cho Nhân viên (Employee)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/homePage.jsx`:
+    * Thêm import icon `User` từ `lucide-react`.
+    * Loại bỏ lối tắt trùng lặp "Đặt phòng họp nhanh" và lối tắt không chính xác "Lịch sử điểm danh".
+    * Thiết kế lại 4 lối tắt chức năng nhanh gồm: Đăng ký họp (`/employee/book`), Lịch họp cá nhân (`/employee/schedule`), Đăng ký khuôn mặt (`/employee/face-register`), và Bản ghi & Tài liệu (`/employee/recordings`) với các gradient màu sắc, mô tả và liên kết điều hướng chuẩn xác.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 17:52
+* **Tên Plan / Yêu cầu**: Phân trang và nâng cấp giao diện cho bảng "Chi tiết các mốc quét camera".
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingPresenceIVSS.jsx` & `src/pages/employee/MeetingDetail.jsx`:
+    * Thêm state `logPage` (client-side pagination) để phân trang 5 dòng mỗi trang.
+    * Nâng cấp giao diện bảng với các badge Vào/Ra có chấm tròn màu sắc sinh động, hiển thị phần trăm độ tin cậy với màu sắc tương ứng theo ngưỡng chất lượng (Xanh lá >=80%, Hổ phách >=50%, Đỏ <50%).
+    * Thêm bộ điều hướng trang: Hiển thị phạm vi dòng (Ví dụ: 1-5 trong 12 mốc quét) và nút "Trước" / "Sau" để chuyển trang trực quan.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 17:50
+* **Tên Plan / Yêu cầu**: Tích hợp ảnh camera sự kiện vào tab thời lượng tham gia trên màn hình Chi tiết cuộc họp của Nhân viên.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`:
+    * Import `ThumbnailImage` và `EventSnapshotModal`.
+    * Thêm cột "Ảnh camera" vào bảng "Chi tiết các mốc quét camera" trong tab "Thời lượng tham dự" (hiển thị thời lượng của chính Employee).
+    * Tích hợp sự kiện click vào ảnh để phóng to toàn màn hình và xem tất cả các ảnh quét sự kiện bằng carousel chuyển ảnh.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 17:47
+* **Tên Plan / Yêu cầu**: Tích hợp ảnh camera sự kiện vào chi tiết mốc quét và hiển thị modal thông tin nhân sự khi click vào tên.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingPresenceIVSS.jsx`:
+    * Import và tích hợp `ThumbnailImage` và `EventSnapshotModal`.
+    * Thêm cột "Ảnh camera" vào bảng "Chi tiết các mốc quét camera" trong `UserDetailModal` (dùng `ThumbnailImage` với `ev.id`). Khi click vào ảnh camera này, sẽ hiển thị trình xem ảnh phóng to toàn màn hình hỗ trợ carousel lướt qua toàn bộ ảnh sự kiện trong mốc quét.
+    * Tạo component `UserProfileModal` hiển thị thông tin hồ sơ của nhân sự (Avatar lớn, họ tên, mã nhân viên, phòng ban, email, ID hệ thống).
+    * Cập nhật danh sách bảng điểm danh để khi click vào khu vực Avatar + Tên nhân viên sẽ hiển thị `UserProfileModal`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 16:39
+* **Tên Plan / Yêu cầu**: Hiển thị dạng chồng ảnh và thêm carousel chuyển ảnh trong viewer tại Trung tâm Cảnh báo An ninh.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/security/EventSnapshotModal.jsx`: Nâng cấp modal EventSnapshotModal để hỗ trợ nhận danh sách `eventIds`, thêm nút điều hướng Left/Right, hiển thị chỉ số ảnh `currentIndex / total` và hỗ trợ phím mũi tên bàn phím.
+  * `[Cập nhật] src/pages/systemAdmin/SecurityAlerts.jsx`: Thêm helper `getAlertImages` và subcomponent `AlertImagesStack`. Đổi cột "Hình ảnh" trong bảng danh sách cảnh báo từ hiển thị 1 ảnh thành dạng chồng ảnh (nhiều ảnh xếp đè lệch nhau kèm số lượng ảnh). Khi click vào chồng ảnh này hoặc thumbnail trong modal "Chi tiết lượt vi phạm", sẽ mở carousel với đầy đủ các ảnh của sự kiện.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 16:27
+* **Tên Plan / Yêu cầu**: Sửa lỗi 500 khi gọi API lấy thống kê tỷ lệ đi muộn trên Dashboard của Business Admin và System Admin.
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/bussinessAdmin/dashBoard.jsx` & `src/pages/systemAdmin/dashBoard.jsx`: Thay đổi cách truyền ngày tháng `from`/`to` cho API `getAttendanceAnalytics` từ chuỗi ISO đầy đủ (`.toISOString()`) sang định dạng chỉ ngày (`YYYY-MM-DD`) để khớp với DTO của Backend, tránh gây lỗi crash 500 do định dạng ngày không hợp lệ.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 16:18
 * **Tên Plan / Yêu cầu**: Khắc phục lỗi 404 console khi gọi API lấy transcript của cuộc họp chưa có dữ liệu.
 * **Chi tiết thay đổi**:

@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, LogIn, PlusCircle, ShieldAlert, Video } from 'lucide-react';
+import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, LogIn, PlusCircle, ShieldAlert, User, Video } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -254,7 +254,14 @@ const EmployeeHomePage = () => {
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-blue uppercase">Lượt vào cổng hôm nay</h4>
                                     <h3 className="text-xl font-bold text-midnight-indigo">
-                                        {campusSummaryLoading ? '...' : (campusSummary?.gateAccessToday ?? 0)} lượt
+                                        {campusSummaryLoading ? '...' : (() => {
+                                            const g = campusSummary?.gateAccessToday;
+                                            if (g == null) return 0;
+                                            if (typeof g === 'number') return g;
+                                            if (Array.isArray(g)) return g.length;
+                                            if (typeof g === 'object') return g.count ?? g.total ?? g.value ?? 1;
+                                            return 0;
+                                        })()} lượt
                                     </h3>
                                 </div>
                             </div>
@@ -310,34 +317,34 @@ const EmployeeHomePage = () => {
                                 </div>
 
                                 <div
-                                    onClick={() => navigate('/employee/book?quick=true')}
-                                    className="group bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                                    onClick={() => navigate('/employee/schedule')}
+                                    className="group bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                                            <Clock className="w-6 h-6 text-white" />
+                                            <Calendar className="w-6 h-6 text-white" />
                                         </div>
                                     </div>
-                                    <h3 className="font-bold text-base mb-1">Đặt phòng họp nhanh</h3>
-                                    <p className="text-xs text-emerald-100 mb-4">Đặt phòng họp đột xuất ngay lập tức cho các cuộc thảo luận khẩn.</p>
+                                    <h3 className="font-bold text-base mb-1">Lịch họp cá nhân</h3>
+                                    <p className="text-xs text-indigo-100 mb-4">Theo dõi và quản lý lịch trình các cuộc họp cá nhân của bạn.</p>
                                     <div className="flex items-center gap-1 text-xs font-bold mt-auto group-hover:gap-2 transition-all">
-                                        Đặt nhanh <ArrowRight className="w-4 h-4" />
+                                        Xem lịch trình <ArrowRight className="w-4 h-4" />
                                     </div>
                                 </div>
 
                                 <div
-                                    onClick={() => navigate('/employee/schedule')}
-                                    className="group bg-gradient-to-br from-purple-500 to-purple-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                                    onClick={() => navigate('/employee/face-register')}
+                                    className="group bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                                            <BookOpen className="w-6 h-6 text-white" />
+                                            <User className="w-6 h-6 text-white" />
                                         </div>
                                     </div>
-                                    <h3 className="font-bold text-base mb-1">Lịch cá nhân</h3>
-                                    <p className="text-xs text-purple-100 mb-4">Kiểm tra lịch trình cuộc họp chi tiết của bản thân.</p>
+                                    <h3 className="font-bold text-base mb-1">Đăng ký khuôn mặt</h3>
+                                    <p className="text-xs text-emerald-100 mb-4">Cập nhật dữ liệu khuôn mặt phục vụ điểm danh thông minh bằng Camera AI.</p>
                                     <div className="flex items-center gap-1 text-xs font-bold mt-auto group-hover:gap-2 transition-all">
-                                        Xem lịch trình <ArrowRight className="w-4 h-4" />
+                                        Đăng ký ngay <ArrowRight className="w-4 h-4" />
                                     </div>
                                 </div>
 
@@ -347,13 +354,13 @@ const EmployeeHomePage = () => {
                                 >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                                            <Award className="w-6 h-6 text-white" />
+                                            <Video className="w-6 h-6 text-white" />
                                         </div>
                                     </div>
-                                    <h3 className="font-bold text-base mb-1">Lịch sử điểm danh</h3>
-                                    <p className="text-xs text-amber-100 mb-4">Tra cứu lịch sử vào/ra phòng họp và thời gian họp thực tế.</p>
+                                    <h3 className="font-bold text-base mb-1">Bản ghi & Tài liệu</h3>
+                                    <p className="text-xs text-amber-100 mb-4">Tra cứu video ghi âm, ghi hình và tài liệu tóm tắt cuộc họp.</p>
                                     <div className="flex items-center gap-1 text-xs font-bold mt-auto group-hover:gap-2 transition-all">
-                                        Xem báo cáo <ArrowRight className="w-4 h-4" />
+                                        Xem bản ghi <ArrowRight className="w-4 h-4" />
                                     </div>
                                 </div>
                             </div>
