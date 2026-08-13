@@ -8,6 +8,7 @@ import Error500 from '../pages/Error/500';
 import ProtectedRoute from './ProtectedRoute';
 import RoomUsageAnalytics from '../pages/shared/RoomUsageAnalytics';
 import EmployeeOnTimeAnalytics from '../pages/shared/EmployeeOnTimeAnalytics';
+import MeetingAttendanceAdmin from '../pages/shared/MeetingAttendanceAdmin';
 
 // SystemAdmin Layout + Pages
 import SystemAdminLayout from '../pages/systemAdmin/layout/SystemAdminLayout';
@@ -46,6 +47,7 @@ import ManagerHomePage from '../pages/manager/homePage';
 import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
+import ManagerMeetingAttendance from '../pages/manager/MeetingAttendance';
 import BiometricSubmissionsReview from '../pages/bussinessAdmin/BiometricSubmissionsReview';
 
 // Employee Layout + Pages
@@ -202,6 +204,10 @@ export const router = [
                 element: <EmployeeOnTimeAnalytics />
             },
             {
+                path: 'meeting-attendance',
+                element: <MeetingAttendanceAdmin />
+            },
+            {
                 path: 'legal',
                 element: <LegalAndSupport />
             }
@@ -280,6 +286,10 @@ export const router = [
                 element: <EmployeeOnTimeAnalytics />
             },
             {
+                path: 'meeting-attendance',
+                element: <MeetingAttendanceAdmin />
+            },
+            {
                 path: 'legal',
                 element: <LegalAndSupport />
             }
@@ -322,6 +332,10 @@ export const router = [
             {
                 path: 'meeting-approvals',
                 element: <ManagerMeetingApprovals />
+            },
+            {
+                path: 'meeting-attendance',
+                element: <ManagerMeetingAttendance />
             },
             {
                 path: 'meeting/:id',

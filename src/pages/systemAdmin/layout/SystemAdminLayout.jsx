@@ -7,7 +7,7 @@ import {
     RiLoginBoxLine, RiCameraLine, RiCarLine, RiMapPinLine,
     RiAlertLine, RiEqualizerLine,
     RiCalendarLine, RiBuilding2Line, RiFileTextLine,
-    RiBarChart2Line, RiPieChart2Line, RiTimerLine, RiMenuLine
+    RiBarChart2Line, RiPieChart2Line, RiTimerLine, RiMenuLine, RiGroupLine
 } from 'react-icons/ri';
 
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -67,6 +67,7 @@ const STATIC_NAVIGATION_ITEMS = [
         children: [
             { label: 'Hiệu suất phòng họp', to: '/system-admin/room-analytics',        icon: RiPieChart2Line },
             { label: 'Tỷ lệ đúng giờ',      to: '/system-admin/attendance-analytics',  icon: RiTimerLine },
+            { label: 'Chuyên cần phòng ban', to: '/system-admin/meeting-attendance',   icon: RiGroupLine },
         ],
     },
 ];
