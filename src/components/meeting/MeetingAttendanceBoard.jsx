@@ -35,6 +35,7 @@ const ATTENDANCE_SOURCE_MAP = {
 const MeetingAttendanceBoard = ({ meetingId }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [errorCode, setErrorCode] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
     const [attendanceData, setAttendanceData] = useState(null);
 
@@ -52,6 +53,7 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
     const fetchAttendance = useCallback(async () => {
         setLoading(true);
         setError(null);
+        setErrorCode(null);
         try {
             const params = {
                 page,
@@ -66,7 +68,10 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                 throw new Error(res?.message || 'Không thể tải dữ liệu điểm danh.');
             }
         } catch (err) {
-            setError(err.message || 'Lỗi hệ thống khi tải điểm danh.');
+            const code = err?.error?.code || 'UNKNOWN_ERROR';
+            const msg = err?.error?.message || err?.message || 'Lỗi hệ thống khi tải điểm danh.';
+            setError(msg);
+            setErrorCode(code);
         } finally {
             setLoading(false);
         }
@@ -143,6 +148,22 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
     }
 
     if (error && !attendanceData) {
+        if (errorCode === 'MEETING_NOT_ACTIVE') {
+            return (
+                <div className="p-8 bg-blue-50/40 border border-blue-100 rounded-2xl flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 text-action-blue flex items-center justify-center">
+                        <Clock className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                        <h3 className="text-midnight-indigo font-bold text-sm">Điểm danh chưa khả dụng</h3>
+                        <p className="text-xs text-slate-blue mt-1.5 leading-relaxed">
+                            Danh sách điểm danh sẽ hiển thị sau khi cuộc họp được bắt đầu. Vui lòng quay lại sau.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="p-6 bg-red-50 border border-red-200 rounded-2xl flex flex-col items-center">
                 <AlertTriangle className="w-10 h-10 text-red-500 mb-2" />
