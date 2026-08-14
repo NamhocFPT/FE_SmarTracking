@@ -8,6 +8,7 @@ import BusinessAdminSidebar from './BusinessAdminSidebar';
 import { RiMenuLine } from 'react-icons/ri';
 import {
     Activity,
+    Archive,
     Home,
     Calendar,
     Layers,
@@ -49,6 +50,11 @@ const STATIC_NAVIGATION_ITEMS = [
             { label: 'Ghi hình', to: '/business-admin/recordings', icon: Video },
             { label: 'Cảnh báo an ninh', to: '/business-admin/security-alerts', icon: AlertTriangle },
         ],
+    },
+    {
+        label: 'Kho tài liệu',
+        to: '/business-admin/documents',
+        icon: Archive,
     },
     {
         label: 'Báo cáo',

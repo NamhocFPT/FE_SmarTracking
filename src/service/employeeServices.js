@@ -101,6 +101,16 @@ export const addInternalParticipant = async (meetingId, data) => {
 };
 
 /**
+ * UC-AT-ME: Thống kê chuyên cần cá nhân
+ * GET /analytics/attendance/on-time-rate/me
+ * @param {object} params - { preset: 'week'|'month'|'quarter', from?, to? }
+ */
+export const getMyAttendanceStats = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/analytics/attendance/on-time-rate/me${query}`);
+};
+
+/**
  * UC-22: Tra cứu lịch trình cá nhân
  * @param {object} params - { from, to, view, status }
  */
@@ -157,6 +167,11 @@ export const getMeetingById = async (id) => {
 
 export const getMeetingMediaFiles = async (meetingId) => {
     return await get(`/meetings/${meetingId}/media-files`);
+};
+
+export const getMeetingMinutesByMeetingId = async (meetingId) => {
+    const query = buildQuery({ meetingId, limit: 1 });
+    return await get(`/meeting-minutes${query}`);
 };
 
 /**

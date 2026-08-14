@@ -10,7 +10,7 @@ Ngôn ngữ hiển thị UI:
 
 * 100% Tiếng Việt chuẩn xác.
 * BẮT BUỘC sử dụng ngôn ngữ chuyên ngành (professional/industry-specific terminology) trong việc Việt hóa tất cả các màn hình (ví dụ: dùng thuật ngữ chuẩn của hệ thống giám sát an ninh, quản lý tòa nhà, IoT).
-* Không sử dụng tiếng Anh trong giao diện người dùng trừ các thuật ngữ kỹ thuật đặc thù không thể dịch (VD: IP, MAC, UUID).
+* Không sử dụng tiếng Anh trong giao diện người dùng trừ các thuật ngữ kỹ thuật đặc thù không thể dịch (VD: IP, UUID).
 
 ---
 

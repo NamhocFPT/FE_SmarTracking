@@ -218,47 +218,56 @@ const ANPRManagement = () => {
 
             {/* TAB CONTENT: HISTORY */}
             {activeTab === 'history' && (
-                <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 p-6 space-y-6 animate-fade-in">
+                <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 p-6 space-y-5 animate-fade-in">
+
+                    {/* Header */}
                     <div className="flex justify-between items-center">
-                        <h2 className="text-lg font-bold text-midnight-indigo">Luồng xe vào ra hệ thống</h2>
+                        <div>
+                            <h2 className="text-lg font-bold text-midnight-indigo">Luồng xe vào ra hệ thống</h2>
+                            <p className="text-xs text-slate-blue mt-0.5">Nhật ký nhận diện biển số qua camera ANPR · cập nhật mỗi 10 giây</p>
+                        </div>
                         <button
                             onClick={() => setIsExportOpen(true)}
                             className="inline-flex items-center gap-2 px-3 py-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist rounded-xl text-xs font-semibold transition-colors"
                         >
-                            <Download className="w-4 h-4" />
-                            Xuất báo cáo
+                            <Download className="w-4 h-4" /> Xuất báo cáo
                         </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <div className="relative flex-1 min-w-[200px]">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    {/* Filter bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-cloud-mist/50 p-4 rounded-xl border border-platinum-tint">
+                        {/* Search */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-blue pointer-events-none" />
                             <input
                                 type="text"
-                                placeholder="Tìm kiếm theo Biển số..."
+                                placeholder="Tìm theo biển số..."
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 rounded-xl border border-platinum-tint text-sm text-midnight-indigo focus:border-action-blue focus:ring-1 focus:ring-action-blue outline-none bg-white"
-                                title="Tìm kiếm theo Biển số nhận diện. (Tìm theo Tên chủ xe chưa được hỗ trợ từ API)"
+                                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-platinum-tint text-sm text-midnight-indigo focus:border-action-blue focus:ring-2 focus:ring-action-blue/20 outline-none bg-white transition-all"
                             />
                         </div>
+
+                        {/* Date range */}
                         <div className="relative">
-                            <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10 pointer-events-none" />
+                            <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-blue z-10 pointer-events-none" />
                             <DatePicker
-                                selectsRange={true}
+                                selectsRange
                                 startDate={startDate}
                                 endDate={endDate}
                                 onChange={(update) => setDateRange(update)}
-                                placeholderText="Lọc theo khoảng ngày"
-                                className="pl-9 pr-4 py-2 rounded-xl border border-platinum-tint text-sm text-midnight-indigo focus:border-action-blue focus:ring-1 focus:ring-action-blue outline-none bg-white w-[260px]"
+                                placeholderText="Khoảng ngày..."
+                                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-platinum-tint text-sm text-midnight-indigo focus:border-action-blue focus:ring-2 focus:ring-action-blue/20 outline-none bg-white"
                                 dateFormat="dd/MM/yyyy"
                                 isClearable
                             />
                         </div>
+
+                        {/* Match state */}
                         <select
                             value={filterMatchState}
                             onChange={(e) => setFilterMatchState(e.target.value)}
-                            className="px-4 py-2 rounded-xl border border-platinum-tint text-sm font-semibold text-midnight-indigo focus:border-action-blue focus:ring-1 focus:ring-action-blue outline-none bg-white w-48"
+                            className="px-3 py-2.5 rounded-xl border border-platinum-tint text-sm font-semibold text-midnight-indigo focus:border-action-blue focus:ring-2 focus:ring-action-blue/20 outline-none bg-white transition-all"
                         >
                             <option value="ALL">Tất cả trạng thái</option>
                             <option value="matched">Khớp dữ liệu</option>
@@ -266,111 +275,142 @@ const ANPRManagement = () => {
                         </select>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    {/* Table */}
+                    <div className="overflow-x-auto rounded-xl border border-platinum-tint">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-cloud-mist border-b border-platinum-tint">
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase whitespace-nowrap text-left">Ngày</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase whitespace-nowrap text-left">Thời gian</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Camera / Làn</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Biển số nhận diện</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Trạng thái (Khớp)</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-left">Chủ xe</th>
-                                    <th className="py-3 px-4 text-xs font-bold text-slate-blue uppercase text-center">Xem ảnh</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap">Thời điểm</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap text-center">Hướng</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap text-center">Camera</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap text-center">Biển số</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap text-center">Đối soát</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap">Chủ xe</th>
+                                    <th className="py-3 px-4 text-[11px] font-extrabold text-slate-blue uppercase tracking-wider whitespace-nowrap text-center">Ảnh</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-platinum-tint">
                                 {loading && historyList.length === 0 ? (
-                                    <tr><td colSpan="6" className="py-8 text-center text-slate-blue">Đang tải...</td></tr>
+                                    <tr><td colSpan="7" className="py-10 text-center text-slate-blue text-sm">Đang tải...</td></tr>
                                 ) : historyList.length === 0 ? (
-                                    <tr><td colSpan="6" className="py-8 text-center text-slate-blue">Không có dữ liệu phù hợp.</td></tr>
+                                    <tr><td colSpan="7" className="py-10 text-center text-slate-blue text-sm">Không có dữ liệu phù hợp.</td></tr>
                                 ) : (
-                                    historyList.map((item, idx) => (
-                                        <tr key={item.id || idx} className="hover:bg-cloud-mist/30">
-                                            <td className="py-3 px-4 text-sm font-semibold text-midnight-indigo whitespace-nowrap text-left">
-                                                {new Date(item.eventTime).toLocaleDateString('vi-VN')}
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-slate-blue font-medium whitespace-nowrap text-left">
-                                                {new Date(item.eventTime).toLocaleTimeString('vi-VN')}
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-slate-blue text-center">{item.channelId || 'Main Gate'}</td>
-                                            <td className="py-3 px-4 text-center">
-                                                <div className="flex flex-col gap-1.5 items-center justify-center">
-                                                    <span className="font-bold text-midnight-indigo border border-steel-gray px-2 py-1 rounded bg-white shadow-sm font-mono text-sm">{item.plateNumber}</span>
-                                                    {item.isBlacklisted && (
-                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200" title="Chỉ hiện cho lượt đầu tiên trong 5 phút">
-                                                            ⚠️ Danh sách đen
+                                    historyList.map((item, idx) => {
+                                        const evtDate = item.eventTime ? new Date(item.eventTime) : null;
+                                        const dir = item.direction;
+                                        const isEnter = dir === 'enter' || dir === 'in' || dir === 'ENTRY';
+                                        const isLeave = dir === 'leave' || dir === 'out' || dir === 'EXIT';
+
+                                        return (
+                                            <tr key={item.id || idx} className="hover:bg-cloud-mist/40 transition-colors">
+                                                {/* Thời điểm */}
+                                                <td className="py-3 px-4 whitespace-nowrap">
+                                                    <p className="text-sm font-semibold text-midnight-indigo">
+                                                        {evtDate ? evtDate.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—'}
+                                                    </p>
+                                                    <p className="text-xs text-slate-blue mt-0.5 font-mono">
+                                                        {evtDate ? evtDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) : '—'}
+                                                    </p>
+                                                </td>
+
+                                                {/* Hướng */}
+                                                <td className="py-3 px-4 text-center whitespace-nowrap">
+                                                    {isEnter ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            ↓ Vào
+                                                        </span>
+                                                    ) : isLeave ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                            ↑ Ra
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-50 text-slate-500 border border-slate-200">
+                                                            — Thấy
                                                         </span>
                                                     )}
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-4 text-center">
-                                                {item.matchState === 'matched' ? (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-700">Khớp dữ liệu</span>
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-100 text-orange-700">Biển lạ</span>
-                                                )}
-                                            </td>
-                                            <td className="py-3 px-4 text-left">
-                                                {item.owner ? (
-                                                    <div 
-                                                        className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors group w-fit"
-                                                        onClick={() => {
-                                                            setSelectedOwner(item.owner);
-                                                            setIsOwnerModalOpen(true);
-                                                        }}
-                                                    >
-                                                        <UserAvatar 
-                                                            user={item.owner} 
-                                                            name={item.owner.fullName}
-                                                            className="w-7 h-7 rounded-full text-xs shadow-sm border border-platinum-tint group-hover:border-action-blue" 
-                                                        />
-                                                        <span className="text-sm font-semibold text-action-blue group-hover:text-blue-700 truncate max-w-[150px]" title={item.owner.fullName}>
-                                                            {item.owner.fullName}
+                                                </td>
+
+                                                {/* Camera */}
+                                                <td className="py-3 px-4 text-center whitespace-nowrap">
+                                                    <span className="text-xs font-semibold text-slate-blue">{item.channelId || 'Main Gate'}</span>
+                                                </td>
+
+                                                {/* Biển số */}
+                                                <td className="py-3 px-4 text-center whitespace-nowrap">
+                                                    <div className="inline-flex flex-col items-center gap-1">
+                                                        <span className="font-bold text-midnight-indigo border border-slate-300 px-2.5 py-0.5 rounded-md bg-white shadow-sm font-mono text-sm tracking-wider">
+                                                            {item.plateNumber}
                                                         </span>
+                                                        {item.isBlacklisted && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                                                                ⚠ Danh sách đen
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <div className="flex items-center gap-2 p-1.5 w-fit">
-                                                        <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-100 shadow-sm">
-                                                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-[110%] h-[110%] text-white mt-3">
-                                                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                                            </svg>
+                                                </td>
+
+                                                {/* Đối soát */}
+                                                <td className="py-3 px-4 text-center whitespace-nowrap">
+                                                    {item.matchState === 'matched' ? (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Khớp</span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">Biển lạ</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Chủ xe */}
+                                                <td className="py-3 px-4">
+                                                    {item.owner ? (
+                                                        <div
+                                                            className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded-lg transition-colors group w-fit max-w-[160px]"
+                                                            onClick={() => { setSelectedOwner(item.owner); setIsOwnerModalOpen(true); }}
+                                                        >
+                                                            <UserAvatar
+                                                                user={item.owner}
+                                                                name={item.owner.fullName}
+                                                                className="w-7 h-7 rounded-full text-xs shadow-sm border border-platinum-tint group-hover:border-action-blue flex-shrink-0"
+                                                            />
+                                                            <span className="text-sm font-semibold text-action-blue group-hover:text-blue-700 truncate" title={item.owner.fullName}>
+                                                                {item.owner.fullName}
+                                                            </span>
                                                         </div>
-                                                        <span className="text-sm font-medium text-slate-400">Không xác định</span>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 font-medium px-2">Không xác định</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Ảnh */}
+                                                <td className="py-3 px-4">
+                                                    <div className="flex justify-center">
+                                                        <ThumbnailImage
+                                                            eventId={item.id}
+                                                            onClick={() => { setSnapshotEventId(item.id); setIsSnapshotOpen(true); }}
+                                                        />
                                                     </div>
-                                                )}
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex justify-center">
-                                                    <ThumbnailImage
-                                                        eventId={item.id}
-                                                        onClick={() => {
-                                                            setSnapshotEventId(item.id);
-                                                            setIsSnapshotOpen(true);
-                                                        }}
-                                                    />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Pagination History */}
-                    {!loading && Math.ceil(historyTotal / itemsPerPage) > 1 && (
-                        <div className="flex justify-between items-center pt-4 mt-2 border-t border-platinum-tint/50">
-                            <span className="text-[11px] text-slate-blue">
-                                Hiển thị {(historyPage - 1) * itemsPerPage + 1} - {Math.min(historyPage * itemsPerPage, historyTotal)} trong tổng số {historyTotal} lượt quét
-                            </span>
-                            <Pagination 
-                                currentPage={historyPage} 
-                                totalPages={Math.ceil(historyTotal / itemsPerPage)} 
-                                onPageChange={setHistoryPage} 
+                    {/* Pagination */}
+                    <div className="flex justify-between items-center pt-2">
+                        <span className="text-[11px] text-slate-blue font-semibold">
+                            {historyTotal > 0
+                                ? `Hiển thị ${(historyPage - 1) * itemsPerPage + 1}–${Math.min(historyPage * itemsPerPage, historyTotal)} / ${historyTotal} lượt quét`
+                                : 'Không có dữ liệu'}
+                        </span>
+                        {!loading && Math.ceil(historyTotal / itemsPerPage) > 1 && (
+                            <Pagination
+                                currentPage={historyPage}
+                                totalPages={Math.ceil(historyTotal / itemsPerPage)}
+                                onPageChange={setHistoryPage}
                             />
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             )}
 

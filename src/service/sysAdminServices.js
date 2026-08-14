@@ -206,7 +206,7 @@ export const getDeviceById = async (deviceId) => {
 
 /**
  * UC-67: Đăng ký thiết bị camera/IoT
- * @param {object} data - { deviceCode, deviceName, deviceType, roomId, ipAddress, macAddress, ... }
+ * @param {object} data - { deviceCode, deviceName, deviceType, roomId, ipAddress, ... }
  * @returns {Promise<object>} response envelope
  */
 export const registerDevice = async (data) => {

@@ -1,7 +1,7 @@
 import { Activity, AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -117,7 +117,9 @@ const EmployeeMeetingDetail = () => {
     const [refreshTranscriptKey, setRefreshTranscriptKey] = useState(0);
     const [audioPage, setAudioPage] = useState(1);
     const audioItemsPerPage = 5;
-    const [activeRightTab, setActiveRightTab] = useState('transcript');
+    const [searchParams] = useSearchParams();
+    const initialTab = searchParams.get('tab') || 'transcript';
+    const [activeRightTab, setActiveRightTab] = useState(initialTab);
     const [presenceData, setPresenceData] = useState(null);
     const [presenceLoading, setPresenceLoading] = useState(false);
     const [presenceError, setPresenceError] = useState(null);

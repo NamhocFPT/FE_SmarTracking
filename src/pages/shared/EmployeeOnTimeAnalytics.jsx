@@ -501,7 +501,10 @@ const EmployeeOnTimeAnalytics = () => {
                 {isManager ? (
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm overflow-hidden lg:col-span-2">
                         <div className="px-6 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex items-center justify-between">
-                            <h3 className="font-bold text-midnight-indigo text-sm">Tỷ lệ đi muộn theo thành viên</h3>
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo text-sm">Chuyên cần theo thành viên</h3>
+                                <p className="text-[10px] text-slate-blue mt-0.5">Số lượt đúng giờ · đến muộn · vắng mặt trên tổng lịch bắt buộc</p>
+                            </div>
                             {memberLoading && (
                                 <div className="w-4 h-4 border-2 border-action-blue/20 border-t-action-blue rounded-full animate-spin" />
                             )}
@@ -511,10 +514,10 @@ const EmployeeOnTimeAnalytics = () => {
                                 <thead>
                                     <tr className="border-b border-platinum-tint bg-slate-50/50 text-[10px] font-bold text-slate-blue uppercase tracking-wider">
                                         <th className="px-4 py-3">Thành viên</th>
-                                        <th className="px-4 py-3 hidden sm:table-cell">Email</th>
-                                        <th className="px-4 py-3 text-right">Tổng lượt</th>
-                                        <th className="px-4 py-3 text-right">Lượt muộn</th>
-                                        <th className="px-4 py-3 text-right">Tỷ lệ</th>
+                                        <th className="px-4 py-3 text-center">Đúng giờ</th>
+                                        <th className="px-4 py-3 text-center">Đến muộn</th>
+                                        <th className="px-4 py-3 text-center">Vắng mặt</th>
+                                        <th className="px-4 py-3 text-right hidden sm:table-cell">Tổng bắt buộc</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-platinum-tint text-xs">
@@ -527,10 +530,10 @@ const EmployeeOnTimeAnalytics = () => {
                                                         <div className="h-3 w-24 bg-slate-100 rounded" />
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 hidden sm:table-cell"><div className="h-3 w-32 bg-slate-100 rounded" /></td>
-                                                <td className="px-4 py-3"><div className="h-3 w-8 bg-slate-100 rounded ml-auto" /></td>
-                                                <td className="px-4 py-3"><div className="h-3 w-8 bg-slate-100 rounded ml-auto" /></td>
-                                                <td className="px-4 py-3"><div className="h-3 w-10 bg-slate-100 rounded ml-auto" /></td>
+                                                <td className="px-4 py-3"><div className="h-5 w-12 bg-slate-100 rounded-full mx-auto" /></td>
+                                                <td className="px-4 py-3"><div className="h-5 w-12 bg-slate-100 rounded-full mx-auto" /></td>
+                                                <td className="px-4 py-3"><div className="h-5 w-12 bg-slate-100 rounded-full mx-auto" /></td>
+                                                <td className="px-4 py-3 hidden sm:table-cell"><div className="h-3 w-8 bg-slate-100 rounded ml-auto" /></td>
                                             </tr>
                                         ))
                                     ) : memberStats.length === 0 ? (
@@ -540,39 +543,48 @@ const EmployeeOnTimeAnalytics = () => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        memberStats.map(member => (
-                                            <tr key={member.userId}
-                                                onClick={() => handleUserClick({ userId: member.userId, fullName: member.fullName })}
-                                                className="hover:bg-slate-50/60 transition-colors cursor-pointer">
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <UserAvatar avatarUrl={member.avatarUrl} fullName={member.fullName} size={32} />
-                                                        <div className="min-w-0">
-                                                            <p className="font-bold text-midnight-indigo truncate">{member.fullName}</p>
-                                                            {member.employeeCode && (
-                                                                <p className="text-[10px] text-slate-blue font-mono">{member.employeeCode}</p>
-                                                            )}
+                                        memberStats.map(member => {
+                                            const total = member.totalMeetings ?? member.totalRequired ?? 0;
+                                            const late = member.lateCount ?? 0;
+                                            const onTime = member.onTimeCount ?? 0;
+                                            const absent = member.absentCount ?? Math.max(0, total - onTime - late);
+                                            return (
+                                                <tr key={member.userId}
+                                                    onClick={() => handleUserClick({ userId: member.userId, fullName: member.fullName })}
+                                                    className="hover:bg-slate-50/60 transition-colors cursor-pointer">
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <UserAvatar avatarUrl={member.avatarUrl} fullName={member.fullName} size={32} />
+                                                            <div className="min-w-0">
+                                                                <p className="font-bold text-midnight-indigo truncate">{member.fullName}</p>
+                                                                {member.employeeCode && (
+                                                                    <p className="text-[10px] text-slate-blue font-mono">{member.employeeCode}</p>
+                                                                )}
+                                                                <p className="text-[10px] text-slate-blue font-mono truncate hidden sm:block">{member.email}</p>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 hidden sm:table-cell">
-                                                    <span className="text-slate-blue font-mono truncate block max-w-[180px]">{member.email}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-slate-blue font-semibold tabular-nums">
-                                                    {member.totalMeetings ?? member.totalRequired}
-                                                </td>
-                                                <td className="px-4 py-3 text-right tabular-nums">
-                                                    <span className={`font-bold ${member.lateCount > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                                                        {member.lateCount}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right tabular-nums">
-                                                    <span className={`font-black text-sm ${member.lateRate > 15 ? 'text-red-500' : member.lateRate > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                                                        {member.lateRate}%
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-flex items-center justify-center min-w-[40px] px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${onTime > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                            {onTime}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-flex items-center justify-center min-w-[40px] px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${late > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                            {late}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-flex items-center justify-center min-w-[40px] px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${absent > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                            {absent}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right text-slate-blue font-semibold tabular-nums hidden sm:table-cell">
+                                                        {total}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>

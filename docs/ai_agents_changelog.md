@@ -5,6 +5,86 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-14 02:00
+* **Tên Plan / Yêu cầu**: Tích hợp màn hình Hành trình khuôn viên, Tái cấu trúc Navbar và Tối ưu hóa Trang chủ Nhân viên & Trưởng phòng
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/UserJourney.jsx`:
+    * Bổ sung thuộc tính `isSelfOnly` kiểm tra vai trò của người dùng hiện tại (Nhân viên và Trưởng phòng).
+    * Khi `isSelfOnly` là true, tự động tải hành trình của chính tài khoản đó bằng cách lấy thông tin từ local storage, đồng thời ẩn giao diện tìm kiếm và dropdown chọn nhân viên để đảm bảo bảo mật và cá nhân hóa.
+    * Việt hóa và tinh chỉnh nội dung mô tả tiêu đề cho trường hợp xem hành trình cá nhân.
+  * `[Cập nhật] src/routers/index.js`:
+    * Thêm đường dẫn `user-journey` và `meeting-approvals` liên kết với các component tương ứng dưới nhóm route bảo vệ của Nhân viên (Employee).
+  * `[Cập nhật] src/pages/employee/layout/EmployeeLayout.jsx`:
+    * Import các icon `MapPin` và `FileCheck` từ `lucide-react`.
+    * Tái cấu trúc menu: Tích hợp mục "Phê duyệt cuộc họp" vào trong dropdown "Cuộc họp" với thuộc tính `requiredPermission: 'meeting_request.read'` để đảm bảo hiển thị đúng quyền hạn.
+    * Bổ sung mục "Hành trình" vào danh sách điều hướng.
+  * `[Cập nhật] src/pages/manager/layout/ManagerLayout.jsx`:
+    * Tích hợp mục "Phê duyệt cuộc họp" vào trong dropdown "Cuộc họp", đồng thời loại bỏ nhóm dropdown "Phê duyệt" cũ.
+    * Loại bỏ menu dropdown "Giám sát" và đưa liên kết "Hành trình" ra trực tiếp ở cấp cao nhất của thanh điều hướng (top-level navigation).
+    * Dọn dẹp các icon import không sử dụng (`CheckSquare`, `Shield`).
+  * `[Cập nhật] src/pages/employee/homePage.jsx`:
+    * Loại bỏ hoàn toàn card "Ghi hình chờ duyệt" (do thông tin này không tồn tại / không áp dụng với vai trò Nhân viên bình thường).
+    * Tái thiết kế lại grid layout hiển thị các thẻ overview dashboard thành 3 cột cân đối (`md:grid-cols-3`).
+    * Dọn dẹp biến state `pendingConsents`.
+  * `[Cập nhật] src/pages/employee/Recordings.jsx`:
+    * Thay đổi giá trị bộ lọc `status` khi gọi `getMySchedule` từ mảng trùng lặp `['completed', 'completed']` thành `'completed'` dạng chuỗi đơn, ngăn chặn tạo tham số trùng lặp trên URL dẫn đến lỗi 400 Bad Request ở Backend.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 23:30
+* **Tên Plan / Yêu cầu**: Cập nhật nút tài liệu dạng Text thành Biên bản cuộc họp đã ban hành
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/employeeServices.js`:
+    * Thêm API `getMeetingMinutesByMeetingId` để lấy biên bản cuộc họp theo `meetingId`.
+  * `[Cập nhật] src/pages/employee/Recordings.jsx`:
+    * Tích hợp `getMeetingMinutesByMeetingId` để kiểm tra trạng thái ban hành của biên bản cuộc họp (`status === 'published'`).
+    * Thay đổi nút "Text" thành "Biên bản" với hành vi chỉ hoạt động (không bị vô hiệu hóa) khi biên bản cuộc họp đã được ban hành chính thức.
+    * Khi click nút "Biên bản", thực hiện điều hướng đến trang chi tiết cuộc họp kèm tham số `tab=minutes` để tự động mở tab Biên bản.
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx` & `src/pages/manager/MeetingDetail.jsx`:
+    * Sử dụng `useSearchParams` để đọc tham số `tab` từ URL và kích hoạt tab tương ứng (mặc định là `transcript`).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 22:25
+* **Tên Plan / Yêu cầu**: Hoàn thiện chức năng Thống kê chuyên cần cá nhân của Nhân viên và nâng cấp giao diện Quản lý thiết bị
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/employeeServices.js`:
+    * Thêm API `getMyAttendanceStats` gọi endpoint `GET /analytics/attendance/on-time-rate/me` để lấy thống kê chuyên cần cá nhân.
+  * `[Cập nhật] src/pages/employee/homePage.jsx`:
+    * Tích hợp tab "Thống kê" sử dụng API thống kê chuyên cần cá nhân.
+    * Thêm hiển thị 4 thẻ KPI (Lượt tham dự, Đúng giờ, Đi muộn, Vắng mặt), biểu đồ tròn (phân bố trạng thái chuyên cần), danh sách 5 lần đi muộn gần nhất và biểu đồ cột (xu hướng chuyên cần).
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Nâng cấp toàn diện danh sách thiết bị từ dạng bảng (table) sang dạng lưới thẻ (card grid) 3 cột hiển thị sinh động theo tông màu thương hiệu của từng loại thiết bị.
+    * Cải thiện bộ lọc thu gọn, hiển thị số lượng thiết bị, xử lý trạng thái rỗng (empty state) và phân trang theo dạng lưới thẻ.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 22:15
+* **Tên Plan / Yêu cầu**: Tách commit và push code cho các tính năng đã hoàn thành
+* **Chi tiết thay đổi**:
+  * `[Tạo mới] src/docs/PLAN_BE_personal_attendance_stats.md`:
+    * Tạo tài liệu kế hoạch Backend về tính năng Thống kê chuyên cần cá nhân (Employee Personal Stats) và API `GET /analytics/attendance/on-time-rate/me`.
+  * `[Cập nhật] src/pages/employee/homePage.jsx` & `src/pages/manager/homePage.jsx`:
+    * Nâng cấp giao diện Lối tắt / Trạng thái nhanh (Quick Status Bar) thành dạng lưới 3 cột có kích thước nhỏ gọn, layout hiện đại, typography rõ ràng và icon trực quan.
+  * `[Cập nhật] src/pages/shared/EmployeeOnTimeAnalytics.jsx`:
+    * Thay đổi hiển thị bảng Thống kê thành viên: thay cột tỷ lệ đi muộn và số lượt đi muộn thô bằng các cột chi tiết "Đúng giờ", "Đến muộn", "Vắng mặt" (có badge màu sắc) và "Tổng bắt buộc".
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Di chuyển nút "Gán phòng" lên đầu danh sách hành động.
+    * Đổi tên hiển thị và cấu hình từ "Face Terminal" sang "Face Server".
+    * Xóa bỏ dropdown chọn phòng trực tiếp trong modal tạo mới (bắt buộc gán sau khi tạo qua nút Gán phòng).
+    * Khóa dropdown "Loại thiết bị" khi chỉnh sửa (chỉ hiển thị nhãn đọc) và loại bỏ nút Xóa thiết bị khỏi danh sách.
+  * `[Cập nhật] src/pages/systemAdmin/RoomAccessLogs.jsx` & `src/pages/systemAdmin/ZoneManagement.jsx`:
+    * Đồng bộ nhãn trạng thái "Chưa khớp (unmatched)" hiển thị thành "Người lạ" màu đỏ kèm icon cảnh báo tương ứng.
+    * Thiết kế lại danh sách sự kiện truy cập khu vực (ZoneAccessLogCard) từ dạng danh sách dọc thành dạng lưới thẻ (3 cột) hiển thị ThumbnailImage 16:9 toàn chiều rộng kèm overlay thời gian.
+    * Loại bỏ các phần liên quan đến Occupancy / Đếm người (cột, chỉ số KPI đỉnh Occupancy) trong ZoneTimelineCard để đơn giản hóa giao diện.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-13 19:55
+* **Tên Plan / Yêu cầu**: Loại bỏ "Toàn hệ thống" và bắt buộc chọn khu vực trong Quy tắc cảnh báo
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/AlertRules.jsx`:
+    * Loại bỏ tùy chọn "Toàn hệ thống (Mọi khu vực)" khỏi dropdown select "Khu vực áp dụng" trong modal tạo/sửa quy tắc.
+    * Thay thế bằng placeholder mặc định bị vô hiệu hóa "-- Chọn khu vực áp dụng --" và đánh dấu trường này là bắt buộc (`required`).
+    * Thêm kiểm tra validation ở `handleSubmit` và hiển thị thông báo lỗi nếu chưa chọn khu vực.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-13 19:25
 * **Tên Plan / Yêu cầu**: Thay đổi thiết kế Lối tắt chức năng nhanh cho Nhân viên (Employee)
 * **Chi tiết thay đổi**:

@@ -2653,7 +2653,6 @@
   "deviceType": "face_server",
   "roomId": "uuid",
   "ipAddress": "192.168.1.10",
-  "macAddress": "AA:BB:CC:DD:EE:FF",
   "networkIdentifier": "face-server-main",
   "streamUrl": null,
   "agentVersion": "v2.3.1",

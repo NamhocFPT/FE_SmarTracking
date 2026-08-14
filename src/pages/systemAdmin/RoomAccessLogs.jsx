@@ -42,12 +42,8 @@ const formatVNFull = (iso) => {
     return `${time} ${date}`;
 };
 
-const getTodayVNString = () => {
-    const d = new Date();
-    const offset = d.getTimezoneOffset();
-    const vn = new Date(d.getTime() + (7 * 60 + offset) * 60 * 1000);
-    return `${vn.getFullYear()}-${String(vn.getMonth() + 1).padStart(2, '0')}-${String(vn.getDate()).padStart(2, '0')}`;
-};
+const getTodayVNString = () =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 
 const getIdentityStatus = (ev) => {
     if (ev.isStranger)  return 'stranger';
@@ -102,7 +98,7 @@ const StatusBadge = ({ status }) => {
     if (status === 'stranger')
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold text-red-700 bg-red-50 border-red-200"><AlertTriangle className="w-3 h-3" />Người lạ</span>;
     if (status === 'unmatched')
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold text-amber-700 bg-amber-50 border-amber-200"><ShieldQuestion className="w-3 h-3" />Chưa khớp</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold text-red-700 bg-red-50 border-red-200"><AlertTriangle className="w-3 h-3" />Người lạ</span>;
     return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold text-emerald-700 bg-emerald-50 border-emerald-200"><ShieldCheck className="w-3 h-3" />Khớp</span>;
 };
 
@@ -138,6 +134,23 @@ const RoomAccessLogs = () => {
     const [isUserModalOpen, setIsUserModalOpen]   = useState(false);
 
     const [usersMap, setUsersMap] = useState({});
+
+    // auto-update date when page becomes visible again (e.g. left open overnight)
+    const autoDateRef = useRef(getTodayVNString());
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (document.hidden) return;
+            const today = getTodayVNString();
+            const prevAuto = autoDateRef.current;
+            if (today !== prevAuto) {
+                autoDateRef.current = today;
+                // only auto-advance if user hadn't manually changed the date
+                setSelectedDate(prev => prev === prevAuto ? today : prev);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
+    }, []);
 
     // close meeting dropdown on outside click
     useEffect(() => {
@@ -495,7 +508,7 @@ const RoomAccessLogs = () => {
                         <button onClick={() => setSortOrder(v => v === 'desc' ? 'asc' : 'desc')}
                             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-platinum-tint rounded-xl text-xs text-midnight-indigo hover:bg-cloud-mist transition-colors font-semibold">
                             <ArrowUpDown className="w-3.5 h-3.5 text-slate-blue" />
-                            {sortOrder === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
+                            {sortOrder === 'desc' ? 'Mới nhất trước ↓' : 'Cũ nhất trước ↑'}
                         </button>
                     </div>
                 </div>

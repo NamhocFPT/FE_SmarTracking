@@ -455,6 +455,12 @@ export const removeInternalParticipant = async (meetingId, participantUserId, da
 // B-M6: BIÊN BẢN NÂNG CAO (Minutes)
 // ============================================================
 
+// B-M6.0 — Danh sách biên bản toàn công ty (Business Admin = all, Manager = dept-scoped)
+export const listMinutes = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meeting-minutes${query}`);
+};
+
 // B-M6.1 — Tìm biên bản theo người (limit max 20)
 export const searchMinutesByPerson = async (userId, params = {}) => {
     const query = buildQuery({ userId, ...params });

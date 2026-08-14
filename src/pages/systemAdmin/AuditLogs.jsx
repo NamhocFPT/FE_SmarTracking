@@ -61,7 +61,6 @@ const TRANSLATED_KEYS = {
     lastSeen: 'Hoạt động lần cuối',
     retryCount: 'Số lần kết nối lại',
     ipAddress: 'Địa chỉ IP thiết bị',
-    macAddress: 'Địa chỉ MAC',
     deviceName: 'Tên thiết bị',
     deviceType: 'Chủng loại thiết bị',
     streamUrl: 'Đường dẫn RTSP stream',
