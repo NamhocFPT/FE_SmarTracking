@@ -151,6 +151,15 @@ export const getMySchedule = async (params = {}) => {
 };
 
 /**
+ * Lấy lịch sử cuộc họp cá nhân (hỗ trợ phân trang, phục vụ trang Bản ghi)
+ * @param {object} params - { status, page, limit, from, to, q }
+ */
+export const getMyMeetingHistory = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/me/meetings/history${query}`);
+};
+
+/**
  * UC-ACC-07: Xem chi tiết hồ sơ user (self)
  * @param {number|string} userId
  */

@@ -1,8 +1,8 @@
-import { AlertTriangle, Cpu, MapPin, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench } from 'lucide-react';
+import { AlertTriangle, Cpu, MapPin, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment } from '../../service/equipmentServices';
+import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment, confirmEquipmentFault, resolveEquipmentFault } from '../../service/equipmentServices';
 import { getRooms } from '../../service/businessAdminServices';
 
 
@@ -26,6 +26,8 @@ const EquipmentManagement = () => {
     // Modal states
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isFaultModalOpen, setIsFaultModalOpen] = useState(false);
+    const [isConfirmFaultModalOpen, setIsConfirmFaultModalOpen] = useState(false);
+    const [isResolveFaultModalOpen, setIsResolveFaultModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedEquipment, setSelectedEquipment] = useState(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -47,6 +49,16 @@ const EquipmentManagement = () => {
         healthStatus: 'faulty',
         assetStatus: 'maintenance',
         issueNote: ''
+    });
+
+    const [confirmFaultForm, setConfirmFaultForm] = useState({
+        confirmationNote: ''
+    });
+
+    const [resolveFaultForm, setResolveFaultForm] = useState({
+        healthStatus: 'healthy',
+        assetStatus: 'active',
+        resolutionNote: ''
     });
 
     const [assignForm, setAssignForm] = useState({
@@ -141,6 +153,44 @@ const EquipmentManagement = () => {
             }
         } catch (err) {
             setError(err?.message || 'Lỗi khi báo hỏng thiết bị.');
+        }
+    };
+
+    // Handle Confirm Fault
+    const handleConfirmFaultSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await confirmEquipmentFault(selectedEquipment.id, confirmFaultForm);
+            if (res?.success) {
+                setSuccessMessage('Đã xác nhận lỗi thiết bị thành công!');
+                setIsConfirmFaultModalOpen(false);
+                fetchEquipments();
+            } else {
+                setError(res?.message || 'Xác nhận lỗi thất bại.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Lỗi khi xác nhận lỗi thiết bị.');
+        }
+    };
+
+    // Handle Resolve Fault
+    const handleResolveFaultSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await resolveEquipmentFault(selectedEquipment.id, resolveFaultForm);
+            if (res?.success) {
+                setSuccessMessage('Đã cập nhật khắc phục lỗi thiết bị thành công!');
+                setIsResolveFaultModalOpen(false);
+                fetchEquipments();
+            } else {
+                setError(res?.message || 'Khắc phục lỗi thất bại.');
+            }
+        } catch (err) {
+            setError(err?.message || 'Lỗi khi khắc phục lỗi thiết bị.');
         }
     };
 
@@ -388,6 +438,32 @@ const EquipmentManagement = () => {
                                             >
                                                 <Wrench className="w-4 h-4" />
                                             </button>
+                                            {eq.healthStatus !== 'healthy' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedEquipment(eq);
+                                                            setConfirmFaultForm({ confirmationNote: '' });
+                                                            setIsConfirmFaultModalOpen(true);
+                                                        }}
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-emerald-500 hover:bg-emerald-50 transition-colors mr-1"
+                                                        title="Xác nhận hỏng"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedEquipment(eq);
+                                                            setResolveFaultForm({ healthStatus: 'healthy', assetStatus: eq.assetStatus || 'active', resolutionNote: '' });
+                                                            setIsResolveFaultModalOpen(true);
+                                                        }}
+                                                        className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-blue-500 hover:bg-blue-50 transition-colors mr-1"
+                                                        title="Cập nhật sửa xong"
+                                                    >
+                                                        <RefreshCw className="w-4 h-4" />
+                                                    </button>
+                                                </>
+                                            )}
                                             <button
                                                 onClick={() => handleDeleteClick(eq)}
                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -561,6 +637,81 @@ const EquipmentManagement = () => {
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
                                 <button type="button" onClick={() => setIsFaultModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
                                 <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700">Lưu thông tin</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* CONFIRM FAULT MODAL */}
+            {isConfirmFaultModalOpen && selectedEquipment && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full flex flex-col">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-emerald-50">
+                            <h3 className="font-bold text-emerald-700 flex items-center gap-1.5">
+                                <Check className="w-5 h-5" /> Xác nhận lỗi thiết bị
+                            </h3>
+                            <button onClick={() => setIsConfirmFaultModalOpen(false)} className="text-emerald-700 hover:text-emerald-900">✕</button>
+                        </div>
+                        <form onSubmit={handleConfirmFaultSubmit} className="p-6 space-y-4">
+                            <div className="p-3 bg-cloud-mist/30 rounded-xl mb-4 text-xs">
+                                <p className="text-sm font-bold text-midnight-indigo">{selectedEquipment.equipmentName}</p>
+                                <p className="text-xs text-slate-blue mt-0.5">Mã: {selectedEquipment.equipmentCode} • Trạng thái lỗi: <span className="text-red-500 font-semibold">{selectedEquipment.healthStatus}</span></p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Ghi chú xác nhận lỗi (Không bắt buộc)</label>
+                                <textarea rows="3" value={confirmFaultForm.confirmationNote} onChange={e => setConfirmFaultForm({confirmationNote: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Nhập ghi chú kiểm tra thực tế..." />
+                            </div>
+                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setIsConfirmFaultModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
+                                <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700">Xác nhận lỗi thật</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* RESOLVE FAULT MODAL */}
+            {isResolveFaultModalOpen && selectedEquipment && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-md w-full flex flex-col">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-blue-50">
+                            <h3 className="font-bold text-blue-700 flex items-center gap-1.5">
+                                <RefreshCw className="w-4 h-4" /> Cập nhật kết quả sửa chữa
+                            </h3>
+                            <button onClick={() => setIsResolveFaultModalOpen(false)} className="text-blue-700 hover:text-blue-900">✕</button>
+                        </div>
+                        <form onSubmit={handleResolveFaultSubmit} className="p-6 space-y-4">
+                            <div className="p-3 bg-cloud-mist/30 rounded-xl mb-4">
+                                <p className="text-sm font-bold text-midnight-indigo">{selectedEquipment.equipmentName}</p>
+                                <p className="text-xs text-slate-blue mt-0.5">Mã: {selectedEquipment.equipmentCode}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Tình trạng sức khỏe <span className="text-red-500">*</span></label>
+                                    <select required value={resolveFaultForm.healthStatus} onChange={e => setResolveFaultForm({...resolveFaultForm, healthStatus: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white">
+                                        <option value="healthy">Tốt (Healthy)</option>
+                                        <option value="warning">Cảnh báo (Warning)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Trạng thái vận hành</label>
+                                    <select value={resolveFaultForm.assetStatus} onChange={e => setResolveFaultForm({...resolveFaultForm, assetStatus: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm bg-white">
+                                        <option value="active">Hoạt động (Active)</option>
+                                        <option value="maintenance">Bảo trì (Maintenance)</option>
+                                        <option value="retired">Thanh lý (Retired)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Ghi chú khắc phục lỗi <span className="text-red-500">*</span></label>
+                                <textarea required rows="3" value={resolveFaultForm.resolutionNote} onChange={e => setResolveFaultForm({...resolveFaultForm, resolutionNote: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm resize-none" placeholder="Nhập chi tiết đã sửa chữa hoặc thay thế những gì..." />
+                            </div>
+                            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
+                                <button type="button" onClick={() => setIsResolveFaultModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
+                                <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700">Lưu thông tin</button>
                             </div>
                         </form>
                     </div>

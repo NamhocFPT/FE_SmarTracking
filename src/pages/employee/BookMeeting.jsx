@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, Building, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, ChevronDown, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X, Edit2, GripVertical } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building, Calendar, CalendarPlus, Check, CheckCircle2, ChevronRight, ChevronDown, Clock, Download, FileSpreadsheet, HelpCircle, Info, Mic, Paperclip, Plus, Search, ShieldAlert, Trash2, Upload, Users, Video, X, Edit2, GripVertical, Wrench } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 
 import ReactDOM from 'react-dom';
@@ -122,6 +122,7 @@ const BookMeeting = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [conflictInfo, setConflictInfo] = useState(null);
+    const [faultyEquipmentWarning, setFaultyEquipmentWarning] = useState(null);
     const [alternativeRooms, setAlternativeRooms] = useState([]);
 
     // Participant search states (server-side, debounced)
@@ -895,20 +896,27 @@ const BookMeeting = () => {
             navigate(homePath, { state: { successMessage: msg } });
         } catch (err) {
             console.error('Booking failed', err);
-            const message = err?.error?.message
-                || 'Rất tiếc, phòng họp này hoặc người tham dự đã bị trùng lịch trong khung giờ được chọn. Vui lòng chọn phòng khác hoặc điều chỉnh khung giờ.';
-            setConflictInfo({ message });
+            if (err?.error?.code === 'ROOM_HAS_FAULTY_EQUIPMENT') {
+                setFaultyEquipmentWarning({
+                    faultyEquipments: err.error.details?.faultyEquipments || [],
+                    payload: payload
+                });
+            } else {
+                const message = err?.error?.message
+                    || 'Rất tiếc, phòng họp này hoặc người tham dự đã bị trùng lịch trong khung giờ được chọn. Vui lòng chọn phòng khác hoặc điều chỉnh khung giờ.';
+                setConflictInfo({ message });
 
-            try {
-                const { isoStart, isoEnd } = buildIsoRange();
-                const params = { startTime: isoStart, endTime: isoEnd };
-                if (expectedAttendeeCount) params.minCapacity = expectedAttendeeCount;
-                const altRes = await getAvailableRooms(params);
-                const alts = (altRes?.data || []).filter(r => (r.id || r.roomId) !== selectedRoomId);
-                setAlternativeRooms(alts);
-            } catch (altErr) {
-                console.error('Failed to fetch alternative rooms', altErr);
-                setAlternativeRooms([]);
+                try {
+                    const { isoStart, isoEnd } = buildIsoRange();
+                    const params = { startTime: isoStart, endTime: isoEnd };
+                    if (expectedAttendeeCount) params.minCapacity = expectedAttendeeCount;
+                    const altRes = await getAvailableRooms(params);
+                    const alts = (altRes?.data || []).filter(r => (r.id || r.roomId) !== selectedRoomId);
+                    setAlternativeRooms(alts);
+                } catch (altErr) {
+                    console.error('Failed to fetch alternative rooms', altErr);
+                    setAlternativeRooms([]);
+                }
             }
         } finally {
             setSubmitting(false);
@@ -920,6 +928,110 @@ const BookMeeting = () => {
         setCapacityOverrideConfirmed(false);
         setConflictInfo(null);
         setAlternativeRooms([]);
+    };
+
+    const handleConfirmFaultyEquipmentBooking = async () => {
+        if (!faultyEquipmentWarning) return;
+        const retryPayload = {
+            ...faultyEquipmentWarning.payload,
+            equipmentWarningConfirmed: true
+        };
+        setFaultyEquipmentWarning(null);
+        setSubmitting(true);
+        try {
+            const res = await createMeeting(retryPayload);
+            if (!res?.success) {
+                const failure = new Error(res?.message || 'Tạo cuộc họp thất bại.');
+                failure.error = { message: res?.message || 'Tạo cuộc họp thất bại.' };
+                throw failure;
+            }
+
+            const meetingId = res.data?.id;
+            const subWarnings = [];
+
+            if (meetingId && (recordingEnabled || audioRecordingEnabled)) {
+                try {
+                    await addRecordingConfig(meetingId, {
+                        enableVideo: recordingEnabled,
+                        enableAudio: audioRecordingEnabled,
+                        consentRequired: pdpaConsent,
+                    });
+                } catch (subErr) {
+                    console.error('Failed to save recording config', subErr);
+                    subWarnings.push('cấu hình ghi âm/ghi hình');
+                }
+            }
+
+            if (meetingId && agendaList.length > 0) {
+                try {
+                    const payloadAgendas = agendaList.map(item => ({
+                        title: item.title,
+                        plannedDurationMinutes: Number(item.durationMin)
+                    }));
+                    const agendaRes = await replaceAgendas(meetingId, payloadAgendas);
+
+                    if (agendaRes?.success && agendaRes.data?.items) {
+                        const savedItems = agendaRes.data.items;
+                        for (let i = 0; i < agendaList.length; i++) {
+                            if (agendaList[i].file && savedItems[i]) {
+                                const formData = new FormData();
+                                formData.append('file', agendaList[i].file);
+                                try {
+                                    await uploadAgendaAttachment(meetingId, savedItems[i].id, formData);
+                                } catch (uploadErr) {
+                                    console.error('Failed to upload attachment', uploadErr);
+                                    subWarnings.push(`file đính kèm cho "${agendaList[i].title}"`);
+                                }
+                            }
+                        }
+                    }
+                } catch (subErr) {
+                    console.error('Failed to save agenda', subErr);
+                    subWarnings.push('chương trình họp (agenda)');
+                }
+            }
+
+            const isScheduled = res.data?.status === 'scheduled';
+            let msg = isScheduled
+                ? 'Đặt phòng họp thành công! Lịch họp đã được lên lịch.'
+                : 'Đăng ký đặt phòng họp thành công! Yêu cầu của bạn đã được gửi tới Quản lý phê duyệt.';
+            if (subWarnings.length > 0) {
+                msg += ` (Lưu ý: lưu ${subWarnings.join(', ')} thất bại, vui lòng cập nhật lại ở trang chi tiết cuộc họp.)`;
+            }
+
+            let homePath = '/employee';
+            if (currentUser?.roles) {
+                const roles = currentUser.roles.map(r => (typeof r === 'string' ? r : r.roleCode || '').toUpperCase());
+                if (roles.includes('SYSTEM_ADMIN') || roles.includes('ADMIN')) homePath = '/system-admin';
+                else if (roles.includes('BUSINESS_ADMIN')) homePath = '/business-admin';
+                else if (roles.includes('MANAGER')) homePath = '/manager';
+            }
+
+            // Clear form and reset
+            setTitle('');
+            setDescription('');
+            setSelectedRoomId('');
+            setExpectedAttendeeCount('');
+            setCapacityOverrideConfirmed(false);
+            setSelectedParticipantIds([]);
+            setExternalParticipants([]);
+            setSearchEmail('');
+            setAgendaList([]);
+            setRecordingEnabled(false);
+            setAudioRecordingEnabled(false);
+            setPdpaConsent(false);
+            setCurrentStep(1);
+            setSearchPerformed(false);
+            setAvailableRooms([]);
+
+            navigate(homePath, { state: { successMessage: msg } });
+        } catch (err) {
+            console.error('Booking failed on retry', err);
+            const message = err?.error?.message || 'Tạo cuộc họp thất bại.';
+            setConflictInfo({ message });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // BE trả roleCode dạng UPPER_SNAKE trong currentUser.roles[] (mảng object), không phải field `role` string PascalCase.
@@ -1108,7 +1220,7 @@ const BookMeeting = () => {
                                                 <div
                                                     key={roomId}
                                                     onClick={() => handleSelectRoom(room)}
-                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-36 ${isSelected
+                                                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between min-h-[9rem] ${isSelected
                                                         ? 'bg-blue-50/20 border-action-blue shadow-md ring-2 ring-action-blue/15'
                                                         : 'bg-white border-platinum-tint hover:border-action-blue/50 hover:bg-cloud-mist/50'
                                                         }`}
@@ -1128,6 +1240,20 @@ const BookMeeting = () => {
                                                             <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title="Chưa được duyệt nên chưa chắc chắn giữ được phòng">
                                                                 <AlertTriangle className="w-3 h-3 shrink-0" />
                                                                 {room.pendingConflicts.length} yêu cầu khác đang chờ duyệt cùng giờ
+                                                            </p>
+                                                        )}
+
+                                                        {/* Thiết bị hỏng/cảnh báo */}
+                                                        {(room.hasFaultyEquipment || room.has_faulty_equipment) && (
+                                                            <p className="text-[10px] text-red-600 mt-1 flex items-center gap-1 font-semibold animate-pulse" title={`Có ${room.faultyEquipmentCount || room.faulty_equipment_count} thiết bị đang bị lỗi hoặc ngoại tuyến`}>
+                                                                <Wrench className="w-3 h-3 shrink-0" />
+                                                                Có {room.faultyEquipmentCount || room.faulty_equipment_count} thiết bị hỏng/offline
+                                                            </p>
+                                                        )}
+                                                        {(room.hasEquipmentWarning || room.has_equipment_warning) && !(room.hasFaultyEquipment || room.has_faulty_equipment) && (
+                                                            <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1 font-semibold" title="Có thiết bị hoạt động không ổn định hoặc cần lưu ý">
+                                                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                                                Có thiết bị hoạt động kém
                                                             </p>
                                                         )}
                                                     </div>
@@ -2188,7 +2314,75 @@ const BookMeeting = () => {
                 </AnimatePresence>
                 , document.body)}
 
-            {selectedDetailUserId && ReactDOM.createPortal(
+                        {faultyEquipmentWarning && ReactDOM.createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-platinum-tint max-w-md w-full overflow-hidden flex flex-col animate-fade-in-up">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-amber-50">
+                            <div className="flex items-center gap-2 text-amber-600">
+                                <AlertTriangle className="w-5 h-5 animate-pulse" />
+                                <h3 className="font-extrabold text-midnight-indigo text-base">Cảnh báo thiết bị phòng họp</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setFaultyEquipmentWarning(null)}
+                                className="text-slate-blue hover:text-midnight-indigo font-bold"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-slate-blue leading-relaxed">
+                                Phòng họp bạn chọn hiện đang có một số thiết bị gặp sự cố hoặc ngoại tuyến. Bạn có chắc chắn vẫn muốn tiếp tục đặt phòng này không?
+                            </p>
+
+                            <div className="bg-cloud-mist/40 rounded-xl border border-platinum-tint p-4 space-y-3 max-h-48 overflow-y-auto">
+                                <span className="text-xs font-bold text-slate-blue uppercase block mb-1">
+                                    Danh sách thiết bị sự cố:
+                                </span>
+                                {faultyEquipmentWarning.faultyEquipments.map((eq) => (
+                                    <div key={eq.id} className="flex items-start gap-2.5 text-xs bg-white p-2.5 rounded-lg border border-platinum-tint shadow-sm">
+                                        <div className="w-6 h-6 rounded-md bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+                                            <Wrench className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-midnight-indigo">{eq.equipmentName}</p>
+                                            <p className="text-[11px] text-slate-blue mt-0.5">
+                                                Loại: <span className="font-semibold">{eq.equipmentType}</span> • Trạng thái: <span className="text-red-500 font-semibold">{eq.healthStatus === 'faulty' ? 'Lỗi' : 'Ngoại tuyến'}</span>
+                                            </p>
+                                            {eq.lastIssueNote && (
+                                                <p className="text-[11px] text-slate-blue mt-0.5 italic bg-cloud-mist/50 p-1 rounded border border-platinum-tint/30">
+                                                    Chi tiết: "{eq.lastIssueNote}"
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/35 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setFaultyEquipmentWarning(null)}
+                                className="px-4 py-2 rounded-xl border border-platinum-tint text-xs font-bold text-slate-blue hover:bg-cloud-mist transition-colors"
+                            >
+                                Hủy đặt phòng
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmFaultyEquipmentBooking}
+                                className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-action-blue hover:bg-blue-700 transition-colors shadow-sm"
+                            >
+                                Vẫn tiếp tục đặt
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+{selectedDetailUserId && ReactDOM.createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4">
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-sm-2 max-w-xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 sticky top-0 z-10">

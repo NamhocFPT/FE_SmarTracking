@@ -1,5 +1,5 @@
 import {
-    AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight,
+    AlertCircle, BookOpen, Calendar, CheckCircle, ChevronLeft, ChevronRight,
     Clock, FileAudio, FileText, FolderOpen, Play, RefreshCw,
     Search, User, Video,
 } from 'lucide-react';
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
-    getMySchedule, getMeetingMediaFiles, getMediaFile,
+    getMyMeetingHistory, getMeetingMediaFiles, getMediaFile, getMeetingMinutesByMeetingId,
 } from '../../service/employeeServices';
 
 const ITEMS_PER_PAGE = 9;
@@ -112,44 +112,51 @@ const EmployeeRecordings = () => {
         setLoading(true);
         setErrorMsg(null);
         try {
-            // default: show up to 2 years of history (no limit/page — /me/schedule doesn't accept them)
+            // default: show up to 2 years of history
             const todayStr    = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
             const twoYearsAgo = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
                 .format(new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000));
             const fromStr = `${startDate || twoYearsAgo}T00:00:00+07:00`;
             const toStr   = `${endDate   || todayStr  }T23:59:59+07:00`;
 
-            const scheduleParams = {
-                from: fromStr, to: toStr,
-                view: 'month',
-                status: 'completed',
+            const historyParams = {
+                from: fromStr,
+                to: toStr,
+                status: ['completed'],
+                limit: 100,
             };
 
-            const firstRes = await getMySchedule(scheduleParams);
-            if (!firstRes?.success) throw new Error(firstRes?.message || 'Lỗi khi tải lịch họp');
+            const firstRes = await getMyMeetingHistory(historyParams);
+            if (!firstRes?.success) throw new Error(firstRes?.message || 'Lỗi khi tải lịch sử cuộc họp');
 
             let meetings = firstRes.data?.items || firstRes.data || [];
 
             if (!meetings.length) { setRecordings([]); return; }
 
-            // Fetch media files per meeting in parallel
+            // Fetch media + minutes per meeting in parallel
             const results = await Promise.all(meetings.map(async (meeting) => {
                 const mid = meeting.meetingId || meeting.id;
                 if (!mid) return null;
                 try {
-                    const mediaRes   = await getMeetingMediaFiles(mid);
-                    const mediaFiles = mediaRes?.success ? (mediaRes.data || []) : [];
+                    const [mediaRes, minutesRes] = await Promise.all([
+                        getMeetingMediaFiles(mid),
+                        getMeetingMinutesByMeetingId(mid).catch(() => null),
+                    ]);
+                    const mediaFiles          = mediaRes?.success  ? (mediaRes.data  || []) : [];
+                    const minutesList         = minutesRes?.success ? (minutesRes.data || []) : [];
+                    const hasPublishedMinutes = minutesList[0]?.status === 'published';
 
-                    if (!mediaFiles.length) return null;
+                    if (!mediaFiles.length && !hasPublishedMinutes) return null;
 
                     return {
                         meetingId: mid,
-                        meetingTitle:    meeting.title || meeting.subject || 'Cuộc họp không có tiêu đề',
-                        roomName:        meeting.room?.roomName || meeting.roomName || meeting.room?.name || '—',
-                        hostName:        meeting.organizerName || meeting.organizer?.fullName || '—',
-                        startTime:       meeting.startTime || meeting.scheduledStart || null,
-                        durationMinutes: meeting.durationMinutes || null,
+                        meetingTitle:      meeting.title || meeting.subject || 'Cuộc họp không có tiêu đề',
+                        roomName:          meeting.room?.roomName || meeting.roomName || meeting.room?.name || '—',
+                        hostName:          meeting.organizerName || meeting.organizer?.fullName || '—',
+                        startTime:         meeting.startTime || meeting.scheduledStart || null,
+                        durationMinutes:   meeting.durationMinutes || null,
                         mediaFiles,
+                        hasPublishedMinutes,
                     };
                 } catch { return null; }
             }));
@@ -247,6 +254,9 @@ const EmployeeRecordings = () => {
                     <div className="flex items-center gap-2 mb-2">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700">
                             <Video className="w-3.5 h-3.5" /> Ghi hình
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue">
+                            <BookOpen className="w-3.5 h-3.5" /> Biên bản
                         </span>
                     </div>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Bản ghi & Tài liệu cuộc họp</h1>
@@ -467,12 +477,13 @@ const EmployeeRecordings = () => {
                                                 <span>Audio</span>
                                             </button>
                                             <button
-                                                disabled
-                                                title="Tải Transcript"
-                                                className="py-2 border border-platinum-tint bg-white rounded-xl text-[10px] font-bold text-slate-blue transition-all flex flex-col items-center gap-0.5 opacity-40 cursor-not-allowed"
+                                                onClick={() => navigate(`/employee/meeting/${rec.meetingId}?tab=minutes`)}
+                                                disabled={!rec.hasPublishedMinutes}
+                                                title={rec.hasPublishedMinutes ? 'Xem biên bản' : 'Biên bản chưa ban hành'}
+                                                className="py-2 border border-platinum-tint bg-white hover:bg-cloud-mist rounded-xl text-[10px] font-bold text-slate-blue hover:text-midnight-indigo transition-all flex flex-col items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
-                                                <FileText className="w-4 h-4 text-blue-500" />
-                                                <span>Text</span>
+                                                <FileText className={`w-4 h-4 ${rec.hasPublishedMinutes ? 'text-blue-500' : 'text-slate-300'}`} />
+                                                <span>Biên bản</span>
                                             </button>
                                         </div>
                                     </div>
