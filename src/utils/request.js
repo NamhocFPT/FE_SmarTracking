@@ -1,3 +1,4 @@
+import toast from './toast';
 export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.smartracking.io.vn/api/v1';
 
 const decodeUnicodeEscapes = (obj) => {
@@ -187,12 +188,13 @@ export const request = async (path, options = {}) => {
             }
         }
 
-        return handleResponse(response);
+        return handleResponse(response, options);
     } catch (error) {
         if (error.success === false && error.error) {
+            if (!options.skipToast) toast.error(error.error.message);
             throw error;
         }
-        throw {
+        const connError = {
             success: false,
             error: {
                 message: 'Lỗi mạng: Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.',
@@ -201,10 +203,44 @@ export const request = async (path, options = {}) => {
             },
             requestId: null
         };
+        if (!options.skipToast) toast.error(connError.error.message);
+        throw connError;
     }
 };
 
-const handleResponse = async (response) => {
+const ERROR_TRANSLATIONS = {
+    // Attendance list errors
+    'attendance list is not open yet': 'Danh sách điểm danh chưa được mở. Vui lòng quay lại khi cuộc họp bắt đầu.',
+    'please come back when the meeting starts': 'Danh sách điểm danh chưa được mở. Vui lòng quay lại khi cuộc họp bắt đầu.',
+    
+    // Auth & Account errors
+    'unauthorized': 'Phiên làm việc không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',
+    'forbidden': 'Bạn không có quyền thực hiện hành động này.',
+    'invalid credentials': 'Tài khoản hoặc mật khẩu không chính xác.',
+    'email is already in use': 'Email này đã được đăng ký sử dụng bởi người dùng khác.',
+    'username is already in use': 'Tên đăng nhập này đã được đăng ký sử dụng.',
+    
+    // Meeting & Booking errors
+    'meeting has already ended': 'Cuộc họp này đã kết thúc.',
+    'room is already booked during this time range': 'Phòng họp đã được đặt trong khung giờ này. Vui lòng chọn phòng khác.',
+    'pdpa consent is required': 'Bạn phải đồng ý với cam kết bảo vệ dữ liệu cá nhân (PDPA) khi kích hoạt ghi âm/ghi hình.',
+    'room has faulty equipment': 'Phòng họp hiện có thiết bị gặp sự cố kỹ thuật.',
+    'cannot book meeting in the past': 'Không thể đặt cuộc họp trong quá khứ.',
+    'meeting time range is invalid': 'Khung giờ cuộc họp không hợp lệ.',
+};
+
+const translateErrorMessage = (msg) => {
+    if (!msg || typeof msg !== 'string') return msg;
+    const cleanMsg = msg.toLowerCase().trim();
+    for (const [eng, vie] of Object.entries(ERROR_TRANSLATIONS)) {
+        if (cleanMsg.includes(eng)) {
+            return vie;
+        }
+    }
+    return msg;
+};
+
+const handleResponse = async (response, options = {}) => {
     const contentType = response.headers.get('Content-Type') || '';
     if (
         contentType.includes('spreadsheetml') ||
@@ -230,7 +266,7 @@ const handleResponse = async (response) => {
         const parsed = await response.json();
         result = decodeUnicodeEscapes(parsed);
     } catch (e) {
-        throw {
+        const parseError = {
             success: false,
             error: {
                 message: `Lỗi hệ thống: Phản hồi không hợp lệ từ máy chủ (${response.status})`,
@@ -239,6 +275,8 @@ const handleResponse = async (response) => {
             },
             requestId: null
         };
+        if (!options.skipToast) toast.error(parseError.error.message);
+        throw parseError;
     }
 
     if (!response.ok || result.success === false) {
@@ -254,6 +292,8 @@ const handleResponse = async (response) => {
                 message = 'Lỗi hệ thống: Máy chủ đang gặp sự cố.';
             } else if (response.status === 404 && message.includes('Not Found')) {
                 message = 'Lỗi hệ thống: Không tìm thấy dữ liệu yêu cầu.';
+            } else {
+                message = translateErrorMessage(message);
             }
         }
 
@@ -261,7 +301,7 @@ const handleResponse = async (response) => {
             requestId = null;
         }
 
-        throw {
+        const errorObj = {
             success: false,
             error: {
                 message: message,
@@ -272,6 +312,12 @@ const handleResponse = async (response) => {
             status: response.status,
             requestId: requestId
         };
+
+        if (!options.skipToast) {
+            toast.error(message);
+        }
+
+        throw errorObj;
     }
 
     // Mock API Adapter: json-server returns direct objects/arrays. Wrap them.
