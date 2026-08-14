@@ -5,6 +5,264 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-15 03:05
+* **Tên Plan / Yêu cầu**: Thiết kế lại thanh tab Sidebar gọn gàng, không bị chồng chéo
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Thay đổi chiến lược layout tab từ `flex-1` (co giãn đều) sang `flex-shrink-0` với `min-w-[54px]` + `overflow-x-auto` — cho phép scroll ngang khi cần.
+    * Thêm `whitespace-nowrap` vào label — text không xuống dòng, không chồng chéo.
+    * Icon được bọc trong div tròn mờ xanh khi active (`bg-action-blue/10`).
+    * Badge điểm danh chuyển thành pill nhỏ góc trên phải thay vì xuống dòng.
+    * Badge khách mời (số lượng) hiển thị chấm tròn màu amber thay vì text dài.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 03:00
+* **Tên Plan / Yêu cầu**: Thêm tab Ghi âm riêng cho Host để quản lý recording sessions
+* **Chi tiết thay đổi**:
+  * `[Tạo mới] src/components/meeting/RecordingsTab.jsx`:
+    * Component mới hiển thị 2 danh sách: **Tệp đã lưu** (từ `GET /meetings/{id}/media-files`) và **Phiên ghi** (từ `GET /meetings/{id}/recording-sessions`).
+    * Hỗ trợ phát lại qua API `GET /media-files/{id}/playback` và nút tải xuống nếu có `downloadUrl`.
+    * Hiển thị badge trạng thái (Đang ghi / Đang xử lý / Hoàn thành / Thất bại) với màu sắc phân biệt rõ ràng.
+    * Có nút Làm mới thủ công và loading skeleton khi đang tải.
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Import `RecordingsTab`, `getRecordingSessions` từ cả 2 service, icon `Film`.
+    * Thêm states: `recordingSessions`, `recordingsLoading`, `playbackUrls`.
+    * Thêm tab **"Ghi âm"** (icon Film) vào `tabs` array — chỉ hiển thị cho Host.
+    * Thêm block render tab `recordings` sau tab `guests`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:55
+* **Tên Plan / Yêu cầu**: Ẩn "Bản ghi cuộc họp" khi meeting đang diễn ra
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Thêm điều kiện `meetingState?.status === 'completed'` vào block render phần media files. Phần "Bản ghi cuộc họp" sẽ chỉ xuất hiện sau khi cuộc họp kết thúc hoàn toàn, không còn hiển thị trong lúc họp đang diễn ra nữa.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:50
+* **Tên Plan / Yêu cầu**: Gỡ bỏ toàn bộ mock data và cơ chế giả lập Bot trong phòng họp
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Xóa bỏ hoàn toàn đối tượng `defaultMeeting` chứa thông tin cuộc họp và thành viên giả lập (Bot 1, 2, 3).
+    * Thay đổi logic trong `initMeetingState`: Khởi tạo thông tin cuộc họp trực tiếp 100% từ API dữ liệu thật của Backend (`baseMeeting`). Nếu API lỗi hoặc thất bại, hiển thị thông báo lỗi bằng Toast thay vì tự động tải mock data.
+    * Đặt `isBot = false` cho tất cả participant để đồng nhất dữ liệu thật từ Backend.
+    * Xóa bỏ hoàn toàn hook `useEffect` giả lập Bot nói chuyện tự động.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:45
+* **Tên Plan / Yêu cầu**: Thiết kế lại nhãn CHỦ TỌA và tự động gán tab mặc định cho người tham dự
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Trong danh sách người tham gia, thay thế nhãn viết tắt `CT` màu hồng thô sơ bằng nhãn in hoa nổi bật `"CHỦ TỌA"` với nền xanh dương nhẹ (`bg-blue-50`), viền nhạt (`border-blue-200/60`), chữ xanh dương (`text-blue-600`) và thêm icon `Shield` bảo mật cực kỳ chỉn chu, chuyên nghiệp.
+    * Thêm `useEffect` tự động sửa lỗi sidebar trống trơn của người tham dự. Khi một thành viên (`!isHost`) tham gia, active tab sẽ tự động chuyển từ `'host'` (vốn bị ẩn đối với họ) sang tab đầu tiên khả dụng của họ là `'agenda'` (Chương trình).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:40
+* **Tên Plan / Yêu cầu**: Giới hạn Grid phòng họp chỉ hiển thị tài khoản của chính mình (Self View Only)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Thay đổi logic tính toán `activeGridParticipants` từ việc hiển thị tất cả các thành viên đang hoạt động sang chỉ hiển thị duy nhất thành viên có `id === myParticipantId` (chính tài khoản đang đăng nhập). Các thành viên khác hoặc khách mời khi tham gia/rời đi sẽ không hiển thị ô Grid trên giao diện nữa.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:35
+* **Tên Plan / Yêu cầu**: Tích hợp API check-out khi rời phòng họp và Background Avatar Loader
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Trong hàm `confirmLeave`, bổ sung lệnh gọi API `updateAttendanceStatus` chuyển trạng thái điểm danh sang `'left_early'` (Rời sớm) khi một client nhấn nút **Rời khỏi**. Nhờ đó, Host và các client khác sẽ nhận biết được qua danh sách điểm danh cập nhật và xoá họ khỏi Grid.
+    * Trong hook đồng bộ `attendance`, bổ sung kiểm tra để tự động đặt `isPresent = false` khi trạng thái check-in chuyển sang khác `present` (như `left_early`, `absent`).
+    * Thêm hook `useEffect` thứ hai: Tự động phát hiện các participant có mặt trên Grid (`isPresent === true`) nhưng bị thiếu `avatarUrl` (do API meeting trả về thiếu), thực hiện gọi background API `getUserPublicProfile` để lấy avatar thực tế của họ và cập nhật hiển thị.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:30
+* **Tên Plan / Yêu cầu**: Tối ưu hóa điều kiện đồng bộ Grid (tránh ghi đè sự kiện Rời phòng họp)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Điều chỉnh logic hook `useEffect` đồng bộ danh sách điểm danh sang trạng thái Grid. Chỉ cho phép kích hoạt `isPresent = true` khi có check-in mới (từ `false` -> `true`).
+    * Loại bỏ việc tự động ép ngược về `true` từ danh sách `attendance` nếu họ đã rời phòng (trạng thái `isPresent` đã chuyển sang `false` qua sự kiện rời phòng). Nhờ đó, người dùng rời đi sẽ biến mất hoàn toàn trên Grid của Host và những người khác mà không bị kéo ngược trở lại nữa.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:25
+* **Tên Plan / Yêu cầu**: Tự động đồng bộ danh sách điểm danh (attendance) lên Grid cuộc họp realtime
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Bổ sung một hook `useEffect` lắng nghe sự thay đổi của danh sách điểm danh `attendance` (được cập nhật liên tục qua API sau mỗi 15 giây hoặc qua WebSocket).
+    * Ánh xạ các user check-in thành công từ `attendance` sang `meetingState.participants` và cập nhật thuộc tính `isPresent = true` (hoặc `false` khi họ rời đi). Nhờ đó, Grid hiển thị cuộc họp (`MeetingGrid`) sẽ tự động xuất hiện hoặc ẩn đi các Avatar tương ứng khi có người tham gia hoặc rời phòng họp.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:20
+* **Tên Plan / Yêu cầu**: Ẩn hoàn toàn tính năng Giơ tay, Thả cảm xúc và Phát biểu (loa) cho cả Host và người tham dự
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Xóa bỏ hoàn toàn khối code Interactions (bao gồm nút Giơ tay, nút Phát biểu/Loa, nút Cảm xúc và bảng chọn Emojis) khỏi Bottom Control Bar. Như vậy, cả Host và người tham dự sẽ không còn nhìn thấy và không thể thao tác các tính năng này trên thanh công cụ dưới đáy.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:15
+* **Tên Plan / Yêu cầu**: Giới hạn cảnh báo vắng mặt No-show chỉ hiển thị đối với Host
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Bổ sung điều kiện kiểm tra `isHost` vào khối render của No-show Pop-up Modal. Nhờ đó, chỉ có Host mới nhìn thấy hộp thoại cảnh báo giữ phòng này, còn người tham dự thông thường (`!isHost`) sẽ không bị làm phiền bởi thông báo hệ thống.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:10
+* **Tên Plan / Yêu cầu**: Nâng cấp cảnh báo No-show giải phóng phòng thành dạng Pop-up Modal che mờ màn hình
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Chuyển đổi thiết kế từ dạng Alert banner nổi phía trên sang dạng **Pop-up Modal ở chính giữa màn hình** với z-index cao nhất (`z-[99999]`), bo góc sâu (`rounded-3xl`) và bóng đổ mượt.
+    * Bổ sung lớp phủ Backdrop làm mờ toàn màn hình phía sau (`bg-slate-950/70 backdrop-blur-lg`) giúp người dùng tập trung tuyệt đối vào cảnh báo và thực hiện click xác nhận giữ phòng nhanh nhất.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:05
+* **Tên Plan / Yêu cầu**: Giới hạn quyền tương tác trong phòng họp (ẩn mic/interactions của người tham gia) và xóa hiệu ứng nhấp nhô Avatar
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingGrid.jsx`:
+    * Xóa bỏ hoàn toàn hiệu ứng âm thanh nhấp nhô màu xanh lá (các thẻ div pulsing rings) bao quanh vòng tròn Avatar.
+    * Sửa đổi viền của thẻ div bọc ngoài và Avatar để luôn hiển thị tĩnh (đáp ứng đúng yêu cầu người dùng không được tự tiện bật mic).
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Bọc các nút Mic, ngăn cách, và tương tác (Giơ tay, Phát biểu, Loa, Emojis, Gia hạn) trong điều kiện `isHost`. Nhờ đó, người tham dự thông thường (`!isHost`) sẽ không nhìn thấy và không thể thao tác các nút này (chỉ hiển thị duy nhất nút "Rời khỏi").
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 02:00
+* **Tên Plan / Yêu cầu**: Tự động Việt hóa các thông báo lỗi (Exceptions) từ Backend
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/utils/request.js`:
+    * Tạo từ điển ánh xạ dịch lỗi `ERROR_TRANSLATIONS` dịch các lỗi tiếng Anh phổ biến từ Backend (lỗi điểm danh: `Attendance list is not open yet`, lỗi xác thực: `Unauthorized`, `Forbidden`, lỗi đặt phòng trùng: `Room is already booked`, PDPA, lỗi tài khoản) sang tiếng Việt chuyên ngành chính xác và dễ hiểu.
+    * Tạo hàm `translateErrorMessage` để tự động đối chiếu, dịch nghĩa và gán thông báo lỗi tiếng Việt trước khi Toast hiển thị và trả về giao diện.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:55
+* **Tên Plan / Yêu cầu**: Thiết kế lại giao diện Toast Notification tối giản kèm thanh đếm ngược (Progress Bar Timer)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/common/ToastContainer.jsx`:
+    * Chuyển nền Toast về dạng thẻ trắng tinh tế (`bg-white`), viền xám mỏng (`border border-slate-200/80`) và đổ bóng mịn màng (`shadow-lg shadow-slate-100/50`) đúng theo hình ảnh mẫu tham khảo.
+    * Tái thiết kế các biểu tượng ở góc trái: Sử dụng các icon dạng hình tròn đặc có màu nổi bật (Success: tick trắng trên tròn xanh lá, Error: x trắng trên tròn đỏ, Info: chữ i trắng trên tròn xanh dương, Warning: tam giác vàng viền đậm).
+    * Tích hợp dải màu chạy đếm ngược (Progress Bar Timer) dưới đáy thẻ Toast sử dụng CSS animation `@keyframes shrinkWidth` chạy mượt mà trong vòng 4 giây, giúp người dùng dễ dàng theo dõi thời gian tự động đóng của thông báo.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:50
+* **Tên Plan / Yêu cầu**: Tối ưu hóa màu sắc Toast Notification để rõ nét và tương phản cao hơn
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/common/ToastContainer.jsx`:
+    * Chuyển đổi nền Toast từ màu trắng đục (`bg-white/95`) sang nền màu đặc trưng dịu của từng loại thông báo (success: `bg-emerald-50`, error: `bg-rose-50`, warning: `bg-amber-50`, info: `bg-indigo-50`) để tăng tính nhận diện thị giác.
+    * Tăng độ đậm của viền (`border-X-500/40`) và đổi màu chữ sang màu siêu tối có tông màu tương ứng (`text-emerald-950`, `text-rose-950`, v.v.) giúp văn bản sắc nét và dễ đọc hơn ở cỡ chữ nhỏ.
+    * Tăng kích thước cỡ chữ lên `text-[13px]` và đặt độ dày chữ thành `font-bold`.
+    * Cải thiện độ rõ nét của các icon đóng (nút `X`) và các icon biểu tượng.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:40
+* **Tên Plan / Yêu cầu**: Sửa logic kiểm tra Job bận của TranscriptViewer để tránh kẹt UI do job rác cũ
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/transcription/TranscriptViewer.jsx`:
+    * Thay đổi cách kiểm tra trạng thái đang xử lý (`hasProcessing`) trong hàm `fetchJobs`: Thay vì sử dụng `.some()` quét toàn bộ các job trong mảng (khiến UI bị khóa vĩnh viễn nếu có 1 job cũ bị kẹt ở trạng thái `queued`), nay chỉ kiểm tra job mới nhất (`currentJobs[0]`) do Backend đã trả dữ liệu sắp xếp mới nhất lên đầu.
+    * Bổ sung đầy đủ các trạng thái của Background Job (`running`, `scheduled`, `retrying`) vào điều kiện kiểm tra bên cạnh `queued` và `processing` để tránh bỏ sót.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:35
+* **Tên Plan / Yêu cầu**: Khắc phục triệt để lỗi phân nhóm "Chưa phân bổ" khi thêm 1 người và hiển thị tên phòng ban tiếng Việt
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`:
+    * Sửa đổi hàm `getUserDeptCode`: Ưu tiên trả về `dept.departmentName` (tên tiếng Việt đầy đủ) thay vì `dept.departmentCode` (mã viết hoa tiếng Anh `"PARTNER"`), giúp hiển thị tên phòng ban thuần Việt.
+    * Nâng cấp hàm `toggleParticipant`: Khi tích chọn thêm 1 người đơn lẻ từ ô tìm kiếm, nếu tài khoản của họ chưa có thông tin phòng ban trong cache (do API search của Backend không trả về `departmentId`), Frontend sẽ tự động gọi API `getUserPublicProfile` ở background để lấy chi tiết phòng ban của họ và cập nhật vào cache. Nhờ đó, họ sẽ được đưa vào đúng nhóm phòng ban tương ứng (ví dụ: nhóm "Đối tác") thay vì bị quy sai vào nhóm "Thành viên tự do".
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:30
+* **Tên Plan / Yêu cầu**: Cải tiến hệ thống Toast Notification toàn cục và tự động hóa thông báo
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/common/ToastContainer.jsx`:
+    * Di chuyển vị trí hiển thị Toast từ góc dưới bên phải (`bottom-6 right-5`) lên **góc trên bên phải** (`top-6 right-5`) để người dùng thấy ngay lập tức, không bị che khuất.
+    * Nâng cấp thiết kế Toast sang phong cách **Glassmorphism** cao cấp (nền bán trong suốt `bg-white/95`, viền mờ theo loại thông báo, chữ tối `text-slate-800` có tương phản cao, bóng mờ mịn).
+  * `[Cập nhật] src/utils/request.js`:
+    * Tích hợp tự động bắn Toast đỏ báo lỗi (`toast.error`) khi có lỗi mạng (Connection Error) hoặc lỗi phản hồi từ API (HTTP status errors / success false), giúp hiển thị thông báo lỗi tự động cho toàn bộ các màn hình mà không cần sửa code UI riêng lẻ. Hỗ trợ option `skipToast` để bỏ qua Toast tự động trên các request đặc thù.
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`, `src/pages/employee/MeetingDetail.jsx`, `src/pages/manager/MeetingDetail.jsx`:
+    * Thêm `useEffect` tự động lắng nghe các state lỗi validate cục bộ (`errorMsg`/`error`) và thông báo thành công (`successMessage`/`successMsg`), kích hoạt gọi `toast.error`/`toast.success` và reset state ngay lập tức để ẩn hoàn toàn các hộp thông báo tĩnh màu hồng nhạt cũ.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:25
+* **Tên Plan / Yêu cầu**: Sửa lỗi nhận diện phòng ban đối tác và Việt hóa ngôn ngữ chuyên ngành người tham gia
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`:
+    * Khắc phục hàm `mergeUsers`: bổ sung ưu tiên lấy `u.departmentId` hoặc `u.department_id` trực tiếp từ đối tượng user Backend trả về (`u.departmentId || u.department_id || u._departmentId`), sửa lỗi ghi đè cứng trường phòng ban thành `null` khiến các user đã có phòng ban (như "Đối tác") bị quy sai nhóm.
+    * Việt hóa nhãn hiển thị danh sách phân loại người tham gia chưa gán phòng ban: Thay thế chữ `"Chưa phân bổ"` thành cụm từ chuyên ngành phù hợp `"Thành viên tự do"`.
+    * Việt hóa nhãn hiển thị tại popup chi tiết thông tin user: Thay thế `"Chưa phân bổ"` thành `"Chưa gán phòng ban"`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:20
+* **Tên Plan / Yêu cầu**: Nâng cấp check trùng lịch & Thiết kế lại Modal thông báo xung đột phòng họp
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/service/employeeServices.js`, `src/service/managerServices.js`:
+    * Chỉnh sửa hàm `getAvailableRooms` để giữ nguyên các tham số thời gian `startTime` và `endTime` trong query params, đồng thời chuyển đổi đích gọi từ `/rooms/search` sang `/rooms/available` nhằm phục vụ check trùng lịch phía Backend.
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`:
+    * Thiết kế lại giao diện Cảnh báo bận lịch/trùng phòng (Collision Warning). Chuyển từ panel tĩnh hiển thị phía dưới form thành một **Floating Portal Modal** cao cấp (backdrop-blur, z-[9999]).
+    * Tăng tính minh bạch trong thông báo lỗi (báo rõ nguyên nhân có người khác đặt trước trong khi soạn thảo thông tin) và hiển thị lưới các phòng họp thay thế (alternativeRooms) với đầy đủ thông số (tên, sức chứa, địa điểm, các thiết bị hỗ trợ) giúp người dùng bấm đổi phòng nhanh tức thì.
+  * `[Tạo mới] docs/backend_api_requirements_available_rooms.md`:
+    * Soạn thảo tài liệu đặc tả yêu cầu Backend cung cấp/hoàn thiện API `/rooms/available` chi tiết (mô tả mục đích, query params, logic SQL overlap đề xuất, cấu trúc JSON trả về) để chuyển giao cho đội phát triển Backend.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:07
+* **Tên Plan / Yêu cầu**: Khắc phục lỗi TypeError 'Cannot read properties of undefined (reading replace)' khi chọn ngày
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`, `src/pages/employee/MeetingDetail.jsx`, `src/pages/manager/MeetingDetail.jsx`:
+    * Sửa đổi hàm `handleDateChangeRaw(e)` xử lý lọc thô của DatePicker: bổ sung kiểm tra null/undefined cho đối tượng sự kiện `e` và `e.target` (`if (!e || !e.target) return;`), đồng thời kiểm tra kiểu dữ liệu chuỗi (`typeof rawVal === 'string'`) trước khi thực hiện gọi hàm `.replace()`.
+    * Khắc phục triệt để lỗi crash giao diện khi người dùng click chọn ngày trực tiếp bằng chuột trên lịch.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 01:05
+* **Tên Plan / Yêu cầu**: Sửa lỗi ẩn thanh search và tối ưu hóa tìm kiếm tức thì ở ô Mời khách tham gia
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`:
+    * Sửa đổi logic `onMouseDown` của phần gợi ý nhân viên (User suggestions) trong dropdown: loại bỏ `setSearchEmail('')` và `setSearchFocused(false)` để ngăn chặn việc đóng dropdown và làm trống ô search đột ngột khi người dùng chọn một thành viên. Giờ đây người dùng có thể tích chọn liên tục nhiều người có cùng từ khóa mà không mất dropdown hay focus.
+    * Tối ưu hóa biến `visibleSuggestions` (sử dụng `useMemo` kết hợp): thực hiện lọc tức thì (Client-side filtering) trên cache danh sách nhân viên đã biết ở client, kết hợp gộp kết quả tìm kiếm bất đồng bộ (Server-side API search). Điều này giúp giao diện hiển thị ngay lập tức khi gõ chữ hoặc xóa chữ mà không bị trễ bởi debounce của API.
+    * Cải thiện sự kiện click nút xóa chữ `X` của ô search bằng `onMouseDown` kèm `e.preventDefault()`, giúp xóa sạch chữ nhưng vẫn giữ nguyên focus của ô input và mở dropdown suggestions.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 00:58
+* **Tên Plan / Yêu cầu**: Giới hạn dropdown Loại thiết bị trong modal Đăng ký thiết bị mới
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/DeviceManagement.jsx`:
+    * Sửa đổi select dropdown "Loại thiết bị" trong modal Đăng ký thiết bị mới (Register Modal), loại bỏ toàn bộ các loại thiết bị không được sử dụng thực tế (như Camera vào/ra, Camera phòng họp, Micro ghi âm, Capture Agent, Cảm biến, Màn hình), chỉ giữ lại 2 tùy chọn thực tế: `ip_camera` (Camera AI) và `face_server` (Máy chủ Face Server).
+    * Đồng bộ sửa đổi select dropdown "Loại thiết bị" trong thanh bộ lọc (Filter Bar) để chỉ hiển thị 2 loại thiết bị trên cùng tùy chọn "Tất cả loại".
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 00:44
+* **Tên Plan / Yêu cầu**: Kiểm tra và tối ưu cấu hình responsive trên toàn bộ các màn hình
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/manager/layout/ManagerLayout.jsx`:
+    * Bổ sung state `isMobileMenuOpen` và nút Hamburger (sử dụng icon `Menu` và `X` của `lucide-react`) vào Header Navbar chỉ hiển thị trên mobile.
+    * Xây dựng Mobile Menu Drawer hiển thị danh sách điều hướng dọc cho các thiết bị di động (< 768px), giúp Trưởng phòng (Manager) có thể thao tác điều hướng toàn diện trên điện thoại.
+  * `[Cập nhật] src/pages/manager/homePage.jsx`:
+    * Sửa đổi class của grid "Quick Status Bar" từ `grid-cols-3` thành `grid-cols-1 md:grid-cols-3` để ngăn chặn lỗi tràn viền và vỡ layout trên mobile.
+  * `[Kiểm tra] src/pages/employee/layout/EmployeeLayout.jsx`, `src/pages/employee/BookMeeting.jsx`, `src/pages/shared/InMeetingRoom.jsx` và `src/components/meeting/MeetingGrid.jsx`:
+    * Rà soát cấu hình responsive (bao gồm bảng biểu, form, video grids thích ứng động) và xác nhận hoạt động tương thích tốt trên mobile.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 00:39
+* **Tên Plan / Yêu cầu**: Tắt cảnh báo thiếu source map của thư viện bên thứ ba
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] .env`:
+    * Thêm biến cấu hình `GENERATE_SOURCEMAP=false` để tắt trình phân tích source map đối với các thư viện trong `node_modules` (như `@mediapipe/tasks-vision`), giúp tắt hoàn toàn các cảnh báo `Failed to parse source map` và tối ưu hóa tốc độ build/dev.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-14 18:00
+* **Tên Plan / Yêu cầu**: Cải thiện UX xử lý lỗi 409 (Meeting Not Active) khi tải điểm danh
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/components/meeting/MeetingAttendanceBoard.jsx`:
+    * Thêm state `errorCode` để lưu trữ mã lỗi cụ thể từ response.
+    * Tinh chỉnh catch error trong `fetchAttendance` để đọc đúng `err.error?.code` và `err.error?.message` thay vì chỉ `err.message` (vốn bị undefined khi object lỗi do `request.js` ném ra).
+    * Thay thế khung thông báo lỗi màu đỏ (Error Banner) bằng một màn hình rỗng thân thiện (Empty Info State) "Điểm danh chưa khả dụng" khi gặp mã lỗi `MEETING_NOT_ACTIVE`.
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-14 15:08
+* **Tên Plan / Yêu cầu**: Ngăn chặn nhập chữ và validate ô chọn ngày/giờ họp
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/employee/BookMeeting.jsx`:
+    * Thêm các hàm helper `isValidDate`, `handleDateKeyDown`, và `handleDateChangeRaw` để chặn nhập và dán văn bản chứa chữ vào DatePicker của "Khung ngày họp".
+    * Cập nhật `handleSearchRooms` và `handleSubmit` để kiểm tra ngày/giờ họp hợp lệ trước khi gọi API hoặc submit form.
+  * `[Cập nhật] src/pages/employee/MeetingDetail.jsx`:
+    * Thêm chặn nhập/dán chữ cho DatePicker của "Khung ngày họp" trong modal chỉnh sửa.
+    * Thêm validation ngày/giờ họp hợp lệ trong `handleCheckAvailability` và `handleSaveEdit`.
+  * `[Cập nhật] src/pages/manager/MeetingDetail.jsx`:
+    * Đồng bộ chặn nhập/dán chữ cho DatePicker của "Khung ngày họp" trong modal chỉnh sửa.
+    * Đồng bộ validation ngày/giờ họp hợp lệ trong `handleCheckAvailability` và `handleSaveEdit`.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-14 02:23
 * **Tên Plan / Yêu cầu**: Tách commit các chức năng đã hoàn thiện
 * **Chi tiết thay đổi**:
@@ -946,3 +1204,16 @@ ormaliseOwner() d? map snake_case/camelCase v? c�ng shape.
   - src/components/minutes/MinutesViewerEditor.jsx
 - **Trạng thái**: Đã hoàn thành.
 - **[2026-08-13]** [Implementation Plan: Fix Manager Homepage Shortcuts & API Verification] Fix Manager Homepage shortcuts (Trạng thái phòng, Điểm danh phòng ban) & add departmentId to analytics API calls to prevent 403 Forbidden/Mock Data fallback.
+
+### 2026-08-15 02:45
+* **Tên Plan / Yêu cầu**: Cải thiện UI/UX màn hình trong phòng họp (InMeetingRoom) và thông báo hệ thống (ToastContainer)
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/InMeetingRoom.jsx`:
+    * Ẩn các nút tương tác (Giơ tay, Phát biểu, Cảm xúc) đối với Chủ tọa (Host) trên thanh điều khiển dưới cùng.
+    * Đặt tab mặc định là "Chương trình" cho người tham dự khi tham gia phòng họp (trước đây bị hiển thị trắng do mặc định trỏ vào tab 'host').
+    * Chặn quyền truy cập các tab quản lý (Q.Lý, Khách, Ghi âm) đối với người tham dự thông thường và hiển thị thông báo lỗi "Hệ thống chỉ dành cho host!".
+    * Làm lại thanh điều hướng Tab: hiển thị nhãn ngắn gọn (Q.Lý, T.Gia, C.Trình), phân bố đều `flex-1`, loại bỏ cuộn ngang.
+  * `[Cập nhật] src/components/common/ToastContainer.jsx`:
+    * Thay đổi giao diện hiển thị thông báo hệ thống từ góc phải phía trên thành dạng pop-up ở giữa màn hình.
+    * Thêm hiệu ứng làm mờ nền (blur backdrop) khi thông báo hiển thị để tập trung sự chú ý.
+* **Trạng thái**: Hoàn thành
