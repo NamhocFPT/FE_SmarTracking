@@ -120,6 +120,15 @@ export const getMySchedule = async (params = {}) => {
 };
 
 /**
+ * Lấy lịch sử cuộc họp cá nhân (hỗ trợ phân trang, phục vụ trang Bản ghi)
+ * @param {object} params - { status, page, limit, from, to, q }
+ */
+export const getMyMeetingHistory = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/me/meetings/history${query}`);
+};
+
+/**
  * UC-ACC-07: Xem chi tiết hồ sơ user (self)
  * @param {number|string} userId
  */
@@ -165,9 +174,15 @@ export const getMeetingById = async (id) => {
     return await get(`/meetings/${id}`);
 };
 
-export const getMeetingMediaFiles = async (meetingId) => {
-    return await get(`/meetings/${meetingId}/media-files`);
+export const getMeetingMediaFiles = async (meetingId, params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/meetings/${meetingId}/media-files${query}`);
 };
+
+export const updateMediaVisibility = async (fileId, data) => {
+    return await patch(`/media-files/${fileId}/visibility`, data);
+};
+
 
 export const getMeetingMinutesByMeetingId = async (meetingId) => {
     const query = buildQuery({ meetingId, limit: 1 });

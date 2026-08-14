@@ -154,7 +154,38 @@ const MeetingManagement = () => {
                 setError(res?.message || 'Có lỗi xảy ra, vui lòng thử lại.');
             }
         } catch (err) {
-            setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi lưu cuộc họp.');
+            if (err?.error?.code === 'ROOM_HAS_FAULTY_EQUIPMENT') {
+                const faultyNames = (err.error.details?.faultyEquipments || [])
+                    .map(eq => `${eq.equipmentName} (${eq.healthStatus === 'faulty' ? 'Lỗi' : 'Ngoại tuyến'})`)
+                    .join(', ');
+                setConfirm({
+                    message: `Phòng họp này đang có thiết bị gặp sự cố: ${faultyNames}. Bạn có muốn tiếp tục đặt phòng?`,
+                    onConfirm: async () => {
+                        setError(null);
+                        try {
+                            const res = await createMeeting({
+                                title: formData.title,
+                                roomId: formData.roomId,
+                                startTime: new Date(formData.startTime).toISOString(),
+                                endTime: new Date(formData.endTime).toISOString(),
+                                description: formData.description,
+                                equipmentWarningConfirmed: true,
+                            });
+                            if (res?.success) {
+                                setSuccessMessage('Tạo cuộc họp thành công!');
+                                setIsModalOpen(false);
+                                fetchMeetingsList();
+                            } else {
+                                setError(res?.message || 'Có lỗi xảy ra.');
+                            }
+                        } catch (retryErr) {
+                            setError(retryErr?.message || retryErr?.error?.message || 'Có lỗi xảy ra khi lưu cuộc họp.');
+                        }
+                    }
+                });
+            } else {
+                setError(err?.message || err?.error?.message || 'Có lỗi xảy ra khi lưu cuộc họp.');
+            }
         }
     };
 
@@ -543,7 +574,10 @@ const MeetingManagement = () => {
                                         >
                                             <option value="">Chọn phòng</option>
                                             {rooms.map(r => (
-                                                <option key={r.id} value={r.id}>{r.roomName}</option>
+                                                <option key={r.id} value={r.id}>
+                                                    {r.roomName}
+                                                    {r.hasFaultyEquipment || r.has_faulty_equipment ? ' (Có thiết bị hỏng)' : r.hasEquipmentWarning || r.has_equipment_warning ? ' (Thiết bị lỗi nhẹ)' : ''}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
@@ -672,7 +706,10 @@ const MeetingManagement = () => {
                                 >
                                     <option value="">Chọn phòng</option>
                                     {rooms.map(r => (
-                                        <option key={r.id} value={r.id}>{r.roomName}</option>
+                                        <option key={r.id} value={r.id}>
+                                            {r.roomName}
+                                            {r.hasFaultyEquipment || r.has_faulty_equipment ? ' (Có thiết bị hỏng)' : r.hasEquipmentWarning || r.has_equipment_warning ? ' (Thiết bị lỗi nhẹ)' : ''}
+                                        </option>
                                     ))}
                                 </select>
                                 {roomTarget?.roomName && (

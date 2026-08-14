@@ -48,3 +48,26 @@ export const assignEquipment = async (equipmentId, data) => {
 export const deleteEquipment = async (equipmentId) => {
     return await dele(`/equipments/${equipmentId}`);
 };
+
+/**
+ * Xác nhận thiết bị báo lỗi là hỏng thật (bước trước khi cử người sửa)
+ * BE: PATCH /equipments/:id/fault-confirmation
+ * @param {string|number} equipmentId
+ * @param {object} data - { confirmationNote }
+ * @returns {Promise<object>}
+ */
+export const confirmEquipmentFault = async (equipmentId, data) => {
+    return await patch(`/equipments/${equipmentId}/fault-confirmation`, data);
+};
+
+/**
+ * Cập nhật lại thiết bị sau khi sửa xong
+ * BE: PATCH /equipments/:id/fault-resolution
+ * @param {string|number} equipmentId
+ * @param {object} data - { healthStatus, assetStatus, resolutionNote }
+ * @returns {Promise<object>}
+ */
+export const resolveEquipmentFault = async (equipmentId, data) => {
+    return await patch(`/equipments/${equipmentId}/fault-resolution`, data);
+};
+

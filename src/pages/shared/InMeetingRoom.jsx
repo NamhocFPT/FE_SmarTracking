@@ -479,6 +479,27 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     }
                 });
                 initial.participants = parts;
+
+                // Nếu meeting đang diễn ra (vào muộn hoặc refresh page),
+                // tự động mark người dùng hiện tại là isPresent = true để hiện lên grid.
+                if (initial.status === 'in_progress' && myParticipantId) {
+                    const selfIdx = initial.participants.findIndex(p => p.id === myParticipantId);
+                    if (selfIdx !== -1) {
+                        initial.participants[selfIdx] = { ...initial.participants[selfIdx], isPresent: true };
+                    } else {
+                        // User vào muộn và không có trong danh sách participants ban đầu
+                        initial.participants.push({
+                            id: myParticipantId,
+                            fullName: currentUser?.fullName || currentUser?.full_name || 'Thành viên',
+                            avatarUrl: resolveAvatarUrl(currentUser) || '',
+                            role: initial.hostId === myParticipantId ? 'Chủ tọa' : 'Thành viên',
+                            isMuted: false,
+                            isSpeaking: false,
+                            isBot: false,
+                            isPresent: true,
+                        });
+                    }
+                }
             }
             setMeetingState(initial);
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(initial));
@@ -599,9 +620,27 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
         const onSessionStarted = (data) => {
             setMeetingState(prev => {
+                // Tự động mark người dùng hiện tại là isPresent khi host bắt đầu họp
+                const updatedParticipants = [...(prev.participants || [])];
+                const selfIdx = updatedParticipants.findIndex(p => p.id === myParticipantId);
+                if (selfIdx !== -1) {
+                    updatedParticipants[selfIdx] = { ...updatedParticipants[selfIdx], isPresent: true };
+                } else if (myParticipantId) {
+                    updatedParticipants.push({
+                        id: myParticipantId,
+                        fullName: currentUser?.fullName || currentUser?.full_name || 'Thành viên',
+                        avatarUrl: resolveAvatarUrl(currentUser) || '',
+                        role: prev.hostId === myParticipantId ? 'Chủ tọa' : 'Thành viên',
+                        isMuted: false,
+                        isSpeaking: false,
+                        isBot: false,
+                        isPresent: true,
+                    });
+                }
                 const next = {
                     ...prev,
                     status: 'in_progress',
+                    participants: updatedParticipants,
                     ...(data?.scheduledEndTime ? { endTime: data.scheduledEndTime } : {}),
                 };
                 localStorage.setItem(`meeting_state_${id}`, JSON.stringify(next));
@@ -1189,7 +1228,14 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setRenameModal({ isOpen: false, targetId: null, currentName: '', isSelf: true });
     };
 
-    const handleLeaveRoom = () => setConfirmLeaveModal(true);
+    const handleLeaveRoom = () => {
+        // Nếu cuộc họp đã kết thúc thì không cần hỏi xác nhận, navigate thẳng
+        if (meetingState.status === 'completed') {
+            navigate(isPublic ? '/' : '/employee');
+            return;
+        }
+        setConfirmLeaveModal(true);
+    };
 
     const confirmLeave = () => {
         setMeetingState(prev => {

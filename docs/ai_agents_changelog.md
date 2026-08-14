@@ -5,6 +5,22 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-14 02:23
+* **Tên Plan / Yêu cầu**: Tách commit các chức năng đã hoàn thiện
+* **Chi tiết thay đổi**:
+  * Phân tích 21 file thay đổi, chia thành 9 commit riêng biệt theo chức năng:
+    * `feat(layout)` — Refactor navbar, tích hợp user-journey & meeting-approvals routes (6 files)
+    * `feat(business-admin)` — Thêm trang Kho tài liệu, sidebar navigation (4 files)
+    * `feat(employee)` — Redesign trang Bản ghi & phân trang (Recordings.jsx, bỏ phần Biên bản chờ BE)
+    * `feat(meeting)` — Hỗ trợ deep-link tab qua URL params `?tab=` (3 files)
+    * `feat(employee)` — Ẩn cấu hình ghi âm/hình khi phòng không có thiết bị (BookMeeting.jsx)
+    * `feat(in-meeting)` — Thêm đếm ngược & cảnh báo hết giờ họp (InMeetingRoom.jsx)
+    * `refactor(anpr)` — Redesign bộ lọc ANPR dạng 3-cột grid (ANPRManagement.jsx)
+    * `refactor(system-admin)` — UI tweaks RoomAccessLogs & ZoneManagement
+    * `docs` — Cập nhật archive docs & changelog
+  * Xử lý đặc biệt `Recordings.jsx`: tạo version commit-safe (bỏ nút Biên bản), commit, rồi restore file đầy đủ — giữ lại phần tích hợp `getMeetingMinutesByMeetingId` (nút Biên bản) chưa commit vì phụ thuộc BE endpoint `/meeting-minutes`.
+* **Trạng thái**: Hoàn thành — 9 commits mới, Recordings.jsx vẫn còn unstaged với phần Biên bản chờ BE
+
 ### 2026-08-14 02:00
 * **Tên Plan / Yêu cầu**: Tích hợp màn hình Hành trình khuôn viên, Tái cấu trúc Navbar và Tối ưu hóa Trang chủ Nhân viên & Trưởng phòng
 * **Chi tiết thay đổi**:

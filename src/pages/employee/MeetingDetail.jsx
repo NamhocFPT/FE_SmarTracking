@@ -8,7 +8,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { vi } from 'date-fns/locale/vi';
 import TimePicker from '../../components/common/TimePicker';
 
-import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment } from '../../service/employeeServices';
+import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment, updateMediaVisibility } from '../../service/employeeServices';
 import UserAvatar from '../../components/common/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -614,6 +614,25 @@ const EmployeeMeetingDetail = () => {
         } catch (e) {
             toast.error('Lỗi khi lấy link tải file.');
         }
+    };
+
+    const handleDeleteAudio = (fileId) => {
+        setConfirm({
+            message: 'Bạn có chắc chắn muốn xóa bản ghi âm này? Thao tác này không thể hoàn tác trên giao diện.',
+            onConfirm: async () => {
+                try {
+                    const res = await updateMediaVisibility(fileId, { action: 'soft_delete', reason: 'Host tự xóa audio thừa của meeting' });
+                    if (res?.success) {
+                        toast.success('Đã xóa bản ghi âm thành công.');
+                        setMediaFiles(prev => prev.filter(m => m.id !== fileId));
+                    } else {
+                        toast.error(res?.message || 'Không thể xóa bản ghi âm.');
+                    }
+                } catch (err) {
+                    toast.error(err?.message || 'Có lỗi xảy ra khi xóa bản ghi âm.');
+                }
+            }
+        });
     };
 
     const handleRemoveInternalParticipant = (p) => {
@@ -1572,15 +1591,32 @@ const EmployeeMeetingDetail = () => {
                                                 {currentAudioFiles.map((audioFile, idx) => (
                                                     <div key={audioFile.id || idx} className="flex flex-col gap-2 p-3 bg-cloud-mist rounded-xl border border-outline-gray">
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-xs font-bold text-midnight-indigo truncate pr-4">
-                                                                {audioFile.fileName || audioFile.file_name || `Bản ghi âm ${(audioPage - 1) * audioItemsPerPage + idx + 1}`}
+                                                            <span className="text-xs font-bold text-midnight-indigo truncate pr-4 flex flex-col">
+                                                                <span>{audioFile.fileName || audioFile.file_name || `Bản ghi âm ${(audioPage - 1) * audioItemsPerPage + idx + 1}`}</span>
+                                                                {audioFile.channelUserId && (
+                                                                    <span className="text-[10px] font-normal text-slate-400 mt-0.5">
+                                                                        Audio track cá nhân
+                                                                    </span>
+                                                                )}
                                                             </span>
-                                                            {audioFile.downloadUrl && (
-                                                                <a href={audioFile.downloadUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-platinum-tint text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg text-xs font-bold transition-colors">
-                                                                    <Download className="w-3.5 h-3.5" />
-                                                                    Tải xuống
-                                                                </a>
-                                                            )}
+                                                            <div className="flex items-center gap-2">
+                                                                {audioFile.downloadUrl && (
+                                                                    <a href={audioFile.downloadUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-platinum-tint text-slate-blue hover:text-action-blue hover:border-action-blue rounded-lg text-xs font-bold transition-colors">
+                                                                        <Download className="w-3.5 h-3.5" />
+                                                                        Tải xuống
+                                                                    </a>
+                                                                )}
+                                                                {canManage && !audioFile.channelUserId && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteAudio(audioFile.id)}
+                                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 rounded-lg text-xs font-bold transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                        Xóa
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         {audioFile.downloadUrl && (
                                                             <audio controls src={audioFile.downloadUrl} className="w-full h-10 mt-1" />
