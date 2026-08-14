@@ -38,6 +38,28 @@ const getInitialTimes = () => {
     return { start, end };
 };
 
+const isValidDate = (d) => d instanceof Date && !isNaN(d.getTime());
+
+const handleDateKeyDown = (e) => {
+    if (e.ctrlKey || e.metaKey) return;
+    const allowedKeys = [
+        'Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'Home', 'End',
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        '/', '-', ' '
+    ];
+    if (allowedKeys.includes(e.key)) return;
+    if (/^[0-9]$/.test(e.key)) return;
+    e.preventDefault();
+};
+
+const handleDateChangeRaw = (e) => {
+    if (!e || !e.target) return;
+    const rawVal = e.target.value;
+    if (typeof rawVal === 'string' && /[a-zA-ZÀ-ỹ]/.test(rawVal)) {
+        e.target.value = rawVal.replace(/[a-zA-ZÀ-ỹ]/g, '');
+    }
+};
+
 const BookMeeting = () => {
     const navigate = useNavigate();
     const [currentUser, setCurrentUser] = useState(null);
@@ -57,7 +79,7 @@ const BookMeeting = () => {
     const [startDate, endDate] = dateRange;
 
     const formatDateToLocal = (dateObj) => {
-        if (!dateObj) return '';
+        if (!dateObj || !isValidDate(dateObj)) return '';
         const d = new Date(dateObj);
         const m = d.getMonth() + 1;
         const day = d.getDate();
@@ -104,7 +126,7 @@ const BookMeeting = () => {
                 next[u.id] = {
                     ...existing,
                     ...u,
-                    _departmentId: departmentId || existing?._departmentId || null,
+                    _departmentId: u.departmentId || u.department_id || u._departmentId || departmentId || existing?._departmentId || null,
                 };
             });
             return next;
@@ -124,6 +146,20 @@ const BookMeeting = () => {
     const [conflictInfo, setConflictInfo] = useState(null);
     const [faultyEquipmentWarning, setFaultyEquipmentWarning] = useState(null);
     const [alternativeRooms, setAlternativeRooms] = useState([]);
+
+    useEffect(() => {
+        if (errorMsg) {
+            toast.error(errorMsg);
+            setErrorMsg('');
+        }
+    }, [errorMsg]);
+
+    useEffect(() => {
+        if (successMessage) {
+            toast.success(successMessage);
+            setSuccessMessage('');
+        }
+    }, [successMessage]);
 
     // Participant search states (server-side, debounced)
     const [searchEmail, setSearchEmail] = useState('');
@@ -320,15 +356,36 @@ const BookMeeting = () => {
         setSearchingRooms(true);
         setErrorMsg('');
 
+        if (!startDate || !isValidDate(startDate)) {
+            setErrorMsg('Khung ngày họp bắt đầu không hợp lệ.');
+            setSearchingRooms(false);
+            return;
+        }
+        if (!endDate || !isValidDate(endDate)) {
+            setErrorMsg('Khung ngày họp kết thúc không hợp lệ.');
+            setSearchingRooms(false);
+            return;
+        }
+        if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) {
+            setErrorMsg('Giờ bắt đầu cuộc họp không hợp lệ.');
+            setSearchingRooms(false);
+            return;
+        }
+        if (!endTime || !/^\d{2}:\d{2}$/.test(endTime)) {
+            setErrorMsg('Giờ kết thúc cuộc họp không hợp lệ.');
+            setSearchingRooms(false);
+            return;
+        }
+
         const now = new Date();
-        const selectedStart = new Date(`${startStr || new Date().toLocaleDateString('en-CA')}T${startTime}:00`);
+        const selectedStart = new Date(`${startStr}T${startTime}:00`);
         if (selectedStart < now) {
             setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
             setSearchingRooms(false);
             return;
         }
 
-        const selectedEnd = new Date(`${endStr || startStr || new Date().toLocaleDateString('en-CA')}T${endTime}:00`);
+        const selectedEnd = new Date(`${endStr}T${endTime}:00`);
         if (selectedEnd <= selectedStart) {
             setErrorMsg('Thời gian kết thúc phải sau thời gian bắt đầu.');
             setSearchingRooms(false);
@@ -407,10 +464,39 @@ const BookMeeting = () => {
         handleRemoveAgenda(index);
     };
 
-    const toggleParticipant = (userId) => {
+    const toggleParticipant = async (userId) => {
+        const isAdding = !selectedParticipantIds.includes(userId);
+        
         setSelectedParticipantIds(prev =>
             prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
         );
+
+        if (isAdding) {
+            const user = usersById[userId];
+            if (!user?._departmentId) {
+                try {
+                    const res = await getUserPublicProfile(userId);
+                    if (res?.success && res.data) {
+                        const detail = res.data;
+                        const deptId = detail.departmentId || detail.department_id || detail.department?.id;
+                        if (deptId) {
+                            setUsersById(prev => {
+                                if (!prev[userId]) return prev;
+                                return {
+                                    ...prev,
+                                    [userId]: {
+                                        ...prev[userId],
+                                        _departmentId: deptId
+                                    }
+                                };
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load user department details', err);
+                }
+            }
+        }
     };
 
     // BE (UserListItemDto/DepartmentMemberItemDto) không trả departmentId trên user
@@ -421,12 +507,35 @@ const BookMeeting = () => {
     const getUserDeptCode = (user) => {
         if (!user?._departmentId) return '';
         const dept = departments.find(d => d.id === user._departmentId);
-        return dept ? (dept.departmentCode || dept.departmentName) : '';
+        return dept ? (dept.departmentName || dept.departmentCode) : '';
     };
 
-    // Gợi ý hiển thị trong dropdown tìm kiếm: kết quả search server (hoặc gợi ý
-    // mặc định khi ô trống), loại trừ chính mình.
-    const visibleSuggestions = searchResults.filter(u => u.id !== currentUser?.id);
+    // Gợi ý hiển thị trong dropdown tìm kiếm: kết hợp lọc client-side tức thì và kết quả API từ server
+    const visibleSuggestions = useMemo(() => {
+        const query = searchEmail.trim().toLowerCase();
+        if (!query) {
+            return defaultSuggestions.filter(u => u.id !== currentUser?.id);
+        }
+
+        // Lọc ngay lập tức trên danh sách cache nội bộ (client-side)
+        const clientFiltered = users.filter(u => {
+            if (u.id === currentUser?.id) return false;
+            const fullName = (u.fullName || u.full_name || '').toLowerCase();
+            const email = (u.email || '').toLowerCase();
+            const code = (u.employeeCode || u.employee_code || '').toLowerCase();
+            return fullName.includes(query) || email.includes(query) || code.includes(query);
+        });
+
+        // Gộp kết quả trả về từ API (searchResults)
+        const apiResults = searchResults.filter(u => u.id !== currentUser?.id);
+
+        // Hợp nhất hai danh sách và loại bỏ trùng lặp
+        const mergedMap = {};
+        clientFiltered.forEach(u => { mergedMap[u.id] = u; });
+        apiResults.forEach(u => { mergedMap[u.id] = u; });
+
+        return Object.values(mergedMap);
+    }, [searchEmail, defaultSuggestions, searchResults, users, currentUser]);
 
     const visibleDepartments = useMemo(() => {
         if (!searchEmail.trim()) return [];
@@ -745,14 +854,31 @@ const BookMeeting = () => {
         setConflictInfo(null);
         setAlternativeRooms([]);
 
+        if (!startDate || !isValidDate(startDate)) {
+            setErrorMsg('Khung ngày họp bắt đầu không hợp lệ.');
+            return;
+        }
+        if (!endDate || !isValidDate(endDate)) {
+            setErrorMsg('Khung ngày họp kết thúc không hợp lệ.');
+            return;
+        }
+        if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) {
+            setErrorMsg('Giờ bắt đầu cuộc họp không hợp lệ.');
+            return;
+        }
+        if (!endTime || !/^\d{2}:\d{2}$/.test(endTime)) {
+            setErrorMsg('Giờ kết thúc cuộc họp không hợp lệ.');
+            return;
+        }
+
         const now = new Date();
-        const selectedStart = new Date(`${startStr || new Date().toLocaleDateString('en-CA')}T${startTime}:00`);
+        const selectedStart = new Date(`${startStr}T${startTime}:00`);
         if (selectedStart < now) {
             setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
             return;
         }
 
-        const selectedEnd = new Date(`${endStr || startStr || new Date().toLocaleDateString('en-CA')}T${endTime}:00`);
+        const selectedEnd = new Date(`${endStr}T${endTime}:00`);
         if (selectedEnd <= selectedStart) {
             setErrorMsg('Thời gian kết thúc phải sau thời gian bắt đầu.');
             return;
@@ -1146,6 +1272,8 @@ const BookMeeting = () => {
                                             className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo bg-white"
                                             wrapperClassName="w-full"
                                             placeholderText="DD/MM/YYYY - DD/MM/YYYY"
+                                            onKeyDown={handleDateKeyDown}
+                                            onChangeRaw={handleDateChangeRaw}
                                         />
                                     </div>
                                 </div>
@@ -1425,7 +1553,10 @@ const BookMeeting = () => {
                                             {searchEmail && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setSearchEmail('')}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        setSearchEmail('');
+                                                    }}
                                                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-blue/50 hover:text-slate-blue"
                                                 >
                                                     <X className="w-4 h-4" />
@@ -1480,10 +1611,6 @@ const BookMeeting = () => {
                                                                         onMouseDown={(e) => {
                                                                             e.preventDefault();
                                                                             toggleParticipant(user.id);
-                                                                            if (!isSelected) {
-                                                                                setSearchEmail('');
-                                                                            }
-                                                                            setSearchFocused(false);
                                                                         }}
                                                                         className={`p-3 cursor-pointer flex items-center justify-between transition-colors gap-3 min-w-0 group ${isSelected
                                                                             ? 'bg-action-blue/[0.04] hover:bg-rose-50/50 border-l-2 border-action-blue'
@@ -1560,7 +1687,7 @@ const BookMeeting = () => {
                                                     const selectedUsers = users.filter(u => selectedParticipantIds.includes(u.id));
                                                     const groupedUsers = {};
                                                     selectedUsers.forEach(user => {
-                                                        const deptCode = getUserDeptCode(user) || 'Chưa phân bổ';
+                                                         const deptCode = getUserDeptCode(user) || 'Thành viên tự do';
                                                         if (!groupedUsers[deptCode]) groupedUsers[deptCode] = [];
                                                         groupedUsers[deptCode].push(user);
                                                     });
@@ -1980,52 +2107,105 @@ const BookMeeting = () => {
                 )}
             </AnimatePresence>
 
-            {/* Collision modal / panel (keeps fallback alternative rooms logic) */}
+            {/* Collision modal (keeps fallback alternative rooms logic) */}
+            {conflictInfo && ReactDOM.createPortal(
             <AnimatePresence>
                 {conflictInfo && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 15 }}
-                        className="bg-white p-6 rounded-2xl border border-amber-200 shadow-lg space-y-4"
-                    >
-                        <div className="flex gap-3 items-start bg-amber-50 p-4 rounded-xl border border-amber-100">
-                            <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                                <h4 className="font-bold text-sm text-amber-800">Xung đột bận lịch (Collision Detected)</h4>
-                                <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-                                    {conflictInfo.message}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 className="font-bold text-xs text-slate-blue uppercase mb-3 flex items-center gap-1.5">
-                                <HelpCircle className="w-4 h-4 text-action-blue" /> Đề xuất phòng họp thay thế khả dụng:
-                            </h4>
-                            {alternativeRooms.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {alternativeRooms.map(room => (
-                                        <div
-                                            key={room.id || room.roomId}
-                                            onClick={() => handleSelectAlternativeRoom(room.id || room.roomId)}
-                                            className="p-4 rounded-xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/20 cursor-pointer transition-all flex items-center justify-between"
-                                        >
-                                            <div>
-                                                <h5 className="font-bold text-sm text-midnight-indigo">{room.roomName || room.room_name}</h5>
-                                                <p className="text-xs text-slate-blue">Sức chứa: {room.capacity} người • {room.siteName || room.site_name}</p>
-                                            </div>
-                                            <span className="text-xs font-bold text-action-blue bg-blue-50 px-2.5 py-1 rounded-lg">Chọn phòng này</span>
-                                        </div>
-                                    ))}
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-3xl border border-platinum-tint shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-fade-in-up"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center gap-3 p-5 bg-rose-50 border-b border-rose-100">
+                                <AlertTriangle className="w-6 h-6 text-rose-600 shrink-0" />
+                                <div>
+                                    <h3 className="font-bold text-base text-rose-800">Phòng họp không khả dụng (Trùng lịch)</h3>
+                                    <p className="text-xs text-rose-700/80 mt-0.5">Phát hiện xung đột lịch đặt phòng họp</p>
                                 </div>
-                            ) : (
-                                <p className="text-xs text-slate-blue italic pl-2">Không tìm thấy phòng họp trống thay thế nào có sức chứa tương đương trong thời gian này.</p>
-                            )}
-                        </div>
-                    </motion.div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setConflictInfo(null); setAlternativeRooms([]); }}
+                                    className="ml-auto p-1.5 hover:bg-rose-100 rounded-lg text-rose-700 transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="p-6 overflow-y-auto space-y-6">
+                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/70 text-xs text-amber-800 leading-relaxed">
+                                    <p className="font-bold text-sm text-amber-900 mb-1">Thông báo chi tiết:</p>
+                                    Trong lúc bạn đang điền thông tin chi tiết cuộc họp, đã có người khác thực hiện đặt phòng này trước hoặc khung giờ này đã bị trùng lịch. Vui lòng chọn một phòng họp thay thế khả dụng bên dưới hoặc nhấn hủy để điều chỉnh lại khung giờ.
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h4 className="font-extrabold text-xs text-midnight-indigo uppercase tracking-wider flex items-center gap-1.5">
+                                        <Building className="w-4 h-4 text-action-blue" /> Đề xuất phòng họp thay thế trống cùng giờ:
+                                    </h4>
+
+                                    {alternativeRooms.length > 0 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {alternativeRooms.map(room => {
+                                                const roomId = room.id || room.roomId;
+                                                return (
+                                                    <div
+                                                        key={roomId}
+                                                        onClick={() => handleSelectAlternativeRoom(roomId)}
+                                                        className="p-4 rounded-2xl border border-platinum-tint hover:border-action-blue hover:bg-blue-50/10 cursor-pointer transition-all flex flex-col justify-between hover:shadow-md min-h-[7rem] group"
+                                                    >
+                                                        <div>
+                                                            <div className="flex justify-between items-start">
+                                                                <h5 className="font-bold text-sm text-midnight-indigo group-hover:text-action-blue transition-colors">{room.roomName || room.room_name}</h5>
+                                                                <span className="text-[10px] font-bold text-slate-blue bg-cloud-mist px-2 py-0.5 rounded-md">
+                                                                    Sức chứa: {room.capacity} người
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-slate-blue mt-1 line-clamp-1">
+                                                                {room.siteName || room.site_name} • {room.areaName || room.area_name || 'Khu vực'}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between border-t border-platinum-tint/40 pt-2.5 mt-3">
+                                                            <div className="flex items-center gap-2 text-slate-blue/60">
+                                                                {(room.hasCamera || room.has_camera) && <Video className="w-3.5 h-3.5" title="Có Camera" />}
+                                                                {(room.hasMicrophone || room.has_microphone) && <Mic className="w-3.5 h-3.5" title="Có Mic" />}
+                                                            </div>
+                                                            <span className="text-[11px] font-bold text-action-blue group-hover:underline">
+                                                                Đổi sang phòng này
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="p-8 text-center bg-cloud-mist/10 rounded-2xl border border-platinum-tint border-dashed">
+                                            <Building className="w-8 h-8 text-slate-blue/40 mx-auto mb-2" />
+                                            <p className="text-xs text-slate-blue italic">Không tìm thấy phòng họp trống thay thế nào có sức chứa tương đương trong thời gian này.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="p-5 bg-cloud-mist/20 border-t border-platinum-tint/50 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setConflictInfo(null); setAlternativeRooms([]); }}
+                                    className="px-5 py-2.5 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all"
+                                >
+                                    Đóng & Điều chỉnh giờ
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+            )}
 
             {/* Import Participants Modal (combined feature with backdrop blur) */}
             {showImportModal && ReactDOM.createPortal(
@@ -2436,7 +2616,7 @@ const BookMeeting = () => {
                                         <div className="bg-cloud-mist/20 p-3 rounded-xl border border-platinum-tint/30">
                                             <span className="text-xs text-slate-blue block mb-0.5">Phòng ban</span>
                                             <span className="font-semibold text-midnight-indigo">
-                                                {userDetail.department?.departmentName || "Chưa phân bổ"}
+                                                {userDetail.department?.departmentName || "Chưa gán phòng ban"}
                                             </span>
                                         </div>
                                     </div>

@@ -34,6 +34,28 @@ const STATUS_BADGE = {
     cancelled: { label: 'Đã hủy', className: 'bg-red-50 text-red-700 border border-red-200' },
 };
 
+const isValidDate = (d) => d instanceof Date && !isNaN(d.getTime());
+
+const handleDateKeyDown = (e) => {
+    if (e.ctrlKey || e.metaKey) return;
+    const allowedKeys = [
+        'Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'Home', 'End',
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        '/', '-', ' '
+    ];
+    if (allowedKeys.includes(e.key)) return;
+    if (/^[0-9]$/.test(e.key)) return;
+    e.preventDefault();
+};
+
+const handleDateChangeRaw = (e) => {
+    if (!e || !e.target) return;
+    const rawVal = e.target.value;
+    if (typeof rawVal === 'string' && /[a-zA-ZÀ-ỹ]/.test(rawVal)) {
+        e.target.value = rawVal.replace(/[a-zA-ZÀ-ỹ]/g, '');
+    }
+};
+
 const ManagerMeetingDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -47,6 +69,20 @@ const ManagerMeetingDetail = () => {
     const [successMsg, setSuccessMsg] = useState(null);
     const [confirm, setConfirm] = useState(null);
     const [mediaFiles, setMediaFiles] = useState([]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+            setError(null);
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (successMsg) {
+            toast.success(successMsg);
+            setSuccessMsg(null);
+        }
+    }, [successMsg]);
     const [activeParticipantTab, setActiveParticipantTab] = useState('internal');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [showAddGuestModal, setShowAddGuestModal] = useState(false);
@@ -63,7 +99,7 @@ const ManagerMeetingDetail = () => {
     const [editStartDate, editEndDate] = editDateRange;
 
     const formatDateToLocal = (dateObj) => {
-        if (!dateObj) return '';
+        if (!dateObj || !isValidDate(dateObj)) return '';
         const d = new Date(dateObj);
         const m = d.getMonth() + 1;
         const day = d.getDate();
@@ -331,7 +367,23 @@ const ManagerMeetingDetail = () => {
     }, [editStart, editEnd, editStartStr, editEndStr]);
 
     const handleCheckAvailability = async () => {
-        if (!editStartStr || !editEndStr || !editStart || !editEnd) return;
+        if (!editStartDate || !isValidDate(editStartDate)) {
+            setError('Khung ngày họp bắt đầu không hợp lệ.');
+            return;
+        }
+        if (!editEndDate || !isValidDate(editEndDate)) {
+            setError('Khung ngày họp kết thúc không hợp lệ.');
+            return;
+        }
+        if (!editStart || !/^\d{2}:\d{2}$/.test(editStart)) {
+            setError('Giờ bắt đầu cuộc họp không hợp lệ.');
+            return;
+        }
+        if (!editEnd || !/^\d{2}:\d{2}$/.test(editEnd)) {
+            setError('Giờ kết thúc cuộc họp không hợp lệ.');
+            return;
+        }
+
         setIsFetchingRooms(true);
         try {
             const startISO = new Date(`${editStartStr}T${editStart}:00`).toISOString();
@@ -368,6 +420,24 @@ const ManagerMeetingDetail = () => {
     const handleSaveEdit = async (e) => {
         e.preventDefault();
         setError(null);
+
+        if (!editStartDate || !isValidDate(editStartDate)) {
+            setError('Khung ngày họp bắt đầu không hợp lệ.');
+            return;
+        }
+        if (!editEndDate || !isValidDate(editEndDate)) {
+            setError('Khung ngày họp kết thúc không hợp lệ.');
+            return;
+        }
+        if (!editStart || !/^\d{2}:\d{2}$/.test(editStart)) {
+            setError('Giờ bắt đầu cuộc họp không hợp lệ.');
+            return;
+        }
+        if (!editEnd || !/^\d{2}:\d{2}$/.test(editEnd)) {
+            setError('Giờ kết thúc cuộc họp không hợp lệ.');
+            return;
+        }
+
         const startISO = new Date(`${editStartStr}T${editStart}:00`).toISOString();
         const endISO = new Date(`${editEndStr}T${editEnd}:00`).toISOString();
         await doSaveEdit(startISO, endISO);
@@ -1463,6 +1533,8 @@ const ManagerMeetingDetail = () => {
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                                                 wrapperClassName="w-full"
                                                 placeholderText="DD/MM/YYYY - DD/MM/YYYY"
+                                                onKeyDown={handleDateKeyDown}
+                                                onChangeRaw={handleDateChangeRaw}
                                             />
                                         </div>
                                     </div>
