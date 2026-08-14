@@ -12,11 +12,8 @@ import { get, post, patch, put, dele, buildQuery } from '../utils/request';
  * @param {object} params - { startTime, endTime, minCapacity }
  */
 export const getAvailableRooms = async (params = {}) => {
-    const { minCapacity, ...rest } = params;
-    const searchParams = {};
-    if (minCapacity) searchParams.minCapacity = minCapacity;
-    const query = buildQuery(searchParams);
-    return await get(`/rooms/search${query}`);
+    const query = buildQuery(params);
+    return await get(`/rooms/available${query}`);
 };
 
 /**
