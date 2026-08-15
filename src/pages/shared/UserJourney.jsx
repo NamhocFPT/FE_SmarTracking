@@ -57,9 +57,10 @@ const UserJourney = () => {
 
     const isSelfOnly = React.useMemo(() => {
         if (!localUser) return true;
-        const isAdmin = localUser.roles?.some(r =>
-            ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes((r.roleCode || r.role_code || '').toUpperCase())
-        );
+        const isAdmin = localUser.roles?.some(r => {
+            const roleStr = (typeof r === 'string' ? r : r.roleCode || r.role_code || '').toUpperCase();
+            return ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes(roleStr);
+        });
         return !isAdmin;
     }, [localUser]);
 
@@ -69,9 +70,10 @@ const UserJourney = () => {
             const userStr = localStorage.getItem('user');
             const user = userStr ? JSON.parse(userStr) : null;
             if (user) {
-                const isAdmin = user.roles?.some(r =>
-                    ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes((r.roleCode || r.role_code || '').toUpperCase())
-                );
+                const isAdmin = user.roles?.some(r => {
+                    const roleStr = (typeof r === 'string' ? r : r.roleCode || r.role_code || '').toUpperCase();
+                    return ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes(roleStr);
+                });
                 if (!isAdmin) {
                     return user;
                 }
@@ -84,9 +86,10 @@ const UserJourney = () => {
             const userStr = localStorage.getItem('user');
             const user = userStr ? JSON.parse(userStr) : null;
             if (user) {
-                const isAdmin = user.roles?.some(r =>
-                    ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes((r.roleCode || r.role_code || '').toUpperCase())
-                );
+                const isAdmin = user.roles?.some(r => {
+                    const roleStr = (typeof r === 'string' ? r : r.roleCode || r.role_code || '').toUpperCase();
+                    return ['SYSTEM_ADMIN', 'BUSINESS_ADMIN', 'ADMIN'].includes(roleStr);
+                });
                 if (!isAdmin) {
                     return user.fullName || '';
                 }

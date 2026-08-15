@@ -37,9 +37,16 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                 const currentJobs = res.data || [];
                 setJobs(currentJobs);
                 
-                // Nếu có job đang processing
-                const hasProcessing = currentJobs.some(j => 
-                    j.status === 'queued' || j.transcriptStatus === 'processing'
+                // Chỉ xét job MỚI NHẤT (BE đã sort newest-first theo completedAt/startedAt).
+                // Không dùng .some() trên toàn bộ mảng — 1 job cũ bị kẹt (vd: worker chưa
+                // bao giờ nhặt lên chạy) sẽ khóa UI vĩnh viễn dù job mới nhất đã xong.
+                const latestJob = currentJobs[0];
+                const hasProcessing = !!latestJob && (
+                    latestJob.status === 'queued' ||
+                    latestJob.status === 'running' ||
+                    latestJob.status === 'scheduled' ||
+                    latestJob.status === 'retrying' ||
+                    latestJob.transcriptStatus === 'processing'
                 );
 
                 if (hasProcessing) {

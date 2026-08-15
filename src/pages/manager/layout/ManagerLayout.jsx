@@ -1,4 +1,4 @@
-import { Activity, BarChart2, Calendar, ChevronDown, Clock, FileCheck, Home, MapPin, PlusCircle } from 'lucide-react';
+import { Activity, BarChart2, Calendar, ChevronDown, Clock, FileCheck, Home, MapPin, PlusCircle, Menu, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -82,6 +82,7 @@ const ManagerLayout = () => {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
     const [openDropdown, setOpenDropdown] = useState(null);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const profileMenuRef = useRef(null);
     const navRef = useRef(null);
@@ -123,6 +124,9 @@ const ManagerLayout = () => {
             }
             if (navRef.current && !navRef.current.contains(event.target)) {
                 setOpenDropdown(null);
+            }
+            if (event.target.closest('.mobile-menu-overlay')) {
+                setIsMobileMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -368,9 +372,75 @@ const ManagerLayout = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Hamburger Menu Toggle (Mobile) */}
+                        <button
+                            type="button"
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="md:hidden flex items-center justify-center p-2 rounded-lg text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist transition-colors bg-transparent border-0"
+                        >
+                            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                        </button>
                     </div>
                 </div>
             </header>
+
+            {/* ========== MOBILE MENU DRAWER ========== */}
+            <div className={`md:hidden fixed inset-0 z-40 transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                {/* Overlay backdrop */}
+                <div 
+                    className="absolute inset-0 bg-midnight-indigo/20 backdrop-blur-sm mobile-menu-overlay" 
+                    aria-hidden="true" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+                
+                {/* Drawer panel */}
+                <div className={`absolute top-16 right-0 bottom-0 w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out transform ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} overflow-y-auto`}>
+                    <div className="p-4 flex flex-col gap-2">
+                        {navigationItems.map((item) => (
+                            <div key={item.label}>
+                                {item.isDropdown ? (
+                                    <div className="flex flex-col gap-1">
+                                        <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                            {item.label}
+                                        </div>
+                                        {item.children.map(child => (
+                                            <NavLink
+                                                key={child.label}
+                                                to={child.to}
+                                                end={child.end || false}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                                className={({ isActive }) =>
+                                                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors no-underline ${
+                                                        isActive ? 'text-action-blue bg-blue-50/70 font-bold' : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
+                                                    }`
+                                                }
+                                            >
+                                                {child.icon && <child.icon className="w-4 h-4 text-slate-400" />}
+                                                <span>{child.label}</span>
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <NavLink
+                                        to={item.to}
+                                        end={item.end || false}
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className={({ isActive }) =>
+                                            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors no-underline ${
+                                                isActive ? 'text-action-blue bg-blue-50 font-bold' : 'text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
+                                            }`
+                                        }
+                                    >
+                                        {item.icon && <item.icon className="w-4 h-4 text-slate-400" />}
+                                        <span>{item.label}</span>
+                                    </NavLink>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
 
             {/* ========== MAIN CONTENT ========== */}
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-6 lg:px-12 py-6">

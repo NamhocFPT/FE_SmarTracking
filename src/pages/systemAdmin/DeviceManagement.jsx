@@ -679,13 +679,7 @@ const DeviceManagement = () => {
                             >
                                 <option value="">Tất cả loại</option>
                                 <option value="ip_camera">Camera AI</option>
-                                <option value="door_camera">Camera vào/ra</option>
-                                <option value="room_camera">Camera phòng</option>
                                 <option value="face_server">Face Server</option>
-                                <option value="microphone">Micro</option>
-                                <option value="capture_agent">Capture Agent</option>
-                                <option value="occupancy_sensor">Cảm biến</option>
-                                <option value="display">Màn hình</option>
                             </select>
                             <select
                                 value={selectedStatus}
@@ -996,13 +990,7 @@ const DeviceManagement = () => {
                                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                                     >
                                         <option value="ip_camera">Camera AI</option>
-                                        <option value="door_camera">Camera kiểm soát vào/ra</option>
-                                        <option value="room_camera">Camera phòng họp</option>
                                         <option value="face_server">Máy chủ Face Server</option>
-                                        <option value="microphone">Micro ghi âm</option>
-                                        <option value="capture_agent">Capture Agent</option>
-                                        <option value="occupancy_sensor">Cảm biến đếm người</option>
-                                        <option value="display">Màn hình hiển thị</option>
                                     </select>
                                 </div>
                             </div>

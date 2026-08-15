@@ -435,11 +435,8 @@ export const deleteAgendaAttachment = async (meetingId, agendaId, fileId) => {
  * @param {object} params - { startTime, endTime, minCapacity }
  */
 export const getAvailableRooms = async (params = {}) => {
-    const { minCapacity } = params;
-    const searchParams = {};
-    if (minCapacity) searchParams.minCapacity = minCapacity;
-    const query = buildQuery(searchParams);
-    return await get(`/rooms/search${query}`);
+    const query = buildQuery(params);
+    return await get(`/rooms/available${query}`);
 };
 
 /**

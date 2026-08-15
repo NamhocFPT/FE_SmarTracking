@@ -1,23 +1,37 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, Check, Info, VolumeX, X } from 'lucide-react';
+import { AlertTriangle, Check, Info, X } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { TOAST_EVENT } from '../../utils/toast';
 
 const ICONS = {
-    success: <Check className="w-4 h-4 shrink-0" />,
-    error:   <VolumeX className="w-4 h-4 shrink-0" />,
-    warning: <AlertTriangle className="w-4 h-4 shrink-0" />,
-    info:    <Info className="w-4 h-4 shrink-0" />,
+    success: (
+        <div className="shrink-0 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white mt-0.5">
+            <Check className="w-3 h-3 stroke-[3.5]" />
+        </div>
+    ),
+    error: (
+        <div className="shrink-0 w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-white mt-0.5">
+            <X className="w-3 h-3 stroke-[3.5]" />
+        </div>
+    ),
+    warning: (
+        <AlertTriangle className="shrink-0 w-5.5 h-5.5 text-amber-500 fill-amber-500/10 stroke-[2.5] mt-0.5" />
+    ),
+    info: (
+        <div className="shrink-0 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center text-white mt-0.5">
+            <Info className="w-3 h-3 stroke-[3.5]" />
+        </div>
+    ),
 };
 
-const BG = {
-    success: 'bg-emerald-600 border-emerald-500',
-    error:   'bg-red-600 border-red-500',
-    warning: 'bg-amber-500 border-amber-400',
-    info:    'bg-midnight-indigo border-indigo-800',
+const BAR_COLOR = {
+    success: '#10b981', // emerald-500
+    error:   '#f43f5e', // rose-500
+    warning: '#f59e0b', // amber-500
+    info:    '#0ea5e9', // sky-500
 };
 
-const DURATION = 3500;
+const DURATION = 4000;
 
 const ToastContainer = () => {
     const [toasts, setToasts] = useState([]);
@@ -37,27 +51,44 @@ const ToastContainer = () => {
     }, [remove]);
 
     return (
-        <div className="fixed bottom-6 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
+        <div className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center gap-3 w-full h-full transition-all duration-300 ${toasts.length > 0 ? 'bg-midnight-indigo/40 backdrop-blur-sm pointer-events-auto' : 'pointer-events-none'}`}>
+            {/* Inject keyframes animation style */}
+            <style>{`
+                @keyframes shrinkWidth {
+                    from { width: 100%; }
+                    to { width: 0%; }
+                }
+            `}</style>
+
             <AnimatePresence>
                 {toasts.map(t => (
                     <motion.div
                         key={t.id}
-                        initial={{ opacity: 0, x: 40 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 40 }}
-                        transition={{ duration: 0.22 }}
-                        className={`pointer-events-auto px-4 py-3 rounded-xl shadow-2xl border text-xs font-bold flex items-center justify-between gap-3 text-white max-w-[340px] ${BG[t.type] ?? BG.info}`}
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
+                        layout
+                        className="relative pointer-events-auto px-5 py-5 rounded-2xl border border-slate-200/80 bg-white text-[14px] font-semibold flex items-center justify-between gap-4 shadow-2xl shadow-midnight-indigo/20 max-w-[400px] w-[90%] overflow-hidden transition-all duration-300"
                     >
-                        <div className="flex items-center gap-2.5 flex-1 pr-1">
+                        <div className="flex items-center gap-4 flex-1 pr-2 text-slate-800">
                             {ICONS[t.type]}
-                            <span className="leading-snug">{t.message}</span>
+                            <span className="leading-snug break-words">{t.message}</span>
                         </div>
                         <button
                             onClick={() => remove(t.id)}
-                            className="p-1.5 hover:bg-white/25 rounded-md transition-colors shrink-0 opacity-80 hover:opacity-100"
+                            className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-slate-600 transition-colors shrink-0"
                         >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-4 h-4" />
                         </button>
+
+                        {/* Progress Bar Timer */}
+                        <div 
+                            className="absolute bottom-0 left-0 h-[4px] rounded-b-2xl"
+                            style={{
+                                backgroundColor: BAR_COLOR[t.type] ?? BAR_COLOR.info,
+                                animation: `shrinkWidth ${DURATION}ms linear forwards`
+                            }}
+                        />
                     </motion.div>
                 ))}
             </AnimatePresence>

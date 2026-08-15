@@ -1,6 +1,6 @@
 import {
     AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-    Clock, Cpu, Download, ExternalLink, Eye, FileText, Loader, Mic, MicOff,
+    Clock, Cpu, Download, ExternalLink, Eye, FileText, Film, Loader, Mic, MicOff,
     MonitorUp, Play, Plus, RefreshCw, Shield, Smile,
     StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
     VolumeX, X, Edit2
@@ -26,6 +26,7 @@ import {
     stopVideoRecording as stopEmployeeVideoRecording,
     getRecordingStatus as getEmployeeRecordingStatus,
     getMeetingMediaFiles as getEmployeeMediaFiles,
+    getRecordingSessions as getEmployeeRecordingSessions,
     requestExtension as requestEmployeeExtension,
     decideExtension as decideEmployeeExtension,
     getRoomDevices as getEmployeeRoomDevices,
@@ -50,11 +51,13 @@ import {
     getRoomDevices as getManagerRoomDevices,
     invalidateAttendanceRecord,
     getMediaFile as getManagerMediaFile,
+    getRecordingSessions as getManagerRecordingSessions,
 } from '../../service/managerServices';
 import UserAvatar, { resolveAvatarUrl } from '../../components/common/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
 import GuestPanel from '../../components/meeting/GuestPanel';
+import RecordingsTab from '../../components/meeting/RecordingsTab';
 import { startRecordingMarker, createLiveSpeakerTag } from '../../service/transcriptionServices';
 
 const customStyles = `
@@ -214,12 +217,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [mediaFiles, setMediaFiles] = useState([]);
     const [editingMediaId, setEditingMediaId] = useState(null);
     const [editingMediaTitle, setEditingMediaTitle] = useState('');
+    const [recordingSessions, setRecordingSessions] = useState([]);
+    const [recordingsLoading, setRecordingsLoading] = useState(false);
+    const [playbackUrls, setPlaybackUrls] = useState({});
 
     // Local settings
     const [isMicOn, setIsMicOn] = useState(true);
     const [localName, setLocalName] = useState('');
     const [isLobbyReady, setIsLobbyReady] = useState(false);
-    const [activeChatTab, setActiveChatTab] = useState('host');
+    const [activeChatTab, setActiveChatTab] = useState('');
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
 
@@ -794,6 +800,24 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     const isHost = meetingState?.hostId === myParticipantId;
 
+    const initialTabSet = useRef(false);
+
+    useEffect(() => {
+        if (!meetingState) return;
+        
+        if (!initialTabSet.current) {
+            setActiveChatTab(isHost ? 'host' : 'agenda');
+            initialTabSet.current = true;
+            return;
+        }
+
+        const hostTabs = ['host', 'guests', 'recordings'];
+        if (!isHost && hostTabs.includes(activeChatTab)) {
+            showToast('Hệ thống chỉ dành cho host!', 'error');
+            setActiveChatTab('agenda');
+        }
+    }, [activeChatTab, isHost, meetingState]);
+
     // FE-MB: Countdown đến scheduled end time
     useEffect(() => {
         if (!meetingState?.endTime || meetingState?.status !== 'in_progress') {
@@ -1260,12 +1284,14 @@ const InMeetingRoom = ({ isPublic = false }) => {
     ];
     const uncheckedParticipants = (meetingState.participants || []).filter(p => !isCheckedIn(p));
 
+    // fullLabel dùng cho tooltip title, label ngắn để hiển thị trong tab (tránh xuống dòng)
     const tabs = [
-        ...(isHost ? [{ id: 'host', label: 'Quản lý', icon: Shield }] : []),
-        { id: 'agenda', label: 'Chương trình', icon: Calendar },
-        { id: 'notes', label: 'Ghi chú', icon: StickyNote },
-        { id: 'attendance', label: 'Người tham gia', icon: Users },
-        ...(isHost ? [{ id: 'guests', label: 'Khách', icon: UserCheck }] : []),
+        ...(isHost ? [{ id: 'host', label: 'Q.Lý', fullLabel: 'Quản lý', icon: Shield }] : []),
+        { id: 'agenda', label: 'C.Trình', fullLabel: 'Chương trình', icon: Calendar },
+        { id: 'notes', label: 'Ghi chú', fullLabel: 'Ghi chú', icon: StickyNote },
+        { id: 'attendance', label: 'T.Gia', fullLabel: 'Người tham gia', icon: Users },
+        ...(isHost ? [{ id: 'guests', label: 'Khách', fullLabel: 'Khách', icon: UserCheck }] : []),
+        ...(isHost ? [{ id: 'recordings', label: 'Ghi âm', fullLabel: 'Quản lý ghi âm', icon: Film }] : []),
     ];
 
     // ─── RENDER ───────────────────────────────────────────────────────
@@ -1709,38 +1735,40 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
                             {/* Interactions */}
                             <div className="flex items-center gap-2 relative">
-                                <button
-                                    onClick={handleToggleRaiseHand}
-                                    className={`p-3 rounded-2xl transition-all text-white shadow-sm ${isHandRaised ? 'bg-amber-500/90 shadow-amber-900/20' : 'bg-white/10 hover:bg-white/20'}`}
-                                    title="Giơ tay"
-                                >
-                                    <IoHandLeft className="w-5 h-5" />
-                                </button>
-                                <button
-                                    onClick={handleSelfSpeak}
-                                    className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm"
-                                    title="Phát biểu"
-                                >
-                                    <IoVolumeHigh className="w-5 h-5" />
-                                </button>
-                                <button
-                                    onClick={() => setShowReactionPicker(v => !v)}
-                                    disabled={meetingState.reactionsLocked && !isHost}
-                                    className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm disabled:opacity-30"
-                                    title="Cảm xúc"
-                                >
-                                    <IoHappy className="w-5 h-5" />
-                                </button>
                                 {!isHost && (
-                                    <button
-                                        onClick={() => setExtensionModal({ isOpen: true, minutes: 15, reason: '' })}
-                                        className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm"
-                                        title="Yêu cầu gia hạn"
-                                    >
-                                        <IoTime className="w-5 h-5" />
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={handleToggleRaiseHand}
+                                            className={`p-3 rounded-2xl transition-all text-white shadow-sm ${isHandRaised ? 'bg-amber-500/90 shadow-amber-900/20' : 'bg-white/10 hover:bg-white/20'}`}
+                                            title="Giơ tay"
+                                        >
+                                            <IoHandLeft className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={handleSelfSpeak}
+                                            className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm"
+                                            title="Phát biểu"
+                                        >
+                                            <IoVolumeHigh className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReactionPicker(v => !v)}
+                                            disabled={meetingState.reactionsLocked}
+                                            className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm disabled:opacity-30"
+                                            title="Cảm xúc"
+                                        >
+                                            <IoHappy className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={() => setExtensionModal({ isOpen: true, minutes: 15, reason: '' })}
+                                            className="p-3 rounded-2xl text-white bg-white/10 hover:bg-white/20 transition-all shadow-sm"
+                                            title="Yêu cầu gia hạn"
+                                        >
+                                            <IoTime className="w-5 h-5" />
+                                        </button>
+                                    </>
                                 )}
-                                {showReactionPicker && (
+                                {showReactionPicker && !isHost && (
                                     <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex gap-1.5 bg-midnight-indigo border border-white/10 p-2.5 rounded-2xl shadow-2xl z-20">
                                         {['👏', '❤️', '👍', '🎉', '😂', '🔥'].map(emoji => (
                                             <button key={emoji} onClick={() => sendReaction(emoji)} className="text-xl hover:scale-125 transition-transform px-1">
@@ -1773,30 +1801,42 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     {/* Right: Room Panel */}
                     <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full h-[50vh] lg:h-auto lg:w-[320px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0 h-0 lg:h-auto'}`}>
 
-                        {/* Tabs */}
-                        <nav className="flex overflow-x-auto border-b border-platinum-tint shrink-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                            {tabs.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveChatTab(tab.id)}
-                                    className={`relative flex-1 min-w-0 flex flex-col items-center justify-center gap-1 py-2 px-0.5 text-[9px] sm:text-[10px] font-bold transition-all border-b-2 ${activeChatTab === tab.id
-                                        ? 'border-action-blue text-action-blue bg-blue-50/50'
-                                        : 'border-transparent text-slate-blue hover:text-midnight-indigo hover:bg-cloud-mist'
-                                        }`}
-                                >
-                                    <tab.icon className="w-4 h-4" />
-                                    <span className="uppercase tracking-wide text-center leading-tight whitespace-normal break-words">{tab.label}</span>
-                                    {tab.id === 'attendance' && (
-                                        <span className="text-[9px] text-emerald-600 font-extrabold">{checkedInCount}/{meetingState.participants?.length}</span>
-                                    )}
-                                    {tab.id === 'guests' && admittedGuestCount > 0 && (
-                                        <span className="text-[9px] text-amber-600 font-extrabold">{admittedGuestCount} đang xem</span>
-                                    )}
-                                    {tab.id === 'host' && pendingExtensions.length > 0 && (
-                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 absolute top-1 right-1" />
-                                    )}
-                                </button>
-                            ))}
+                        {/* Tabs — flex-1 chia đều, label viết tắt, whitespace-nowrap */}
+                        <nav className="flex border-b border-platinum-tint shrink-0 bg-white">
+                            {tabs.map(tab => {
+                                const isActive = activeChatTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveChatTab(tab.id)}
+                                        title={tab.fullLabel || tab.label}
+                                        className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-0.5 transition-all border-b-2 ${isActive
+                                                ? 'border-action-blue bg-blue-50/60'
+                                                : 'border-transparent hover:bg-cloud-mist'
+                                            }`}
+                                    >
+                                        <tab.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-action-blue' : 'text-slate-400'
+                                            }`} />
+                                        <span className={`text-[8px] font-bold tracking-wide whitespace-nowrap leading-none ${isActive ? 'text-action-blue' : 'text-slate-400'
+                                            }`}>
+                                            {tab.label}
+                                        </span>
+                                        {tab.id === 'attendance' && (
+                                            <span className="text-[7px] font-extrabold text-emerald-600 leading-none">
+                                                {checkedInCount}/{meetingState.participants?.length}
+                                            </span>
+                                        )}
+                                        {tab.id === 'guests' && admittedGuestCount > 0 && (
+                                            <span className="absolute top-0.5 right-0.5 min-w-[12px] h-3 flex items-center justify-center text-[6px] font-extrabold bg-amber-400 text-white rounded-full px-0.5">
+                                                {admittedGuestCount}
+                                            </span>
+                                        )}
+                                        {tab.id === 'host' && pendingExtensions.length > 0 && (
+                                            <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 border border-white" />
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </nav>
 
                         {/* Tab Content */}
@@ -2198,7 +2238,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             })}
 
                                             {/* Media files */}
-                                            {mediaFiles.length > 0 && (
+                                            {/* Media files — chỉ hiển sau khi cuộc họ p kết thúc */}
+                                            {mediaFiles.length > 0 && meetingState?.status === 'completed' && (
                                                 <div className="space-y-1.5">
                                                     <h4 className="text-[10px] font-bold text-slate-blue uppercase tracking-wider flex items-center gap-1.5">
                                                         <FileText className="w-3 h-3" /> Bản ghi cuộc họp ({mediaFiles.length})
@@ -2423,6 +2464,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     onGuestsUpdate={setAdmittedGuests}
                                 />
                             )}
+
+                            {/* ── TAB: Ghi âm (chỉ Host) ── */}
+                            {activeChatTab === 'recordings' && isHost && (
+                                <RecordingsTab
+                                    meetingId={id}
+                                    mediaFiles={mediaFiles}
+                                    recordingSessions={recordingSessions}
+                                    setRecordingSessions={setRecordingSessions}
+                                    recordingsLoading={recordingsLoading}
+                                    setRecordingsLoading={setRecordingsLoading}
+                                    playbackUrls={playbackUrls}
+                                    setPlaybackUrls={setPlaybackUrls}
+                                    formatDuration={formatDuration}
+                                    meetingStatus={meetingState?.status}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2543,11 +2600,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border text-sm font-semibold max-w-[480px] w-[90vw] pointer-events-auto ${
-                            noShowWarning.kind === 'warning'
+                        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border text-sm font-semibold max-w-[480px] w-[90vw] pointer-events-auto ${noShowWarning.kind === 'warning'
                                 ? 'bg-amber-500 border-amber-400 text-white'
                                 : 'bg-midnight-indigo border-indigo-700 text-white'
-                        }`}
+                            }`}
                     >
                         <AlertTriangle className="w-5 h-5 shrink-0" />
                         <span className="flex-1 leading-snug">
