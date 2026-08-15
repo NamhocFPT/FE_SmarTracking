@@ -38,8 +38,6 @@ const ZoneDirectionBadge = ({ direction }) => {
 const ZoneStatusBadge = ({ isStranger, matchState }) => {
     if (isStranger)
         return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
-    if (matchState && matchState !== 'matched')
-        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><ShieldCheck className="w-2.5 h-2.5" />Khớp</span>;
 };
 
@@ -179,12 +177,9 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                         {events.map((ev) => {
                             const time = fmtEventTime(ev.eventTime || ev.timestamp);
                             const name = ev.fullName || (ev.isStranger ? 'Người lạ' : 'Không nhận diện được');
-                            const isUnmatched = !ev.isStranger && ev.matchState && ev.matchState !== 'matched';
                             const cardStyle = ev.isStranger
                                 ? 'border-red-300 ring-1 ring-red-200'
-                                : isUnmatched
-                                    ? 'border-amber-300 ring-1 ring-amber-200'
-                                    : 'border-platinum-tint';
+                                : 'border-platinum-tint';
                             return (
                                 <div key={ev.id} className={`rounded-xl border overflow-hidden bg-white hover:shadow-md transition-shadow ${cardStyle}`}>
                                     {/* Thumbnail — full width, 16:9 */}
@@ -499,7 +494,7 @@ const ZoneTimelineCard = ({ zoneId }) => {
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                {(ev.isStranger || (ev.matchState && ev.matchState !== 'matched')) ? (
+                                                {ev.isStranger ? (
                                                     <span className="inline-flex items-center gap-1 text-[10px] text-red-700 font-medium">
                                                         <AlertTriangle className="w-2.5 h-2.5" />Người lạ
                                                     </span>
