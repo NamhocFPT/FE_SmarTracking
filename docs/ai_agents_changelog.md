@@ -5,6 +5,23 @@ Quy tắc bắt buộc: AI Agent phải luôn ghi log vào cuối mỗi lần th
 
 ## Lịch sử thay đổi
 
+### 2026-08-15 08:29
+* **Tên Plan / Yêu cầu**: Khôi phục badge vàng "Chưa khớp" cho nhật ký Room Access Logs
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/systemAdmin/RoomAccessLogs.jsx`:
+    * Tách lại nhánh trạng thái `unmatched` để hiển thị màu vàng hổ phách (amber), icon `ShieldQuestion`, text "Chưa khớp" (khôi phục đúng bản trước commit dfe3b34).
+    * Giữ nguyên nhánh trạng thái `stranger` hiển thị màu đỏ với icon `AlertTriangle`, text "Người lạ" để phân biệt rõ ràng hai mức độ an ninh (người quen sai phòng vs. người lạ hoàn toàn).
+* **Trạng thái**: Hoàn thành
+
+### 2026-08-15 08:27
+* **Tên Plan / Yêu cầu**: Sửa lỗi phân quyền xem hành trình người dùng cho SysAdmin
+* **Chi tiết thay đổi**:
+  * `[Cập nhật] src/pages/shared/UserJourney.jsx`:
+    * Khắc phục lỗi kiểm tra quyền bị sai khi cấu trúc role trả về là chuỗi (string) thay vì object. Sửa logic `isAdmin` sử dụng `typeof r === 'string'` để phân tách đúng roleCode.
+    * Cho phép System Admin, Business Admin và Admin (có biến `isAdmin` = true) được quyền tìm kiếm và xem lịch trình của toàn bộ người dùng trong hệ thống (biến `isSelfOnly` = false).
+    * Đảm bảo Nhân viên (Employee) và Trưởng phòng (Manager) vẫn giữ nguyên `isSelfOnly` = true để chỉ được phép xem hành trình của chính mình theo đúng yêu cầu bảo mật.
+* **Trạng thái**: Hoàn thành
+
 ### 2026-08-15 03:05
 * **Tên Plan / Yêu cầu**: Thiết kế lại thanh tab Sidebar gọn gàng, không bị chồng chéo
 * **Chi tiết thay đổi**:
