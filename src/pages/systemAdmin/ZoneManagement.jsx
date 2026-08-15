@@ -117,7 +117,7 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                         <div className="flex items-center gap-1.5">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">{total} sự kiện</span>
                             {matchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">{matchedCount} khớp</span>}
-                            {unmatchedCount > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700">{unmatchedCount} lượt người lạ</span>}
+                            {/* Ẩn thống kê người lạ / chưa khớp theo yêu cầu */}
                         </div>
                     )}
                 </div>
