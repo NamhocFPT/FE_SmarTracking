@@ -5,31 +5,27 @@ import {
     Users, Clock, CheckCircle, AlertTriangle, AlertCircle, XCircle, Edit3, Save, X, RotateCcw
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
-import { 
-    getMeetingAttendance, 
-    updateAttendanceStatus, 
+import {
+    getMeetingAttendance,
+    updateAttendanceStatus,
     invalidateAttendanceRecord,
-    manualAttendanceCheckIn 
+    manualAttendanceCheckIn
 } from '../../service/managerServices';
+import { getSocket, subscribeToMeeting } from '../../utils/socket';
 
 const CHECK_IN_METHOD_MAP = {
-    door_camera:   'Nhận diện khuôn mặt',
-    face:          'Nhận diện khuôn mặt',
-    face_terminal: 'Face Terminal',
-    manual:        'Điểm danh thủ công',
-    qr:            'Quét mã QR',
-    kiosk:         'Kiosk tự phục vụ',
-    biometric:     'Sinh trắc học',
-    nfc:           'Quẹt thẻ NFC',
+    door_camera: 'Nhận diện khuôn mặt',
+    room_camera: 'Camera trong phòng',
+    manual:      'Điểm danh thủ công',
+    qr:          'Quét mã QR',
+    system:      'Hệ thống',
 };
 
 const ATTENDANCE_SOURCE_MAP = {
-    face_terminal: 'Face Terminal',
-    door_camera:   'Camera cửa ra/vào',
-    camera:        'Camera AI',
-    manual:        'Thủ công',
-    kiosk:         'Kiosk',
-    system:        'Hệ thống',
+    manual:            'Thủ công',
+    camera:            'Camera AI',
+    presence_snapshot: 'Ảnh chụp hiện diện',
+    mixed:             'Kết hợp nhiều nguồn',
 };
 
 const MeetingAttendanceBoard = ({ meetingId }) => {
@@ -80,6 +76,27 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
     useEffect(() => {
         fetchAttendance();
     }, [fetchAttendance]);
+
+    // [FIX 2026-08-16] Điểm danh mới qua Face Terminal (meeting.attendance.updated,
+    // BE emit tại face-attendance.service.ts) → tự refetch bảng điểm danh, KHÔNG cần F5.
+    // Payload BE chỉ tối thiểu {meetingId, userId, attendanceStatus, checkInTime} — không
+    // đủ để patch trực tiếp 1 dòng (thiếu fullName/avatarUrl/...), nên refetch nguyên trang
+    // hiện tại là cách an toàn nhất, mirror đúng pattern subscribeToMeeting đã dùng ở
+    // InMeetingRoom.jsx (join/leave room qua meeting:subscribe, KHÔNG tự nghĩ cách mới).
+    useEffect(() => {
+        if (!meetingId) return;
+        const cleanup = subscribeToMeeting(meetingId);
+        const s = getSocket();
+        const onAttendanceUpdated = (payload) => {
+            if (payload?.meetingId && payload.meetingId !== meetingId) return;
+            fetchAttendance();
+        };
+        s.on('meeting.attendance.updated', onAttendanceUpdated);
+        return () => {
+            s.off('meeting.attendance.updated', onAttendanceUpdated);
+            cleanup();
+        };
+    }, [meetingId, fetchAttendance]);
 
     // Auto-hide success
     useEffect(() => {
@@ -200,11 +217,16 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                         {lateMinutes ? `Đến muộn (${lateMinutes}p)` : 'Đến muộn'}
                     </span>
                 );
-            case 'checked_in':
-            case 'maybe_present':
+            case 'left_early':
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600">
-                        <CheckCircle className="w-3 h-3" /> Đã điểm danh
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-600">
+                        <AlertCircle className="w-3 h-3" /> Về sớm
+                    </span>
+                );
+            case 'pending_review':
+                return (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                        <AlertTriangle className="w-3 h-3" /> Chờ duyệt
                     </span>
                 );
             case 'absent':

@@ -1,5 +1,10 @@
 import toast from './toast';
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.smartracking.io.vn/api/v1';
+import { backendReady, getApiBaseUrl } from './backendResolver';
+
+// Giữ nguyên là export mutable (live binding ES module) vì vài file khác (DeviceManagement.jsx,
+// sysAdminServices.js, EventSnapshotModal.jsx, ThumbnailImage.jsx, UserAvatar.jsx) import trực
+// tiếp API_BASE_URL để dựng URL — reassign ở đây tự động phản ánh sang các nơi đó, không cần sửa.
+export let API_BASE_URL = getApiBaseUrl();
 
 const decodeUnicodeEscapes = (obj) => {
     if (obj === null || obj === undefined) return obj;
@@ -85,6 +90,11 @@ const isPublicEndpoint = (path) => {
 };
 
 export const request = async (path, options = {}) => {
+    // Chờ 1 lần dò backend CHÍNH lúc app khởi động (đã cache, các lần gọi sau await promise
+    // đã resolve nên gần như không tốn thời gian) để chọn đúng domain trước khi bắn request.
+    await backendReady;
+    API_BASE_URL = getApiBaseUrl();
+
     const { method = 'GET', body, headers = {}, isPublic: customIsPublic, token: overrideToken } = options;
     const isPublic = customIsPublic !== undefined ? customIsPublic : isPublicEndpoint(path);
     const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;

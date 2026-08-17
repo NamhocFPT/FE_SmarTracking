@@ -1,7 +1,6 @@
 import { io } from 'socket.io-client';
 import { getAccessToken } from './request';
-
-const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'https://api.smartracking.io.vn';
+import { getWsBaseUrl } from './backendResolver';
 
 let socket = null;
 
@@ -11,9 +10,13 @@ const resolveToken = () => {
   return guestToken || getAccessToken() || null;
 };
 
+// getSocket()/getGuestSocket() luôn được gọi từ trong phòng họp (sau khi người dùng đã
+// đăng nhập/điều hướng qua vài trang), tức là sau khi request() đã await backendReady ít
+// nhất 1 lần — nên đọc getWsBaseUrl() tại thời điểm gọi là đủ để đồng bộ đúng domain với
+// REST, không cần đổi getSocket() thành async (tránh phải sửa thêm các nơi gọi nó).
 export const getSocket = () => {
   if (!socket) {
-    socket = io(WS_BASE_URL, {
+    socket = io(getWsBaseUrl(), {
       path: '/ws',
       transports: ['websocket'],
       autoConnect: true,
@@ -28,7 +31,7 @@ export const getGuestSocket = () => {
   const guestToken = sessionStorage.getItem('guestToken');
   if (!guestToken) return null;
   // Nếu socket hiện tại đang chạy với accessToken nhân viên, tạo socket tạm riêng
-  return io(WS_BASE_URL, {
+  return io(getWsBaseUrl(), {
     path: '/ws',
     transports: ['websocket'],
     autoConnect: true,
