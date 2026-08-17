@@ -9,7 +9,7 @@ const PRIMARY_WS_URL = process.env.REACT_APP_WS_URL || 'https://api.smartracking
 const BACKUP_WS_URL = process.env.REACT_APP_WS_URL_BACKUP || 'https://api-backup.smartracking.io.vn';
 
 const HEALTH_CHECK_TIMEOUT_MS = 4000;
-const RECHECK_INTERVAL_MS = 5 * 60 * 1000;
+const RECHECK_INTERVAL_MS = 2 * 60 * 1000;
 
 // Mặc định lạc quan là CHÍNH — không đổi hành vi hiện tại khi CHÍNH hoạt động bình thường.
 let currentApiBaseUrl = PRIMARY_API_BASE_URL;

@@ -1640,6 +1640,12 @@ const BookMeeting = () => {
                                                                                             {deptCode}
                                                                                         </span>
                                                                                     )}
+                                                                                    {user.hasFaceProfile === false && (
+                                                                                        <AlertTriangle
+                                                                                            className="w-3.5 h-3.5 text-amber-500 shrink-0"
+                                                                                            title="Chưa có ảnh khuôn mặt — sẽ không điểm danh được bằng Face Terminal"
+                                                                                        />
+                                                                                    )}
                                                                                 </div>
                                                                                 <p className="text-xs text-slate-blue opacity-75 truncate" title={user.email}>{user.email}</p>
                                                                             </div>
@@ -1745,6 +1751,12 @@ const BookMeeting = () => {
                                                                                             >
                                                                                                 {userDeptCode}
                                                                                             </span>
+                                                                                        )}
+                                                                                        {user.hasFaceProfile === false && (
+                                                                                            <AlertTriangle
+                                                                                                className="w-3.5 h-3.5 text-amber-500 shrink-0"
+                                                                                                title="Chưa có ảnh khuôn mặt — sẽ không điểm danh được bằng Face Terminal"
+                                                                                            />
                                                                                         )}
                                                                                     </div>
                                                                                     <p
