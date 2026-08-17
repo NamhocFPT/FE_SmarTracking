@@ -1,4 +1,4 @@
-import { post, get, clearTokens } from '../utils/request';
+import { post, get, patch, clearTokens } from '../utils/request';
 
 /**
  * UC-AUTH-01 Đăng nhập hệ thống
@@ -26,22 +26,12 @@ export const logout = async () => {
 
 
 /**
- * Đặt lại mật khẩu mới (Reset Password)
- * @param {string} token
- * @param {string} newPassword
- * @returns {Promise<object>} response envelope
- */
-export const resetPassword = async (token, newPassword) => {
-    return await post('/auth/password-reset/otp', { token, newPassword }, { isPublic: true });
-};
-
-/**
  * Yêu cầu mã OTP đặt lại mật khẩu (UC-AUTH-03)
  * @param {string} email
  * @returns {Promise<object>} response envelope
  */
 export const requestPasswordResetOtp = async (email) => {
-    return await post('/auth/password-reset/otp', { email }, { isPublic: true });
+    return await post('/auth/password-reset/request', { email }, { isPublic: true });
 };
 
 /**
@@ -64,7 +54,7 @@ export const confirmPasswordReset = async (email, otp, newPassword, confirmPassw
  * @returns {Promise<object>} response envelope
  */
 export const changePassword = async (currentPassword, newPassword, confirmPassword) => {
-    return await post('/auth/me/password', { currentPassword, newPassword, confirmPassword });
+    return await patch('/auth/change-password', { currentPassword, newPassword, confirmPassword });
 };
 
 /**
@@ -73,14 +63,5 @@ export const changePassword = async (currentPassword, newPassword, confirmPasswo
  */
 export const getCurrentUser = async () => {
     return await get('/auth/me');
-};
-
-/**
- * Xác thực token reset mật khẩu có hợp lệ không
- * @param {string} token
- * @returns {Promise<object>} response envelope
- */
-export const verifyResetToken = async (token) => {
-    return await post('/auth/verify-reset-token', { token }, { isPublic: true });
 };
 

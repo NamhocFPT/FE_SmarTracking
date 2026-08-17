@@ -1,0 +1,211 @@
+/* ===================================================
+   Skeleton Loading Component - Shimmer Wave Animation
+   =================================================== */
+
+/* Base skeleton element */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: #e8edf2;
+  border-radius: 8px;
+}
+
+/* Shimmer wave overlay */
+.skeleton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 20%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0.3) 80%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Variant: text line */
+.skeleton--text {
+  height: 14px;
+  border-radius: 6px;
+}
+
+/* Variant: heading */
+.skeleton--heading {
+  height: 32px;
+  border-radius: 8px;
+}
+
+/* Variant: circle (avatar, icon) */
+.skeleton--circle {
+  border-radius: 50%;
+}
+
+/* Variant: button */
+.skeleton--button {
+  height: 48px;
+  border-radius: 12px;
+}
+
+/* Variant: input field */
+.skeleton--input {
+  height: 48px;
+  border-radius: 8px;
+}
+
+/* Variant: rectangular (card, image) */
+.skeleton--rect {
+  border-radius: 12px;
+}
+
+/* Variant: badge/tag */
+.skeleton--badge {
+  height: 28px;
+  border-radius: 999px;
+}
+
+/* Skeleton container for grouped elements */
+.skeleton-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+/* Pulse animation alternative (slower, gentler) */
+.skeleton--pulse {
+  animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.skeleton--pulse::after {
+  display: none;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Transition for skeleton fade-out when content loads */
+.skeleton-fade-enter {
+  opacity: 1;
+}
+
+.skeleton-fade-exit {
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+/* Auth page skeleton wrapper */
+.skeleton-auth-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: flex-start;
+  gap: 31px;
+  padding: 24px;
+}
+
+@media (min-width: 640px) {
+  .skeleton-auth-wrapper {
+    padding: 40px;
+  }
+}
+
+.skeleton-auth-wrapper .skeleton-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.skeleton-auth-wrapper .skeleton-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.skeleton-auth-wrapper .skeleton-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.skeleton-auth-wrapper .skeleton-divider {
+  width: 100%;
+  height: 1px;
+  background-color: #d4e0ed;
+  margin: 4px 0;
+}
+
+.skeleton-auth-wrapper .skeleton-social-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Hero section skeleton */
+.skeleton-hero-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 22.8px;
+  width: 100%;
+}
+
+.skeleton-hero-wrapper .skeleton-image-card {
+  position: relative;
+  width: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(219, 228, 237, 0.5);
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+  background: white;
+  padding: 8px;
+}
+
+.skeleton-hero-wrapper .skeleton-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  width: 100%;
+}
+
+.skeleton-hero-wrapper .skeleton-feature-card {
+  height: 73px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid rgba(219, 228, 237, 0.3);
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}

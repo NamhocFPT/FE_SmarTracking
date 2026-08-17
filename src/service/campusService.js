@@ -1,0 +1,39 @@
+import { get, buildQuery } from '../utils/request';
+
+/**
+ * UC-TRACK-01: Get user journey/campus tracking details
+ * GET /campus/user-journey
+ * @param {object} params - { userId, date }
+ * @returns {Promise<object>} response envelope { success, data: { userId, fullName, date, events: [...] } }
+ */
+export const getUserJourney = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/campus/user-journey${query}`);
+};
+
+/**
+ * CDB-RS-001: Manager role-scoped dashboard summary
+ * GET /campus-dashboard/manager-summary (MANAGER only, others 403)
+ * @returns {Promise<object>} { success, data: { teamPresenceToday: {presentCount, totalCount}, pendingMeetingRequestsCount, onTimeRateThisWeek: {rate, sampleSize}, teamZoneSecurityAlerts: {value, note} } }
+ */
+export const getManagerSummary = async () => {
+    return await get('/campus-dashboard/manager-summary');
+};
+
+/**
+ * CDB-RS-001: Employee role-scoped dashboard summary
+ * GET /campus-dashboard/employee-summary (all 4 roles)
+ * @returns {Promise<object>} { success, data: { gateAccessToday, vehicleStatus: {plateNumber, status} | null, meetingsToday } }
+ */
+export const getEmployeeSummary = async () => {
+    return await get('/campus-dashboard/employee-summary');
+};
+
+/**
+ * CDB-RS-001: Business admin role-scoped dashboard summary
+ * GET /campus-dashboard/business-admin-summary (BUSINESS_ADMIN, SYSTEM_ADMIN only)
+ * @returns {Promise<object>} { success, data: { gateTrafficToday: {entriesToday}, securityAlertsBySeverity, zoneOccupancy: {totalCount, zonesWithDataCount, totalZoneCount}, vehicleControlHitsToday } }
+ */
+export const getBusinessAdminSummary = async () => {
+    return await get('/campus-dashboard/business-admin-summary');
+};
