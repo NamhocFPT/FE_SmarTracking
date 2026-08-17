@@ -13,6 +13,10 @@ import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import Pagination from '../../components/common/Pagination';
 
+// Biển số nằm ở payload_json gốc (được lưu ngay từ lần vi phạm đầu tiên, occurrence_count=1),
+// KHÔNG chỉ trong payload_json.occurrences[] (chỉ có từ lần vi phạm thứ 2 trở đi).
+const getAlertPlateNumber = (alert) => alert?.payload_json?.plateNumber || null;
+
 // Extract all valid event snapshot IDs from an alert's payload and source
 const getAlertImages = (alert) => {
     if (!alert) return [];
@@ -505,16 +509,27 @@ const SecurityAlerts = () => {
                                         {/* Loại */}
                                         <td className="p-4 text-center">
                                             <p className="text-sm font-bold text-midnight-indigo">{getAlertTypeLabel(alert.alert_type)}</p>
-                                            {(alert.occurrence_count > 1 || alert.occurrenceCount > 1) && (
-                                                <button
-                                                    onClick={() => setOccurrencesModal({ open: true, alert })}
-                                                    className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors"
-                                                    title="Bấm để xem tất cả lượt vi phạm"
-                                                >
-                                                    <Users className="w-3 h-3" />
-                                                    {alert.occurrence_count || alert.occurrenceCount} lần
-                                                </button>
-                                            )}
+                                            <div className="flex flex-col items-center gap-1 mt-1">
+                                                {alert.alert_type === 'vehicle_control_match' && getAlertPlateNumber(alert) && (
+                                                    <span
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 text-white font-mono text-[10px] font-bold rounded uppercase tracking-wider shadow-sm border border-slate-950"
+                                                        title="Biển số"
+                                                    >
+                                                        <Car className="w-3 h-3" />
+                                                        {getAlertPlateNumber(alert)}
+                                                    </span>
+                                                )}
+                                                {(alert.occurrence_count > 1 || alert.occurrenceCount > 1) && (
+                                                    <button
+                                                        onClick={() => setOccurrencesModal({ open: true, alert })}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors"
+                                                        title="Bấm để xem tất cả lượt vi phạm"
+                                                    >
+                                                        <Users className="w-3 h-3" />
+                                                        {alert.occurrence_count || alert.occurrenceCount} lần
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
 
                                         {/* Mức độ */}
@@ -602,6 +617,17 @@ const SecurityAlerts = () => {
                                 <p className="text-xs text-slate-blue font-bold uppercase mb-1">Loại sự kiện</p>
                                 <p className="text-sm font-bold text-midnight-indigo">{getAlertTypeLabel(resolveModal.alert?.alert_type)}</p>
                             </div>
+                            {resolveModal.alert?.alert_type === 'vehicle_control_match' && getAlertPlateNumber(resolveModal.alert) && (
+                                <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                    <p className="text-xs text-slate-blue font-bold uppercase mb-1 flex items-center gap-1.5">
+                                        <Car className="w-3.5 h-3.5" />
+                                        Biển số
+                                    </p>
+                                    <span className="inline-flex px-2.5 py-1 bg-slate-900 text-white font-mono text-sm font-bold rounded uppercase tracking-wider shadow-sm border border-slate-950">
+                                        {getAlertPlateNumber(resolveModal.alert)}
+                                    </span>
+                                </div>
+                            )}
                             <div className="mb-4">
                                 <label className="block text-sm font-bold text-midnight-indigo mb-2">
                                     Ghi chú kết quả xử lý <span className="text-red-500">*</span>
