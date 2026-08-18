@@ -296,7 +296,7 @@ const MeetingAttendanceBoard = ({ meetingId }) => {
                         </div>
                         <div>
                             <p className="text-[10px] uppercase font-bold text-slate-blue">Tỷ lệ điểm danh</p>
-                            <p className="text-xl font-black text-midnight-indigo">{Math.round((summary.attendanceRate || 0) * 100)}%</p>
+                            <p className="text-xl font-black text-midnight-indigo">{Math.round(summary.attendanceRate || 0)}%</p>
                         </div>
                     </div>
 
