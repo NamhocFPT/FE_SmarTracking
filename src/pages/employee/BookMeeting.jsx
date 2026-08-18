@@ -1161,7 +1161,9 @@ const BookMeeting = () => {
     };
 
     // BE trả roleCode dạng UPPER_SNAKE trong currentUser.roles[] (mảng object), không phải field `role` string PascalCase.
-    const isManagerOrAdmin = currentUser?.roles?.some(r => ['MANAGER', 'BUSINESS_ADMIN', 'SYSTEM_ADMIN'].includes(r.roleCode || r.role_code));
+    // Chỉ Manager tự động phê duyệt theo nghiệp vụ Ý ĐỊNH — Business/System Admin không đặt phòng, không có luồng duyệt riêng.
+    // Lưu ý: BE hiện vẫn PENDING_APPROVAL cho MỌI role (chưa nhánh hóa theo role) — label này phản ánh nghiệp vụ mục tiêu, sẽ khớp hành vi thật sau khi BE fix riêng.
+    const isManagerAutoApprove = currentUser?.roles?.some(r => (r.roleCode || r.role_code) === 'MANAGER');
 
     if (loadingData) {
         return (
@@ -1986,7 +1988,7 @@ const BookMeeting = () => {
 
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-blue">Quy trình duyệt:</span>
-                                            {isManagerOrAdmin ? (
+                                            {isManagerAutoApprove ? (
                                                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold border border-emerald-100">
                                                     Tự động phê duyệt
                                                 </span>
@@ -1998,8 +2000,8 @@ const BookMeeting = () => {
                                         </div>
 
                                         <p className="text-xs text-slate-blue leading-relaxed pt-2 border-t border-cloud-mist/50">
-                                            {isManagerOrAdmin
-                                                ? 'Với vai trò quản lý hệ thống, lịch họp này sẽ được chốt tức thời mà không cần qua bước phê duyệt trung gian.'
+                                            {isManagerAutoApprove
+                                                ? 'Với vai trò Trưởng phòng, lịch họp này sẽ được chốt tức thời mà không cần qua bước phê duyệt trung gian.'
                                                 : 'Yêu cầu của bạn sẽ được gửi tới hòm thư phê duyệt của Trưởng phòng. Phòng họp sẽ được tạm khóa giữ chỗ để tránh xung đột.'}
                                         </p>
                                     </div>

@@ -278,7 +278,7 @@ const RoomOperations = () => {
                         Phòng họp
                     </span>
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Vận hành Phòng họp</h1>
-                    <p className="text-slate-blue text-sm mt-1">Cấu hình các ngưỡng No-Show, tự động giải phóng và trạng thái phòng theo thời gian thực.</p>
+                    <p className="text-slate-blue text-sm mt-1">Cấu hình các ngưỡng No-Show, tự động giải phóng và xem trạng thái phòng (cập nhật khi tải lại trang).</p>
                 </div>
                 <button
                     onClick={() => { setRoomsLoading(true); loadConfigs(); }}
@@ -323,7 +323,7 @@ const RoomOperations = () => {
                 iconColor="bg-orange-100 text-orange-600"
                 fields={[
                     { key: 'thresholdMinutes', label: 'Ngưỡng No-Show', unit: 'phút', min: 1, max: 1440, default: 15, hint: 'Sau bao nhiêu phút không có mặt thì tính là No-Show' },
-                    { key: 'warningGraceMinutes', label: 'Thời gian cảnh báo', unit: 'phút', min: 0, max: 1440, default: 0, hint: 'Cảnh báo trước khi tính No-Show (0 = không cảnh báo)' },
+                    { key: 'warningGraceMinutes', label: 'Trễ gửi cảnh báo', unit: 'phút', min: 0, max: 1440, default: 0, hint: 'Sau khi đã tính No-Show, trễ thêm bấy nhiêu phút thì gửi cảnh báo (0 = gửi ngay khi đạt ngưỡng)' },
                     { key: 'autoReleaseGraceMinutes', label: 'Tự giải phóng sau', unit: 'phút', min: 1, max: 1440, default: 5, hint: 'Thời gian thêm trước khi phòng được tự động giải phóng' },
                 ]}
                 values={noShowValues}
@@ -359,8 +359,8 @@ const RoomOperations = () => {
                             <Building2 className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-midnight-indigo">Trạng thái Phòng theo Thời gian Thực</h3>
-                            <p className="text-xs text-slate-blue mt-0.5">Tổng quan toàn bộ trạng thái phòng họp trong hệ thống.</p>
+                            <h3 className="font-bold text-midnight-indigo">Trạng thái Phòng</h3>
+                            <p className="text-xs text-slate-blue mt-0.5">Tổng quan toàn bộ trạng thái phòng họp trong hệ thống. Bấm "Tải lại" để cập nhật.</p>
                         </div>
                     </div>
                     <div className="hidden sm:flex items-center gap-3 text-[10px] font-semibold">
