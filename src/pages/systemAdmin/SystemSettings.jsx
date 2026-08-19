@@ -818,12 +818,12 @@ const SystemSettings = () => {
 
                                     {/* Warning grace minutes */}
                                     <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
-                                        <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian cảnh báo trước khi nhả phòng</label>
-                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Thời gian gửi cảnh báo đến Host trước khi phòng bị thu hồi do no-show (phút).</span>
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">Trễ gửi cảnh báo</label>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Sau khi đã tính No-Show, trễ thêm bấy nhiêu phút thì gửi cảnh báo (0 = gửi ngay khi đạt ngưỡng).</span>
                                         <div className="mt-3 relative">
                                             <input
                                                 type="number"
-                                                min="1"
+                                                min="0"
                                                 max="60"
                                                 value={noShowConfig.warningGraceMinutes}
                                                 onChange={(e) => handleNoShowChange('warningGraceMinutes', Number(e.target.value))}
