@@ -76,6 +76,25 @@ const roomStatusConfig = {
     inactive: { label: 'Ngừng hoạt động', color: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
 
+// no_show_cases.detection_status (room-status.service.ts) — chỉ 'risk'/'warning_sent' là
+// cảnh báo ĐANG diễn ra cần người vận hành chú ý; 'released'/'resolved'/'dismissed'/null là
+// ca đã xử lý xong hoặc không có, không hiện gì (tránh nhiễu thông tin cũ đã qua).
+// Màu amber riêng biệt — KHÔNG dùng đỏ (đã là màu trạng thái "Đang sử dụng" ở trên) hay cam
+// (đã là "Đã đặt" ở trên, và là màu "Ra cổng" đã chuẩn hoá ở màn UserJourney) — tránh trùng
+// nghĩa màu sắc giữa các màn trong cùng hệ thống.
+const noShowStatusConfig = {
+    risk: {
+        label: 'Nghi vấn no-show',
+        color: 'bg-amber-50 text-amber-700 border-amber-300',
+        pulse: false,
+    },
+    warning_sent: {
+        label: 'Đã cảnh báo no-show',
+        color: 'bg-amber-100 text-amber-800 border-amber-400',
+        pulse: true,
+    },
+};
+
 const RoomStatusGrid = ({ rooms, loading }) => {
     if (loading) return (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -97,11 +116,18 @@ const RoomStatusGrid = ({ rooms, loading }) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {rooms.map((room) => {
                 const status = roomStatusConfig[room.currentStatus] || roomStatusConfig.inactive;
+                const noShow = noShowStatusConfig[room.noShowStatus];
                 return (
-                    <div key={room.roomId} className="bg-white rounded-2xl border border-platinum-tint p-4 hover:shadow-md transition-shadow">
+                    <div key={room.roomId} className={`bg-white rounded-2xl border p-4 hover:shadow-md transition-shadow ${noShow ? 'border-amber-300' : 'border-platinum-tint'}`}>
                         <div className="flex items-start justify-between mb-2">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.color}`}>{status.label}</span>
                         </div>
+                        {noShow && (
+                            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-lg border mb-2 ${noShow.color} ${noShow.pulse ? 'animate-pulse' : ''}`}>
+                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                {noShow.label}
+                            </div>
+                        )}
                         <p className="font-bold text-midnight-indigo text-sm leading-tight">{room.roomName || room.roomCode}</p>
                         <p className="text-[11px] text-slate-blue mt-0.5">{room.roomCode}</p>
                         {room.currentBooking?.meetingTitle && (
