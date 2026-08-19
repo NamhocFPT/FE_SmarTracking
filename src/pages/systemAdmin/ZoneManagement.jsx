@@ -31,7 +31,7 @@ const ZoneDirectionBadge = ({ direction }) => {
     if (direction === 'enter')
         return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><LogIn className="w-2.5 h-2.5" />Vào</span>;
     if (direction === 'leave')
-        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 whitespace-nowrap"><LogOut className="w-2.5 h-2.5" />Ra</span>;
+        return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 whitespace-nowrap"><LogOut className="w-2.5 h-2.5" />Ra</span>;
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 whitespace-nowrap"><Eye className="w-2.5 h-2.5" />Thấy</span>;
 };
 

@@ -216,7 +216,7 @@ export default function GateAccessManagement() {
                                                 <td className="px-4 py-3 font-medium text-midnight-indigo">{formatDateTime(log.access_time).split(' ')[0]}</td>
                                                 <td className="px-4 py-3">{log.zone_name || '-'}</td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.direction === 'enter' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.direction === 'enter' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
                                                         {log.direction === 'enter' ? 'VÀO' : 'RA'}
                                                     </span>
                                                 </td>
@@ -356,13 +356,13 @@ export default function GateAccessManagement() {
                                 <div className="space-y-6">
                                     <h3 className="text-sm font-bold text-midnight-indigo uppercase tracking-wider">Tổng quan lưu lượng</h3>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                            <div className="text-[10px] font-bold text-blue-600 uppercase">Tổng lượt VÀO</div>
-                                            <div className="text-2xl font-black text-blue-700 mt-1">{stats.summary.total_enter}</div>
-                                        </div>
                                         <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                            <div className="text-[10px] font-bold text-emerald-600 uppercase">Tổng lượt RA</div>
-                                            <div className="text-2xl font-black text-emerald-700 mt-1">{stats.summary.total_leave}</div>
+                                            <div className="text-[10px] font-bold text-emerald-600 uppercase">Tổng lượt VÀO</div>
+                                            <div className="text-2xl font-black text-emerald-700 mt-1">{stats.summary.total_enter}</div>
+                                        </div>
+                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                                            <div className="text-[10px] font-bold text-orange-600 uppercase">Tổng lượt RA</div>
+                                            <div className="text-2xl font-black text-orange-700 mt-1">{stats.summary.total_leave}</div>
                                         </div>
                                         <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
                                             <div className="text-[10px] font-bold text-amber-600 uppercase">Số lượng xe độc nhất</div>
@@ -390,7 +390,7 @@ export default function GateAccessManagement() {
                                                         <tr key={idx} className="hover:bg-cloud-mist/30 border-b border-platinum-tint/50 last:border-0">
                                                             <td className="px-4 py-3 font-medium text-midnight-indigo">{s.bucket}</td>
                                                             <td className="px-4 py-3 font-bold text-emerald-600">{s.enter}</td>
-                                                            <td className="px-4 py-3 font-bold text-rose-600">{s.leave}</td>
+                                                            <td className="px-4 py-3 font-bold text-orange-600">{s.leave}</td>
                                                             <td className="px-4 py-3 font-medium text-slate-blue">{s.seen}</td>
                                                         </tr>
                                                     ))}
@@ -453,7 +453,7 @@ export default function GateAccessManagement() {
                                                 <div className="font-bold text-sm text-midnight-indigo">{formatDateTime(sessionDetail.check_in_time)}</div>
                                             </div>
                                             <div className="border border-platinum-tint rounded-xl p-4">
-                                                <div className="text-[10px] font-bold text-slate-blue uppercase mb-3 flex items-center gap-1"><ArrowLeft className="w-3 h-3 text-rose-500" /> Giờ ra</div>
+                                                <div className="text-[10px] font-bold text-slate-blue uppercase mb-3 flex items-center gap-1"><ArrowLeft className="w-3 h-3 text-orange-500" /> Giờ ra</div>
                                                 <div className="font-bold text-sm text-midnight-indigo">{formatDateTime(sessionDetail.check_out_time)}</div>
                                             </div>
                                         </div>

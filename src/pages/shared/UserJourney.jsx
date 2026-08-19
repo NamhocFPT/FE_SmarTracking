@@ -213,9 +213,9 @@ const UserJourney = () => {
         if (type === 'gate') {
             const isEnter = dir === 'enter';
             return (
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border relative ${isEnter ? 'bg-green-50 border-green-200 text-green-600' : 'bg-orange-50 border-orange-200 text-orange-600'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border relative ${isEnter ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-orange-50 border-orange-200 text-orange-600'}`}>
                     {isEnter
-                        ? <ArrowDownLeft className="w-4 h-4 absolute -top-1 -left-1 bg-green-600 text-white rounded-full p-0.5 border border-white" />
+                        ? <ArrowDownLeft className="w-4 h-4 absolute -top-1 -left-1 bg-emerald-600 text-white rounded-full p-0.5 border border-white" />
                         : <ArrowUpRight className="w-4 h-4 absolute -top-1 -right-1 bg-orange-500 text-white rounded-full p-0.5 border border-white" />}
                     <Car className="w-5 h-5" />
                 </div>
@@ -245,7 +245,7 @@ const UserJourney = () => {
 
         /* tag colors */
         const tagCls =
-            type === 'gate' ? 'bg-green-100 text-green-700' :
+            type === 'gate' ? (dir === 'enter' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700') :
             type === 'meeting' ? 'bg-blue-100 text-action-blue' :
             'bg-purple-100 text-royal-amethyst';
         const tagLabel =
@@ -555,7 +555,7 @@ const UserJourney = () => {
                                 <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Cổng ANPR (Xe)</p>
                                 <p className="text-2xl font-black text-midnight-indigo mt-1">{journeyData.gateCount || 0}</p>
                             </div>
-                            <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                                 <Car className="w-5 h-5" />
                             </div>
                         </div>
