@@ -195,6 +195,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
     // Core states
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [meetingState, setMeetingState] = useState(null);
     const [toasts, setToasts] = useState([]);
     const [floatingReactions, setFloatingReactions] = useState([]);
@@ -329,6 +330,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
     // ─── Data Loading ──────────────────────────────────────────────────
     const initMeetingState = async () => {
         setLoading(true);
+        setLoadError(false);
         let baseMeeting = null;
         try {
             const res = await getMeetingEmployee(id);
@@ -409,6 +411,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
             }
             setMeetingState(savedState);
             localStorage.setItem(`meeting_state_${id}`, JSON.stringify(savedState));
+        } else if (!baseMeeting) {
+            // Cả 2 API (employee/manager) đều fail VÀ chưa có cache nào cho meeting này
+            // trong trình duyệt — KHÔNG có dữ liệu thật lẫn dữ liệu cũ để dùng tạm.
+            // Trước đây rơi vào dữ liệu bịa cứng (defaultMeeting: tên họp/phòng/host/
+            // participant giả) mà không cảnh báo gì — chặn hẳn, không cho vào phòng họp
+            // với dữ liệu giả, để người dùng biết rõ và có thể thử lại.
+            setLoadError(true);
+            setLoading(false);
+            return;
         } else {
             const initial = { ...defaultMeeting, id };
             if (baseMeeting) {
@@ -463,7 +474,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             role: 'Thành viên',
                             isMuted: false,
                             isSpeaking: false,
-                            isBot: true,
+                            isBot: false,
                             isPresent: false,
                         });
                     }
@@ -873,6 +884,24 @@ const InMeetingRoom = ({ isPublic = false }) => {
     };
 
     const checkedInCount = meetingState?.participants?.filter(p => isCheckedIn(p)).length || 0;
+
+    if (loadError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-cloud-mist px-4 text-center">
+                <AlertTriangle className="w-10 h-10 text-red-500 mb-4" />
+                <p className="text-midnight-indigo text-base font-bold">Không thể tải thông tin cuộc họp</p>
+                <p className="mt-1 text-slate-blue text-sm max-w-md">
+                    Vui lòng kiểm tra kết nối mạng và thử lại. Nếu tình trạng này tiếp diễn, hãy liên hệ quản trị viên.
+                </p>
+                <button
+                    onClick={initMeetingState}
+                    className="mt-5 px-5 py-2.5 rounded-xl bg-action-blue text-white text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                    <RefreshCw className="w-4 h-4" /> Thử lại
+                </button>
+            </div>
+        );
+    }
 
     if (loading || !meetingState) {
         return (

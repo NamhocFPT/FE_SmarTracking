@@ -325,7 +325,7 @@ const BookMeeting = () => {
     }, [searchEmail, defaultSuggestions]);
 
     const selectedRoom = availableRooms.find(r => (r.id || r.roomId) === selectedRoomId);
-    const roomHasCamera = !!(selectedRoom?.hasCamera || selectedRoom?.has_camera || selectedRoom?.allowRecording || selectedRoom?.allow_recording);
+    const roomHasCamera = !!(selectedRoom?.hasCamera || selectedRoom?.has_camera);
     const roomHasMic = !!(selectedRoom?.hasMicrophone || selectedRoom?.has_microphone);
     const roomAllowsRecording = roomHasCamera || roomHasMic;
 
@@ -985,10 +985,7 @@ const BookMeeting = () => {
                 }
             }
 
-            const isScheduled = res.data?.status === 'scheduled';
-            let msg = isScheduled
-                ? 'Đặt phòng họp thành công! Lịch họp đã được lên lịch.'
-                : 'Đăng ký đặt phòng họp thành công! Yêu cầu của bạn đã được gửi tới Quản lý phê duyệt.';
+            let msg = 'Đăng ký đặt phòng họp thành công! Yêu cầu của bạn đã được gửi tới Quản lý phê duyệt.';
             if (subWarnings.length > 0) {
                 msg += ` (Lưu ý: lưu ${subWarnings.join(', ')} thất bại, vui lòng cập nhật lại ở trang chi tiết cuộc họp.)`;
             }
@@ -1370,20 +1367,6 @@ const BookMeeting = () => {
                                                             <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1" title="Chưa được duyệt nên chưa chắc chắn giữ được phòng">
                                                                 <AlertTriangle className="w-3 h-3 shrink-0" />
                                                                 {room.pendingConflicts.length} yêu cầu khác đang chờ duyệt cùng giờ
-                                                            </p>
-                                                        )}
-
-                                                        {/* Thiết bị hỏng/cảnh báo */}
-                                                        {(room.hasFaultyEquipment || room.has_faulty_equipment) && (
-                                                            <p className="text-[10px] text-red-600 mt-1 flex items-center gap-1 font-semibold animate-pulse" title={`Có ${room.faultyEquipmentCount || room.faulty_equipment_count} thiết bị đang bị lỗi hoặc ngoại tuyến`}>
-                                                                <Wrench className="w-3 h-3 shrink-0" />
-                                                                Có {room.faultyEquipmentCount || room.faulty_equipment_count} thiết bị hỏng/offline
-                                                            </p>
-                                                        )}
-                                                        {(room.hasEquipmentWarning || room.has_equipment_warning) && !(room.hasFaultyEquipment || room.has_faulty_equipment) && (
-                                                            <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1 font-semibold" title="Có thiết bị hoạt động không ổn định hoặc cần lưu ý">
-                                                                <AlertTriangle className="w-3 h-3 shrink-0" />
-                                                                Có thiết bị hoạt động kém
                                                             </p>
                                                         )}
                                                     </div>
@@ -2359,15 +2342,14 @@ const BookMeeting = () => {
                                                     <Info className="w-3.5 h-3.5 text-action-blue" /> Hướng dẫn định dạng cột Excel:
                                                 </h4>
                                                 <p className="text-[11px] text-slate-blue leading-relaxed">
-                                                    File dùng đúng bộ cột chuẩn của hệ thống (giống định dạng khi thêm thành viên ở trang chi tiết cuộc họp):
+                                                    File dùng đúng bộ cột như trong file mẫu (hệ thống tự nhận diện nhân viên nội bộ/khách ngoài):
                                                 </p>
                                                 <ul className="list-disc pl-4 text-[11px] text-slate-blue space-y-0.5">
-                                                    <li>Cột <strong>type</strong>: <code className="px-1 py-0.2 bg-white border rounded font-semibold text-blue-600">internal</code> (nhân viên nội bộ) hoặc <code className="px-1 py-0.2 bg-white border rounded font-semibold text-emerald-600">external</code> (khách ngoài) — bắt buộc.</li>
-                                                    <li>Cột <strong>email</strong>: định danh chính cho nhân viên nội bộ (ưu tiên); bắt buộc với khách ngoài.</li>
-                                                    <li>Cột <strong>employee_code</strong>: mã nhân viên — dùng thay email khi tra cứu nhân viên nội bộ.</li>
-                                                    <li>Cột <strong>full_name</strong>: bắt buộc với khách ngoài.</li>
-                                                    <li>Cột <strong>organization_name</strong>: tổ chức của khách ngoài (tùy chọn).</li>
-                                                    <li className="text-[10px] italic text-slate-blue/70">Cột phone_number chỉ để tham khảo, chưa được lưu ở bước tạo cuộc họp.</li>
+                                                    <li>Cột <strong>Email</strong>: định danh chính cho nhân viên nội bộ (ưu tiên); bắt buộc với khách ngoài.</li>
+                                                    <li>Cột <strong>Mã nhân viên</strong>: dùng thay Email khi tra cứu nhân viên nội bộ.</li>
+                                                    <li>Cột <strong>Họ và tên</strong>: bắt buộc với khách ngoài (không tìm thấy trong hệ thống).</li>
+                                                    <li>Cột <strong>Tổ chức/Công ty</strong>: tùy chọn, dùng cho khách ngoài.</li>
+                                                    <li className="text-[10px] italic text-slate-blue/70">Cột Số điện thoại chỉ để tham khảo, chưa được lưu ở bước tạo cuộc họp.</li>
                                                 </ul>
 
                                                 {/* Mini preview table */}
@@ -2375,27 +2357,27 @@ const BookMeeting = () => {
                                                     <table className="w-full text-[10.5px] text-left">
                                                         <thead>
                                                             <tr className="bg-blue-50/60 text-slate-blue font-bold">
-                                                                <th className="py-1.5 px-2">type</th>
-                                                                <th className="py-1.5 px-2">email</th>
-                                                                <th className="py-1.5 px-2">employee_code</th>
-                                                                <th className="py-1.5 px-2">full_name</th>
-                                                                <th className="py-1.5 px-2">organization_name</th>
+                                                                <th className="py-1.5 px-2">Email</th>
+                                                                <th className="py-1.5 px-2">Mã nhân viên</th>
+                                                                <th className="py-1.5 px-2">Họ và tên</th>
+                                                                <th className="py-1.5 px-2">Tổ chức/Công ty</th>
+                                                                <th className="py-1.5 px-2">Số điện thoại</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="text-slate-blue/80">
                                                             <tr className="border-t border-blue-50">
-                                                                <td className="py-1 px-2 text-blue-600 font-bold">internal</td>
                                                                 <td className="py-1 px-2">nhanvien@smrmpts.com</td>
+                                                                <td className="py-1 px-2">—</td>
                                                                 <td className="py-1 px-2">—</td>
                                                                 <td className="py-1 px-2">—</td>
                                                                 <td className="py-1 px-2">—</td>
                                                             </tr>
                                                             <tr className="border-t border-blue-50">
-                                                                <td className="py-1 px-2 text-emerald-600 font-bold">external</td>
-                                                                <td className="py-1 px-2">khachngoai@gmail.com</td>
+                                                                <td className="py-1 px-2">khach@doitac.com</td>
                                                                 <td className="py-1 px-2">—</td>
-                                                                <td className="py-1 px-2">Nguyễn Văn A</td>
+                                                                <td className="py-1 px-2">Nguyễn Văn B</td>
                                                                 <td className="py-1 px-2">Công ty ABC</td>
+                                                                <td className="py-1 px-2">0900000000</td>
                                                             </tr>
                                                         </tbody>
                                                     </table>
