@@ -71,21 +71,26 @@ const RecordingsTab = ({
 
     useEffect(() => { loadAll(); }, [loadAll]);
 
+    // BUG (2026-08-15): endpoint /playback trả binary audio thô, nhưng bị gọi qua
+    // wrapper get() chỉ hiểu JSON (request.js không liệt kê audio/* trong danh sách
+    // blob) → response.json() luôn throw. Dùng thẳng /media-files/:id (JSON, có sẵn
+    // field downloadUrl — signed URL phát trực tiếp được) thay vì gọi /playback.
+    // Xem BAO_CAO_LOI_FE_PHAT_LAI_GHI_AM_MAT_TIENG_2026-08-15.md.
     const handleGetPlayback = async (fileId) => {
         if (playbackUrls[fileId]) { window.open(playbackUrls[fileId], '_blank'); return; }
+        let url = '';
         try {
-            const { getMediaFilePlayback } = await import('../../service/managerServices');
-            const res = await getMediaFilePlayback(fileId);
-            const url = res?.data?.url || '';
-            if (url) { setPlaybackUrls(prev => ({ ...prev, [fileId]: url })); window.open(url, '_blank'); }
+            const { getMediaFile } = await import('../../service/managerServices');
+            const res = await getMediaFile(fileId);
+            url = res?.data?.downloadUrl || res?.data?.url || '';
         } catch (_) {
             try {
-                const { getMediaFile } = await import('../../service/employeeServices');
-                const res = await getMediaFile(fileId);
-                const url = res?.data?.downloadUrl || res?.data?.url || res?.data?.playbackUrl || '';
-                if (url) { setPlaybackUrls(prev => ({ ...prev, [fileId]: url })); window.open(url, '_blank'); }
+                const { getMediaFile: getMediaFileEmp } = await import('../../service/employeeServices');
+                const res = await getMediaFileEmp(fileId);
+                url = res?.data?.downloadUrl || res?.data?.url || '';
             } catch (__) { }
         }
+        if (url) { setPlaybackUrls(prev => ({ ...prev, [fileId]: url })); window.open(url, '_blank'); }
     };
 
     const hasSessions = recordingSessions.length > 0;
@@ -199,7 +204,7 @@ const RecordingsTab = ({
 
                 {!recordingsLoading && !isEmpty && (
                     <p className="text-[9px] text-slate-400 text-center pb-2 leading-relaxed">
-                        Tệp ghi âm được xử lý tự động sau khi phiên kết thúc.<br />
+                        Sau khi phiên kết thúc, vào tab "Bản ghi (STT)" để chạy Speech to Text theo yêu cầu.<br />
                         Dữ liệu lưu trữ trong vòng 90 ngày.
                     </p>
                 )}

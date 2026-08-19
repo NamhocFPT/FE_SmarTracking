@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, MapPin, Pause, Play, Search, Trash2, Upload, Users, UserPlus, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity, AlertTriangle, Calendar, Check, Clock, Download, Edit3, FileText, GripVertical, List, Loader2, MapPin, Pause, Play, Search, Sparkles, Trash2, Upload, Users, UserPlus, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { vi } from 'date-fns/locale/vi';
 import TimePicker from '../../components/common/TimePicker';
 
 import { getMeetingById, updateMeeting, updateMeetingTime, updateMeetingRoom, updateMeetingRecordingConfig, addRecordingConfig, replaceAgendas, cancelMeeting, getAvailableRoomsForMeeting, getUsers, getMeetingMediaFiles, getMediaFile, uploadAgendaAttachment, deleteAgendaAttachment, updateMediaVisibility } from '../../service/employeeServices';
+import { createTranscriptionJob } from '../../service/transcriptionServices';
 import UserAvatar from '../../components/common/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -151,6 +152,7 @@ const EmployeeMeetingDetail = () => {
 
     // Force re-render flag for TranscriptViewer when upload succeeds
     const [refreshTranscriptKey, setRefreshTranscriptKey] = useState(0);
+    const [runningSttSessionIds, setRunningSttSessionIds] = useState(() => new Set());
     const [audioPage, setAudioPage] = useState(1);
     const audioItemsPerPage = 5;
     const [searchParams] = useSearchParams();
@@ -683,6 +685,31 @@ const EmployeeMeetingDetail = () => {
             }
         } catch (e) {
             toast.error('Lỗi khi lấy link tải file.');
+        }
+    };
+
+    const handleRunSttForSession = async (recordingSessionId) => {
+        setRunningSttSessionIds(prev => new Set(prev).add(recordingSessionId));
+        try {
+            const res = await createTranscriptionJob(meeting.id, {
+                recordingSessionId,
+                language: 'vi-VN',
+                speakerMappingMode: 'diarization_only'
+            });
+            if (res?.success) {
+                toast.success('Đã bắt đầu chạy Speech to Text cho bản ghi này.');
+                setRefreshTranscriptKey(prev => prev + 1);
+            } else {
+                toast.error(res?.error?.message || res?.message || 'Không thể khởi tạo Speech to Text.');
+            }
+        } catch (err) {
+            toast.error(err?.error?.message || err?.message || 'Có lỗi xảy ra khi khởi tạo Speech to Text.');
+        } finally {
+            setRunningSttSessionIds(prev => {
+                const next = new Set(prev);
+                next.delete(recordingSessionId);
+                return next;
+            });
         }
     };
 
@@ -1675,6 +1702,19 @@ const EmployeeMeetingDetail = () => {
                                                                         <Download className="w-3.5 h-3.5" />
                                                                         Tải xuống
                                                                     </a>
+                                                                )}
+                                                                {canManage && !audioFile.channelUserId && (audioFile.recordingSessionId || audioFile.recording_session_id) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={runningSttSessionIds.has(audioFile.recordingSessionId || audioFile.recording_session_id)}
+                                                                        onClick={() => handleRunSttForSession(audioFile.recordingSessionId || audioFile.recording_session_id)}
+                                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        {runningSttSessionIds.has(audioFile.recordingSessionId || audioFile.recording_session_id)
+                                                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                            : <Sparkles className="w-3.5 h-3.5" />}
+                                                                        Chạy Speech to Text
+                                                                    </button>
                                                                 )}
                                                                 {canManage && !audioFile.channelUserId && (
                                                                     <button

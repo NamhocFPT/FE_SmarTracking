@@ -1,14 +1,15 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileAudio, CheckCircle, AlertCircle, X, Loader2 } from 'lucide-react';
+import { UploadCloud, FileAudio, CheckCircle, AlertCircle, X, Loader2, Sparkles } from 'lucide-react';
 import { uploadAudio, createTranscriptionJob } from '../../service/transcriptionServices';
 
 const AudioUploader = ({ meetingId, onUploadSuccess }) => {
     const [file, setFile] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
-    const [status, setStatus] = useState('idle'); // idle, uploading, processing, success, error
+    const [status, setStatus] = useState('idle'); // idle, uploading, uploaded, processing, success, error
     const [errorMsg, setErrorMsg] = useState('');
     const [featureDisabled, setFeatureDisabled] = useState(false);
+    const [recordingSessionId, setRecordingSessionId] = useState(null);
     const fileInputRef = useRef(null);
 
     const handleDragOver = (e) => {
@@ -57,18 +58,29 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
         setErrorMsg('');
 
         try {
-            // Bước 1: Upload audio
             const uploadRes = await uploadAudio(meetingId, file);
             if (!uploadRes?.success) {
                 throw new Error(uploadRes?.error?.message || uploadRes?.message || 'Lỗi khi tải lên tệp âm thanh.');
             }
 
-            const recordingSessionId = uploadRes.data?.recordingSessionId;
-            if (!recordingSessionId) throw new Error('Không nhận được phiên ghi âm từ máy chủ.');
+            const newSessionId = uploadRes.data?.recordingSessionId;
+            if (!newSessionId) throw new Error('Không nhận được phiên ghi âm từ máy chủ.');
 
-            setStatus('processing');
+            setRecordingSessionId(newSessionId);
+            setStatus('uploaded');
+        } catch (err) {
+            setStatus('error');
+            setErrorMsg(err?.error?.message || err?.message || 'Có lỗi xảy ra trong quá trình xử lý.');
+        }
+    };
 
-            // Bước 2: Tạo Job Transcription
+    const handleRunStt = async () => {
+        if (!recordingSessionId || !meetingId) return;
+
+        setStatus('processing');
+        setErrorMsg('');
+
+        try {
             const jobRes = await createTranscriptionJob(meetingId, {
                 recordingSessionId,
                 language: 'vi-VN',
@@ -85,6 +97,7 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
                 onUploadSuccess?.(); // Trigger parent to reload/polling
                 setStatus('idle');
                 setFile(null);
+                setRecordingSessionId(null);
             }, 2000);
 
         } catch (err) {
@@ -203,6 +216,21 @@ const AudioUploader = ({ meetingId, onUploadSuccess }) => {
                                         transition={{ duration: 2, ease: "easeInOut" }} // Fake progress
                                     />
                                 </div>
+                            </div>
+                        )}
+
+                        {status === 'uploaded' && (
+                            <div className="flex flex-col gap-3 p-4 bg-green-50/50 rounded-xl border border-green-100">
+                                <div className="flex items-center gap-3 text-green-700">
+                                    <CheckCircle className="w-5 h-5" />
+                                    <span className="text-xs font-bold">Tải file thành công. Bấm để bắt đầu chuyển đổi giọng nói.</span>
+                                </div>
+                                <button
+                                    onClick={handleRunStt}
+                                    className="self-end px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
+                                >
+                                    <Sparkles className="w-4 h-4" /> Chạy Speech to Text
+                                </button>
                             </div>
                         )}
 

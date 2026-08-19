@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, FileText, CheckCircle, AlertTriangle,
-    RefreshCw, Edit3, Save, X, Loader2, Users
+    RefreshCw, Edit3, Save, X, Loader2, Users, Trash2
 } from 'lucide-react';
 import toast from '../../utils/toast';
 import SpeakerMappingModal from './SpeakerMappingModal';
@@ -10,7 +10,8 @@ import {
     getTranscriptionJobs,
     getTranscript,
     updateTranscriptSegments,
-    updateTranscriptStatus
+    updateTranscriptStatus,
+    deleteTranscript
 } from '../../service/transcriptionServices';
 
 const TranscriptViewer = ({ meetingId, isHost }) => {
@@ -24,6 +25,7 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     const [editForm, setEditForm] = useState({ text: '', speakerLabel: '', revisionNote: '' });
     const [isSaving, setIsSaving] = useState(false);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     
     // Speaker Mapping Modal state
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
@@ -175,6 +177,32 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
         }
     };
 
+    const handleDeleteTranscript = async () => {
+        if (!transcript || isDeleting) return;
+        if (!window.confirm('Xóa nội dung transcript này? Thao tác không thể hoàn tác.')) return;
+
+        setIsDeleting(true);
+        try {
+            const res = await deleteTranscript(transcript.transcriptId);
+            if (res?.success) {
+                showToast('Đã xóa transcript.');
+                setTranscript(null);
+                setJobs([]);
+                setStatus('empty');
+            } else {
+                showToast(res?.message || 'Không thể xóa transcript.', 'error');
+            }
+        } catch (err) {
+            if (err?.error?.code === 'TRANSCRIPT_NOT_DRAFT') {
+                showToast('Transcript đã được xem/duyệt, không thể xóa.', 'error');
+            } else {
+                showToast(err?.error?.message || err?.message || 'Không thể xóa transcript.', 'error');
+            }
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     // Filter segments
     const filteredSegments = (transcript?.segments || []).filter(s => 
         (s.text || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -208,7 +236,7 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
             <div className="bg-white rounded-3xl border border-platinum-tint shadow-sm-2 p-8 text-center">
                 <FileText className="w-10 h-10 text-platinum-tint mx-auto mb-3" />
                 <h3 className="text-sm font-bold text-midnight-indigo uppercase">Chưa có Transcript</h3>
-                <p className="text-xs text-slate-blue mt-1">Cuộc họp này chưa có dữ liệu STT. Bạn có thể tải file âm thanh lên để tạo transcript mới.</p>
+                <p className="text-xs text-slate-blue mt-1">Cuộc họp này chưa có dữ liệu STT. Tải file âm thanh lên hoặc bấm "Chạy Speech to Text" trên bản ghi có sẵn để tạo transcript.</p>
             </div>
         );
     }
@@ -272,6 +300,14 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50"
                             >
                                 <CheckCircle className="w-3.5 h-3.5" /> Đánh dấu đã xem
+                            </button>
+                            <button
+                                onClick={handleDeleteTranscript}
+                                disabled={isDeleting}
+                                title="Xóa transcript chưa xem"
+                                className="px-3 py-1.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50"
+                            >
+                                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Xóa
                             </button>
                         </div>
                     )}

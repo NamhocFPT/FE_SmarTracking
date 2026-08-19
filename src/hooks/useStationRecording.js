@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { uploadAudio, uploadStationSpeakerMarks, createTranscriptionJob } from '../service/transcriptionServices';
+import { uploadAudio, uploadStationSpeakerMarks } from '../service/transcriptionServices';
 
 // Helpers cho IndexedDB để chống mất dữ liệu khi browser crash
 const DB_NAME = 'SmarTrackingRecordingDB';
@@ -153,20 +153,8 @@ export const useStationRecording = (meetingId, meetingTitle) => {
                         }
                     }
 
-                    // Tạo job STT ngay cho đúng recordingSessionId vừa upload — thiếu bước này thì
-                    // transcript không bao giờ được tạo cho đường ghi âm trạm cố định (BUG-15).
-                    if (sessionId) {
-                        try {
-                            await createTranscriptionJob(meetingId, {
-                                recordingSessionId: sessionId,
-                                language: 'vi-VN',
-                                speakerMappingMode: 'diarization_only'
-                            });
-                        } catch (jobErr) {
-                            console.error('Lỗi khi tạo job STT:', jobErr);
-                            // Audio + marks đã lưu; job có thể tạo lại sau nên không chặn luồng
-                        }
-                    }
+                    // STT không tự chạy ở đây nữa — người dùng chủ động bấm "Chạy Speech to Text"
+                    // sau khi meeting kết thúc (xem audioFile card trong MeetingDetail.jsx).
 
                     // Dọn dẹp DB
                     await clearDB(dbRef.current);

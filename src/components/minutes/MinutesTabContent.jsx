@@ -1,25 +1,36 @@
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { FileText, Sparkles, Plus, AlertTriangle, Loader2, Lock } from 'lucide-react';
-import { 
-    getAiDraftConfig, 
-    createAiDraftJob, 
-    getAiDraftJobs, 
-    createManualMinutes, 
-    getMeetingMinutesById 
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { FileText, Sparkles, Plus, AlertTriangle, Loader2, Lock, PenLine, Columns2 } from 'lucide-react';
+import {
+    getAiDraftConfig,
+    createAiDraftJob,
+    getAiDraftJobs,
+    createManualMinutes,
+    getMeetingMinutesById,
+    compareMeetingMinutes
 } from '../../service/minutesServices';
-import { get, buildQuery } from '../../utils/request';
+import { get } from '../../utils/request';
+import { getSocket, subscribeToMeeting } from '../../utils/socket';
 
 import AiGeneratorProgress from './AiGeneratorProgress';
 import MinutesViewerEditor from './MinutesViewerEditor';
+import CreateManualMinutesModal from './CreateManualMinutesModal';
 
-const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
+const MinutesTabContent = ({ meetingId, isHost, transcriptStatus, allowAiCreate = true }) => {
     const [config, setConfig] = useState(null);
     const [status, setStatus] = useState('loading'); // loading, empty, ai_running, has_minutes, error
-    const [minutes, setMinutes] = useState(null);
+    const [manualSummary, setManualSummary] = useState(null); // MinutesListItemDto | null — nguồn 'manual'
+    const [aiSummary, setAiSummary] = useState(null); // MinutesListItemDto | null — nguồn 'ai'
+    const [manualDetail, setManualDetail] = useState(null); // MinutesDetailResponseDto đầy đủ
+    const [aiDetail, setAiDetail] = useState(null);
+    const [activeTab, setActiveTab] = useState('manual'); // 'manual' | 'ai' | 'compare'
     const [activeJobId, setActiveJobId] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
+    const [showCreateManualModal, setShowCreateManualModal] = useState(false);
+    const [creatingManual, setCreatingManual] = useState(false);
 
+    // MKM-MANUAL-01: 1 meeting có thể có song song tối đa 2 biên bản active
+    // (1 nguồn 'manual', 1 nguồn 'ai'). Fetch cả 2 qua endpoint compare, rồi
+    // tải chi tiết đầy đủ cho bên nào đang tồn tại để MinutesViewerEditor dùng.
     const fetchState = useCallback(async () => {
         setStatus('loading');
         try {
@@ -29,10 +40,8 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
                 if (cfgRes?.success) {
                     setConfig(cfgRes.data);
                 }
-            }
 
-            // 2. Fetch active AI jobs — chỉ host mới có quyền
-            if (isHost) {
+                // 2. Fetch active AI jobs — chỉ host mới có quyền
                 const jobsRes = await getAiDraftJobs(meetingId);
                 if (jobsRes?.success && jobsRes.data?.length > 0) {
                     const latestJob = jobsRes.data[0];
@@ -41,27 +50,38 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
                         setStatus('ai_running');
                         return;
                     }
-
-                    // If completed, fetch the minutes
-                    if (latestJob.status === 'completed' && latestJob.result?.minutesId) {
-                        await loadMinutesDetail(latestJob.result.minutesId);
-                        return;
-                    }
                 }
             }
 
-            // 3. Fallback: tra biên bản đã có của cuộc họp này qua MinutesQueryDto.meetingId
-            // (BE GET /meeting-minutes hỗ trợ sẵn filter server-side, không cần tải hết rồi lọc client)
-            const minutesListRes = await get(`/meeting-minutes${buildQuery({ meetingId, limit: 1 })}`);
-            if (minutesListRes?.success) {
-                const meetingMinute = minutesListRes.data?.[0];
-                if (meetingMinute) {
-                    await loadMinutesDetail(meetingMinute.id);
-                    return;
-                }
+            // 3. So sánh song song 2 nguồn — thay cho việc chỉ lấy 1 bản ghi duy nhất trước đây
+            const cmpRes = await compareMeetingMinutes(meetingId);
+            const manual = cmpRes?.success ? cmpRes.data?.manual ?? null : null;
+            const ai = cmpRes?.success ? cmpRes.data?.ai ?? null : null;
+            setManualSummary(manual);
+            setAiSummary(ai);
+
+            if (!manual && !ai) {
+                setManualDetail(null);
+                setAiDetail(null);
+                setStatus('empty');
+                return;
             }
-            
-            setStatus('empty');
+
+            const [manualDetailRes, aiDetailRes] = await Promise.all([
+                manual ? getMeetingMinutesById(manual.id) : Promise.resolve(null),
+                ai ? getMeetingMinutesById(ai.id) : Promise.resolve(null),
+            ]);
+            setManualDetail(manualDetailRes?.success ? manualDetailRes.data : null);
+            setAiDetail(aiDetailRes?.success ? aiDetailRes.data : null);
+
+            // Giữ nguyên tab đang xem nếu vẫn còn hợp lệ, không thì fallback về bên đang có
+            setActiveTab((prev) => {
+                if (prev === 'compare' && manual && ai) return 'compare';
+                if (prev === 'ai' && ai) return 'ai';
+                if (prev === 'manual' && manual) return 'manual';
+                return manual ? 'manual' : 'ai';
+            });
+            setStatus('has_minutes');
         } catch (err) {
             console.error('Error fetching minutes state:', err);
             // Default to empty if not found, rather than blocking the UI with error
@@ -74,24 +94,38 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
         }
     }, [meetingId, isHost]);
 
-    const loadMinutesDetail = async (minutesId) => {
-        try {
-            const detailRes = await getMeetingMinutesById(minutesId);
-            if (detailRes?.success && detailRes.data) {
-                setMinutes(detailRes.data);
-                setStatus('has_minutes');
-            } else {
-                setStatus('empty');
-            }
-        } catch (err) {
-            console.error(err);
-            setStatus('empty');
-        }
-    };
-
     useEffect(() => {
         fetchState();
     }, [fetchState]);
+
+    // MKM-LIVE-01: subscribe room meeting:${meetingId} — mirror đúng pattern
+    // subscribeToMeeting/getSocket đã dùng ở MeetingAttendanceBoard.jsx (KHÔNG
+    // tự nghĩ cách kết nối mới). Bất kỳ tín hiệu live-share nào (bật/tắt/có
+    // nội dung mới) đều refetch qua đúng fetchState() hiện có — debounce nhẹ
+    // để tránh gọi API dồn dập khi Host lưu liên tục (spec mục 4.4).
+    const refreshTimerRef = useRef(null);
+    useEffect(() => {
+        if (!meetingId) return;
+        const cleanup = subscribeToMeeting(meetingId);
+        const s = getSocket();
+        const scheduleRefresh = (payload) => {
+            if (payload?.meetingId && payload.meetingId !== meetingId) return;
+            if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+            refreshTimerRef.current = setTimeout(() => {
+                fetchState();
+            }, 600);
+        };
+        s.on('minutes.draft.live_started', scheduleRefresh);
+        s.on('minutes.draft.live_stopped', scheduleRefresh);
+        s.on('minutes.draft.updated', scheduleRefresh);
+        return () => {
+            s.off('minutes.draft.live_started', scheduleRefresh);
+            s.off('minutes.draft.live_stopped', scheduleRefresh);
+            s.off('minutes.draft.updated', scheduleRefresh);
+            if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+            cleanup();
+        };
+    }, [meetingId, fetchState]);
 
     const handleCreateAiDraft = async () => {
         try {
@@ -112,11 +146,11 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
             }
 
             setStatus('loading');
-            const res = await createAiDraftJob(meetingId, { 
+            const res = await createAiDraftJob(meetingId, {
                 transcriptId: tRes.data.transcriptId,
                 language: 'vi-VN'
             });
-            
+
             if (res?.success) {
                 setActiveJobId(res.data.jobId);
                 setStatus('ai_running');
@@ -127,16 +161,19 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
         }
     };
 
-    const handleCreateManual = async () => {
+    const handleCreateManual = async (contentFormat) => {
         try {
-            setStatus('loading');
-            const res = await createManualMinutes(meetingId, { title: 'Biên bản cuộc họp' });
+            setCreatingManual(true);
+            const res = await createManualMinutes(meetingId, { title: 'Biên bản cuộc họp', contentFormat });
             if (res?.success) {
-                await loadMinutesDetail(res.data.id);
+                setShowCreateManualModal(false);
+                await fetchState();
             }
         } catch (err) {
             setErrorMsg(err.message || 'Không thể tạo biên bản thủ công.');
             setStatus('error');
+        } finally {
+            setCreatingManual(false);
         }
     };
 
@@ -163,9 +200,9 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
 
     if (status === 'ai_running') {
         return (
-            <AiGeneratorProgress 
-                jobId={activeJobId} 
-                onComplete={loadMinutesDetail}
+            <AiGeneratorProgress
+                jobId={activeJobId}
+                onComplete={fetchState}
                 onError={(msg) => {
                     setErrorMsg(msg);
                     setStatus('error');
@@ -174,14 +211,126 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
         );
     }
 
-    if (status === 'has_minutes' && minutes) {
+    if (status === 'has_minutes') {
+        const hasManual = !!manualSummary;
+        const hasAi = !!aiSummary;
+        const hasBoth = hasManual && hasAi;
+
         return (
-            <MinutesViewerEditor
-                minutes={minutes}
-                meetingId={meetingId}
-                isHost={isHost}
-                onRefresh={fetchState}
-            />
+            <div className="space-y-4">
+                {hasBoth && (
+                    <div className="inline-flex bg-cloud-mist rounded-2xl p-1 gap-1">
+                        <button
+                            onClick={() => setActiveTab('manual')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                                activeTab === 'manual' ? 'bg-white text-midnight-indigo shadow-sm' : 'text-slate-blue hover:text-midnight-indigo'
+                            }`}
+                        >
+                            <PenLine className="w-3.5 h-3.5" /> Bản thủ công
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('ai')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                                activeTab === 'ai' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-blue hover:text-purple-700'
+                            }`}
+                        >
+                            <Sparkles className="w-3.5 h-3.5" /> Bản AI
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('compare')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                                activeTab === 'compare' ? 'bg-white text-action-blue shadow-sm' : 'text-slate-blue hover:text-action-blue'
+                            }`}
+                        >
+                            <Columns2 className="w-3.5 h-3.5" /> So sánh song song
+                        </button>
+                    </div>
+                )}
+
+                {!hasBoth && isHost && (hasManual ? allowAiCreate : true) && (
+                    <div className="bg-cloud-mist/60 border border-platinum-tint rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <p className="text-xs text-slate-blue leading-relaxed">
+                            {hasManual
+                                ? 'Cuộc họp này chưa có bản tóm tắt AI. Bạn có thể tạo thêm để đối chiếu song song với bản thủ công.'
+                                : 'Cuộc họp này chưa có biên bản thủ công. Bạn có thể tự soạn thêm để đối chiếu song song với bản AI.'}
+                        </p>
+                        {hasManual ? (
+                            config?.enabled !== false && (
+                                <button
+                                    onClick={handleCreateAiDraft}
+                                    className="shrink-0 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" /> Tóm tắt bằng AI
+                                </button>
+                            )
+                        ) : (
+                            <button
+                                onClick={() => setShowCreateManualModal(true)}
+                                className="shrink-0 px-4 py-2 border-2 border-platinum-tint text-slate-700 hover:bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Tạo thủ công
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'compare' && hasBoth ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <h4 className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <PenLine className="w-3.5 h-3.5" /> Bản thủ công
+                            </h4>
+                            {manualDetail && (
+                                <MinutesViewerEditor
+                                    minutes={manualDetail}
+                                    meetingId={meetingId}
+                                    isHost={isHost}
+                                    onRefresh={fetchState}
+                                />
+                            )}
+                        </div>
+                        <div>
+                            <h4 className="text-[11px] font-bold text-purple-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5" /> Bản AI
+                            </h4>
+                            {aiDetail && (
+                                <MinutesViewerEditor
+                                    minutes={aiDetail}
+                                    meetingId={meetingId}
+                                    isHost={isHost}
+                                    onRefresh={fetchState}
+                                />
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {activeTab === 'manual' && manualDetail && (
+                            <MinutesViewerEditor
+                                minutes={manualDetail}
+                                meetingId={meetingId}
+                                isHost={isHost}
+                                onRefresh={fetchState}
+                            />
+                        )}
+                        {activeTab === 'ai' && aiDetail && (
+                            <MinutesViewerEditor
+                                minutes={aiDetail}
+                                meetingId={meetingId}
+                                isHost={isHost}
+                                onRefresh={fetchState}
+                            />
+                        )}
+                    </>
+                )}
+
+                <CreateManualMinutesModal
+                    open={showCreateManualModal}
+                    creating={creatingManual}
+                    onClose={() => setShowCreateManualModal(false)}
+                    onSelect={handleCreateManual}
+                />
+            </div>
         );
     }
 
@@ -208,11 +357,13 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
             </div>
             <h3 className="text-base font-bold text-midnight-indigo mb-2">Chưa có Biên bản cuộc họp</h3>
             <p className="text-xs text-slate-blue max-w-sm mb-8 leading-relaxed">
-                Cuộc họp này hiện chưa có biên bản chính thức nào được lưu. Bạn có thể tự soạn thảo thủ công hoặc để AI phân tích và tự động tạo.
+                {allowAiCreate
+                    ? 'Cuộc họp này hiện chưa có biên bản chính thức nào được lưu. Bạn có thể tự soạn thảo thủ công hoặc để AI phân tích và tự động tạo — cả 2 bản có thể cùng tồn tại song song để đối chiếu.'
+                    : 'Cuộc họp này hiện chưa có biên bản chính thức nào được lưu. Bạn có thể tự soạn thảo ngay trong lúc họp.'}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                {config?.enabled !== false && (
+                {allowAiCreate && config?.enabled !== false && (
                     <button
                         onClick={handleCreateAiDraft}
                         className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
@@ -221,18 +372,25 @@ const MinutesTabContent = ({ meetingId, isHost, transcriptStatus }) => {
                     </button>
                 )}
                 <button
-                    onClick={handleCreateManual}
+                    onClick={() => setShowCreateManualModal(true)}
                     className="px-5 py-2.5 border-2 border-platinum-tint text-slate-700 hover:bg-cloud-mist rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
                 >
                     <Plus className="w-4 h-4" /> Tạo thủ công
                 </button>
             </div>
 
-            {config?.enabled !== false && (transcriptStatus === 'empty' || transcriptStatus === 'loading') && (
+            {allowAiCreate && config?.enabled !== false && (transcriptStatus === 'empty' || transcriptStatus === 'loading') && (
                 <p className="text-[10px] text-amber-600 mt-4 bg-amber-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" /> Tính năng AI yêu cầu phải có Bản ghi (Transcript) trước.
                 </p>
             )}
+
+            <CreateManualMinutesModal
+                open={showCreateManualModal}
+                creating={creatingManual}
+                onClose={() => setShowCreateManualModal(false)}
+                onSelect={handleCreateManual}
+            />
         </div>
     );
 };

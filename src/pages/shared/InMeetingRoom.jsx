@@ -1,6 +1,6 @@
 import {
     AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-    Clock, Cpu, Download, ExternalLink, Eye, FileText, Film, Loader, Mic, MicOff,
+    ClipboardList, Clock, Cpu, Download, ExternalLink, Eye, FileText, Film, Loader, Mic, MicOff,
     MonitorUp, Play, Plus, RefreshCw, Shield, Smile,
     StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
     VolumeX, X, Edit2
@@ -56,6 +56,7 @@ import {
 import UserAvatar, { resolveAvatarUrl } from '../../components/common/UserAvatar';
 import MeetingGrid from '../../components/meeting/MeetingGrid';
 import StationRecorder from '../../components/transcription/StationRecorder';
+import MinutesTabContent from '../../components/minutes/MinutesTabContent';
 import GuestPanel from '../../components/meeting/GuestPanel';
 import RecordingsTab from '../../components/meeting/RecordingsTab';
 import { startRecordingMarker, createLiveSpeakerTag } from '../../service/transcriptionServices';
@@ -1332,6 +1333,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         ...(isHost ? [{ id: 'host', label: 'Q.Lý', fullLabel: 'Quản lý', icon: Shield }] : []),
         { id: 'agenda', label: 'C.Trình', fullLabel: 'Chương trình', icon: Calendar },
         { id: 'notes', label: 'Ghi chú', fullLabel: 'Ghi chú', icon: StickyNote },
+        { id: 'minutes', label: 'Biên bản', fullLabel: 'Biên bản họp', icon: ClipboardList },
         { id: 'attendance', label: 'T.Gia', fullLabel: 'Người tham gia', icon: Users },
         ...(isHost ? [{ id: 'guests', label: 'Khách', fullLabel: 'Khách', icon: UserCheck }] : []),
         ...(isHost ? [{ id: 'recordings', label: 'Ghi âm', fullLabel: 'Quản lý ghi âm', icon: Film }] : []),
@@ -1849,7 +1851,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                     </button>
 
                     {/* Right: Room Panel */}
-                    <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full h-[50vh] lg:h-auto lg:w-[320px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0 h-0 lg:h-auto'}`}>
+                    <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full h-[50vh] lg:h-auto lg:w-[420px] xl:w-[480px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0 h-0 lg:h-auto'}`}>
 
                         {/* Tabs — flex-1 chia đều, label viết tắt, whitespace-nowrap */}
                         <nav className="flex border-b border-platinum-tint shrink-0 bg-white">
@@ -2407,6 +2409,18 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             })
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {/* ── TAB: Biên bản (MKM-MANUAL-01 / MKM-LIVE-01) ── */}
+                            {activeChatTab === 'minutes' && (
+                                <div className="p-3 h-full overflow-y-auto">
+                                    <MinutesTabContent
+                                        meetingId={id}
+                                        isHost={isHost}
+                                        transcriptStatus="empty"
+                                        allowAiCreate={false}
+                                    />
                                 </div>
                             )}
 

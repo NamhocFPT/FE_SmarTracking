@@ -2,7 +2,7 @@ import {
     Activity, AlertCircle, ArrowLeft, Calendar, CheckCircle,
     ChevronLeft, ChevronRight, Clock, DoorOpen, Edit2, Eye,
     Home, List, MapPin, Mic, Monitor, Plus, RefreshCw,
-    ShieldAlert, Trash2, UserCheck, Users, Video, X
+    ShieldAlert, Trash2, UserCheck, Users, Video, Wrench, X
 } from 'lucide-react';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
@@ -13,8 +13,10 @@ import {
     createRoom,
     updateRoom,
     deleteRoom,
+    getRoomDeletionImpact,
     getMeetings,
-    getRoomDetail
+    getRoomDetail,
+    updateRoomAdministrativeStatus
 } from '../../service/businessAdminServices';
 
 import RealtimeRoomMonitor from '../../components/security/RealtimeRoomMonitor';
@@ -79,7 +81,9 @@ const MEETING_STATUS_CONFIG = {
 const STATUS_CONFIG = {
     available: { label: 'Đang trống', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     occupied: { label: 'Đang họp', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-    maintenance: { label: 'Bảo trì', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+    reserved: { label: 'Đã đặt trước', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+    maintenance: { label: 'Bảo trì', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    inactive: { label: 'Ngừng hoạt động', cls: 'bg-gray-100 text-gray-600 border-gray-200' }
 };
 
 const getStatus = (room) => room.currentStatus || room.roomStatus || 'available';
@@ -93,6 +97,7 @@ const AmenityBadge = ({ active, icon: Icon, label }) => (
 );
 
 const EMPTY_FORM = {
+    roomCode: 'RM-',
     roomName: '',
     capacity: '',
     roomType: 'meeting_room',
@@ -105,6 +110,19 @@ const EMPTY_FORM = {
     allowRecording: false
 };
 
+// Backend contract: /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/, 3-80 ky tu (create-room.dto.ts).
+// FE further constrains to a mandatory "RM-" prefix, ex: RM-BE312, RM-AL234.
+const ROOM_CODE_REGEX = /^RM-[A-Z0-9]+(?:-[A-Z0-9]+)*$/;
+
+const sanitizeRoomCode = (raw) => {
+    let val = raw.toUpperCase();
+    if (!val.startsWith('RM-')) {
+        val = 'RM-' + val.replace(/^RM-?/, '');
+    }
+    const suffix = val.slice(3).replace(/[^A-Z0-9-]/g, '');
+    return 'RM-' + suffix;
+};
+
 const RoomManagement = () => {
     const [viewMode, setViewMode] = useState('list');
     const [roomsList, setRoomsList] = useState([]);
@@ -112,6 +130,8 @@ const RoomManagement = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [confirm, setConfirm] = useState(null);
+    const [deleteImpactModal, setDeleteImpactModal] = useState(null);
+    const [checkingDeleteImpactId, setCheckingDeleteImpactId] = useState(null);
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -129,6 +149,7 @@ const RoomManagement = () => {
     // Chi tiết phòng
     const [detailRoom, setDetailRoom] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const [savingAdminStatus, setSavingAdminStatus] = useState(false);
 
     const openRoomDetail = async (room) => {
         const roomId = room.id || room.roomId;
@@ -144,6 +165,28 @@ const RoomManagement = () => {
             console.error("Lỗi tải thông tin chi tiết phòng:", err);
         } finally {
             setLoadingDetail(false);
+        }
+    };
+
+    // Dat/go trang thai chu dong (bao tri / ngung hoat dong) cho phong dang xem chi tiet.
+    const handleSetAdministrativeStatus = async (status) => {
+        if (!detailRoom) return;
+        const roomId = detailRoom.id || detailRoom.roomId;
+        setSavingAdminStatus(true);
+        setError(null);
+        try {
+            const res = await updateRoomAdministrativeStatus(roomId, { status });
+            if (res?.success) {
+                setDetailRoom(prev => ({ ...prev, administrativeStatus: res.data?.administrativeStatus ?? status }));
+                setSuccessMessage('Đã cập nhật trạng thái phòng họp!');
+                fetchRoomsList();
+            } else {
+                setError(res?.error?.message || 'Không thể cập nhật trạng thái phòng.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể cập nhật trạng thái phòng.');
+        } finally {
+            setSavingAdminStatus(false);
         }
     };
 
@@ -191,6 +234,7 @@ const RoomManagement = () => {
         if (mode === 'edit' && room) {
             setSelectedRoom(room);
             setFormData({
+                roomCode: room.roomCode || '',
                 roomName: room.roomName || '',
                 capacity: room.capacity ?? '',
                 roomType: room.roomType || 'meeting_room',
@@ -211,16 +255,21 @@ const RoomManagement = () => {
 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
+        if (modalMode === 'create' && !ROOM_CODE_REGEX.test(formData.roomCode.trim())) {
+            setError('Mã phòng không hợp lệ. Định dạng bắt buộc: RM-XXXX (chữ hoa/số sau dấu -), ví dụ RM-BE312.');
+            return;
+        }
         setSaving(true);
         setError(null);
         try {
             const payload = {
+                ...(modalMode === 'create' && { roomCode: formData.roomCode.trim() }),
                 roomName: formData.roomName.trim(),
                 capacity: parseInt(formData.capacity, 10),
                 roomType: formData.roomType,
                 ...(formData.siteName.trim() && { siteName: formData.siteName.trim() }),
                 ...(formData.areaName.trim() && { areaName: formData.areaName.trim() }),
-                ...(formData.description.trim() && { description: formData.description.trim() }),
+                ...(formData.description.trim() && { locationDescription: formData.description.trim() }),
                 hasCamera: formData.hasCamera,
                 hasMicrophone: formData.hasMicrophone,
                 hasDisplay: formData.hasDisplay,
@@ -244,23 +293,52 @@ const RoomManagement = () => {
         }
     };
 
-    const handleDelete = (room) => {
-        setConfirm({
-            message: `Bạn có chắc chắn muốn xoá phòng "${room.roomName}"? Thao tác không thể hoàn tác.`,
-            onConfirm: async () => {
-                try {
-                    const res = await deleteRoom(room.id || room.roomId);
-                    if (res?.success) {
-                        setSuccessMessage('Đã xoá phòng họp thành công!');
-                        fetchRoomsList();
-                    } else {
-                        setError(res?.error?.message || 'Không thể xoá phòng họp.');
-                    }
-                } catch (err) {
-                    setError(err?.error?.message || err?.message || 'Không thể xoá phòng họp.');
-                }
+    // Xoá phòng: PHẢI kiểm tra tác động trước (GET .../deletion-impact) — nếu
+    // còn cuộc họp tương lai đã duyệt (status=scheduled), chặn xoá hoàn toàn
+    // và hiện danh sách cuộc họp đang chặn (không có ngoại lệ force-delete).
+    const handleDelete = async (room) => {
+        const roomId = room.id || room.roomId;
+        setError(null);
+        setCheckingDeleteImpactId(roomId);
+        try {
+            const res = await getRoomDeletionImpact(roomId);
+            if (!res?.success) {
+                setError(res?.error?.message || 'Không thể kiểm tra tác động xoá phòng.');
+                return;
             }
-        });
+            const impact = res.data || {};
+            if (!impact.canDelete) {
+                setDeleteImpactModal({
+                    room,
+                    blockingMeetings: impact.blockingMeetings || [],
+                    blockedByInProgressMeeting: impact.blockedByInProgressMeeting,
+                });
+                return;
+            }
+            const pendingNote = impact.pendingMeetingCount > 0
+                ? ` Lưu ý: ${impact.pendingMeetingCount} cuộc họp chưa duyệt tại phòng này sẽ bị gỡ địa điểm và người liên quan sẽ được thông báo.`
+                : '';
+            setConfirm({
+                message: `Bạn có chắc chắn muốn xoá phòng "${room.roomName}"? Thao tác không thể hoàn tác.${pendingNote}`,
+                onConfirm: async () => {
+                    try {
+                        const res = await deleteRoom(roomId);
+                        if (res?.success) {
+                            setSuccessMessage('Đã xoá phòng họp thành công!');
+                            fetchRoomsList();
+                        } else {
+                            setError(res?.error?.message || 'Không thể xoá phòng họp.');
+                        }
+                    } catch (err) {
+                        setError(err?.error?.message || err?.message || 'Không thể xoá phòng họp.');
+                    }
+                }
+            });
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể kiểm tra tác động xoá phòng.');
+        } finally {
+            setCheckingDeleteImpactId(null);
+        }
     };
 
     const setField = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
@@ -274,6 +352,42 @@ const RoomManagement = () => {
                 onConfirm={() => { confirm?.onConfirm(); setConfirm(null); }}
                 onCancel={() => setConfirm(null)}
             />
+
+            {/* Chặn xoá phòng khi còn cuộc họp tương lai đã duyệt (EX2) */}
+            {deleteImpactModal && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-platinum-tint max-w-md w-full p-6 space-y-4 animate-fade-in-up">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-red-100 text-red-600">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo text-base">Không thể xoá phòng "{deleteImpactModal.room?.roomName}"</h3>
+                                <p className="text-sm text-slate-blue mt-1 leading-relaxed">
+                                    Phòng này còn {deleteImpactModal.blockingMeetings.length} cuộc họp đã được duyệt trong tương lai. Vui lòng đổi phòng hoặc huỷ các cuộc họp dưới đây trước khi xoá.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto rounded-xl border border-platinum-tint divide-y divide-platinum-tint">
+                            {deleteImpactModal.blockingMeetings.map((m) => (
+                                <div key={m.id} className="p-3 text-xs">
+                                    <p className="font-bold text-midnight-indigo">{m.title}</p>
+                                    <p className="text-slate-blue mt-0.5">{formatTimeRange(m.startTime, m.endTime)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setDeleteImpactModal(null)}
+                                className="px-4 py-2 rounded-xl border border-platinum-tint text-sm font-semibold text-slate-blue hover:bg-cloud-mist transition-colors"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -346,7 +460,9 @@ const RoomManagement = () => {
                             <option value="">Tất cả trạng thái</option>
                             <option value="available">Đang trống</option>
                             <option value="occupied">Đang họp</option>
+                            <option value="reserved">Đã đặt trước</option>
                             <option value="maintenance">Bảo trì</option>
+                            <option value="inactive">Ngừng hoạt động</option>
                         </select>
                         <button
                             onClick={() => fetchRoomsList()}
@@ -463,10 +579,13 @@ const RoomManagement = () => {
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDelete(room)}
-                                                                className="p-1 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                                disabled={checkingDeleteImpactId === (room.id || room.roomId)}
+                                                                className="p-1 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                                                                 title="Xoá phòng"
                                                             >
-                                                                <Trash2 className="w-4 h-4" />
+                                                                {checkingDeleteImpactId === (room.id || room.roomId)
+                                                                    ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                                                                    : <Trash2 className="w-4 h-4" />}
                                                             </button>
                                                         </div>
                                                     </td>
@@ -532,6 +651,25 @@ const RoomManagement = () => {
                                     <AlertCircle className="w-4 h-4 shrink-0" />{error}
                                 </div>
                             )}
+
+                            {/* Mã phòng */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Mã phòng họp <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text" required
+                                    disabled={modalMode === 'edit'}
+                                    value={formData.roomCode}
+                                    onChange={e => setField('roomCode', sanitizeRoomCode(e.target.value))}
+                                    placeholder="RM-BE312"
+                                    className={`w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue ${modalMode === 'edit' ? 'bg-cloud-mist/60 text-slate-blue cursor-not-allowed' : ''
+                                        }`}
+                                />
+                                <p className="text-[10px] text-slate-blue/70 mt-1">
+                                    {modalMode === 'edit'
+                                        ? 'Mã phòng không thể thay đổi sau khi tạo.'
+                                        : 'Định dạng bắt buộc: RM-XXXX (chữ hoa và số sau dấu gạch ngang). Ví dụ: RM-BE312, RM-AL234.'}
+                                </p>
+                            </div>
 
                             {/* Tên & loại phòng */}
                             <div>
@@ -735,7 +873,35 @@ const RoomManagement = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end gap-2 shrink-0">
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex items-center justify-between gap-2 shrink-0">
+                            <div className="flex items-center gap-2">
+                                {detailRoom.administrativeStatus && detailRoom.administrativeStatus !== 'available' ? (
+                                    <button
+                                        onClick={() => handleSetAdministrativeStatus('available')}
+                                        disabled={savingAdminStatus}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue bg-white hover:bg-cloud-mist disabled:opacity-50 transition-colors"
+                                    >
+                                        <Wrench className="w-3.5 h-3.5" /> Gỡ trạng thái đặc biệt
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => handleSetAdministrativeStatus('maintenance')}
+                                            disabled={savingAdminStatus}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-amber-200 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            <Wrench className="w-3.5 h-3.5" /> Đặt bảo trì
+                                        </button>
+                                        <button
+                                            onClick={() => handleSetAdministrativeStatus('inactive')}
+                                            disabled={savingAdminStatus}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            Ngừng hoạt động
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setDetailRoom(null)}
                                 className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"

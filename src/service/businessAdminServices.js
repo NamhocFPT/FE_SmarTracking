@@ -274,8 +274,17 @@ export const updateRoom = async (roomId, data) => {
     return await patch(`/rooms/${roomId}`, data);
 };
 
+// status: 'available' | 'maintenance' | 'inactive'. Gui 'available' de go override.
+export const updateRoomAdministrativeStatus = async (roomId, data) => {
+    return await patch(`/rooms/${roomId}/administrative-status`, data);
+};
+
 export const deleteRoom = async (roomId) => {
     return await dele(`/rooms/${roomId}`);
+};
+
+export const getRoomDeletionImpact = async (roomId) => {
+    return await get(`/rooms/${roomId}/deletion-impact`);
 };
 
 export const getRoomDetail = async (roomId) => {

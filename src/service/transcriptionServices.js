@@ -1,4 +1,4 @@
-import { get, post, patch, buildQuery } from '../utils/request';
+import { get, post, patch, dele, buildQuery } from '../utils/request';
 
 /**
  * Upload audio file cho meeting
@@ -80,6 +80,15 @@ export const updateTranscriptStatus = async (transcriptId, status, note) => {
     const body = { status };
     if (note) body.note = note;
     return await patch(`/transcripts/${transcriptId}/status`, body);
+};
+
+/**
+ * Xóa (ẩn) transcript chưa được đánh dấu đã xem (draft/failed) — dọn kết quả
+ * STT cũ trước khi chạy lại. Không xóa được reviewed/approved (BE trả 409).
+ * @param {string} transcriptId
+ */
+export const deleteTranscript = async (transcriptId) => {
+    return await dele(`/transcripts/${transcriptId}`);
 };
 
 /**

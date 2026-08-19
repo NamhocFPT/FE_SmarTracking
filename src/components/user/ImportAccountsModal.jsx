@@ -369,7 +369,14 @@ const EmployeeTab = ({ onSuccess }) => {
                         : { type: 'success', text: `Xác thực thành công — ${report.successCount ?? 0} tài khoản hợp lệ, sẵn sàng nhập.` });
                     setStep(2);
                 } else {
-                    setBanner({ type: 'success', text: `Đã tạo ${report.successCount ?? 0}/${report.totalRows ?? 0} tài khoản.${failed.length ? ` Bỏ qua ${failed.length} dòng lỗi.` : ''}` });
+                    const created = report.successCount ?? 0;
+                    setBanner(
+                        created === 0 && failed.length > 0
+                            ? { type: 'error', text: `Không tạo được tài khoản nào — cả ${failed.length} dòng đều lỗi. Xem chi tiết bên dưới.` }
+                            : failed.length > 0
+                                ? { type: 'warn', text: `Đã tạo ${created}/${report.totalRows ?? 0} tài khoản. Bỏ qua ${failed.length} dòng lỗi.` }
+                                : { type: 'success', text: `Đã tạo ${created}/${report.totalRows ?? 0} tài khoản.` },
+                    );
                     setStep(3);
                     onSuccess();
                 }
@@ -643,7 +650,14 @@ const PartnerTab = ({ onSuccess }) => {
                         : { type: 'success', text: `Xác thực thành công — ${report.successCount ?? 0} tài khoản đối tác hợp lệ.` });
                     setStep(2);
                 } else {
-                    setBanner({ type: 'success', text: `Đã tạo ${report.successCount ?? 0}/${report.totalRows ?? 0} tài khoản đối tác.` });
+                    const created = report.successCount ?? 0;
+                    setBanner(
+                        created === 0 && failed.length > 0
+                            ? { type: 'error', text: `Không tạo được tài khoản đối tác nào — cả ${failed.length} dòng đều lỗi. Xem chi tiết bên dưới.` }
+                            : failed.length > 0
+                                ? { type: 'warn', text: `Đã tạo ${created}/${report.totalRows ?? 0} tài khoản đối tác. Bỏ qua ${failed.length} dòng lỗi.` }
+                                : { type: 'success', text: `Đã tạo ${created}/${report.totalRows ?? 0} tài khoản đối tác.` },
+                    );
                     setStep(3);
                     onSuccess();
                 }

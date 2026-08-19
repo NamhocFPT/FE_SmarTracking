@@ -1,21 +1,21 @@
 import {
     Archive, Calendar, ChevronLeft, ChevronRight, Clock,
-    Download, ExternalLink, FileText, Film, HardDrive,
+    Download, FileText, Film, HardDrive,
     Mic, Play, RefreshCw, Search, Video, X, XCircle, AlertTriangle,
     CheckCircle, Users, Building2, Briefcase, ClipboardList, ListChecks,
     MapPin, User,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import toast from '../../utils/toast';
 import {
-    listMinutes, exportMinutes,
+    listMinutes,
     getMeetings, getMeetingMediaFiles, getMediaFile,
     updateMediaVisibility, getRooms,
 } from '../../service/businessAdminServices';
 import { getMeetingMinutesById } from '../../service/minutesServices';
+import ExportMinutesModal from '../../components/minutes/ExportMinutesModal';
 
 // ─── Constants ───────────────────────────────────────────────
 const MINUTES_LIMIT = 15;
@@ -73,7 +73,6 @@ const StatusBadge = ({ status }) => {
 
 // ─── Main Component ───────────────────────────────────────────
 const DocumentArchive = () => {
-    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('minutes');
 
     // ── Minutes state ──
@@ -87,7 +86,7 @@ const DocumentArchive = () => {
     const [mStatus, setMStatus]       = useState('');
     const [mFrom,   setMFrom]         = useState('');
     const [mTo,     setMTo]           = useState('');
-    const [exporting, setExporting]   = useState(null); // minutesId being exported
+    const [exportModalId, setExportModalId] = useState(null); // minutesId đang mở modal xuất file
     const [detailItem, setDetailItem]   = useState(null); // { ...min, detail: null | loaded, loading: bool }
 
     // ── Media state ──
@@ -156,23 +155,6 @@ const DocumentArchive = () => {
         fetchMinutes(p);
     };
 
-    // Export handler
-    const handleExport = async (min, format) => {
-        setExporting(min.id);
-        try {
-            const res = await exportMinutes(min.id, { format });
-            if (res?.success) {
-                toast.success(`Đang xuất ${format.toUpperCase()} cho "${min.title || 'Biên bản'}". Kiểm tra trang chi tiết cuộc họp để tải xuống.`);
-            } else {
-                toast.error(res?.message || 'Không thể xuất biên bản.');
-            }
-        } catch {
-            toast.error('Lỗi khi xuất biên bản.');
-        } finally {
-            setExporting(null);
-        }
-    };
-
     // Open detail modal
     const handleOpenDetail = async (min) => {
         setDetailItem({ ...min, _detail: null, _loading: true });
@@ -186,16 +168,6 @@ const DocumentArchive = () => {
         } catch {
             setDetailItem(prev => ({ ...prev, _loading: false }));
         }
-    };
-
-    // Navigate to meeting detail minutes tab
-    const viewMinutes = (min) => {
-        const meetingId = min.meetingId || min.meeting?.id;
-        if (!meetingId) {
-            toast.error('Không tìm thấy thông tin cuộc họp.');
-            return;
-        }
-        navigate(`/business-admin/meeting/${meetingId}?tab=minutes`);
     };
 
     // ════════════════════════════════════
@@ -499,32 +471,14 @@ const DocumentArchive = () => {
                                                                 Chi tiết
                                                             </button>
 
-                                                            {/* Mở trang cuộc họp */}
+                                                            {/* Xuất file */}
                                                             <button
-                                                                onClick={() => viewMinutes(min)}
-                                                                title="Mở trong trang cuộc họp"
-                                                                className="p-1.5 text-slate-blue hover:text-action-blue hover:bg-blue-50 rounded-lg transition-colors"
+                                                                onClick={() => setExportModalId(min.id)}
+                                                                title="Xuất file biên bản"
+                                                                className="p-1.5 text-slate-blue hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
                                                             >
-                                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                                <Download className="w-3.5 h-3.5" />
                                                             </button>
-
-                                                            {/* Export */}
-                                                            <div className="relative group">
-                                                                <button
-                                                                    disabled={exporting === min.id}
-                                                                    className="p-1.5 text-slate-blue hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
-                                                                    title="Xuất file"
-                                                                >
-                                                                    {exporting === min.id
-                                                                        ? <div className="w-3.5 h-3.5 border-2 border-slate-blue border-t-transparent rounded-full animate-spin" />
-                                                                        : <Download className="w-3.5 h-3.5" />
-                                                                    }
-                                                                </button>
-                                                                <div className="absolute right-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-platinum-tint rounded-xl shadow-lg z-20 overflow-hidden min-w-[110px]">
-                                                                    <button onClick={() => handleExport(min, 'pdf')} className="px-3 py-2 text-[11px] font-semibold text-midnight-indigo hover:bg-cloud-mist text-left">Xuất PDF</button>
-                                                                    <button onClick={() => handleExport(min, 'docx')} className="px-3 py-2 text-[11px] font-semibold text-midnight-indigo hover:bg-cloud-mist text-left border-t border-platinum-tint">Xuất DOCX</button>
-                                                                </div>
-                                                            </div>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1005,43 +959,32 @@ const DocumentArchive = () => {
                         </div>
 
                         {/* Modal footer */}
-                        <div className="flex items-center justify-between p-4 border-t border-platinum-tint bg-cloud-mist/10 shrink-0">
+                        <div className="flex items-center justify-end p-4 border-t border-platinum-tint bg-cloud-mist/10 shrink-0 gap-2">
                             <button
-                                onClick={() => viewMinutes(detailItem)}
-                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-action-blue hover:bg-blue-50 rounded-xl transition-colors"
+                                onClick={() => setExportModalId(detailItem.id)}
+                                className="px-3 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist flex items-center gap-1.5"
                             >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                                Mở trang cuộc họp
+                                <Download className="w-3.5 h-3.5" />
+                                Xuất file
                             </button>
-                            <div className="flex gap-2">
-                                <div className="relative group">
-                                    <button
-                                        disabled={exporting === detailItem.id}
-                                        className="px-3 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist flex items-center gap-1.5 disabled:opacity-50"
-                                    >
-                                        {exporting === detailItem.id
-                                            ? <div className="w-3.5 h-3.5 border-2 border-slate-blue border-t-transparent rounded-full animate-spin" />
-                                            : <Download className="w-3.5 h-3.5" />
-                                        }
-                                        Xuất file
-                                    </button>
-                                    <div className="absolute right-0 bottom-full mb-1 hidden group-hover:flex flex-col bg-white border border-platinum-tint rounded-xl shadow-lg z-20 overflow-hidden min-w-[110px]">
-                                        <button onClick={() => handleExport(detailItem, 'pdf')} className="px-3 py-2 text-[11px] font-semibold text-midnight-indigo hover:bg-cloud-mist text-left">Xuất PDF</button>
-                                        <button onClick={() => handleExport(detailItem, 'docx')} className="px-3 py-2 text-[11px] font-semibold text-midnight-indigo hover:bg-cloud-mist text-left border-t border-platinum-tint">Xuất DOCX</button>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setDetailItem(null)}
-                                    className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist"
-                                >
-                                    Đóng
-                                </button>
-                            </div>
+                            <button
+                                onClick={() => setDetailItem(null)}
+                                className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist"
+                            >
+                                Đóng
+                            </button>
                         </div>
                     </motion.div>
                 </div>,
                 document.body
             )}
+
+            {/* ── Export Minutes Modal ── */}
+            <ExportMinutesModal
+                minutesId={exportModalId}
+                open={!!exportModalId}
+                onClose={() => setExportModalId(null)}
+            />
         </div>
     );
 };

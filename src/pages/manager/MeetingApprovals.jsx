@@ -24,6 +24,21 @@ const itemVariants = {
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
 };
 
+/**
+ * 'conflict'  — trùng với booking đã APPROVED/ACTIVE (đỏ, nghiêm trọng: nếu duyệt
+ *               sẽ bị BE chặn ROOM_CONFLICT).
+ * 'pending'   — trùng với 1 request PENDING khác (vàng/cam, chỉ cảnh báo mềm:
+ *               Manager là người chọn duyệt cái nào, duyệt vẫn được).
+ * 'none'      — không phát hiện trùng gì.
+ */
+const getRoomConflictLevel = (req) => {
+    const hasRoomConflict = req.conflictDetails && req.conflictDetails.length > 0;
+    const hasLegacyWarning = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+    if (hasRoomConflict || hasLegacyWarning) return 'conflict';
+    if (req.pendingConflictDetails && req.pendingConflictDetails.length > 0) return 'pending';
+    return 'none';
+};
+
 const MeetingApprovals = () => {
 
 
@@ -391,7 +406,7 @@ const MeetingApprovals = () => {
                     ) : viewMode === 'grid' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-cloud-mist/10">
                             {requests.map(req => {
-                                const hasConflict = (req.conflictDetails && req.conflictDetails.length > 0) || req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+                                const conflictLevel = getRoomConflictLevel(req);
                                 return (
                                     <div key={req.id} className="bg-white border border-platinum-tint/60 hover:border-action-blue/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 h-full">
                                         {/* Header: Request Code & Status */}
@@ -465,9 +480,13 @@ const MeetingApprovals = () => {
                                         {/* Footer: Conflict Status & Actions */}
                                         <div className="mt-auto pt-3 border-t border-platinum-tint/40 flex items-center justify-between">
                                             <div>
-                                                {hasConflict ? (
+                                                {conflictLevel === 'conflict' ? (
                                                     <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-full border border-red-200" title="Bị trùng lịch">
                                                         <AlertTriangle className="w-3.5 h-3.5 text-red-600 animate-pulse" /> Bị trùng lịch
+                                                    </span>
+                                                ) : conflictLevel === 'pending' ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200" title="Trùng với yêu cầu khác đang chờ duyệt">
+                                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Trùng yêu cầu chờ duyệt
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
@@ -536,7 +555,7 @@ const MeetingApprovals = () => {
                             </thead>
                             <tbody>
                                 {requests.map(req => {
-                                    const hasConflict = (req.conflictDetails && req.conflictDetails.length > 0) || req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+                                    const conflictLevel = getRoomConflictLevel(req);
                                     return (
                                         <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/10 transition-colors">
                                             {/* Code */}
@@ -576,10 +595,15 @@ const MeetingApprovals = () => {
 
                                             {/* Conflict Indicator */}
                                             <td className="p-4 whitespace-nowrap">
-                                                {hasConflict ? (
+                                                {conflictLevel === 'conflict' ? (
                                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
                                                         <AlertTriangle className="w-3 h-3 text-red-600 animate-pulse" />
                                                         Bị trùng lịch
+                                                    </span>
+                                                ) : conflictLevel === 'pending' ? (
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                                        Trùng yêu cầu chờ duyệt
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-250">
@@ -769,17 +793,24 @@ const MeetingApprovals = () => {
                                         // giờ hiện dù conflictDetails có dữ liệu thật.
                                         const hasRoomConflict = selectedRequest.conflictDetails && selectedRequest.conflictDetails.length > 0;
                                         const hasLegacyWarning = selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked';
+                                        // Nhóm F (2026-08-16): trùng với request PENDING khác (không phải booking
+                                        // đã duyệt) — chỉ cảnh báo mềm, KHÔNG dùng chung banner đỏ với
+                                        // hasRoomConflict để Manager không nhầm mức độ nghiêm trọng (duyệt vẫn
+                                        // được, không bị BE chặn như trường hợp trùng booking đã APPROVED/ACTIVE).
+                                        const hasPendingConflict = !hasRoomConflict && !hasLegacyWarning && selectedRequest.pendingConflictDetails && selectedRequest.pendingConflictDetails.length > 0;
                                         const showAlert = hasRoomConflict || hasLegacyWarning;
                                         return (
                                             <div className={`p-4 rounded-xl border flex gap-3 ${showAlert
                                                 ? 'bg-rose-50 border-rose-200 text-rose-800'
-                                                : 'bg-emerald-50 border-emerald-250 text-emerald-800'
+                                                : hasPendingConflict
+                                                    ? 'bg-amber-50 border-amber-200 text-amber-800'
+                                                    : 'bg-emerald-50 border-emerald-250 text-emerald-800'
                                                 }`}>
-                                                <AlertTriangle className={`w-5 h-5 shrink-0 ${showAlert ? 'text-red-600 animate-pulse' : 'text-emerald-600'
+                                                <AlertTriangle className={`w-5 h-5 shrink-0 ${showAlert ? 'text-red-600 animate-pulse' : hasPendingConflict ? 'text-amber-600' : 'text-emerald-600'
                                                     }`} />
                                                 <div className="text-xs space-y-2 flex-1">
                                                     <p className="font-bold">
-                                                        {showAlert ? 'Cảnh báo trùng lịch phòng họp!' : 'Phòng họp trống trong khung giờ này'}
+                                                        {showAlert ? 'Cảnh báo trùng lịch phòng họp!' : hasPendingConflict ? 'Trùng với yêu cầu khác đang chờ duyệt' : 'Phòng họp trống trong khung giờ này'}
                                                     </p>
                                                     {hasRoomConflict ? (
                                                         <div className="space-y-1.5">
@@ -798,6 +829,21 @@ const MeetingApprovals = () => {
                                                         </div>
                                                     ) : hasLegacyWarning ? (
                                                         <p className="leading-relaxed opacity-90">Khung giờ này trùng lịch với một hoặc nhiều người tham dự bắt buộc. Vui lòng cân nhắc trước khi duyệt.</p>
+                                                    ) : hasPendingConflict ? (
+                                                        <div className="space-y-1.5">
+                                                            <p className="opacity-90">Khung giờ này đang trùng với {selectedRequest.pendingConflictDetails.length} yêu cầu khác cũng đang chờ duyệt tại cùng phòng — chưa có booking nào được duyệt nên hệ thống KHÔNG chặn bạn duyệt, nhưng chỉ 1 trong các yêu cầu này nên được giữ phòng:</p>
+                                                            <ul className="space-y-1">
+                                                                {selectedRequest.pendingConflictDetails.map((c, idx) => (
+                                                                    <li key={c.bookingId || idx} className="bg-white/60 rounded-lg px-2.5 py-1.5 border border-amber-100">
+                                                                        <span className="font-semibold">{c.meetingTitle || 'Cuộc họp khác'}</span>
+                                                                        {' — '}{c.roomName || 'phòng đã chọn'}
+                                                                        {' · '}{new Date(c.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}-{new Date(c.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                                        {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                            <p className="opacity-80 italic">Nếu bạn duyệt yêu cầu này, các yêu cầu PENDING trùng giờ ở trên sẽ không tự động bị từ chối — khi có người duyệt tiếp yêu cầu đó, hệ thống sẽ báo lỗi trùng phòng (ROOM_CONFLICT) và cần từ chối thủ công.</p>
+                                                        </div>
                                                     ) : (
                                                         <p className="leading-relaxed opacity-90">Không phát hiện bất kì lịch họp trùng nào cho phòng họp này trong khung giờ được yêu cầu.</p>
                                                     )}
