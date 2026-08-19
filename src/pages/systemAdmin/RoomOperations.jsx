@@ -326,10 +326,11 @@ const RoomOperations = () => {
                 </div>
                 <button
                     onClick={() => { setRoomsLoading(true); loadConfigs(); }}
-                    className="p-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo rounded-xl hover:bg-cloud-mist transition-colors"
+                    disabled={roomsLoading}
+                    className="p-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo rounded-xl hover:bg-cloud-mist transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Tải lại"
                 >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className={`w-4 h-4 ${roomsLoading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
