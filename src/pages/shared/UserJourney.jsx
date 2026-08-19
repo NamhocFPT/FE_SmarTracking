@@ -540,7 +540,7 @@ const UserJourney = () => {
                         <div>
                             <h3 className="text-lg font-bold text-midnight-indigo">Không có dữ liệu hành trình</h3>
                             <p className="text-slate-blue text-sm mt-1">
-                                Không tìm thấy bất kỳ hoạt động nào của <strong>{selectedUser.fullName}</strong> trong ngày {new Date(date + 'T00:00:00').toLocaleDateString('vi-VN')}.
+                                Không tìm thấy bất kỳ hoạt động nào của <strong>{selectedUser.fullName}</strong> trong ngày {new Date(date + 'T00:00:00').toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}.
                             </p>
                         </div>
                     </div>
@@ -587,7 +587,7 @@ const UserJourney = () => {
                                 Nhật ký Hành trình chi tiết
                             </h3>
                             <span className="text-xs font-bold px-3 py-1 bg-cloud-mist border border-platinum-tint text-slate-blue rounded-full">
-                                {selectedUser.fullName} &bull; {new Date(date + 'T00:00:00').toLocaleDateString('vi-VN')}
+                                {selectedUser.fullName} &bull; {new Date(date + 'T00:00:00').toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
                             </span>
                         </div>
 

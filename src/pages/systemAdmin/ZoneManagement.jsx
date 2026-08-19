@@ -4,9 +4,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { createPortal } from 'react-dom';
 import {
     getZones, getZoneById, createZone, updateZone,
-    deleteZone, assignDeviceToZone, removeDeviceFromZone
+    deleteZone
 } from '../../service/zoneServices';
-import { getDevices, getZoneAccessLog, getZonePresenceTimeline } from '../../service/sysAdminServices';
+import { getZoneAccessLog, getZonePresenceTimeline } from '../../service/sysAdminServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 
@@ -35,7 +35,7 @@ const ZoneDirectionBadge = ({ direction }) => {
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-600 bg-slate-50 border border-slate-200 whitespace-nowrap"><Eye className="w-2.5 h-2.5" />Thấy</span>;
 };
 
-const ZoneStatusBadge = ({ isStranger, matchState }) => {
+const ZoneStatusBadge = ({ isStranger }) => {
     if (isStranger)
         return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 whitespace-nowrap"><AlertTriangle className="w-2.5 h-2.5" />Người lạ</span>;
     return <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap"><ShieldCheck className="w-2.5 h-2.5" />Khớp</span>;
@@ -203,7 +203,7 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                                         <p className={`text-xs font-bold truncate ${ev.isStranger ? 'text-red-700' : 'text-midnight-indigo'}`}>
                                             {name}
                                         </p>
-                                        <ZoneStatusBadge isStranger={ev.isStranger} matchState={ev.matchState} />
+                                        <ZoneStatusBadge isStranger={ev.isStranger} />
                                     </div>
                                 </div>
                             );
@@ -526,7 +526,6 @@ const ZoneManagement = () => {
     // Data states
     const [zones, setZones] = useState([]);
     const [selectedZone, setSelectedZone] = useState(null);
-    const [availableDevices, setAvailableDevices] = useState([]);
 
     // UI states
     const [loading, setLoading] = useState(true);
@@ -589,23 +588,9 @@ const ZoneManagement = () => {
         }
     }, []);
 
-    const fetchAvailableDevices = useCallback(async () => {
-        try {
-            const res = await getDevices({ limit: 100 });
-            if (res?.success) {
-                const data = res.data || [];
-                const cameras = data.filter(d => ['ip_camera', 'door_camera', 'room_camera', 'occupancy_sensor', 'face_server'].includes(d.device_type));
-                setAvailableDevices(cameras);
-            }
-        } catch (err) {
-            console.error('Lỗi tải thiết bị:', err);
-        }
-    }, []);
-
     useEffect(() => {
         fetchZones();
-        fetchAvailableDevices();
-    }, [fetchZones, fetchAvailableDevices]);
+    }, [fetchZones]);
 
     useEffect(() => {
         if (successMessage || error) {
@@ -813,28 +798,6 @@ const ZoneManagement = () => {
             setError(err?.error?.message || err?.message || 'Lỗi khi gửi yêu cầu cập nhật.');
         }
     };
-
-    const handleRemoveDevice = async (deviceId) => {
-            if (!selectedZone) return;
-            try {
-                const res = await removeDeviceFromZone(selectedZone.id, deviceId);
-                if (res?.success) {
-                    setSuccessMessage('Đã gỡ thiết bị khỏi khu vực.');
-
-                    // Update state ở client thay vì fetch lại API do API ko trả về devices
-                    setSelectedZone(prev => ({
-                        ...prev,
-                        devices: (prev.devices || []).filter(d => d.id !== deviceId)
-                    }));
-
-                    fetchAvailableDevices();
-                } else {
-                    setError(res?.message || 'Lỗi khi gỡ thiết bị.');
-                }
-            } catch (err) {
-                setError('Lỗi kết nối khi gỡ thiết bị.');
-            }
-        };
 
         const filteredZones = zones.filter(z => {
             const searchLower = searchTerm.toLowerCase();

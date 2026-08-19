@@ -463,13 +463,29 @@ const SystemSettings = () => {
         safeChannelPage * CHANNELS_PER_PAGE
     );
 
+    // Zone có thể vừa được tạo ở màn ZoneManagement — refetch mỗi lần mở modal
+    // để dropdown zone luôn khớp DB, không cần F5 cả trang
+    const refetchZones = () => {
+        getZones({ page: 1, limit: 100 })
+            .then(zoneRes => {
+                if (!zoneRes?.success) return;
+                let zoneData = [];
+                if (Array.isArray(zoneRes.data)) zoneData = zoneRes.data;
+                else if (Array.isArray(zoneRes.data?.items)) zoneData = zoneRes.data.items;
+                setZones(zoneData);
+            })
+            .catch(() => {});
+    };
+
     const openAddChannelEditor = () => {
         setError(null);
+        refetchZones();
         setChannelEditor({ open: true, mode: 'add', channelId: '', role: 'checkin_out', roomId: '', direction: 'enter', zoneId: '' });
     };
 
     const openEditChannelEditor = (channelId) => {
         setError(null);
+        refetchZones();
         const inferred = inferChannelRole(channelId, channelMaps);
         setChannelEditor({
             open: true,
