@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from '../../utils/toast';
-import { 
-    CheckCircle, AlertTriangle, Edit3, Save, X, 
+import {
+    Edit3, Save, X,
     Send, Info, AlertCircle, FileText, Target, Sparkles, Loader2, BrainCircuit,
-    Share2, Download, Trash2
+    Share2, Download, Trash2, PenLine, Radio
 } from 'lucide-react';
-import { updateMeetingMinutes, issueMeetingMinutes, distributeMeetingMinutes, deleteMeetingMinutes } from '../../service/minutesServices';
+import { updateMeetingMinutes, issueMeetingMinutes, distributeMeetingMinutes, deleteMeetingMinutes, toggleLiveShareMinutes } from '../../service/minutesServices';
 import ExportMinutesModal from './ExportMinutesModal';
 import ShareMinutesModal from './ShareMinutesModal';
 
@@ -24,6 +24,7 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
     const [isIssuing, setIsIssuing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [distributing, setDistributing] = useState(false);
+    const [isTogglingLive, setIsTogglingLive] = useState(false);
 
     const showToast = (message, type = 'success') => {
         toast[type]?.(message) ?? toast.info(message);
@@ -93,6 +94,24 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
             showToast(e?.error?.message || e?.message || 'Có lỗi khi gửi biên bản.', 'error');
         } finally {
             setDistributing(false);
+        }
+    };
+
+    const handleToggleLiveShare = async () => {
+        setIsTogglingLive(true);
+        try {
+            const nextEnabled = !minutes.isLiveShared;
+            const res = await toggleLiveShareMinutes(minutes.id, nextEnabled);
+            if (res?.success) {
+                showToast(nextEnabled ? 'Đã bật chia sẻ trực tiếp — participant có thể xem bản nháp.' : 'Đã tắt chia sẻ trực tiếp.');
+                if (onRefresh) onRefresh();
+            } else {
+                showToast(res?.message || 'Không thể đổi trạng thái chia sẻ trực tiếp.', 'error');
+            }
+        } catch (err) {
+            showToast(err?.error?.message || err.message || 'Lỗi khi đổi trạng thái chia sẻ trực tiếp.', 'error');
+        } finally {
+            setIsTogglingLive(false);
         }
     };
 
@@ -172,9 +191,18 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                     <div>
                         <div className="flex items-center gap-2">
                             <h3 className="text-sm font-bold text-midnight-indigo uppercase tracking-wider">{minutes.title || 'Biên bản cuộc họp'}</h3>
-                            {minutes.isAiGenerated && (
+                            {minutes.isAiGenerated ? (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 flex items-center gap-1 border border-purple-200">
                                     <Sparkles className="w-3 h-3" /> Tạo bởi AI
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 flex items-center gap-1 border border-blue-200">
+                                    <PenLine className="w-3 h-3" /> Thủ công
+                                </span>
+                            )}
+                            {minutes.contentFormat === 'blank' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    Trang trắng
                                 </span>
                             )}
                         </div>
@@ -185,11 +213,32 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                                 {minutes.status === 'published' ? 'Đã ban hành' : 'Bản nháp'}
                             </span>
                             <span className="text-[10px] text-slate-blue font-medium">Phiên bản: {minutes.versionNo}</span>
+                            {minutes.isLiveShared && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-red-100 text-red-700 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                                    Đang chia sẻ trực tiếp
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
+                    {isHost && minutes.status === 'draft' && (
+                        <button
+                            onClick={handleToggleLiveShare}
+                            disabled={isTogglingLive}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 ${
+                                minutes.isLiveShared
+                                    ? 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100'
+                                    : 'border border-platinum-tint text-slate-blue hover:bg-cloud-mist'
+                            }`}
+                            title={minutes.isLiveShared ? 'Tắt chia sẻ trực tiếp cho participant' : 'Bật chia sẻ trực tiếp cho participant xem trong lúc soạn'}
+                        >
+                            {isTogglingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5" />}
+                            {minutes.isLiveShared ? 'Đang chia sẻ' : 'Chia sẻ trực tiếp'}
+                        </button>
+                    )}
                     {isEditing ? (
                         <>
                             <button 
@@ -328,12 +377,13 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                     </div>
                 )}
 
-                {/* Decisions Section */}
+                {/* Decisions Section — ẩn ở chế độ 'Trang trắng' (không ép cấu trúc) */}
+                {minutes.contentFormat !== 'blank' && (
                 <div>
                     <h4 className="text-xs font-bold text-midnight-indigo uppercase flex items-center gap-1.5 mb-3 border-b border-platinum-tint pb-2">
                         <AlertCircle className="w-4 h-4 text-action-blue" /> Các quyết định
                     </h4>
-                    
+
                     {isEditing ? (
                         <div className="space-y-3">
                             {editForm.decisions.map((decision, idx) => (
@@ -382,13 +432,15 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                         </div>
                     )}
                 </div>
+                )}
 
-                {/* Action Items Section */}
+                {/* Action Items Section — ẩn ở chế độ 'Trang trắng' */}
+                {minutes.contentFormat !== 'blank' && (
                 <div>
                     <h4 className="text-xs font-bold text-midnight-indigo uppercase flex items-center gap-1.5 mb-3 border-b border-platinum-tint pb-2">
                         <Target className="w-4 h-4 text-emerald-600" /> Các công việc cần làm (Action Items)
                     </h4>
-                    
+
                     <div className="overflow-x-auto pb-2 scrollbar-thin w-full">
                         <table className="w-full text-left border-collapse min-w-[650px]">
                             <thead>
@@ -472,18 +524,19 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                         )}
                     </div>
                 </div>
+                )}
 
-                {/* Raw Content */}
+                {/* Raw Content — nội dung chính khi ở chế độ 'Trang trắng', ghi chú thêm khi ở 'Template' */}
                 <div>
                     <h4 className="text-xs font-bold text-midnight-indigo uppercase flex items-center gap-1.5 mb-3 border-b border-platinum-tint pb-2">
-                        <Info className="w-4 h-4 text-slate-blue" /> Nội dung tự do
+                        <Info className="w-4 h-4 text-slate-blue" /> {minutes.contentFormat === 'blank' ? 'Nội dung biên bản' : 'Nội dung tự do'}
                     </h4>
                     {isEditing ? (
                         <textarea
                             value={editForm.minutesContent || ''}
                             onChange={(e) => setEditForm({ ...editForm, minutesContent: e.target.value })}
-                            className="w-full text-xs p-3 border border-platinum-tint rounded-xl focus:outline-none focus:border-action-blue min-h-[120px]"
-                            placeholder="Ghi chú thêm..."
+                            className={`w-full text-xs p-3 border border-platinum-tint rounded-xl focus:outline-none focus:border-action-blue ${minutes.contentFormat === 'blank' ? 'min-h-[400px]' : 'min-h-[120px]'}`}
+                            placeholder={minutes.contentFormat === 'blank' ? 'Soạn nội dung biên bản...' : 'Ghi chú thêm...'}
                         />
                     ) : (
                         <div className="p-4 bg-cloud-mist/20 rounded-xl text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">

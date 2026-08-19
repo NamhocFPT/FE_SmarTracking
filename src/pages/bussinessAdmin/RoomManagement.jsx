@@ -2,7 +2,7 @@ import {
     Activity, AlertCircle, ArrowLeft, Calendar, CheckCircle,
     ChevronLeft, ChevronRight, Clock, DoorOpen, Edit2, Eye,
     Home, List, MapPin, Mic, Monitor, Plus, RefreshCw,
-    ShieldAlert, Trash2, UserCheck, Users, Video, X
+    ShieldAlert, Trash2, UserCheck, Users, Video, Wrench, X
 } from 'lucide-react';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
@@ -15,7 +15,8 @@ import {
     deleteRoom,
     getRoomDeletionImpact,
     getMeetings,
-    getRoomDetail
+    getRoomDetail,
+    updateRoomAdministrativeStatus
 } from '../../service/businessAdminServices';
 
 import RealtimeRoomMonitor from '../../components/security/RealtimeRoomMonitor';
@@ -80,7 +81,9 @@ const MEETING_STATUS_CONFIG = {
 const STATUS_CONFIG = {
     available: { label: 'Đang trống', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     occupied: { label: 'Đang họp', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-    maintenance: { label: 'Bảo trì', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+    reserved: { label: 'Đã đặt trước', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+    maintenance: { label: 'Bảo trì', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    inactive: { label: 'Ngừng hoạt động', cls: 'bg-gray-100 text-gray-600 border-gray-200' }
 };
 
 const getStatus = (room) => room.currentStatus || room.roomStatus || 'available';
@@ -146,6 +149,7 @@ const RoomManagement = () => {
     // Chi tiết phòng
     const [detailRoom, setDetailRoom] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const [savingAdminStatus, setSavingAdminStatus] = useState(false);
 
     const openRoomDetail = async (room) => {
         const roomId = room.id || room.roomId;
@@ -161,6 +165,28 @@ const RoomManagement = () => {
             console.error("Lỗi tải thông tin chi tiết phòng:", err);
         } finally {
             setLoadingDetail(false);
+        }
+    };
+
+    // Dat/go trang thai chu dong (bao tri / ngung hoat dong) cho phong dang xem chi tiet.
+    const handleSetAdministrativeStatus = async (status) => {
+        if (!detailRoom) return;
+        const roomId = detailRoom.id || detailRoom.roomId;
+        setSavingAdminStatus(true);
+        setError(null);
+        try {
+            const res = await updateRoomAdministrativeStatus(roomId, { status });
+            if (res?.success) {
+                setDetailRoom(prev => ({ ...prev, administrativeStatus: res.data?.administrativeStatus ?? status }));
+                setSuccessMessage('Đã cập nhật trạng thái phòng họp!');
+                fetchRoomsList();
+            } else {
+                setError(res?.error?.message || 'Không thể cập nhật trạng thái phòng.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Không thể cập nhật trạng thái phòng.');
+        } finally {
+            setSavingAdminStatus(false);
         }
     };
 
@@ -434,7 +460,9 @@ const RoomManagement = () => {
                             <option value="">Tất cả trạng thái</option>
                             <option value="available">Đang trống</option>
                             <option value="occupied">Đang họp</option>
+                            <option value="reserved">Đã đặt trước</option>
                             <option value="maintenance">Bảo trì</option>
+                            <option value="inactive">Ngừng hoạt động</option>
                         </select>
                         <button
                             onClick={() => fetchRoomsList()}
@@ -845,7 +873,35 @@ const RoomManagement = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex justify-end gap-2 shrink-0">
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex items-center justify-between gap-2 shrink-0">
+                            <div className="flex items-center gap-2">
+                                {detailRoom.administrativeStatus && detailRoom.administrativeStatus !== 'available' ? (
+                                    <button
+                                        onClick={() => handleSetAdministrativeStatus('available')}
+                                        disabled={savingAdminStatus}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-platinum-tint rounded-xl text-xs font-bold text-slate-blue bg-white hover:bg-cloud-mist disabled:opacity-50 transition-colors"
+                                    >
+                                        <Wrench className="w-3.5 h-3.5" /> Gỡ trạng thái đặc biệt
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => handleSetAdministrativeStatus('maintenance')}
+                                            disabled={savingAdminStatus}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-amber-200 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            <Wrench className="w-3.5 h-3.5" /> Đặt bảo trì
+                                        </button>
+                                        <button
+                                            onClick={() => handleSetAdministrativeStatus('inactive')}
+                                            disabled={savingAdminStatus}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            Ngừng hoạt động
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setDetailRoom(null)}
                                 className="px-4 py-2 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"

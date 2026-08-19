@@ -36,10 +36,29 @@ export const createManualMinutes = async (meetingId, payload) => {
 
 /**
  * Lấy chi tiết biên bản cuộc họp
- * @param {string} minutesId 
+ * @param {string} minutesId
  */
 export const getMeetingMinutesById = async (minutesId) => {
     return await get(`/meeting-minutes/${minutesId}`);
+};
+
+/**
+ * So sánh bản biên bản thủ công và bản AI của cùng 1 cuộc họp (song song, độc lập).
+ * Trả về { manual: MinutesListItemDto|null, ai: MinutesListItemDto|null }.
+ * @param {string} meetingId
+ */
+export const compareMeetingMinutes = async (meetingId) => {
+    return await get(`/meeting-minutes/compare${buildQuery({ meetingId })}`);
+};
+
+/**
+ * Bật/tắt chế độ chia sẻ trực tiếp bản nháp cho participant xem read-only (MKM-LIVE-01).
+ * Chỉ Host (preparedBy) gọi được, chỉ áp dụng khi status=draft.
+ * @param {string} minutesId
+ * @param {boolean} enabled
+ */
+export const toggleLiveShareMinutes = async (minutesId, enabled) => {
+    return await patch(`/meeting-minutes/${minutesId}/live-share`, { enabled });
 };
 
 /**
