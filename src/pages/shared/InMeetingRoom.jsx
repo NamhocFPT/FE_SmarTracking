@@ -1350,6 +1350,13 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 'Kết thúc & Giải phóng phòng'
                             )}
                         </button>
+                        <button
+                            onClick={() => setExtensionModal({ isOpen: true, minutes: 15, reason: '' })}
+                            disabled={actionLoading}
+                            className="w-full mt-2.5 py-3 bg-white hover:bg-cloud-mist text-midnight-indigo border border-platinum-tint rounded-xl font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            <IoTime className="w-4 h-4" /> Yêu cầu gia hạn thêm giờ
+                        </button>
                     </div>
                 </div>
             )}
