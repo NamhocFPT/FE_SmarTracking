@@ -95,6 +95,15 @@ const noShowStatusConfig = {
     },
 };
 
+// Phút còn lại tới currentBooking.reservedEndTime — null nếu không có hoặc đã qua giờ kết
+// thúc (tránh hiện số âm/0 vô nghĩa khi dữ liệu chưa kịp cập nhật trạng thái phòng).
+const remainingMinutes = (endTimeIso) => {
+    if (!endTimeIso) return null;
+    const diffMs = new Date(endTimeIso).getTime() - Date.now();
+    if (!Number.isFinite(diffMs) || diffMs <= 0) return null;
+    return Math.round(diffMs / 60000);
+};
+
 const RoomStatusGrid = ({ rooms, loading }) => {
     if (loading) return (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -117,6 +126,7 @@ const RoomStatusGrid = ({ rooms, loading }) => {
             {rooms.map((room) => {
                 const status = roomStatusConfig[room.currentStatus] || roomStatusConfig.inactive;
                 const noShow = noShowStatusConfig[room.noShowStatus];
+                const remainMin = remainingMinutes(room.currentBooking?.reservedEndTime);
                 return (
                     <div key={room.roomId} className={`bg-white rounded-2xl border p-4 hover:shadow-md transition-shadow ${noShow ? 'border-amber-300' : 'border-platinum-tint'}`}>
                         <div className="flex items-start justify-between mb-2">
@@ -134,6 +144,14 @@ const RoomStatusGrid = ({ rooms, loading }) => {
                             <p className="text-[10px] text-slate-blue/70 mt-1.5 truncate" title={room.currentBooking.meetingTitle}>
                                 📅 {room.currentBooking.meetingTitle}
                             </p>
+                        )}
+                        {room.currentBooking?.hostName && (
+                            <p className="text-[10px] text-slate-blue/70 mt-0.5 truncate" title={room.currentBooking.hostName}>
+                                👤 {room.currentBooking.hostName}
+                            </p>
+                        )}
+                        {remainMin !== null && (
+                            <p className="text-[10px] text-slate-blue/70 mt-0.5">⏱ Còn {remainMin} phút</p>
                         )}
                         {room.occupancyCount !== null && room.occupancyCount !== undefined && (
                             <p className="text-[10px] text-slate-blue/70 mt-0.5">👥 {room.occupancyCount} người</p>
