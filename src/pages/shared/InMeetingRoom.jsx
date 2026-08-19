@@ -167,7 +167,19 @@ const RecordingTimer = ({ meetingId, sessionId, initialStatus, onStatusChange })
         return ` · ${(parseInt(bytes) / (1024 * 1024)).toFixed(1)}MB`;
     };
 
-    if (!['recording', 'starting', 'stopping', 'paused'].includes(localStatus)) return null;
+    if (!['recording', 'starting', 'stopping', 'paused', 'failed'].includes(localStatus)) return null;
+
+    if (localStatus === 'failed') {
+        return (
+            <div className="px-3 py-2 rounded-xl border flex items-start gap-2 text-xs font-bold bg-red-50 text-red-700 border-red-300">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                    <span>Ghi hình đã dừng do lỗi</span>
+                    <span className="text-[10px] font-normal opacity-80">Vui lòng kiểm tra camera và bắt đầu lại nếu cần.</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`px-3 py-2 rounded-xl border flex flex-col gap-1 text-xs font-bold ${localStatus === 'recording' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -612,6 +624,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             if (newStatus === 'stopped') {
                                 showToast('Ghi hình đã hoàn tất, đang xử lý video.', 'success');
                                 fetchMediaFiles();
+                            } else if (newStatus === 'failed') {
+                                showToast('Ghi hình đã dừng do lỗi — vui lòng kiểm tra camera.', 'error');
                             }
                         }
                         if (res.data?.startedAt && !recordingStartedAt) {
@@ -2003,11 +2017,12 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     </div>
                                     <div className="p-3 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs text-midnight-indigo font-semibold">
+                                            <span className={`text-xs font-semibold ${recordingStatus === 'failed' ? 'text-red-600' : 'text-midnight-indigo'}`}>
                                                 {recordingStatus === 'inactive' ? 'Chưa ghi hình' :
                                                     recordingStatus === 'recording' ? 'Đang ghi hình' :
                                                         recordingStatus === 'paused' ? 'Đã tạm dừng' :
-                                                            'Đang xử lý...'}
+                                                            recordingStatus === 'failed' ? 'Đã dừng do lỗi' :
+                                                                'Đang xử lý...'}
                                             </span>
                                             <button
                                                 type="button"
@@ -2016,7 +2031,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                     if (recordingStatus === 'inactive') handleStartRecording();
                                                     else if (['recording', 'paused'].includes(recordingStatus)) handleStopRecording();
                                                 }}
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${recordingStatus !== 'inactive' ? 'bg-action-blue' : 'bg-pale-gray'}`}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${recordingStatus === 'failed' ? 'bg-red-400' : recordingStatus !== 'inactive' ? 'bg-action-blue' : 'bg-pale-gray'}`}
                                             >
                                                 <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${recordingStatus !== 'inactive' ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                             </button>

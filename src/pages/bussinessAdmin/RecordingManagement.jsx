@@ -436,9 +436,10 @@ const RecordingManagement = () => {
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => setDeleteTarget(rec)}
-                                                    className="p-1.5 hover:text-red-600 hover:bg-red-50 text-slate-blue rounded-lg transition-colors"
-                                                    title="Xoá vĩnh viễn"
+                                                    type="button"
+                                                    disabled
+                                                    className="p-1.5 text-slate-300 rounded-lg cursor-not-allowed"
+                                                    title="Sắp ra mắt — tính năng xoá bản ghi chưa được hỗ trợ"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
