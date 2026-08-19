@@ -1,7 +1,7 @@
 import {
     AlertCircle, ArrowDownLeft, ArrowUpRight, Calendar, CalendarCheck,
-    Car, Check, Clock, Eye, Map, MapPin, RefreshCw, Search, Sparkles,
-    Timer, User, Video,
+    Car, Check, Clock, Eye, Image as ImageIcon, Map, MapPin, RefreshCw,
+    Search, Sparkles, Timer, User, Video,
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -322,8 +322,8 @@ const UserJourney = () => {
                         </div>
                     )}
 
-                    {/* Snapshot thumbnail (gate / meeting, chỉ khi BE trả sourceEventId) */}
-                    {event.sourceEventId && (
+                    {/* Snapshot thumbnail (gate / meeting) — placeholder cùng kích thước khi BE không trả sourceEventId, để timeline thẳng hàng */}
+                    {event.sourceEventId ? (
                         <ThumbnailImage
                             eventId={event.sourceEventId}
                             className="w-28 md:w-36 aspect-video"
@@ -332,6 +332,11 @@ const UserJourney = () => {
                                 setIsSnapshotOpen(true);
                             }}
                         />
+                    ) : (
+                        <div className="inline-flex flex-col items-center justify-center gap-1 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0 w-28 md:w-36 aspect-video px-1">
+                            <ImageIcon className="w-4 h-4 text-slate-400" />
+                            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-wide leading-none text-center">Không có ảnh</span>
+                        </div>
                     )}
                 </div>
             </div>
@@ -482,6 +487,7 @@ const UserJourney = () => {
                             <input
                                 type="date"
                                 value={date}
+                                max={getVNTodayString()}
                                 onChange={(e) => setDate(e.target.value)}
                                 className="w-full pl-9 pr-4 py-2.5 bg-cloud-mist border border-platinum-tint rounded-xl text-sm text-midnight-indigo focus:ring-2 focus:ring-action-blue/20 focus:border-action-blue outline-none transition-all"
                             />
@@ -588,6 +594,26 @@ const UserJourney = () => {
                             </h3>
                             <span className="text-xs font-bold px-3 py-1 bg-cloud-mist border border-platinum-tint text-slate-blue rounded-full">
                                 {selectedUser.fullName} &bull; {new Date(date + 'T00:00:00').toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
+                            </span>
+                        </div>
+
+                        {/* legend */}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-6 text-[11px] font-semibold text-slate-blue">
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                Vào cổng
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0" />
+                                Ra cổng
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-action-blue shrink-0" />
+                                Phòng họp
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-royal-amethyst shrink-0" />
+                                Khu vực
                             </span>
                         </div>
 
