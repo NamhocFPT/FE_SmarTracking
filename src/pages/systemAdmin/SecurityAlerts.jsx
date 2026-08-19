@@ -315,6 +315,11 @@ const SecurityAlerts = () => {
     };
 
     const SEVERITY_VI = {
+        // [FIX] 'critical' là mức mặc định của alert_type='intrusion' (BE DEFAULT_SEVERITY_BY_TYPE) —
+        // trước đây KHÔNG có key này, mọi alert critical rơi vào fallback "Bình thường" màu xám dù
+        // đây là mức nghiêm trọng nhất. Dùng nền đỏ ĐẶC (không phải đỏ nhạt như 'high'/'urgent') để
+        // nổi bật rõ rệt hơn các mức khác trong cùng thang màu, không lẫn vào 2 mức đỏ nhạt kia.
+        critical: { label: 'Nghiêm trọng', cls: 'bg-red-600 text-white border-red-700' },
         high:   { label: 'Cao',       cls: 'bg-red-50 text-red-700 border-red-200' },
         urgent: { label: 'Khẩn cấp',  cls: 'bg-red-50 text-red-700 border-red-200' },
         medium: { label: 'Trung bình', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
