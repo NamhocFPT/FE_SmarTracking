@@ -9,6 +9,7 @@ import {
 } from '../../service/securityAlertService';
 import ExportReportModal from '../../components/common/ExportReportModal';
 import { getZones } from '../../service/zoneServices';
+import { getUserById } from '../../service/sysAdminServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import Pagination from '../../components/common/Pagination';
@@ -146,6 +147,25 @@ const SecurityAlerts = () => {
     // FE-AC: Occurrences detail modal
     const [occurrencesModal, setOccurrencesModal] = useState({ open: false, alert: null });
 
+    // FE-AC: modal xem lịch sử xử lý (tiếp nhận/đóng) của alert đã resolved
+    const [historyModal, setHistoryModal] = useState({ open: false, alert: null });
+    const [userNamesCache, setUserNamesCache] = useState({});
+
+    const resolveUserName = useCallback(async (userId) => {
+        if (!userId || userNamesCache[userId]) return;
+        try {
+            const res = await getUserById(userId);
+            if (res?.success && res.data) {
+                const name = res.data.fullName || res.data.email || userId;
+                setUserNamesCache(prev => ({ ...prev, [userId]: name }));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }, [userNamesCache]);
+
+    const getUserDisplay = (userId) => userId ? (userNamesCache[userId] || userId) : null;
+
     const fetchZones = async () => {
         try {
             const res = await getZones({ limit: 100 });
@@ -242,6 +262,13 @@ const SecurityAlerts = () => {
     const openResolveModal = (alert) => {
         setResolveModal({ open: true, alert });
         setResolutionNote('');
+        resolveUserName(alert.acknowledged_by);
+    };
+
+    const openHistoryModal = (alert) => {
+        setHistoryModal({ open: true, alert });
+        resolveUserName(alert.acknowledged_by);
+        resolveUserName(alert.resolved_by);
     };
 
     const handleResolve = async (e) => {
@@ -573,12 +600,24 @@ const SecurityAlerts = () => {
                                                 )}
                                                 {alert.status === 'resolved' && (
                                                     <div className="flex flex-col items-end">
-                                                        <button
-                                                            className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-xs border border-slate-200"
-                                                        >
-                                                            <Eye className="w-3.5 h-3.5 mr-1.5" />
-                                                            Đã xử lý
-                                                        </button>
+                                                        {alert.resolved_by ? (
+                                                            <button
+                                                                onClick={() => openHistoryModal(alert)}
+                                                                className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold rounded-lg text-xs border border-slate-200 transition-colors"
+                                                            >
+                                                                <Eye className="w-3.5 h-3.5 mr-1.5" />
+                                                                Đã xử lý
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => openHistoryModal(alert)}
+                                                                title="Hệ thống tự động đóng cảnh báo này (không có người xử lý)"
+                                                                className="inline-flex items-center px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-slate-100 font-semibold rounded-lg text-xs border border-slate-200 border-dashed transition-colors"
+                                                            >
+                                                                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                                                Tự động đóng
+                                                            </button>
+                                                        )}
                                                         <p className="text-[10px] text-slate-400 mt-1 truncate max-w-[120px]" title={alert.resolution_note}>
                                                             Note: {alert.resolution_note}
                                                         </p>
@@ -622,6 +661,20 @@ const SecurityAlerts = () => {
                                 <p className="text-xs text-slate-blue font-bold uppercase mb-1">Loại sự kiện</p>
                                 <p className="text-sm font-bold text-midnight-indigo">{getAlertTypeLabel(resolveModal.alert?.alert_type)}</p>
                             </div>
+                            {resolveModal.alert?.acknowledged_by && (
+                                <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                    <p className="text-xs text-slate-blue font-bold uppercase mb-1 flex items-center gap-1.5">
+                                        <User className="w-3.5 h-3.5" />
+                                        Đã tiếp nhận bởi
+                                    </p>
+                                    <p className="text-sm font-bold text-midnight-indigo">
+                                        {getUserDisplay(resolveModal.alert.acknowledged_by)}
+                                        <span className="text-xs font-normal text-slate-blue ml-2">
+                                            lúc {formatDateTime(resolveModal.alert.acknowledged_at)}
+                                        </span>
+                                    </p>
+                                </div>
+                            )}
                             {resolveModal.alert?.alert_type === 'vehicle_control_match' && getAlertPlateNumber(resolveModal.alert) && (
                                 <div className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
                                     <p className="text-xs text-slate-blue font-bold uppercase mb-1 flex items-center gap-1.5">
@@ -655,6 +708,83 @@ const SecurityAlerts = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FE-AC: HISTORY MODAL — lịch sử tiếp nhận/đóng của alert đã resolved */}
+            {historyModal.open && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-platinum-tint flex flex-col">
+                        <div className="px-6 py-4 border-b border-platinum-tint bg-cloud-mist/30 flex justify-between items-center">
+                            <h3 className="font-bold text-midnight-indigo flex items-center">
+                                <Eye className="w-5 h-5 mr-2 text-action-blue" />
+                                Lịch sử xử lý cảnh báo
+                            </h3>
+                            <button onClick={() => setHistoryModal({ open: false, alert: null })} className="text-slate-blue hover:text-red-500 transition-colors">✕</button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <p className="text-xs text-slate-blue font-bold uppercase mb-1">Loại sự kiện</p>
+                                <p className="text-sm font-bold text-midnight-indigo">{getAlertTypeLabel(historyModal.alert?.alert_type)}</p>
+                            </div>
+
+                            {historyModal.alert?.acknowledged_by ? (
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                    <p className="text-xs text-slate-blue font-bold uppercase mb-1 flex items-center gap-1.5">
+                                        <User className="w-3.5 h-3.5" />
+                                        Đã tiếp nhận bởi
+                                    </p>
+                                    <p className="text-sm font-bold text-midnight-indigo">
+                                        {getUserDisplay(historyModal.alert.acknowledged_by)}
+                                        <span className="text-xs font-normal text-slate-blue ml-2">
+                                            lúc {formatDateTime(historyModal.alert.acknowledged_at)}
+                                        </span>
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-blue italic">Không có bước tiếp nhận (đóng trực tiếp).</p>
+                            )}
+
+                            {historyModal.alert?.resolved_by ? (
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                    <p className="text-xs text-slate-blue font-bold uppercase mb-1 flex items-center gap-1.5">
+                                        <CheckCircle className="w-3.5 h-3.5" />
+                                        Đã xử lý bởi
+                                    </p>
+                                    <p className="text-sm font-bold text-midnight-indigo">
+                                        {getUserDisplay(historyModal.alert.resolved_by)}
+                                        <span className="text-xs font-normal text-slate-blue ml-2">
+                                            lúc {formatDateTime(historyModal.alert.resolved_at)}
+                                        </span>
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                                    <p className="text-xs text-amber-700 font-bold uppercase mb-1 flex items-center gap-1.5">
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                        Tự động đóng bởi hệ thống
+                                    </p>
+                                    <p className="text-sm text-amber-700">
+                                        lúc {formatDateTime(historyModal.alert?.resolved_at)}
+                                    </p>
+                                </div>
+                            )}
+
+                            {historyModal.alert?.resolution_note && (
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                    <p className="text-xs text-slate-blue font-bold uppercase mb-1">Ghi chú xử lý</p>
+                                    <p className="text-sm text-midnight-indigo whitespace-pre-wrap">{historyModal.alert.resolution_note}</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 text-right">
+                            <button
+                                onClick={() => setHistoryModal({ open: false, alert: null })}
+                                className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-platinum-tint rounded-xl hover:bg-slate-50 transition-colors"
+                            >Đóng</button>
+                        </div>
                     </div>
                 </div>,
                 document.body
@@ -751,6 +881,15 @@ const SecurityAlerts = () => {
                                                 <div className="flex items-center gap-1">
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                                                         📌 {occ.watchlistName || occ.name}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {occ.occupancyCount !== undefined && occ.occupancyCount !== null && (
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                    <span className={`text-[11px] font-bold ${occ.threshold != null && occ.occupancyCount > occ.threshold ? 'text-red-600' : 'text-slate-700'}`}>
+                                                        {occ.occupancyCount}{occ.threshold != null ? `/${occ.threshold}` : ''} người
                                                     </span>
                                                 </div>
                                             )}

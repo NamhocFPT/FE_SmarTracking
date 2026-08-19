@@ -187,9 +187,9 @@ const AlertRules = () => {
         if (formData.allow_from || formData.allow_to) {
             if (!formData.allow_from || !formData.allow_to) {
                 errors.allow_from = 'Vui lòng nhập đầy đủ khung giờ nếu muốn cấu hình hạn chế.';
-            } else if (formData.allow_from > formData.allow_to) {
-                errors.allow_from = 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc.';
             }
+            // Không chặn allow_from > allow_to: BE coi đây là khung giờ qua nửa đêm
+            // (vd 22:00→06:00, công thức current>=from||current<=to), không phải lỗi nhập liệu.
         }
 
         setFormErrors(errors);
