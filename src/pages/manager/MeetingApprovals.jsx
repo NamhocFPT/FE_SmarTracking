@@ -1,5 +1,5 @@
 import { AlertTriangle, Calendar, CheckCircle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Info, LayoutGrid, List, RefreshCw, Search, Users, X, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +10,7 @@ import {
     approveMeetingRequest,
     rejectMeetingRequest
 } from '../../service/managerServices';
+import { subscribeToMeetingRequestUpdates } from '../../utils/socket';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -113,6 +114,20 @@ const MeetingApprovals = () => {
     useEffect(() => {
         fetchRequests();
     }, [fetchRequests]);
+
+    // Realtime: BE bắn `meeting_request.updated` khi có yêu cầu mới/được
+    // duyệt/từ chối/hết hạn (room user:{userId}, chỉ join được nếu có quyền
+    // meeting_request.read). Dùng ref để giữ fetchRequests mới nhất mà không
+    // phải subscribe/unsubscribe lại mỗi khi filter đổi.
+    const fetchRequestsRef = useRef(fetchRequests);
+    fetchRequestsRef.current = fetchRequests;
+
+    useEffect(() => {
+        const unsubscribe = subscribeToMeetingRequestUpdates(() => {
+            fetchRequestsRef.current();
+        });
+        return unsubscribe;
+    }, []);
 
     // Close toast messages
     useEffect(() => {

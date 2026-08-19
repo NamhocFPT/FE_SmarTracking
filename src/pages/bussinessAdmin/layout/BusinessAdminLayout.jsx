@@ -8,19 +8,17 @@ import BusinessAdminSidebar from './BusinessAdminSidebar';
 import { RiMenuLine } from 'react-icons/ri';
 import {
     Activity,
-    Archive,
     Home,
-    Calendar,
     Layers,
+    Monitor,
     Video,
     Users,
     Briefcase,
-    Shield,
-    AlertTriangle,
     BarChart2,
     PieChart,
     Clock,
     Fingerprint,
+    ClipboardList,
 } from 'lucide-react';
 
 const STATIC_NAVIGATION_ITEMS = [
@@ -35,26 +33,13 @@ const STATIC_NAVIGATION_ITEMS = [
         isDropdown: true,
         icon: Layers,
         children: [
-            // { label: 'Cuộc họp', to: '/business-admin/meetings', icon: Calendar },
             { label: 'Phòng họp', to: '/business-admin/rooms', icon: Video },
             { label: 'Người dùng', to: '/business-admin/users', icon: Users },
             { label: 'Phòng ban', to: '/business-admin/departments', icon: Briefcase },
+            { label: 'Trang thiết bị', to: '/business-admin/equipments', icon: Monitor },
             { label: 'Duyệt ảnh sinh trắc học', to: '/business-admin/biometric-submissions', icon: Fingerprint },
+            { label: 'Nhật ký kiểm toán', to: '/business-admin/audit-logs', icon: ClipboardList },
         ],
-    },
-    {
-        label: 'An Ninh & Khuôn Viên',
-        isDropdown: true,
-        icon: Shield,
-        children: [
-            { label: 'Ghi hình', to: '/business-admin/recordings', icon: Video },
-            { label: 'Cảnh báo an ninh', to: '/business-admin/security-alerts', icon: AlertTriangle },
-        ],
-    },
-    {
-        label: 'Kho tài liệu',
-        to: '/business-admin/documents',
-        icon: Archive,
     },
     {
         label: 'Báo cáo',
@@ -105,10 +90,6 @@ const BusinessAdminLayout = () => {
         navigate('/business-admin/profile');
     }, [navigate]);
 
-    const handleMyVehicles = useCallback(() => {
-        navigate('/business-admin/my-vehicles');
-    }, [navigate]);
-
     const handleChangePassword = useCallback(() => {
         setIsChangePasswordOpen(true);
     }, []);
@@ -129,7 +110,6 @@ const BusinessAdminLayout = () => {
                 currentUser={currentUser}
                 displayName={displayName}
                 onProfile={handleProfile}
-                onMyVehicles={handleMyVehicles}
                 onChangePassword={handleChangePassword}
                 onLogout={handleLogout}
             />

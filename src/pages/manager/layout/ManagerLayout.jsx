@@ -1,4 +1,4 @@
-import { Activity, BarChart2, Calendar, ChevronDown, Clock, FileCheck, Home, MapPin, PlusCircle, Menu, X } from 'lucide-react';
+import { Activity, BarChart2, Calendar, ChevronDown, Clock, Car, FileCheck, Home, PlusCircle, Menu, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -31,12 +31,6 @@ const STATIC_NAVIGATION_ITEMS = [
         icon: Calendar,
         children: [
             {
-                label: 'Lịch cá nhân',
-                to: '/manager/schedule',
-                icon: Calendar,
-                requiredPermission: 'schedule.read.self',
-            },
-            {
                 label: 'Đăng ký họp',
                 to: '/manager/book',
                 icon: PlusCircle,
@@ -48,11 +42,6 @@ const STATIC_NAVIGATION_ITEMS = [
                 requiredPermission: 'meeting_request.read',
             },
         ],
-    },
-    {
-        label: 'Hành trình',
-        to: '/manager/user-journey',
-        icon: MapPin,
     },
     {
         label: 'Báo cáo',
@@ -333,12 +322,7 @@ const ManagerLayout = () => {
                                             onClick={handleMyVehicles}
                                             className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm text-midnight-indigo hover:bg-cloud-mist transition-colors duration-150"
                                         >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="3" y="11" width="18" height="8" rx="2" ry="2"></rect>
-                                                <path d="M19 11l-2-4H7L5 11"></path>
-                                                <circle cx="7" cy="19" r="2"></circle>
-                                                <circle cx="17" cy="19" r="2"></circle>
-                                            </svg>
+                                            <Car className="w-4 h-4" />
                                             Xe của tôi
                                         </button>
 

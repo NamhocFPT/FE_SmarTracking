@@ -2,7 +2,7 @@ import {
     Activity, AlertCircle, ArrowLeft, Calendar, CheckCircle,
     ChevronLeft, ChevronRight, Clock, DoorOpen, Edit2, Eye,
     Home, List, MapPin, Mic, Monitor, Plus, RefreshCw,
-    ShieldAlert, Trash2, UserCheck, Users, Video, Wrench, X
+    Trash2, Users, Video, Wrench, X
 } from 'lucide-react';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useState, useEffect, useCallback } from 'react';
@@ -20,8 +20,6 @@ import {
 } from '../../service/businessAdminServices';
 
 import RealtimeRoomMonitor from '../../components/security/RealtimeRoomMonitor';
-import StrangerAlerts from '../../components/security/StrangerAlerts';
-import UnmappedVerifyReview from '../../components/security/UnmappedVerifyReview';
 
 const ROOM_TYPE_LABELS = {
     meeting_room: 'Phòng họp',
@@ -123,7 +121,7 @@ const sanitizeRoomCode = (raw) => {
     return 'RM-' + suffix;
 };
 
-const RoomManagement = () => {
+const RoomManagement = ({ readOnly = false }) => {
     const [viewMode, setViewMode] = useState('list');
     const [roomsList, setRoomsList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -401,13 +399,15 @@ const RoomManagement = () => {
                         Cấu hình cơ sở vật chất, sức chứa và kiểm tra trạng thái khả dụng của các phòng họp thông minh.
                     </p>
                 </div>
-                <motion.button
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                    onClick={() => handleOpenModal('create')}
-                    className="inline-flex items-center justify-center px-4 py-2.5 bg-action-blue text-white hover:bg-glacier-blue rounded-xl text-sm font-semibold shadow-sm transition-all"
-                >
-                    <Plus className="w-4 h-4 mr-2" /> Thêm phòng họp
-                </motion.button>
+                {!readOnly && (
+                    <motion.button
+                        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                        onClick={() => handleOpenModal('create')}
+                        className="inline-flex items-center justify-center px-4 py-2.5 bg-action-blue text-white hover:bg-glacier-blue rounded-xl text-sm font-semibold shadow-sm transition-all"
+                    >
+                        <Plus className="w-4 h-4 mr-2" /> Thêm phòng họp
+                    </motion.button>
+                )}
             </div>
 
             {/* Alerts */}
@@ -423,25 +423,25 @@ const RoomManagement = () => {
             )}
 
             {/* Tabs */}
-            <div className="flex flex-wrap bg-cloud-mist/50 p-1 rounded-xl w-fit gap-0.5">
-                {[
-                    { key: 'list', label: 'Danh sách phòng', Icon: List, active: 'text-action-blue' },
-                    { key: 'realtime', label: 'Giám sát trực tuyến', Icon: Activity, active: 'text-action-blue' },
-                    { key: 'alerts', label: 'Cảnh báo an ninh', Icon: ShieldAlert, active: 'text-red-600' },
-                    { key: 'unmapped', label: 'Gán danh tính', Icon: UserCheck, active: 'text-action-blue' }
-                ].map(({ key, label, Icon, active }) => (
-                    <button
-                        key={key}
-                        onClick={() => setViewMode(key)}
-                        className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === key ? `bg-white shadow-sm ${active}` : 'text-slate-blue hover:text-midnight-indigo'
-                            }`}
-                    >
-                        <Icon className="w-4 h-4" /> {label}
-                    </button>
-                ))}
-            </div>
+            {!readOnly && (
+                <div className="flex flex-wrap bg-cloud-mist/50 p-1 rounded-xl w-fit gap-0.5">
+                    {[
+                        { key: 'list', label: 'Danh sách phòng', Icon: List, active: 'text-action-blue' },
+                        { key: 'realtime', label: 'Giám sát trực tuyến', Icon: Activity, active: 'text-action-blue' },
+                    ].map(({ key, label, Icon, active }) => (
+                        <button
+                            key={key}
+                            onClick={() => setViewMode(key)}
+                            className={`px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors ${viewMode === key ? `bg-white shadow-sm ${active}` : 'text-slate-blue hover:text-midnight-indigo'
+                                }`}
+                        >
+                            <Icon className="w-4 h-4" /> {label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
-            {viewMode === 'list' ? (
+            {(readOnly || viewMode === 'list') ? (
                 <>
                     {/* Filters */}
                     <div className="bg-white p-4 rounded-2xl border border-platinum-tint shadow-sm-1 flex flex-col sm:flex-row gap-3">
@@ -570,23 +570,27 @@ const RoomManagement = () => {
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleOpenModal('edit', room)}
-                                                                className="p-1 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
-                                                                title="Chỉnh sửa"
-                                                            >
-                                                                <Edit2 className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(room)}
-                                                                disabled={checkingDeleteImpactId === (room.id || room.roomId)}
-                                                                className="p-1 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
-                                                                title="Xoá phòng"
-                                                            >
-                                                                {checkingDeleteImpactId === (room.id || room.roomId)
-                                                                    ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
-                                                                    : <Trash2 className="w-4 h-4" />}
-                                                            </button>
+                                                            {!readOnly && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleOpenModal('edit', room)}
+                                                                        className="p-1 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors"
+                                                                        title="Chỉnh sửa"
+                                                                    >
+                                                                        <Edit2 className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDelete(room)}
+                                                                        disabled={checkingDeleteImpactId === (room.id || room.roomId)}
+                                                                        className="p-1 rounded-lg text-slate-blue hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                                                                        title="Xoá phòng"
+                                                                    >
+                                                                        {checkingDeleteImpactId === (room.id || room.roomId)
+                                                                            ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                                                                            : <Trash2 className="w-4 h-4" />}
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -626,12 +630,8 @@ const RoomManagement = () => {
                         )}
                     </div>
                 </>
-            ) : viewMode === 'realtime' ? (
-                <RealtimeRoomMonitor />
-            ) : viewMode === 'unmapped' ? (
-                <UnmappedVerifyReview />
             ) : (
-                <StrangerAlerts />
+                <RealtimeRoomMonitor />
             )}
 
             {/* Add/Edit Modal */}
@@ -870,12 +870,59 @@ const RoomManagement = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Upcoming Meetings Panel */}
+                            <div className="bg-slate-50/50 rounded-2xl border border-platinum-tint p-5 space-y-3.5">
+                                <h4 className="text-xs font-extrabold text-midnight-indigo uppercase tracking-wider border-b border-platinum-tint pb-2 flex items-center gap-2">
+                                    <Calendar className="w-3.5 h-3.5 text-action-blue" />
+                                    Lịch họp sắp tới
+                                </h4>
+
+                                {detailRoom.occupancyStatus?.currentBooking && (
+                                    <div className="flex items-start justify-between gap-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50/60">
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-0.5">Đang diễn ra</p>
+                                            <p className="font-bold text-midnight-indigo text-xs truncate">{detailRoom.occupancyStatus.currentBooking.title || 'Cuộc họp'}</p>
+                                            <p className="text-[11px] text-slate-blue mt-0.5">
+                                                {detailRoom.occupancyStatus.currentBooking.hostName ? `Chủ trì: ${detailRoom.occupancyStatus.currentBooking.hostName} · ` : ''}
+                                                {formatTimeRange(detailRoom.occupancyStatus.currentBooking.reservedStartTime, detailRoom.occupancyStatus.currentBooking.reservedEndTime)}
+                                            </p>
+                                        </div>
+                                        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${MEETING_STATUS_CONFIG.in_progress.cls}`}>
+                                            {MEETING_STATUS_CONFIG.in_progress.label}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {detailRoom.upcomingBookings && detailRoom.upcomingBookings.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {detailRoom.upcomingBookings.map((booking) => (
+                                            <div key={booking.bookingId} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-platinum-tint bg-white">
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-midnight-indigo text-xs truncate">{booking.title || 'Cuộc họp'}</p>
+                                                    <p className="text-[11px] text-slate-blue mt-0.5">
+                                                        {booking.hostName ? `Chủ trì: ${booking.hostName} · ` : ''}
+                                                        {formatTimeRange(booking.reservedStartTime, booking.reservedEndTime)}
+                                                    </p>
+                                                </div>
+                                                <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${MEETING_STATUS_CONFIG.scheduled.cls}`}>
+                                                    {MEETING_STATUS_CONFIG.scheduled.label}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    !detailRoom.occupancyStatus?.currentBooking && (
+                                        <p className="text-xs text-slate-blue text-center py-4">Chưa có lịch họp nào sắp tới cho phòng này.</p>
+                                    )
+                                )}
+                            </div>
                         </div>
 
                         {/* Footer */}
                         <div className="px-6 py-4 border-t border-platinum-tint bg-cloud-mist/30 flex items-center justify-between gap-2 shrink-0">
                             <div className="flex items-center gap-2">
-                                {detailRoom.administrativeStatus && detailRoom.administrativeStatus !== 'available' ? (
+                                {readOnly ? null : detailRoom.administrativeStatus && detailRoom.administrativeStatus !== 'available' ? (
                                     <button
                                         onClick={() => handleSetAdministrativeStatus('available')}
                                         disabled={savingAdminStatus}
