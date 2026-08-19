@@ -1,4 +1,4 @@
-import { Building2, Clock, Info, TrendingUp, User, X } from 'lucide-react';
+import { Building2, Clock, Info, RefreshCw, TrendingUp, User, X } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -119,6 +119,7 @@ const EmployeeOnTimeAnalytics = () => {
     const [selectedUserName, setSelectedUserName] = useState('');
     const [lateHistory, setLateHistory] = useState(null);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [historyError, setHistoryError] = useState(false);
 
     // ── Filters ──────────────────────────────────────────────────────────────
     const [preset, setPreset] = useState('month');
@@ -194,48 +195,9 @@ const EmployeeOnTimeAnalytics = () => {
             } else {
                 throw new Error(res?.message || 'Không thể tải dữ liệu.');
             }
-        } catch {
-            const mockData = isManager ? {
-                period: { from: from || '2026-08-01', to: to || '2026-08-31' },
-                graceMinutes: 0,
-                onTimeCount: 58, lateCount: 6, absentCount: 7,
-                totalRequiredParticipants: 71, onTimeRate: 81.7,
-                trend: [
-                    { period: '2026-08-03', onTimeCount: 12, lateCount: 2, absentCount: 1, totalRequiredParticipants: 15, onTimeRate: 80.0 },
-                    { period: '2026-08-10', onTimeCount: 14, lateCount: 1, absentCount: 2, totalRequiredParticipants: 17, onTimeRate: 82.4 },
-                    { period: '2026-08-17', onTimeCount: 16, lateCount: 2, absentCount: 1, totalRequiredParticipants: 19, onTimeRate: 84.2 },
-                    { period: '2026-08-24', onTimeCount: 16, lateCount: 1, absentCount: 3, totalRequiredParticipants: 20, onTimeRate: 80.0 },
-                ],
-                lateByHourOfDay: Array.from({ length: 24 }, (_, i) => ({
-                    hourOfDay: i,
-                    lateCount: i >= 8 && i <= 10 ? 2 : 0,
-                    totalRequiredParticipants: i >= 8 && i <= 10 ? 15 : 0,
-                    lateRate: i >= 8 && i <= 10 ? 13 : 0,
-                })),
-            } : {
-                period: { from: from || '2026-08-01', to: to || '2026-08-31' },
-                graceMinutes: 0,
-                onTimeCount: 142, lateCount: 24, absentCount: 15,
-                totalRequiredParticipants: 181, onTimeRate: 78.5,
-                trend: [
-                    { period: '2026-08-03', onTimeCount: 30, lateCount: 5, absentCount: 3, totalRequiredParticipants: 38, onTimeRate: 78.9 },
-                    { period: '2026-08-10', onTimeCount: 35, lateCount: 7, absentCount: 2, totalRequiredParticipants: 44, onTimeRate: 79.5 },
-                    { period: '2026-08-17', onTimeCount: 38, lateCount: 6, absentCount: 5, totalRequiredParticipants: 49, onTimeRate: 77.6 },
-                    { period: '2026-08-24', onTimeCount: 39, lateCount: 6, absentCount: 5, totalRequiredParticipants: 50, onTimeRate: 78.0 },
-                ],
-                lateByHourOfDay: Array.from({ length: 24 }, (_, i) => ({
-                    hourOfDay: i,
-                    lateCount: i >= 8 && i <= 10 ? 5 : 0,
-                    totalRequiredParticipants: i >= 8 && i <= 10 ? 30 : 0,
-                    lateRate: i >= 8 && i <= 10 ? 17 : 0,
-                })),
-                lateByDepartment: [
-                    { departmentId: 'dept-1', departmentName: 'Phòng Công nghệ thông tin', lateCount: 10, totalRequiredParticipants: 60, lateRate: 16.7 },
-                    { departmentId: 'dept-2', departmentName: 'Phòng Kinh doanh', lateCount: 8, totalRequiredParticipants: 50, lateRate: 16.0 },
-                    { departmentId: 'dept-3', departmentName: 'Phòng Nhân sự', lateCount: 6, totalRequiredParticipants: 71, lateRate: 8.5 },
-                ],
-            };
-            setData(mockData);
+        } catch (err) {
+            setData(null);
+            setError(err?.message || 'Không thể tải dữ liệu chuyên cần. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
@@ -332,6 +294,8 @@ const EmployeeOnTimeAnalytics = () => {
         setSelectedUserId(user.userId);
         setSelectedUserName(user.fullName);
         setLoadingHistory(true);
+        setHistoryError(false);
+        setLateHistory(null);
         try {
             const q = `?preset=${preset}${preset === 'custom' ? `&from=${from}&to=${to}` : ''}`;
             const res = await get(`/analytics/attendance/on-time-rate/users/${user.userId}/late-history${q}`);
@@ -341,14 +305,7 @@ const EmployeeOnTimeAnalytics = () => {
                 throw new Error(res?.message || 'Không thể tải lịch sử.');
             }
         } catch {
-            setLateHistory({
-                user: { userId: user.userId, fullName: user.fullName },
-                period: { from: from || '2026-08-01', to: to || '2026-08-31' },
-                lateMeetings: [
-                    { meetingId: 'm-1', meetingTitle: 'Họp Giao Ban Tuần', scheduledStartTime: new Date(Date.now() - 86400000).toISOString(), checkInTime: new Date(Date.now() - 86400000 + 600000).toISOString(), lateMinutes: 10 },
-                    { meetingId: 'm-2', meetingTitle: 'Review Kế Hoạch Sprint', scheduledStartTime: new Date(Date.now() - 172800000).toISOString(), checkInTime: new Date(Date.now() - 172800000 + 480000).toISOString(), lateMinutes: 8 },
-                ],
-            });
+            setHistoryError(true);
         } finally {
             setLoadingHistory(false);
         }
@@ -473,7 +430,13 @@ const EmployeeOnTimeAnalytics = () => {
             {error && (
                 <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl flex items-start text-sm gap-2">
                     <Info className="w-5 h-5 shrink-0 mt-0.5" />
-                    <p>{error}</p>
+                    <p className="flex-1">{error}</p>
+                    <button
+                        onClick={fetchAttendanceDashboard}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors"
+                    >
+                        <RefreshCw className="w-3.5 h-3.5" /> Thử lại
+                    </button>
                 </div>
             )}
 
@@ -846,6 +809,20 @@ const EmployeeOnTimeAnalytics = () => {
                                 <div className="space-y-3 animate-pulse">
                                     <div className="h-10 bg-slate-100 rounded-lg" />
                                     <div className="h-10 bg-slate-100 rounded-lg" />
+                                </div>
+                            ) : historyError ? (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <Info className="w-8 h-8 text-red-500 mb-3" />
+                                    <p className="text-midnight-indigo text-sm font-bold">Không thể tải lịch sử đi muộn</p>
+                                    <p className="mt-1 text-slate-blue text-xs max-w-sm">
+                                        Vui lòng kiểm tra kết nối mạng và thử lại.
+                                    </p>
+                                    <button
+                                        onClick={() => handleUserClick({ userId: selectedUserId, fullName: selectedUserName })}
+                                        className="mt-4 px-4 py-2 rounded-xl bg-action-blue text-white text-xs font-bold hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                                    >
+                                        <RefreshCw className="w-3.5 h-3.5" /> Thử lại
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="border border-platinum-tint rounded-xl overflow-hidden">
