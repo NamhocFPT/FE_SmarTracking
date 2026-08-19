@@ -512,11 +512,31 @@ const SystemSettings = () => {
 
     // So map mới với map vừa GET được, chỉ PATCH key nào thực sự đổi (BE ghi đè toàn bộ object
     // theo key nên phải luôn GET-đầy-đủ trước — xem PLAN FE "Thiết kế lại Ánh xạ Kênh Camera").
+    //
+    // 2 giai đoạn TUẦN TỰ (fix race condition — trước đây Promise.all bắn tất cả PATCH song
+    // song: khi đổi vai trò 1 channel, PATCH "thêm vào vai mới" có thể chạy assertNoRoleConflict
+    // ở BE TRƯỚC KHI PATCH "xóa khỏi vai cũ" kịp commit, khiến BE thấy channel "còn" ở vai cũ,
+    // từ chối PATCH thêm — trong khi PATCH xóa vẫn thành công song song → channel mất cả 2 vai).
+    // Giai đoạn 1: PATCH mọi key chỉ XÓA channelId (không thêm/đổi id nào) — await xong hẳn.
+    // Giai đoạn 2: PATCH mọi key có THÊM/đổi id — chỉ chạy sau khi Giai đoạn 1 đã commit.
+    // Tổng quát theo diff nội dung từng key (không hardcode tên key room_map/presence_zone_map),
+    // nên vẫn đúng nếu sau này BE khai thêm cặp conflictsWithKey khác.
     const patchChangedChannelMaps = async (freshMaps, newMaps) => {
         const changedKeys = CHANNEL_MAP_KEYS.filter(key =>
             JSON.stringify(newMaps[key]) !== JSON.stringify(freshMaps[key] || {})
         );
-        await Promise.all(changedKeys.map(key => updateChannelMap({ key, value: newMaps[key] })));
+
+        const removalKeys = [];
+        const additionKeys = [];
+        changedKeys.forEach(key => {
+            const freshVal = freshMaps[key] || {};
+            const newVal = newMaps[key] || {};
+            const addsOrChangesId = Object.keys(newVal).some(id => freshVal[id] !== newVal[id]);
+            (addsOrChangesId ? additionKeys : removalKeys).push(key);
+        });
+
+        await Promise.all(removalKeys.map(key => updateChannelMap({ key, value: newMaps[key] })));
+        await Promise.all(additionKeys.map(key => updateChannelMap({ key, value: newMaps[key] })));
     };
 
     const saveChannelRow = async () => {
