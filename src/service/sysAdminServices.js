@@ -715,7 +715,8 @@ export const updateDeviceAiConfig = async (deviceId, config) => {
 };
 
 // UC-48: POST /iot-devices/:id/face-server/configure
-// Body: { callback_protocol, callback_base_url?, allowed_source_ip?, heartbeat_path, verify_path, stranger_path, callback_enabled? }
+// Body: { callback_protocol, callback_base_url?, allowed_source_ip?, heartbeat_path, verify_path, stranger_path, callback_enabled?,
+//         base_url?, username?, password? }  — 3 field cuối: chiều BE→thiết bị (gọi API camera), password server tự mã hoá trước khi lưu
 // Response.data: { device, one_time_callback_token }  — token chỉ xuất hiện 1 lần
 export const configureFaceTerminal = async (deviceId, body) => {
     return await post(`/iot-devices/${deviceId}/face-server/configure`, body);

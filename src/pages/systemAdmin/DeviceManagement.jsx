@@ -429,6 +429,9 @@ const DeviceManagement = () => {
             verify_path: '/verify',
             stranger_path: '/stranger',
             callback_enabled: true,
+            base_url: '',
+            username: '',
+            password: '',
         });
         setIsFaceConfigModalOpen(true);
     };
@@ -448,6 +451,12 @@ const DeviceManagement = () => {
             };
             if (faceConfigForm.callback_base_url.trim()) payload.callback_base_url = faceConfigForm.callback_base_url.trim();
             if (faceConfigForm.allowed_source_ip.trim()) payload.allowed_source_ip = faceConfigForm.allowed_source_ip.trim();
+            // Chiều BE→thiết bị (gọi /webs/login của chính camera để upload ảnh/thêm người) —
+            // trước đây phải sửa tay DB, giờ gửi kèm ở đây. Bỏ trống → giữ nguyên giá trị cũ
+            // (nếu có) hoặc BE tự fallback base_url sang http://ip_address.
+            if (faceConfigForm.base_url.trim()) payload.base_url = faceConfigForm.base_url.trim();
+            if (faceConfigForm.username.trim()) payload.username = faceConfigForm.username.trim();
+            if (faceConfigForm.password.trim()) payload.password = faceConfigForm.password.trim();
 
             const res = await configureFaceTerminal(faceConfigDevice.id, payload);
             if (res?.success) {
@@ -1374,6 +1383,46 @@ const DeviceManagement = () => {
                                     ))}
                                 </div>
                                 <p className="text-[10px] text-slate-blue">URL thật server lắng nghe cố định: <span className="font-mono">/api/v1/vf/</span>, <span className="font-mono">/api/v1/hb/</span>, <span className="font-mono">/api/v1/sf/</span> — không phụ thuộc vào giá trị nhập ở đây.</p>
+                            </div>
+
+                            {/* base_url/username/password — chiều BE→thiết bị (gọi API camera để upload ảnh/thêm người) */}
+                            <div className="space-y-3 pt-3 border-t border-platinum-tint">
+                                <p className="text-xs font-bold text-slate-blue uppercase">Đăng nhập thiết bị (để hệ thống gọi ngược vào camera)</p>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Device Base URL</label>
+                                    <input
+                                        type="text"
+                                        value={faceConfigForm.base_url}
+                                        onChange={(e) => setFaceConfigForm(f => ({ ...f, base_url: e.target.value }))}
+                                        placeholder="http://192.168.0.12:3000 (để trống dùng IP thiết bị, cổng 80)"
+                                        className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Username</label>
+                                        <input
+                                            type="text"
+                                            value={faceConfigForm.username}
+                                            onChange={(e) => setFaceConfigForm(f => ({ ...f, username: e.target.value }))}
+                                            placeholder="admin"
+                                            autoComplete="off"
+                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-blue uppercase mb-1">Password</label>
+                                        <input
+                                            type="password"
+                                            value={faceConfigForm.password}
+                                            onChange={(e) => setFaceConfigForm(f => ({ ...f, password: e.target.value }))}
+                                            placeholder="••••••"
+                                            autoComplete="new-password"
+                                            className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-mono focus:outline-none focus:border-action-blue"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-blue">Để trống nếu không đổi (giữ nguyên giá trị đã cấu hình trước đó). Mật khẩu được mã hoá trước khi lưu, không hiển thị lại sau khi lưu.</p>
                             </div>
 
                             {/* callback_enabled */}
