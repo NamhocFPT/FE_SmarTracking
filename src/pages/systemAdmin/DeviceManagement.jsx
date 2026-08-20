@@ -1244,8 +1244,8 @@ const DeviceManagement = () => {
             {/* TOKEN DISPLAY MODAL — chỉ hiện 1 lần, hỗ trợ cả Rotate (token only) và Configure (token + 3 URLs) */}
             {tokenModalData && createPortal(
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in-up">
-                        <div className="bg-amber-50 p-6 text-center border-b border-amber-100">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden animate-fade-in-up flex flex-col">
+                        <div className="bg-amber-50 p-6 text-center border-b border-amber-100 shrink-0">
                             <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                             </div>
@@ -1254,7 +1254,7 @@ const DeviceManagement = () => {
                             </h2>
                             <p className="text-xs text-amber-700 mt-1">Thiết bị: {tokenModalData.deviceName}</p>
                         </div>
-                        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                             {/* Cảnh báo one-time */}
                             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 font-semibold text-center">
                                 ⚠ Lưu lại ngay — sẽ không hiển thị lại được. Nếu mất, phải cấu hình lại từ đầu (token cũ sẽ mất tác dụng).
@@ -1310,7 +1310,7 @@ const DeviceManagement = () => {
                                 </div>
                             )}
                         </div>
-                        <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 text-right">
+                        <div className="p-4 border-t border-platinum-tint bg-cloud-mist/20 text-right shrink-0">
                             <button onClick={() => setTokenModalData(null)} className="px-4 py-2 text-xs font-bold text-slate-blue hover:text-midnight-indigo">Đã lưu, đóng lại</button>
                         </div>
                     </div>
@@ -1385,8 +1385,12 @@ const DeviceManagement = () => {
             {/* FE-AR: FACE TERMINAL CONFIGURE MODAL */}
             {isFaceConfigModalOpen && faceConfigDevice && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-midnight-indigo/50 backdrop-blur-md p-4">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
-                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                    {/* max-h + flex-col: trước đây modal không giới hạn chiều cao, nội dung dài
+                        (đã thêm section base_url/username/password) đẩy phần header (nút đóng X)
+                        ra khỏi khung nhìn khi màn hình thấp — không cuộn được để thấy lại, kẹt
+                        modal. Giờ header/footer cố định, chỉ phần giữa cuộn. */}
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden animate-fade-in-up flex flex-col">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 shrink-0">
                             <div>
                                 <h3 className="font-bold text-midnight-indigo text-sm">
                                     {faceConfigDevice.metadata_json?.face_server_config ? 'Sửa cấu hình Face Server' : 'Cấu hình Face Server lần đầu'}
@@ -1397,7 +1401,8 @@ const DeviceManagement = () => {
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <form onSubmit={handleFaceConfigSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleFaceConfigSubmit} className="flex flex-col flex-1 min-h-0">
+                        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                             {faceConfigDevice.metadata_json?.face_server_config && (
                                 <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                                     ⚠ Lưu lại sẽ tạo <strong>Token mới</strong> — token cũ và mọi URL đang dùng trên thiết bị vật lý sẽ mất tác dụng ngay, cần cập nhật lại thiết bị bằng token mới sau khi lưu.
@@ -1519,17 +1524,17 @@ const DeviceManagement = () => {
                                     <p className="text-[10px] text-slate-blue">callback_enabled — mặc định bật</p>
                                 </div>
                             </label>
-
-                            <div className="flex justify-end gap-3 pt-4 border-t border-platinum-tint">
-                                <button type="button" onClick={() => setIsFaceConfigModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
-                                <button
-                                    type="submit"
-                                    disabled={faceConfigSubmitting}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50"
-                                >
-                                    {faceConfigSubmitting ? 'Đang lưu...' : (faceConfigDevice.metadata_json?.face_server_config ? 'Lưu & Tạo Token mới' : 'Cấu hình & Lấy Token')}
-                                </button>
-                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 p-4 border-t border-platinum-tint bg-cloud-mist/20 shrink-0">
+                            <button type="button" onClick={() => setIsFaceConfigModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-xs font-bold">Hủy</button>
+                            <button
+                                type="submit"
+                                disabled={faceConfigSubmitting}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50"
+                            >
+                                {faceConfigSubmitting ? 'Đang lưu...' : (faceConfigDevice.metadata_json?.face_server_config ? 'Lưu & Tạo Token mới' : 'Cấu hình & Lấy Token')}
+                            </button>
+                        </div>
                         </form>
                     </div>
                 </div>,
