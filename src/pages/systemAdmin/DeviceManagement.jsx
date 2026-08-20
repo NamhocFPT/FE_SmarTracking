@@ -188,8 +188,11 @@ const DeviceManagement = () => {
         setError(null);
         setSuccessMessage(null);
 
-        // Validation checks
-        if (!validateIP(formData.ipAddress)) {
+        // Validation checks — IP là optional ở BE (CreateIotDeviceDto: @IsOptional() @IsIP()),
+        // đặc biệt face_server thường KHÔNG có IP (dùng base_url riêng, cấu hình sau qua modal
+        // Face Server). Trước đây bắt buộc nhập IP hợp lệ cho MỌI loại thiết bị nên không thể
+        // đăng ký face_server không IP — chỉ validate định dạng khi người dùng CÓ nhập.
+        if (formData.ipAddress.trim() && !validateIP(formData.ipAddress.trim())) {
             setError('Địa chỉ IP không đúng định dạng. Ví dụ: 192.168.1.10');
             return;
         }
@@ -199,7 +202,7 @@ const DeviceManagement = () => {
                 device_code: formData.deviceCode,
                 device_name: formData.deviceName,
                 device_type: formData.deviceType,
-                ip_address: formData.ipAddress || undefined,
+                ip_address: formData.ipAddress.trim() || undefined,
                 metadata_json: {
                     agent_version: formData.agentVersion || 'v1.0.0'
                 }
@@ -225,7 +228,7 @@ const DeviceManagement = () => {
         setError(null);
         setSuccessMessage(null);
 
-        if (!validateIP(formData.ipAddress)) {
+        if (formData.ipAddress.trim() && !validateIP(formData.ipAddress.trim())) {
             setError('Địa chỉ IP không đúng định dạng. Ví dụ: 192.168.1.10');
             return;
         }
@@ -233,7 +236,7 @@ const DeviceManagement = () => {
         try {
             const updatePayload = {
                 device_name: formData.deviceName,
-                ip_address: formData.ipAddress || undefined,
+                ip_address: formData.ipAddress.trim() || undefined,
             };
             const res = await updateDevice(selectedDevice.id, updatePayload);
             if (res?.success) {
@@ -280,13 +283,29 @@ const DeviceManagement = () => {
         });
     };
 
+    // BE trả { ...device, availability: { is_available, check_type, reason_code, message } }
+    // — trước đây FE đọc `res.data.isReachable` (field không tồn tại) nên luôn hiện
+    // "Không thể kết nối" bất kể kết quả thật, khiến nút Ping vô giá trị. Đọc đúng
+    // field + dịch reason_code phổ biến sang tiếng Việt để người dùng biết vì sao lỗi.
+    const AVAILABILITY_REASON_VI = {
+        HEARTBEAT_NOT_SEEN: 'chưa từng nhận được heartbeat từ thiết bị',
+        HEARTBEAT_STALE: 'heartbeat cuối đã quá cũ (>5 phút)',
+        DEVICE_ROOM_ASSIGNMENT_REQUIRED: 'thiết bị chưa được gán phòng',
+        RTSP_CONFIG_MISSING: 'chưa cấu hình RTSP',
+        RTSP_DISABLED: 'RTSP đang bị tắt',
+    };
     const handleCheckAvailability = async (device) => {
         setError(null);
         setSuccessMessage(null);
         try {
             const res = await checkDeviceAvailability(device.id);
             if (res?.success && res.data) {
-                setSuccessMessage(`Thiết bị ${device.device_name} phản hồi: ${res.data.isReachable ? 'Có thể kết nối' : 'Không thể kết nối'}.`);
+                const av = res.data.availability;
+                const isAvailable = av?.is_available === true;
+                const reason = !isAvailable && av?.reason_code
+                    ? ` (${AVAILABILITY_REASON_VI[av.reason_code] || av.reason_code})`
+                    : '';
+                setSuccessMessage(`Thiết bị ${device.device_name}: ${isAvailable ? 'Có thể kết nối' : 'Không thể kết nối' + reason}.`);
                 fetchData(); // refresh status
             } else {
                 throw new Error(res?.error?.message || res?.message || 'Không thể kiểm tra kết nối thiết bị.');
@@ -307,11 +326,27 @@ const DeviceManagement = () => {
                 try {
                     const res = await rotateFaceServerToken(device.id);
                     if (res?.success) {
+                        // BE trả { device, one_time_callback_token } — trước đây FE đọc
+                        // res.data?.token/accessToken (không tồn tại) nên luôn rơi vào chuỗi
+                        // giả "Token đã được tạo", không hiện được token thật để cập nhật lại
+                        // thiết bị vật lý → tính năng rotate coi như vô dụng dù API chạy đúng.
+                        const token = res.data?.one_time_callback_token;
+                        const code = device.device_code;
                         setTokenModalData({
-                            token: res.data?.token || res.data?.accessToken || 'Token đã được tạo',
+                            token,
                             deviceName: device.device_name,
+                            deviceCode: code,
+                            action: 'rotate',
+                            // Rotate sinh token MỚI → 3 URL cũ (nếu có) hết tác dụng ngay lập tức,
+                            // nên dựng lại URL mới luôn, giống flow Configure lần đầu.
+                            urls: token ? {
+                                verify: `${API_BASE_URL}/vf/${code}/${token}`,
+                                heartbeat: `${API_BASE_URL}/hb/${code}/${token}`,
+                                stranger: `${API_BASE_URL}/sf/${code}/${token}`,
+                            } : null,
                         });
                         setCopiedField(null);
+                        fetchData();
                     } else {
                         throw new Error(res?.error?.message || res?.message || 'Không thể rotate token.');
                     }
@@ -418,19 +453,23 @@ const DeviceManagement = () => {
         setTimeout(() => setCopiedField(null), 2000);
     };
 
-    // FE-AR: Open configure form for unconfigured face_server
+    // FE-AR: Mở form cấu hình face_server — dùng chung cho lần đầu (chưa có config,
+    // mọi field trống) VÀ sửa lại sau này (đã có config, prefill từ giá trị cũ; riêng
+    // password không bao giờ lấy lại được (BE chỉ trả '***' đã mask) nên luôn để trống
+    // — "để trống nếu không đổi" ở BE tự hiểu là giữ nguyên mật khẩu cũ).
     const handleOpenFaceConfig = (device) => {
+        const existing = device.metadata_json?.face_server_config || null;
         setFaceConfigDevice(device);
         setFaceConfigForm({
-            callback_protocol: 'https',
-            callback_base_url: '',
-            allowed_source_ip: '',
-            heartbeat_path: '/heartbeat',
-            verify_path: '/verify',
-            stranger_path: '/stranger',
-            callback_enabled: true,
-            base_url: '',
-            username: '',
+            callback_protocol: existing?.callback_protocol || 'https',
+            callback_base_url: existing?.callback_base_url || '',
+            allowed_source_ip: existing?.allowed_source_ip || '',
+            heartbeat_path: existing?.heartbeat_path || '/heartbeat',
+            verify_path: existing?.verify_path || '/verify',
+            stranger_path: existing?.stranger_path || '/stranger',
+            callback_enabled: existing?.callback_enabled ?? true,
+            base_url: existing?.base_url || '',
+            username: existing?.username || '',
             password: '',
         });
         setIsFaceConfigModalOpen(true);
@@ -466,6 +505,7 @@ const DeviceManagement = () => {
                     token,
                     deviceName: faceConfigDevice.device_name,
                     deviceCode: code,
+                    action: 'configure',
                     urls: token ? {
                         verify: `${API_BASE_URL}/vf/${code}/${token}`,
                         heartbeat: `${API_BASE_URL}/hb/${code}/${token}`,
@@ -546,10 +586,13 @@ const DeviceManagement = () => {
 
     // Filtered list
     const filteredDevices = devicesList.filter(device => {
-        const matchSearch = search.trim() === '' || 
-            device.device_code.toLowerCase().includes(search.toLowerCase()) ||
-            device.device_name.toLowerCase().includes(search.toLowerCase()) ||
-            device.ip_address.includes(search);
+        // face_server thường không có ip_address (chỉ dùng base_url) → null. Trước đây gọi
+        // thẳng .includes() trên null làm crash trắng màn hình ngay khi gõ ô tìm kiếm nếu
+        // danh sách có bất kỳ thiết bị nào chưa có IP.
+        const matchSearch = search.trim() === '' ||
+            (device.device_code || '').toLowerCase().includes(search.toLowerCase()) ||
+            (device.device_name || '').toLowerCase().includes(search.toLowerCase()) ||
+            (device.ip_address || '').includes(search);
         const matchType = selectedType === '' || device.device_type === selectedType;
         const matchStatus = selectedStatus === '' || device.status === selectedStatus;
         const matchRoom = selectedRoomId === '' || device.room_id === selectedRoomId;
@@ -587,7 +630,7 @@ const DeviceManagement = () => {
 
             {/* UC-51: Device status summary cards */}
             {statusSummary && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                     <div className="bg-white rounded-xl border border-platinum-tint p-4 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
                             <Cpu className="w-4 h-4 text-action-blue" />
@@ -621,7 +664,19 @@ const DeviceManagement = () => {
                         </div>
                         <div>
                             <p className="text-xs text-slate-blue font-medium">Vô hiệu</p>
+                            {/* BE trước đây không tách riêng disabled khỏi "unknown" nên field
+                                này luôn undefined → hiện 0 dù có thiết bị bị vô hiệu thật. Đã
+                                sửa BE trả đúng field `disabled`. */}
                             <p className="text-xl font-bold text-steel-gray leading-tight">{statusSummary.disabled ?? 0}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-platinum-tint p-4 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                            <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-blue font-medium">Bảo trì</p>
+                            <p className="text-xl font-bold text-amber-600 leading-tight">{statusSummary.maintenance ?? 0}</p>
                         </div>
                     </div>
                 </div>
@@ -796,7 +851,11 @@ const DeviceManagement = () => {
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                                                         </svg>
                                                         <div className="min-w-0">
-                                                            <p className="text-[11px] font-mono font-semibold text-midnight-indigo">{device.ip_address}</p>
+                                                            {device.ip_address ? (
+                                                                <p className="text-[11px] font-mono font-semibold text-midnight-indigo">{device.ip_address}</p>
+                                                            ) : (
+                                                                <p className="text-[11px] italic text-steel-gray">Chưa có IP</p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -813,15 +872,20 @@ const DeviceManagement = () => {
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                                             </svg>
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleCheckAvailability(device)}
-                                                            title="Kiểm tra kết nối (Ping)"
-                                                            className="p-2 rounded-lg text-steel-gray hover:text-green-600 hover:bg-green-50 transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                                            </svg>
-                                                        </button>
+                                                        {/* BE checkAvailability() chỉ hỗ trợ ip_camera/face_server (409
+                                                            DEVICE_TYPE_NOT_CAMERA cho loại khác) — trước đây nút hiện ở MỌI
+                                                            loại thiết bị nên luôn báo lỗi vô nghĩa với microphone/sensor/... */}
+                                                        {['ip_camera', 'face_server'].includes(device.device_type) && (
+                                                            <button
+                                                                onClick={() => handleCheckAvailability(device)}
+                                                                title="Kiểm tra kết nối (Ping)"
+                                                                className="p-2 rounded-lg text-steel-gray hover:text-green-600 hover:bg-green-50 transition-colors"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
                                                         {device.device_type === 'face_server' && (
                                                             <>
                                                             {!device.metadata_json?.face_server_config ? (
@@ -837,6 +901,12 @@ const DeviceManagement = () => {
                                                                 </button>
                                                             ) : (
                                                                 <>
+                                                                <button onClick={() => handleOpenFaceConfig(device)} title="Sửa cấu hình (base_url/username/password/callback)" className="p-2 rounded-lg text-steel-gray hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                    </svg>
+                                                                </button>
                                                                 <button onClick={() => handleRotateToken(device)} title="Tạo lại Token" className="p-2 rounded-lg text-steel-gray hover:text-amber-600 hover:bg-amber-50 transition-colors">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1008,13 +1078,15 @@ const DeviceManagement = () => {
                             </p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ IP</label>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">
+                                        Địa chỉ IP {formData.deviceType !== 'face_server' && <span className="text-red-500">*</span>}
+                                    </label>
                                     <input
                                         type="text"
-                                        required
+                                        required={formData.deviceType !== 'face_server'}
                                         value={formData.ipAddress}
                                         onChange={(e) => setFormData({...formData, ipAddress: e.target.value})}
-                                        placeholder="192.168.1.50"
+                                        placeholder={formData.deviceType === 'face_server' ? '192.168.1.50 (tuỳ chọn — có thể để trống, cấu hình base_url riêng sau)' : '192.168.1.50'}
                                         className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue"
                                     />
                                 </div>
@@ -1070,8 +1142,10 @@ const DeviceManagement = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Địa chỉ IP</label>
-                                <input type="text" required value={formData.ipAddress} onChange={(e) => setFormData({...formData, ipAddress: e.target.value})} placeholder="192.168.1.50" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">
+                                    Địa chỉ IP {formData.deviceType !== 'face_server' && <span className="text-red-500">*</span>}
+                                </label>
+                                <input type="text" required={formData.deviceType !== 'face_server'} value={formData.ipAddress} onChange={(e) => setFormData({...formData, ipAddress: e.target.value})} placeholder="192.168.1.50" className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue" />
                             </div>
                             <div className="pt-4 flex justify-end gap-3 border-t border-platinum-tint mt-4">
                                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border border-platinum-tint text-slate-blue hover:bg-cloud-mist rounded-xl text-sm font-semibold transition-colors">Hủy</button>
@@ -1176,7 +1250,7 @@ const DeviceManagement = () => {
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
                             </div>
                             <h2 className="text-lg font-bold text-amber-900">
-                                {tokenModalData.urls ? 'Cấu hình Face Server thành công' : 'Token mới đã được tạo'}
+                                {tokenModalData.action === 'rotate' ? 'Đã tạo Token mới — cập nhật lại thiết bị' : 'Cấu hình Face Server thành công'}
                             </h2>
                             <p className="text-xs text-amber-700 mt-1">Thiết bị: {tokenModalData.deviceName}</p>
                         </div>
@@ -1314,7 +1388,9 @@ const DeviceManagement = () => {
                     <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up">
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
                             <div>
-                                <h3 className="font-bold text-midnight-indigo text-sm">Cấu hình Face Server lần đầu</h3>
+                                <h3 className="font-bold text-midnight-indigo text-sm">
+                                    {faceConfigDevice.metadata_json?.face_server_config ? 'Sửa cấu hình Face Server' : 'Cấu hình Face Server lần đầu'}
+                                </h3>
                                 <p className="text-[10px] text-slate-blue mt-0.5">{faceConfigDevice.device_name} · {faceConfigDevice.device_code}</p>
                             </div>
                             <button onClick={() => setIsFaceConfigModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">
@@ -1322,6 +1398,11 @@ const DeviceManagement = () => {
                             </button>
                         </div>
                         <form onSubmit={handleFaceConfigSubmit} className="p-6 space-y-4">
+                            {faceConfigDevice.metadata_json?.face_server_config && (
+                                <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                    ⚠ Lưu lại sẽ tạo <strong>Token mới</strong> — token cũ và mọi URL đang dùng trên thiết bị vật lý sẽ mất tác dụng ngay, cần cập nhật lại thiết bị bằng token mới sau khi lưu.
+                                </div>
+                            )}
                             {/* callback_protocol */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1446,7 +1527,7 @@ const DeviceManagement = () => {
                                     disabled={faceConfigSubmitting}
                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50"
                                 >
-                                    {faceConfigSubmitting ? 'Đang cấu hình...' : 'Cấu hình & Lấy Token'}
+                                    {faceConfigSubmitting ? 'Đang lưu...' : (faceConfigDevice.metadata_json?.face_server_config ? 'Lưu & Tạo Token mới' : 'Cấu hình & Lấy Token')}
                                 </button>
                             </div>
                         </form>
