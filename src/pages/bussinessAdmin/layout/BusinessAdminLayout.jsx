@@ -18,7 +18,6 @@ import {
     PieChart,
     Clock,
     Fingerprint,
-    ClipboardList,
 } from 'lucide-react';
 
 const STATIC_NAVIGATION_ITEMS = [
@@ -38,7 +37,6 @@ const STATIC_NAVIGATION_ITEMS = [
             { label: 'Phòng ban', to: '/business-admin/departments', icon: Briefcase },
             { label: 'Trang thiết bị', to: '/business-admin/equipments', icon: Monitor },
             { label: 'Duyệt ảnh sinh trắc học', to: '/business-admin/biometric-submissions', icon: Fingerprint },
-            { label: 'Nhật ký kiểm toán', to: '/business-admin/audit-logs', icon: ClipboardList },
         ],
     },
     {

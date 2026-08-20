@@ -266,7 +266,7 @@ const BookMeeting = () => {
                 }
                 if (suggestions.length === 0) {
                     try {
-                        const usersRes = await getUsers({ limit: 30 });
+                        const usersRes = await getUsers({ limit: 30, meetingEligibleOnly: true });
                         if (usersRes?.success) suggestions = usersRes.data || [];
                         suggestionsDeptId = null;
                     } catch (err) {
@@ -301,7 +301,7 @@ const BookMeeting = () => {
         setSearchingUsers(true);
         const timer = setTimeout(async () => {
             try {
-                const res = await getUsers({ search: query, limit: 20 });
+                const res = await getUsers({ search: query, limit: 20, meetingEligibleOnly: true });
                 if (requestId !== searchRequestRef.current) return; // Kết quả cũ, bỏ qua
                 if (res?.success) {
                     const list = res.data || [];
@@ -352,42 +352,45 @@ const BookMeeting = () => {
         };
     };
 
-    const handleSearchRooms = async () => {
-        setSearchingRooms(true);
-        setErrorMsg('');
-
+    // Kiểm tra khung ngày/giờ hợp lệ (dùng chung cho: tìm phòng, chuyển sang bước
+    // tùy chỉnh, và submit) — tránh việc mỗi nơi tự chép lại logic rồi lệch nhau,
+    // vốn là nguyên nhân khiến người dùng sửa giờ về quá khứ sau khi đã suggest
+    // phòng vẫn lọt qua được tới bước tùy chỉnh cuộc họp.
+    const getTimeRangeError = () => {
         if (!startDate || !isValidDate(startDate)) {
-            setErrorMsg('Khung ngày họp bắt đầu không hợp lệ.');
-            setSearchingRooms(false);
-            return;
+            return 'Khung ngày họp bắt đầu không hợp lệ.';
         }
         if (!endDate || !isValidDate(endDate)) {
-            setErrorMsg('Khung ngày họp kết thúc không hợp lệ.');
-            setSearchingRooms(false);
-            return;
+            return 'Khung ngày họp kết thúc không hợp lệ.';
         }
         if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) {
-            setErrorMsg('Giờ bắt đầu cuộc họp không hợp lệ.');
-            setSearchingRooms(false);
-            return;
+            return 'Giờ bắt đầu cuộc họp không hợp lệ.';
         }
         if (!endTime || !/^\d{2}:\d{2}$/.test(endTime)) {
-            setErrorMsg('Giờ kết thúc cuộc họp không hợp lệ.');
-            setSearchingRooms(false);
-            return;
+            return 'Giờ kết thúc cuộc họp không hợp lệ.';
         }
 
         const now = new Date();
         const selectedStart = new Date(`${startStr}T${startTime}:00`);
         if (selectedStart < now) {
-            setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
-            setSearchingRooms(false);
-            return;
+            return 'Thời gian bắt đầu không được trong quá khứ.';
         }
 
         const selectedEnd = new Date(`${endStr}T${endTime}:00`);
         if (selectedEnd <= selectedStart) {
-            setErrorMsg('Thời gian kết thúc phải sau thời gian bắt đầu.');
+            return 'Thời gian kết thúc phải sau thời gian bắt đầu.';
+        }
+
+        return null;
+    };
+
+    const handleSearchRooms = async () => {
+        setSearchingRooms(true);
+        setErrorMsg('');
+
+        const timeError = getTimeRangeError();
+        if (timeError) {
+            setErrorMsg(timeError);
             setSearchingRooms(false);
             return;
         }
@@ -412,6 +415,27 @@ const BookMeeting = () => {
             setSearchPerformed(true);
             setSearchingRooms(false);
         }
+    };
+
+    // Người dùng sửa giờ/ngày/số người sau khi đã suggest phòng: kết quả suggest cũ
+    // (availableRooms) không còn đáng tin (phòng có thể không còn trống, hoặc giờ mới
+    // có thể không hợp lệ/đã ở quá khứ) — phải xoá luôn danh sách và bắt tìm lại,
+    // không chỉ bỏ chọn phòng, để tránh việc chọn nhầm 1 thẻ phòng cũ rồi lọt qua bước 2.
+    const invalidateRoomSuggestions = () => {
+        setSelectedRoomId('');
+        setAvailableRooms([]);
+        setSearchPerformed(false);
+    };
+
+    const handleContinueToStep2 = () => {
+        const timeError = getTimeRangeError();
+        if (timeError) {
+            invalidateRoomSuggestions();
+            setErrorMsg(timeError);
+            return;
+        }
+        if (!selectedRoomId) return;
+        setCurrentStep(2);
     };
 
     const handleSelectRoom = (room) => {
@@ -854,33 +878,9 @@ const BookMeeting = () => {
         setConflictInfo(null);
         setAlternativeRooms([]);
 
-        if (!startDate || !isValidDate(startDate)) {
-            setErrorMsg('Khung ngày họp bắt đầu không hợp lệ.');
-            return;
-        }
-        if (!endDate || !isValidDate(endDate)) {
-            setErrorMsg('Khung ngày họp kết thúc không hợp lệ.');
-            return;
-        }
-        if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) {
-            setErrorMsg('Giờ bắt đầu cuộc họp không hợp lệ.');
-            return;
-        }
-        if (!endTime || !/^\d{2}:\d{2}$/.test(endTime)) {
-            setErrorMsg('Giờ kết thúc cuộc họp không hợp lệ.');
-            return;
-        }
-
-        const now = new Date();
-        const selectedStart = new Date(`${startStr}T${startTime}:00`);
-        if (selectedStart < now) {
-            setErrorMsg('Thời gian bắt đầu không được trong quá khứ.');
-            return;
-        }
-
-        const selectedEnd = new Date(`${endStr}T${endTime}:00`);
-        if (selectedEnd <= selectedStart) {
-            setErrorMsg('Thời gian kết thúc phải sau thời gian bắt đầu.');
+        const timeError = getTimeRangeError();
+        if (timeError) {
+            setErrorMsg(timeError);
             return;
         }
 
@@ -890,6 +890,11 @@ const BookMeeting = () => {
         }
         if (!selectedRoomId) {
             setErrorMsg('Vui lòng chọn phòng họp.');
+            return;
+        }
+
+        if (selectedParticipantIds.length === 0 && externalParticipants.length === 0) {
+            setErrorMsg('Vui lòng thêm ít nhất 1 người tham gia vào cuộc họp.');
             return;
         }
 
@@ -1263,7 +1268,7 @@ const BookMeeting = () => {
                                             endDate={endDate}
                                             onChange={(update) => {
                                                 setDateRange(update);
-                                                setSelectedRoomId('');
+                                                invalidateRoomSuggestions();
                                             }}
                                             minDate={new Date()}
                                             locale={vi}
@@ -1282,7 +1287,7 @@ const BookMeeting = () => {
                                         value={startTime}
                                         onChange={(newTime) => {
                                             setStartTime(newTime);
-                                            setSelectedRoomId('');
+                                            invalidateRoomSuggestions();
                                         }}
                                         placeholder="Giờ bắt đầu"
                                     />
@@ -1293,7 +1298,7 @@ const BookMeeting = () => {
                                         value={endTime}
                                         onChange={(newTime) => {
                                             setEndTime(newTime);
-                                            setSelectedRoomId('');
+                                            invalidateRoomSuggestions();
                                         }}
                                         placeholder="Giờ kết thúc"
                                     />
@@ -1306,7 +1311,7 @@ const BookMeeting = () => {
                                         value={expectedAttendeeCount}
                                         onChange={(e) => {
                                             setExpectedAttendeeCount(e.target.value);
-                                            setSelectedRoomId('');
+                                            invalidateRoomSuggestions();
                                         }}
                                         placeholder="Tuỳ chọn"
                                         className="w-full px-4 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue text-midnight-indigo"
@@ -1397,7 +1402,7 @@ const BookMeeting = () => {
                             <button
                                 type="button"
                                 disabled={!selectedRoomId}
-                                onClick={() => setCurrentStep(2)}
+                                onClick={handleContinueToStep2}
                                 className="px-6 py-3 bg-action-blue hover:bg-action-blue/90 disabled:opacity-50 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-95"
                             >
                                 Tiếp tục <ChevronRight className="w-4 h-4" />

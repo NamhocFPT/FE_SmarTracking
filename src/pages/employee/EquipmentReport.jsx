@@ -89,7 +89,18 @@ const EquipmentReport = () => {
                 if (!m.room?.id || map.has(m.room.id)) return;
                 map.set(m.room.id, { room: m.room, lastMeeting: m });
             });
-            setRecentRooms(Array.from(map.values()));
+            const entries = Array.from(map.values());
+
+            // Chỉ giữ lại các phòng có ít nhất 1 thiết bị được gán, tránh
+            // cho phép báo hỏng ở phòng chưa gán thiết bị nào.
+            const equipmentChecks = await Promise.all(
+                entries.map((entry) =>
+                    getEquipments({ currentRoomId: entry.room.id, limit: 1 })
+                        .then((r) => (r?.success && (r.data || []).length > 0))
+                        .catch(() => false)
+                )
+            );
+            setRecentRooms(entries.filter((_, idx) => equipmentChecks[idx]));
         } catch (err) {
             setRoomsError(err?.message || 'Lỗi khi tải danh sách phòng.');
         } finally {
@@ -163,15 +174,15 @@ const EquipmentReport = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-fade-in-up">
                 <div>
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-action-blue mb-2">
-                        <Monitor className="w-3.5 h-3.5" />
-                        Thiết bị phòng họp
+                        <Wrench className="w-3.5 h-3.5" />
+                        Báo hỏng thiết bị phòng họp
                     </span>
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">
                         {view === 'rooms' ? 'Phòng họp gần đây của tôi' : selectedEntry?.room?.roomName}
                     </h1>
                     <p className="text-sm text-slate-blue mt-1">
                         {view === 'rooms'
-                            ? 'Chọn một phòng để xem thiết bị và báo cáo sự cố nếu có.'
+                            ? 'Chọn một phòng để xem thiết bị và báo hỏng nếu phát hiện sự cố.'
                             : 'Danh sách thiết bị được lắp đặt trong phòng. Bấm "Báo hỏng" nếu phát hiện thiết bị gặp sự cố.'}
                     </p>
                 </div>

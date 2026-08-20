@@ -114,7 +114,7 @@ const BusinessAdminSidebar = ({
                 ) : (
                     /* Khi mở rộng: logo dẫn về dashboard */
                     <NavLink
-                        to="/system-admin"
+                        to="/business-admin"
                         end
                         className="flex items-center gap-3 shrink-0 no-underline hover:opacity-80 transition-opacity"
                     >
@@ -128,7 +128,7 @@ const BusinessAdminSidebar = ({
                         SmarTracking
                     </p>
                     <p className="text-[11px] text-steel-gray font-semibold whitespace-nowrap">
-                        System Admin
+                        Business Admin
                     </p>
                 </div>
 
@@ -361,7 +361,7 @@ const BusinessAdminSidebar = ({
                             {displayName}
                         </p>
                         <p className="text-[11.5px] text-steel-gray truncate">
-                            Quản trị hệ thống
+                            Quản trị kinh doanh
                         </p>
                     </div>
                     {!isMini && (

@@ -29,13 +29,13 @@ import VehicleControlList from '../pages/systemAdmin/VehicleControlList';
 import VehicleRegistrations from '../pages/systemAdmin/VehicleRegistrations';
 import RoomAccessLogs from '../pages/systemAdmin/RoomAccessLogs';
 import UserJourney from '../pages/shared/UserJourney';
+import AuditLogs from '../pages/systemAdmin/AuditLogs';
 // BusinessAdmin Layout + Pages
 import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLayout';
 import BusinessDashboard from '../pages/bussinessAdmin/dashBoard';
 import BusinessUserManagement from '../pages/bussinessAdmin/UserManagement';
 import BusinessDepartmentManagement from '../pages/bussinessAdmin/DepartmentManagement';
 import BusinessRoomManagement from '../pages/bussinessAdmin/RoomManagement';
-import AuditLogs from '../pages/bussinessAdmin/AuditLogs';
 
 // Manager Layout + Pages
 import ManagerLayout from '../pages/manager/layout/ManagerLayout';
@@ -157,6 +157,10 @@ export const router = [
                 element: <UserJourney />
             },
             {
+                path: 'audit-logs',
+                element: <AuditLogs />
+            },
+            {
                 path: 'legal',
                 element: <LegalAndSupport />
             }
@@ -195,10 +199,6 @@ export const router = [
             {
                 path: 'biometric-submissions',
                 element: <BiometricSubmissionsReview />
-            },
-            {
-                path: 'audit-logs',
-                element: <AuditLogs />
             },
             {
                 path: 'profile',

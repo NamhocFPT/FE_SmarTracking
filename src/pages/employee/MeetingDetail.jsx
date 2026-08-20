@@ -23,6 +23,8 @@ import toast from '../../utils/toast';
 import { getUserPresence } from '../../service/managerServices';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
+import MeetingAttendanceBoard from '../../components/meeting/MeetingAttendanceBoard';
+import { hasPermission } from '../../utils/permissionUtils';
 
 // BE MeetingStatus enum (meeting.entity.ts) có đủ 6 giá trị — trước đây thiếu draft/pending_approval
 // khiến 2 trạng thái này rơi vào nhánh else và bị hiển thị nhầm thành "Đã hủy".
@@ -340,18 +342,21 @@ const EmployeeMeetingDetail = () => {
         fetchMeeting();
     }, [fetchMeeting]);
 
-    // Load helper data for edit forms (users)
+    // Load helper data for edit forms (users) — chạy lại khi mở modal Sửa cuộc họp
+    // HOẶC modal Thêm người tham dự nội bộ (trước đây chỉ gắn với isEditModalOpen nên
+    // nếu user bấm "Nội bộ" mà chưa từng mở modal Sửa, danh sách sẽ rỗng/không được lọc
+    // role mới nhất — BA/SA vẫn có thể lọt qua tìm kiếm thủ công trong modal).
     useEffect(() => {
-        if (isEditModalOpen && meeting?.id) {
+        if ((isEditModalOpen || isImportModalOpen) && meeting?.id) {
             const loadUsers = async () => {
                 try {
-                    const usersRes = await getUsers();
+                    const usersRes = await getUsers({ meetingEligibleOnly: true });
                     if (usersRes?.success) setUsers(usersRes.data || []);
                 } catch (e) { }
             };
             loadUsers();
         }
-    }, [isEditModalOpen, meeting?.id]);
+    }, [isEditModalOpen, isImportModalOpen, meeting?.id]);
 
     // Nạp danh sách phòng còn trống 1 LẦN khi mở modal (dùng giờ gốc của cuộc họp) — KHÔNG tự
     // động chạy lại khi user đổi giờ nữa. Việc kiểm tra lại theo giờ mới do người dùng chủ động
@@ -840,6 +845,14 @@ const EmployeeMeetingDetail = () => {
     // trả data.roles là mảng { roleCode }, không phải field `role` dạng string.
     const isAdmin = currentUser?.roles?.some(r => ['BUSINESS_ADMIN', 'SYSTEM_ADMIN'].includes(r.roleCode || r.role_code));
     const canManage = isHost || isOrganizer || isAdmin;
+    // BE (meetings.service.ts addInternalParticipant/addExternalParticipant) chỉ cho thêm
+    // người tham dự khi status là 'scheduled' hoặc 'in_progress' — draft/pending_approval bị
+    // BE từ chối 400 INVALID_MEETING_STATUS, nên phải ẩn nút thêm người ở các trạng thái đó.
+    const canAddParticipants = canManage && (meeting.status === 'scheduled' || meeting.status === 'in_progress');
+    // Thêm khách ngoài yêu cầu permission 'meeting.participant.add.external' — EMPLOYEE không
+    // được cấp quyền này theo chủ đích (chỉ Manager/Admin), PermissionsGuard chặn 403 kể cả khi
+    // employee là host/organizer, nên nút "Khách" phải ẩn nếu thiếu quyền.
+    const canAddExternalParticipant = canAddParticipants && hasPermission('meeting.participant.add.external');
     const hostParticipant = meeting.participants?.find((participant) =>
         participant.id === (meeting.host_id || meeting.hostId)
         || participant.userId === (meeting.host_id || meeting.hostId)
@@ -1199,20 +1212,24 @@ const EmployeeMeetingDetail = () => {
                                     <Users className="w-4.5 h-4.5 text-action-blue" />
                                     Người tham dự
                                 </h3>
-                                {canManage && meeting.status !== 'cancelled' && meeting.status !== 'completed' && (
+                                {(canAddParticipants || canAddExternalParticipant) && (
                                     <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                        <button
-                                            onClick={() => setIsImportModalOpen(true)}
-                                            className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md text-[11px] font-bold transition-all shadow-sm"
-                                        >
-                                            <UserPlus className="w-3.5 h-3.5" /> Nội bộ
-                                        </button>
-                                        <button
-                                            onClick={() => setShowAddGuestModal(true)}
-                                            className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md text-[11px] font-bold transition-all shadow-sm"
-                                        >
-                                            <UserPlus className="w-3.5 h-3.5" /> Khách
-                                        </button>
+                                        {canAddParticipants && (
+                                            <button
+                                                onClick={() => setIsImportModalOpen(true)}
+                                                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md text-[11px] font-bold transition-all shadow-sm"
+                                            >
+                                                <UserPlus className="w-3.5 h-3.5" /> Nội bộ
+                                            </button>
+                                        )}
+                                        {canAddExternalParticipant && (
+                                            <button
+                                                onClick={() => setShowAddGuestModal(true)}
+                                                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md text-[11px] font-bold transition-all shadow-sm"
+                                            >
+                                                <UserPlus className="w-3.5 h-3.5" /> Khách
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1397,6 +1414,14 @@ const EmployeeMeetingDetail = () => {
                                 className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'presence' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
                             >
                                 Thời lượng tham dự
+                            </button>
+                        )}
+                        {isCompleted && (
+                            <button
+                                onClick={() => setActiveRightTab('attendance')}
+                                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'attendance' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
+                            >
+                                Tình trạng điểm danh
                             </button>
                         )}
                     </div>
@@ -1636,6 +1661,8 @@ const EmployeeMeetingDetail = () => {
                                 </div>
                             ) : null}
                         </div>
+                    ) : activeRightTab === 'attendance' ? (
+                        <MeetingAttendanceBoard meetingId={meeting.id} />
                     ) : activeRightTab === 'transcript' ? (
                         isCompleted ? (
                             <div className="space-y-6">
