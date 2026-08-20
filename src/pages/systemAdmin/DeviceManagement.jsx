@@ -302,10 +302,16 @@ const DeviceManagement = () => {
             if (res?.success && res.data) {
                 const av = res.data.availability;
                 const isAvailable = av?.is_available === true;
-                const reason = !isAvailable && av?.reason_code
-                    ? ` (${AVAILABILITY_REASON_VI[av.reason_code] || av.reason_code})`
-                    : '';
-                setSuccessMessage(`Thiết bị ${device.device_name}: ${isAvailable ? 'Có thể kết nối' : 'Không thể kết nối' + reason}.`);
+                // Gọi API thành công KHÔNG đồng nghĩa thiết bị kết nối được — trước đây mọi kết
+                // quả (kể cả is_available=false) đều đẩy vào successMessage (banner xanh), khiến
+                // dòng "Không thể kết nối" hiện màu xanh như tin tốt. Tách rõ: available → banner
+                // xanh, không available → banner đỏ (setError) kèm lý do.
+                if (isAvailable) {
+                    setSuccessMessage(`Thiết bị ${device.device_name}: Có thể kết nối.`);
+                } else {
+                    const reason = av?.reason_code ? ` (${AVAILABILITY_REASON_VI[av.reason_code] || av.reason_code})` : '';
+                    setError(`Thiết bị ${device.device_name}: Không thể kết nối${reason}.`);
+                }
                 fetchData(); // refresh status
             } else {
                 throw new Error(res?.error?.message || res?.message || 'Không thể kiểm tra kết nối thiết bị.');
