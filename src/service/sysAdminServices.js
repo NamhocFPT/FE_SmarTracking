@@ -697,9 +697,9 @@ export const getSecurityAlertsDailyTrend = async (params = {}) => {
  * Hoạt động hệ thống theo giờ (audit log, 24 bucket).
  * Response: { data: { date, buckets: [{hour, count}], totalToday } }
  */
-export const getAuditActivityHourly = async (params = {}) => {
+export const getAuditActivityHourly = async (params = {}, options = {}) => {
     const query = buildQuery(params);
-    return await get(`/analytics/audit-activity/hourly${query}`);
+    return await get(`/analytics/audit-activity/hourly${query}`, options);
 };
 
 // ============================================================

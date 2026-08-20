@@ -267,7 +267,7 @@ const BusinessAdminSidebar = ({
             <div className="shrink-0 border-t border-white/[0.08] px-2 py-2">
                 <div className={`flex items-center ${isMini ? 'justify-center' : 'gap-3 px-1.5'}`}>
                     <NotificationBell
-                        basePath="/system-admin"
+                        basePath="/business-admin"
                         dark
                         dropUp
                         dropdownAlign="left"
@@ -279,7 +279,7 @@ const BusinessAdminSidebar = ({
                     />
                     {!isMini && (
                         <NavLink
-                            to="/system-admin/notifications"
+                            to="/business-admin/notifications"
                             className="text-[14px] font-semibold text-white/70 hover:text-white select-none cursor-pointer no-underline"
                         >
                             Thông báo
