@@ -1,13 +1,12 @@
-import { AlertTriangle, Cpu, MapPin, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench, Check } from 'lucide-react';
+import { AlertTriangle, Clock, Cpu, History, MapPin, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import { createPortal } from 'react-dom';
-import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment, confirmEquipmentFault, resolveEquipmentFault } from '../../service/equipmentServices';
+import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment, confirmEquipmentFault, resolveEquipmentFault, getEquipmentFaultHistory } from '../../service/equipmentServices';
 import { getRooms } from '../../service/businessAdminServices';
 
 
-const EquipmentManagement = ({ mode = 'full' }) => {
-    const isReportOnly = mode === 'report';
+const EquipmentManagement = () => {
     // Data states
     const [equipmentList, setEquipmentList] = useState([]);
     const [rooms, setRooms] = useState([]);
@@ -34,6 +33,12 @@ const EquipmentManagement = ({ mode = 'full' }) => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [equipmentToDelete, setEquipmentToDelete] = useState(null);
     const [isDeletingEquipment, setIsDeletingEquipment] = useState(false);
+
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [historyEquipment, setHistoryEquipment] = useState(null);
+    const [historyList, setHistoryList] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState(null);
 
     // Form states
     const [createForm, setCreateForm] = useState({
@@ -242,6 +247,37 @@ const EquipmentManagement = ({ mode = 'full' }) => {
         }
     };
 
+    const openHistoryModal = async (eq) => {
+        setHistoryEquipment(eq);
+        setIsHistoryModalOpen(true);
+        setHistoryLoading(true);
+        setHistoryError(null);
+        try {
+            const res = await getEquipmentFaultHistory(eq.id);
+            if (res?.success) {
+                setHistoryList(res.data || []);
+            } else {
+                setHistoryError(res?.message || 'Không thể tải lịch sử báo hỏng.');
+            }
+        } catch (err) {
+            setHistoryError(err?.message || 'Lỗi khi tải lịch sử báo hỏng.');
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    const getHistoryEventMeta = (eventType) => {
+        switch (eventType) {
+            case 'reported': return { label: 'Báo hỏng', icon: <AlertTriangle className="w-4 h-4" />, cls: 'bg-red-50 text-red-600 border-red-100' };
+            case 'confirmed': return { label: 'Xác nhận lỗi', icon: <Check className="w-4 h-4" />, cls: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
+            case 'resolved': return { label: 'Đã khắc phục', icon: <RefreshCw className="w-4 h-4" />, cls: 'bg-blue-50 text-blue-600 border-blue-100' };
+            default: return { label: eventType, icon: <Clock className="w-4 h-4" />, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+        }
+    };
+
+    const fmtDateTime = (iso) =>
+        iso ? new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
+
     const getEquipmentIcon = (type) => {
         switch(type) {
             case 'camera': return <Video className="w-5 h-5 text-action-blue" />;
@@ -277,15 +313,13 @@ const EquipmentManagement = ({ mode = 'full' }) => {
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý Trang thiết bị</h1>
                     <p className="text-sm text-slate-blue mt-1">Quản lý danh sách, điều phối phòng và theo dõi tình trạng thiết bị.</p>
                 </div>
-                {!isReportOnly && (
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="inline-flex items-center px-4 py-2.5 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Thêm thiết bị
-                    </button>
-                )}
+                <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="inline-flex items-center px-4 py-2.5 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
+                >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Thêm thiết bị
+                </button>
             </div>
 
             {error && (
@@ -427,15 +461,13 @@ const EquipmentManagement = ({ mode = 'full' }) => {
                                             )}
                                         </td>
                                         <td className="p-4 text-right">
-                                            {!isReportOnly && (
-                                                <button
-                                                    onClick={() => { setSelectedEquipment(eq); setAssignForm({ roomId: eq.currentRoomId || '', assignmentNote: '' }); setIsAssignModalOpen(true); }}
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors mr-1"
-                                                    title="Gán vào phòng"
-                                                >
-                                                    <MapPin className="w-4 h-4" />
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => { setSelectedEquipment(eq); setAssignForm({ roomId: eq.currentRoomId || '', assignmentNote: '' }); setIsAssignModalOpen(true); }}
+                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors mr-1"
+                                                title="Gán vào phòng"
+                                            >
+                                                <MapPin className="w-4 h-4" />
+                                            </button>
                                             <button
                                                 onClick={() => { setSelectedEquipment(eq); setIsFaultModalOpen(true); }}
                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-orange-500 hover:bg-orange-50 transition-colors mr-1"
@@ -443,7 +475,14 @@ const EquipmentManagement = ({ mode = 'full' }) => {
                                             >
                                                 <Wrench className="w-4 h-4" />
                                             </button>
-                                            {!isReportOnly && eq.healthStatus !== 'healthy' && (
+                                            <button
+                                                onClick={() => openHistoryModal(eq)}
+                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-purple-500 hover:bg-purple-50 transition-colors mr-1"
+                                                title="Lịch sử báo hỏng"
+                                            >
+                                                <History className="w-4 h-4" />
+                                            </button>
+                                            {eq.healthStatus !== 'healthy' && (
                                                 <>
                                                     <button
                                                         onClick={() => {
@@ -459,7 +498,8 @@ const EquipmentManagement = ({ mode = 'full' }) => {
                                                     <button
                                                         onClick={() => {
                                                             setSelectedEquipment(eq);
-                                                            setResolveFaultForm({ healthStatus: 'healthy', assetStatus: eq.assetStatus || 'active', resolutionNote: '' });
+                                                            const defaultAction = ['maintenance', 'retired'].includes(eq.assetStatus) ? eq.assetStatus : 'active';
+                                                            setResolveFaultForm({ healthStatus: 'healthy', assetStatus: defaultAction, resolutionNote: '' });
                                                             setIsResolveFaultModalOpen(true);
                                                         }}
                                                         className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-blue-500 hover:bg-blue-50 transition-colors mr-1"
@@ -469,15 +509,13 @@ const EquipmentManagement = ({ mode = 'full' }) => {
                                                     </button>
                                                 </>
                                             )}
-                                            {!isReportOnly && (
-                                                <button
-                                                    onClick={() => handleDeleteClick(eq)}
-                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                    title="Xoá thiết bị"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => handleDeleteClick(eq)}
+                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                title="Xoá thiết bị"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </td>
                                     </tr>
                                     );
@@ -757,6 +795,65 @@ const EquipmentManagement = ({ mode = 'full' }) => {
                             >
                                 {isDeletingEquipment ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xoá vĩnh viễn'}
                             </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* FAULT HISTORY MODAL */}
+            {isHistoryModalOpen && historyEquipment && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-lg w-full flex flex-col max-h-[85vh]">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50">
+                            <div>
+                                <h3 className="font-bold text-midnight-indigo flex items-center gap-1.5">
+                                    <History className="w-4 h-4" /> Lịch sử báo hỏng
+                                </h3>
+                                <p className="text-xs text-slate-blue mt-0.5">{historyEquipment.equipmentName} • {historyEquipment.equipmentCode}</p>
+                            </div>
+                            <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-blue hover:text-midnight-indigo">✕</button>
+                        </div>
+                        <div className="p-6 overflow-y-auto">
+                            {historyLoading ? (
+                                <div className="space-y-3">
+                                    {Array(3).fill(0).map((_, idx) => (
+                                        <div key={idx} className="h-16 rounded-xl bg-cloud-mist animate-pulse" />
+                                    ))}
+                                </div>
+                            ) : historyError ? (
+                                <div className="p-4 bg-red-50/80 border border-red-200 text-red-700 rounded-xl flex items-start">
+                                    <AlertTriangle className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm">{historyError}</p>
+                                </div>
+                            ) : historyList.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <History className="w-10 h-10 mb-3 mx-auto text-slate-blue opacity-50" />
+                                    <p className="text-sm text-slate-blue">Thiết bị này chưa từng được báo hỏng.</p>
+                                </div>
+                            ) : (
+                                <ol className="space-y-4">
+                                    {historyList.map((item) => {
+                                        const meta = getHistoryEventMeta(item.eventType);
+                                        return (
+                                            <li key={item.id} className={`p-3 rounded-xl border ${meta.cls}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="inline-flex items-center gap-1.5 text-sm font-bold">
+                                                        {meta.icon} {meta.label}
+                                                    </span>
+                                                    <span className="text-[11px] text-slate-blue">{fmtDateTime(item.createdAt)}</span>
+                                                </div>
+                                                <p className="text-sm text-midnight-indigo mt-1.5">
+                                                    <span className="font-semibold">{item.actorName || 'Không rõ người thực hiện'}</span>
+                                                </p>
+                                                {item.note && (
+                                                    <p className="text-xs text-slate-blue mt-1 whitespace-pre-wrap">{item.note}</p>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
+                                </ol>
+                            )}
                         </div>
                     </div>
                 </div>,

@@ -799,7 +799,7 @@ const RoomManagement = ({ readOnly = false }) => {
             {/* Room Detail Modal with backdrop blur */}
             {detailRoom && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in">
-                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-2xl w-full overflow-hidden animate-fade-in-up flex flex-col relative min-h-[300px]">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-fade-in-up flex flex-col relative min-h-[300px]">
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-cloud-mist/50 shrink-0">
                             <div className="flex items-center gap-3">

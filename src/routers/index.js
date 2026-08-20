@@ -52,6 +52,7 @@ import PersonalCalendar from '../pages/employee/PersonalCalendar';
 import EmployeeFaceRegistration from '../pages/employee/FaceRegistration';
 import EmployeeMeetingDetail from '../pages/employee/MeetingDetail';
 import EmployeeRecordings from '../pages/employee/Recordings';
+import EmployeeEquipmentReport from '../pages/employee/EquipmentReport';
 import InMeetingRoom from '../pages/shared/InMeetingRoom';
 import LegalAndSupport from '../pages/public/LegalAndSupport';
 import GuestJoin from '../pages/guest/GuestJoin';
@@ -337,7 +338,7 @@ export const router = [
             },
             {
                 path: 'equipments',
-                element: <EquipmentManagement mode="report" />
+                element: <EmployeeEquipmentReport />
             },
             {
                 path: 'minutes',

@@ -330,7 +330,7 @@ const DashBoard = () => {
             getVehicleControlList({ list_type: 'blocklist', active: true, limit: 100 }),
             getAdminGateAccessHistory({ from: todayStart.toISOString(), to: todayEnd.toISOString(), limit: 5 }),
             getSecurityAlertsDailyTrend({ days: 7 }),
-            getAuditActivityHourly(),
+            getAuditActivityHourly({}, { skipToast: true }),
         ]);
 
         // Devices

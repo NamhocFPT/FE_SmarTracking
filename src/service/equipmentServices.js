@@ -71,3 +71,13 @@ export const resolveEquipmentFault = async (equipmentId, data) => {
     return await patch(`/equipments/${equipmentId}/fault-resolution`, data);
 };
 
+/**
+ * Lich su bao hong / xac nhan / khac phuc cua 1 thiet bi (ai bao, ai xac nhan, ai da sua)
+ * BE: GET /equipments/:id/fault-history
+ * @param {string|number} equipmentId
+ * @returns {Promise<object>} response envelope
+ */
+export const getEquipmentFaultHistory = async (equipmentId) => {
+    return await get(`/equipments/${equipmentId}/fault-history`);
+};
+
