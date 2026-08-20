@@ -72,8 +72,31 @@ const StatusBadge = ({ status }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────
-const DocumentArchive = () => {
+// Xuất file biên bản: chỉ Host / người soạn thảo (preparedBy) / Admin — khớp
+// ownership-or-admin rule ở BE (MinutesExportService.createExportJob, UC-147).
+// Participant thường KHÔNG được export dù biên bản đã published.
+const canExportMinutesItem = (item, currentUser, isAdmin) => {
+    if (!item) return false;
+    if (isAdmin) return true;
+    if (!currentUser) return false;
+    return currentUser.id === item.preparedBy?.id || currentUser.id === item.host?.id;
+};
+
+const DocumentArchive = ({ scope = 'all' }) => {
+    const isSelfScope = scope === 'self';
     const [activeTab, setActiveTab] = useState('minutes');
+
+    // Quyền export biên bản của user hiện tại
+    const [currentUser, setCurrentUser] = useState(null);
+    useEffect(() => {
+        try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) setCurrentUser(JSON.parse(userStr));
+        } catch {
+            // silent
+        }
+    }, []);
+    const isAdmin = currentUser?.roles?.some(r => ['BUSINESS_ADMIN', 'SYSTEM_ADMIN'].includes(r.roleCode || r.role_code));
 
     // ── Minutes state ──
     const [minutes, setMinutes]               = useState([]);
@@ -290,30 +313,38 @@ const DocumentArchive = () => {
                     <Archive className="w-3.5 h-3.5" />
                     Kho tài liệu
                 </span>
-                <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Quản lý tài liệu cuộc họp</h1>
-                <p className="text-slate-blue text-sm mt-0.5">Xem toàn bộ biên bản họp, ghi hình và ghi âm của công ty.</p>
+                <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">
+                    {isSelfScope ? 'Kho biên bản của tôi' : 'Quản lý tài liệu cuộc họp'}
+                </h1>
+                <p className="text-slate-blue text-sm mt-0.5">
+                    {isSelfScope
+                        ? 'Xem và tìm kiếm biên bản các cuộc họp bạn tham gia hoặc chủ trì.'
+                        : 'Xem toàn bộ biên bản họp, ghi hình và ghi âm của công ty.'}
+                </p>
             </div>
 
             {/* ── Tabs ── */}
-            <div className="flex border-b border-platinum-tint gap-1">
-                {[
-                    { id: 'minutes', label: 'Biên bản họp', icon: FileText },
-                    { id: 'media',   label: 'Ghi hình & Âm thanh', icon: Film },
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all -mb-px ${
-                            activeTab === tab.id
-                                ? 'border-action-blue text-action-blue'
-                                : 'border-transparent text-slate-blue hover:text-midnight-indigo'
-                        }`}
-                    >
-                        <tab.icon className="w-4 h-4" />
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            {!isSelfScope && (
+                <div className="flex border-b border-platinum-tint gap-1">
+                    {[
+                        { id: 'minutes', label: 'Biên bản họp', icon: FileText },
+                        { id: 'media',   label: 'Ghi hình & Âm thanh', icon: Film },
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all -mb-px ${
+                                activeTab === tab.id
+                                    ? 'border-action-blue text-action-blue'
+                                    : 'border-transparent text-slate-blue hover:text-midnight-indigo'
+                            }`}
+                        >
+                            <tab.icon className="w-4 h-4" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <AnimatePresence mode="wait">
                 {/* ══════════════════════════════
@@ -471,14 +502,16 @@ const DocumentArchive = () => {
                                                                 Chi tiết
                                                             </button>
 
-                                                            {/* Xuất file */}
-                                                            <button
-                                                                onClick={() => setExportModalId(min.id)}
-                                                                title="Xuất file biên bản"
-                                                                className="p-1.5 text-slate-blue hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
-                                                            >
-                                                                <Download className="w-3.5 h-3.5" />
-                                                            </button>
+                                                            {/* Xuất file — chỉ Host/người soạn thảo/Admin */}
+                                                            {canExportMinutesItem(min, currentUser, isAdmin) && (
+                                                                <button
+                                                                    onClick={() => setExportModalId(min.id)}
+                                                                    title="Xuất file biên bản"
+                                                                    className="p-1.5 text-slate-blue hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                                >
+                                                                    <Download className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -960,13 +993,15 @@ const DocumentArchive = () => {
 
                         {/* Modal footer */}
                         <div className="flex items-center justify-end p-4 border-t border-platinum-tint bg-cloud-mist/10 shrink-0 gap-2">
-                            <button
-                                onClick={() => setExportModalId(detailItem.id)}
-                                className="px-3 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist flex items-center gap-1.5"
-                            >
-                                <Download className="w-3.5 h-3.5" />
-                                Xuất file
-                            </button>
+                            {canExportMinutesItem(detailItem, currentUser, isAdmin) && (
+                                <button
+                                    onClick={() => setExportModalId(detailItem.id)}
+                                    className="px-3 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist flex items-center gap-1.5"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Xuất file
+                                </button>
+                            )}
                             <button
                                 onClick={() => setDetailItem(null)}
                                 className="px-4 py-2 border border-platinum-tint bg-white text-slate-blue rounded-xl text-xs font-bold hover:bg-cloud-mist"

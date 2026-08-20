@@ -2,12 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
     RiHome4Line,
-    RiSettings3Line, RiShieldLine, RiFileListLine, RiSettings2Line,
-    RiCpuLine, RiHardDriveLine, RiComputerLine, RiMapLine, RiDoorOpenLine,
+    RiSettings3Line, RiShieldLine, RiSettings2Line,
+    RiCpuLine, RiHardDriveLine, RiMapLine,
     RiLoginBoxLine, RiCameraLine, RiCarLine, RiMapPinLine,
-    RiAlertLine, RiEqualizerLine,
-    RiCalendarLine, RiBuilding2Line, RiFileTextLine,
-    RiBarChart2Line, RiPieChart2Line, RiTimerLine, RiMenuLine, RiGroupLine
+    RiAlertLine, RiEqualizerLine, RiShieldUserLine,
+    RiFileTextLine, RiMenuLine
 } from 'react-icons/ri';
 
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -30,7 +29,6 @@ const STATIC_NAVIGATION_ITEMS = [
         icon: RiSettings3Line,
         children: [
             { label: 'Vai trò & Phân quyền',  to: '/system-admin/roles-permissions', icon: RiShieldLine },
-            { label: 'Nhật ký kiểm toán',     to: '/system-admin/audit-logs',         icon: RiFileListLine },
             { label: 'Cấu hình hệ thống',     to: '/system-admin/settings',           icon: RiSettings2Line },
         ],
     },
@@ -40,34 +38,21 @@ const STATIC_NAVIGATION_ITEMS = [
         icon: RiCpuLine,
         children: [
             { label: 'Thiết bị IoT',                  to: '/system-admin/devices',              icon: RiHardDriveLine },
-            { label: 'Trang thiết bị',                to: '/system-admin/equipments',           icon: RiComputerLine },
             { label: 'Khu vực giám sát',              to: '/system-admin/zones',                icon: RiMapLine },
-            { label: 'Phòng họp',                     to: '/system-admin/rooms',                icon: RiDoorOpenLine },
             { label: 'Nhật ký ra/vào phòng',          to: '/system-admin/room-access-logs',     icon: RiLoginBoxLine },
+        ],
+    },
+    {
+        label: 'An ninh',
+        isDropdown: true,
+        icon: RiShieldUserLine,
+        children: [
             { label: 'Kiểm soát ra vào cổng',         to: '/system-admin/anpr-management',      icon: RiCameraLine },
             { label: 'Danh sách biển số giám sát',    to: '/system-admin/vehicle-control-list', icon: RiCarLine },
             { label: 'Đăng ký phương tiện',           to: '/system-admin/vehicle-registrations',icon: RiFileTextLine },
             { label: 'Hành trình khuôn viên',         to: '/system-admin/user-journey',         icon: RiMapPinLine },
             { label: 'Cảnh báo an ninh',              to: '/system-admin/security-alerts',      icon: RiAlertLine },
             { label: 'Quy tắc cảnh báo',              to: '/system-admin/alert-rules',          icon: RiEqualizerLine },
-        ],
-    },
-    {
-        label: 'Cuộc họp',
-        isDropdown: true,
-        icon: RiCalendarLine,
-        children: [
-            { label: 'Vận hành phòng họp', to: '/system-admin/room-operations', icon: RiBuilding2Line },
-        ],
-    },
-    {
-        label: 'Báo cáo',
-        isDropdown: true,
-        icon: RiBarChart2Line,
-        children: [
-            { label: 'Hiệu suất phòng họp', to: '/system-admin/room-analytics',        icon: RiPieChart2Line },
-            { label: 'Tỷ lệ đúng giờ',      to: '/system-admin/attendance-analytics',  icon: RiTimerLine },
-            { label: 'Chuyên cần phòng ban', to: '/system-admin/meeting-attendance',   icon: RiGroupLine },
         ],
     },
 ];
@@ -113,10 +98,6 @@ const SystemAdminLayout = () => {
         navigate('/system-admin/profile');
     }, [navigate]);
 
-    const handleMyVehicles = useCallback(() => {
-        navigate('/system-admin/my-vehicles');
-    }, [navigate]);
-
     const handleChangePassword = useCallback(() => {
         setIsChangePasswordOpen(true);
     }, []);
@@ -137,7 +118,6 @@ const SystemAdminLayout = () => {
                 currentUser={currentUser}
                 displayName={displayName}
                 onProfile={handleProfile}
-                onMyVehicles={handleMyVehicles}
                 onChangePassword={handleChangePassword}
                 onLogout={handleLogout}
             />

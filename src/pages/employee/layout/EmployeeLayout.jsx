@@ -1,4 +1,4 @@
-import { Calendar, ChevronDown, FileText, Home, PlusCircle, Menu, X, MapPin, FileCheck } from 'lucide-react';
+import { Calendar, ChevronDown, FileText, Home, PlusCircle, Menu, X, MapPin, Archive, Monitor } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -42,10 +42,9 @@ const STATIC_NAVIGATION_ITEMS = [
                 icon: PlusCircle
             },
             {
-                label: 'Phê duyệt cuộc họp',
-                to: '/employee/meeting-approvals',
-                icon: FileCheck,
-                requiredPermission: 'meeting_request.read'
+                label: 'Kho biên bản',
+                to: '/employee/minutes',
+                icon: Archive
             }
         ]
     },
@@ -53,6 +52,11 @@ const STATIC_NAVIGATION_ITEMS = [
         label: 'Tài liệu họp',
         to: '/employee/recordings',
         icon: FileText
+    },
+    {
+        label: 'Thiết bị',
+        to: '/employee/equipments',
+        icon: Monitor
     },
     {
         label: 'Hành trình',

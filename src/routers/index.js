@@ -18,19 +18,15 @@ import DeviceManagement from '../pages/systemAdmin/DeviceManagement';
 import EquipmentManagement from '../pages/systemAdmin/EquipmentManagement';
 import ZoneManagement from '../pages/systemAdmin/ZoneManagement';
 import RolePermissionManagement from '../pages/systemAdmin/RolePermissionManagement';
-import AuditLogs from '../pages/systemAdmin/AuditLogs';
 import SystemSettings from '../pages/systemAdmin/SystemSettings';
 import Profile from '../pages/shared/Profile';
 import Notifications from '../pages/systemAdmin/Notifications';
 import ANPRManagement from '../pages/bussinessAdmin/ANPRManagement'; // SystemAdmin can also use this
-import GateAccessManagement from '../pages/systemAdmin/GateAccessManagement';
 import MyVehicles from '../pages/shared/MyVehicles';
 import SecurityAlerts from '../pages/systemAdmin/SecurityAlerts';
 import AlertRules from '../pages/systemAdmin/AlertRules';
-import PersonControlList from '../pages/systemAdmin/PersonControlList';
 import VehicleControlList from '../pages/systemAdmin/VehicleControlList';
 import VehicleRegistrations from '../pages/systemAdmin/VehicleRegistrations';
-import RoomOperations from '../pages/systemAdmin/RoomOperations';
 import RoomAccessLogs from '../pages/systemAdmin/RoomAccessLogs';
 import UserJourney from '../pages/shared/UserJourney';
 // BusinessAdmin Layout + Pages
@@ -38,15 +34,12 @@ import BusinessAdminLayout from '../pages/bussinessAdmin/layout/BusinessAdminLay
 import BusinessDashboard from '../pages/bussinessAdmin/dashBoard';
 import BusinessUserManagement from '../pages/bussinessAdmin/UserManagement';
 import BusinessDepartmentManagement from '../pages/bussinessAdmin/DepartmentManagement';
-import BusinessMeetingManagement from '../pages/bussinessAdmin/MeetingManagement';
 import BusinessRoomManagement from '../pages/bussinessAdmin/RoomManagement';
-import BusinessRecordingManagement from '../pages/bussinessAdmin/RecordingManagement';
+import AuditLogs from '../pages/bussinessAdmin/AuditLogs';
 
 // Manager Layout + Pages
 import ManagerLayout from '../pages/manager/layout/ManagerLayout';
 import ManagerHomePage from '../pages/manager/homePage';
-import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
-import ManagerMeetingDetail from '../pages/manager/MeetingDetail';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
 import ManagerMeetingAttendance from '../pages/manager/MeetingAttendance';
 import BiometricSubmissionsReview from '../pages/bussinessAdmin/BiometricSubmissionsReview';
@@ -115,20 +108,12 @@ export const router = [
                 element: <DeviceManagement />
             },
             {
-                path: 'equipments',
-                element: <EquipmentManagement />
-            },
-            {
                 path: 'zones',
                 element: <ZoneManagement />
             },
             {
                 path: 'roles-permissions',
                 element: <RolePermissionManagement />
-            },
-            {
-                path: 'audit-logs',
-                element: <AuditLogs />
             },
             {
                 path: 'settings',
@@ -151,18 +136,6 @@ export const router = [
                 element: <AlertRules />
             },
             {
-                path: 'person-control-list',
-                element: <PersonControlList />
-            },
-            {
-                path: 'my-vehicles',
-                element: <MyVehicles />
-            },
-            {
-                path: 'rooms',
-                element: <BusinessRoomManagement />
-            },
-            {
                 path: 'anpr-management',
                 element: <ANPRManagement />
             },
@@ -175,41 +148,12 @@ export const router = [
                 element: <VehicleRegistrations />
             },
             {
-                path: 'room-operations',
-                element: <RoomOperations />
-            },
-            {
                 path: 'room-access-logs',
                 element: <RoomAccessLogs />
             },
             {
-                path: 'gate-access',
-                element: <GateAccessManagement />
-            },
-            {
                 path: 'user-journey',
                 element: <UserJourney />
-            },
-
-            {
-                path: 'meeting/:id',
-                element: <EmployeeMeetingDetail />
-            },
-            {
-                path: 'in-meeting/:id',
-                element: <InMeetingRoom />
-            },
-            {
-                path: 'room-analytics',
-                element: <RoomUsageAnalytics />
-            },
-            {
-                path: 'attendance-analytics',
-                element: <EmployeeOnTimeAnalytics />
-            },
-            {
-                path: 'meeting-attendance',
-                element: <MeetingAttendanceAdmin />
             },
             {
                 path: 'legal',
@@ -239,25 +183,21 @@ export const router = [
                 path: 'departments',
                 element: <BusinessDepartmentManagement />
             },
-            // {
-            //     path: 'meetings',
-            //     element: <BusinessMeetingManagement />
-            // },
             {
                 path: 'rooms',
                 element: <BusinessRoomManagement />
             },
             {
-                path: 'recordings',
-                element: <BusinessRecordingManagement />
-            },
-            {
-                path: 'documents',
-                element: <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"/></div>}><DocumentArchive /></Suspense>
+                path: 'equipments',
+                element: <EquipmentManagement />
             },
             {
                 path: 'biometric-submissions',
                 element: <BiometricSubmissionsReview />
+            },
+            {
+                path: 'audit-logs',
+                element: <AuditLogs />
             },
             {
                 path: 'profile',
@@ -267,16 +207,6 @@ export const router = [
                 path: 'notifications',
                 element: <Notifications />
             },
-            {
-                path: 'security-alerts',
-                element: <SecurityAlerts />
-            },
-            {
-                path: 'my-vehicles',
-                element: <MyVehicles />
-            },
-
-
             {
                 path: 'meeting/:id',
                 element: <EmployeeMeetingDetail />
@@ -322,20 +252,8 @@ export const router = [
                 element: <BookMeeting />
             },
             {
-                path: 'schedule',
-                element: (
-                    <ProtectedRoute requiredPermission="schedule.read.self">
-                        <PersonalCalendar />
-                    </ProtectedRoute>
-                )
-            },
-            {
                 path: 'profile',
                 element: <Profile />
-            },
-            {
-                path: 'face-register',
-                element: <ManagerFaceRegistration />
             },
             {
                 path: 'meeting-approvals',
@@ -346,28 +264,16 @@ export const router = [
                 element: <ManagerMeetingAttendance />
             },
             {
-                path: 'meeting/:id',
-                element: <ManagerMeetingDetail />
-            },
-            {
-                path: 'in-meeting/:id',
-                element: <InMeetingRoom />
-            },
-            {
                 path: 'notifications',
                 element: <Notifications />
             },
             {
-                path: 'my-vehicles',
-                element: <MyVehicles />
-            },
-            {
-                path: 'user-journey',
-                element: <UserJourney />
-            },
-            {
                 path: 'attendance-analytics',
                 element: <EmployeeOnTimeAnalytics />
+            },
+            {
+                path: 'my-vehicles',
+                element: <MyVehicles />
             },
             {
                 path: 'legal',
@@ -426,8 +332,16 @@ export const router = [
                 element: <EmployeeRecordings />
             },
             {
-                path: 'meeting-approvals',
-                element: <ManagerMeetingApprovals />
+                path: 'rooms',
+                element: <BusinessRoomManagement readOnly />
+            },
+            {
+                path: 'equipments',
+                element: <EquipmentManagement mode="report" />
+            },
+            {
+                path: 'minutes',
+                element: <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"/></div>}><DocumentArchive scope="self" /></Suspense>
             },
             {
                 path: 'user-journey',

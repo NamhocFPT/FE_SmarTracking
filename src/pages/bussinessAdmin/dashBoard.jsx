@@ -5,7 +5,6 @@ import {
     TrendingUp, Users, Wifi, WifiOff,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     BarChart, Bar, Legend, PieChart, Pie, Cell, Sector,
@@ -697,9 +696,6 @@ const DashBoard = () => {
                                     <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Cảnh báo an ninh gần đây</h3>
                                     <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>5 sự kiện chưa xử lý mới nhất</p>
                                 </div>
-                                <Link to="/business-admin/security-alerts" style={{ fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none', padding: '6px 14px', background: `${D.blue}10`, border: `1px solid ${D.blue}28`, borderRadius: 8 }}>
-                                    Xem tất cả →
-                                </Link>
                             </div>
                             {campusLoading ? (
                                 <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="animate-pulse h-14 rounded-xl" style={{ background: D.borderSub }} />)}</div>
@@ -1013,9 +1009,6 @@ const DashBoard = () => {
                                         <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Danh sách xe cần chú ý</h3>
                                         <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>Blocklist đang hiệu lực</p>
                                     </div>
-                                    <Link to="/business-admin/anpr-management" style={{ fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none', padding: '6px 14px', background: `${D.blue}10`, border: `1px solid ${D.blue}28`, borderRadius: 8 }}>
-                                        Xem tất cả →
-                                    </Link>
                                 </div>
                                 {campusLoading ? (
                                     <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="animate-pulse h-12 rounded-xl" style={{ background: D.borderSub }} />)}</div>
@@ -1043,9 +1036,6 @@ const DashBoard = () => {
                                         <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text }}>Lịch sử ra vào gần đây</h3>
                                         <p style={{ fontSize: 12, color: D.muted, marginTop: 3 }}>Hôm nay · Tất cả cổng</p>
                                     </div>
-                                    <Link to="/business-admin/gate-access" style={{ fontSize: 12, fontWeight: 600, color: D.blue, textDecoration: 'none', padding: '6px 14px', background: `${D.blue}10`, border: `1px solid ${D.blue}28`, borderRadius: 8 }}>
-                                        Xem tất cả →
-                                    </Link>
                                 </div>
                                 {campusLoading ? (
                                     <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="animate-pulse h-12 rounded-xl" style={{ background: D.borderSub }} />)}</div>

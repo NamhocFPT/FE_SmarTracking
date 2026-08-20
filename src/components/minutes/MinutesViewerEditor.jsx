@@ -172,6 +172,10 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
     const canEdit = (isHost || minutes.permissions?.canEdit) && minutes.status === 'draft';
     const canIssue = (isHost || minutes.permissions?.canIssue) && minutes.status === 'draft';
     const canDelete = isHost || isOwner || isAdmin || minutes.permissions?.canDelete;
+    // Xuất file: chỉ Host / người soạn thảo (preparedBy) / Admin — khớp ownership-or-admin
+    // rule ở BE (MinutesExportService.createExportJob, UC-147). Participant thường KHÔNG
+    // được export dù biên bản đã published (quyết định PO, xem spec feat-export-meeting-minutes).
+    const canExport = isHost || isOwner || isAdmin;
 
     const getConfidenceBadge = (confidence) => {
         switch (confidence) {
@@ -305,12 +309,14 @@ const MinutesViewerEditor = ({ minutes, meetingId, isHost, onRefresh }) => {
                                             {distributing ? 'Đang gửi...' : 'Gửi thông báo'}
                                         </button>
                                     )}
-                                    <button
-                                        onClick={() => setShowExportModal(true)}
-                                        className="px-3 py-1.5 bg-action-blue text-white rounded-xl text-xs font-bold hover:bg-glacier-blue transition-colors flex items-center gap-1.5 shadow-sm"
-                                    >
-                                        <Download className="w-3.5 h-3.5" /> Xuất file
-                                    </button>
+                                    {canExport && (
+                                        <button
+                                            onClick={() => setShowExportModal(true)}
+                                            className="px-3 py-1.5 bg-action-blue text-white rounded-xl text-xs font-bold hover:bg-glacier-blue transition-colors flex items-center gap-1.5 shadow-sm"
+                                        >
+                                            <Download className="w-3.5 h-3.5" /> Xuất file
+                                        </button>
+                                    )}
                                 </>
                             )}
                         </>

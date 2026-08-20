@@ -46,3 +46,17 @@ export const subscribeToMeeting = (meetingId) => {
     s.emit('meeting:unsubscribe', { meetingId });
   };
 };
+
+// Dùng ở /manager/meeting-approvals — nhận `meeting_request.updated` realtime
+// khi có yêu cầu mới/được duyệt/từ chối/hết hạn, thay vì phải bấm "Tải lại".
+// BE chỉ cho join room user:{userId} của chính người gọi (bỏ qua mọi userId
+// truyền lên) và yêu cầu quyền meeting_request.read — xem EventsGateway#handleUserSubscribe.
+export const subscribeToMeetingRequestUpdates = (onUpdate) => {
+  const s = getSocket();
+  s.emit('user:subscribe');
+  s.on('meeting_request.updated', onUpdate);
+  return () => {
+    s.off('meeting_request.updated', onUpdate);
+    s.emit('user:unsubscribe');
+  };
+};

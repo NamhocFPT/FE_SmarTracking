@@ -6,7 +6,8 @@ import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, 
 import { getRooms } from '../../service/businessAdminServices';
 
 
-const EquipmentManagement = () => {
+const EquipmentManagement = ({ mode = 'full' }) => {
+    const isReportOnly = mode === 'report';
     // Data states
     const [equipmentList, setEquipmentList] = useState([]);
     const [rooms, setRooms] = useState([]);
@@ -276,13 +277,15 @@ const EquipmentManagement = () => {
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý Trang thiết bị</h1>
                     <p className="text-sm text-slate-blue mt-1">Quản lý danh sách, điều phối phòng và theo dõi tình trạng thiết bị.</p>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="inline-flex items-center px-4 py-2.5 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Thêm thiết bị
-                </button>
+                {!isReportOnly && (
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="inline-flex items-center px-4 py-2.5 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm thiết bị
+                    </button>
+                )}
             </div>
 
             {error && (
@@ -424,13 +427,15 @@ const EquipmentManagement = () => {
                                             )}
                                         </td>
                                         <td className="p-4 text-right">
-                                            <button
-                                                onClick={() => { setSelectedEquipment(eq); setAssignForm({ roomId: eq.currentRoomId || '', assignmentNote: '' }); setIsAssignModalOpen(true); }}
-                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors mr-1"
-                                                title="Gán vào phòng"
-                                            >
-                                                <MapPin className="w-4 h-4" />
-                                            </button>
+                                            {!isReportOnly && (
+                                                <button
+                                                    onClick={() => { setSelectedEquipment(eq); setAssignForm({ roomId: eq.currentRoomId || '', assignmentNote: '' }); setIsAssignModalOpen(true); }}
+                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors mr-1"
+                                                    title="Gán vào phòng"
+                                                >
+                                                    <MapPin className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => { setSelectedEquipment(eq); setIsFaultModalOpen(true); }}
                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-orange-500 hover:bg-orange-50 transition-colors mr-1"
@@ -438,7 +443,7 @@ const EquipmentManagement = () => {
                                             >
                                                 <Wrench className="w-4 h-4" />
                                             </button>
-                                            {eq.healthStatus !== 'healthy' && (
+                                            {!isReportOnly && eq.healthStatus !== 'healthy' && (
                                                 <>
                                                     <button
                                                         onClick={() => {
@@ -464,13 +469,15 @@ const EquipmentManagement = () => {
                                                     </button>
                                                 </>
                                             )}
-                                            <button
-                                                onClick={() => handleDeleteClick(eq)}
-                                                className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                title="Xoá thiết bị"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {!isReportOnly && (
+                                                <button
+                                                    onClick={() => handleDeleteClick(eq)}
+                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                    title="Xoá thiết bị"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                     );
