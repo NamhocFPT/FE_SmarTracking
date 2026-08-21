@@ -1,5 +1,5 @@
-import { AlertTriangle, Calendar, CheckCircle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Info, LayoutGrid, List, RefreshCw, Search, Users, X, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { AlertTriangle, Calendar, CheckCircle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, FileText, Info, LayoutGrid, List, MapPin, RefreshCw, Search, UserX, Users, X, XCircle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,18 +26,291 @@ const itemVariants = {
 };
 
 /**
+ * Mức độ xung đột PHÒNG (không tính xung đột người — xem
+ * getParticipantConflictInfo, hiển thị bằng badge riêng).
+ *
  * 'conflict'  — trùng với booking đã APPROVED/ACTIVE (đỏ, nghiêm trọng: nếu duyệt
  *               sẽ bị BE chặn ROOM_CONFLICT).
  * 'pending'   — trùng với 1 request PENDING khác (vàng/cam, chỉ cảnh báo mềm:
  *               Manager là người chọn duyệt cái nào, duyệt vẫn được).
- * 'none'      — không phát hiện trùng gì.
+ * 'none'      — không phát hiện trùng phòng.
+ *
+ * MKM-PCONF-01: trước đây `conflictCheckStatus === 'warning'` (= trùng NGƯỜI,
+ * ghi lúc create()) cũng bị tính là 'conflict' nên card hiện badge đỏ "Bị trùng
+ * lịch" y hệt trùng phòng — sai mức độ nghiêm trọng vì trùng người KHÔNG chặn
+ * duyệt. 'blocked' thì vẫn giữ (đó là cờ trùng phòng ghi lúc approve()).
  */
 const getRoomConflictLevel = (req) => {
     const hasRoomConflict = req.conflictDetails && req.conflictDetails.length > 0;
-    const hasLegacyWarning = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
-    if (hasRoomConflict || hasLegacyWarning) return 'conflict';
+    if (hasRoomConflict || req.conflictCheckStatus === 'blocked') return 'conflict';
     if (req.pendingConflictDetails && req.pendingConflictDetails.length > 0) return 'pending';
     return 'none';
+};
+
+/**
+ * MKM-PCONF-01 (2026-08-22) — xung đột NGƯỜI THAM DỰ.
+ *
+ * Khác xung đột PHÒNG (đỏ, BE chặn approve bằng ROOM_CONFLICT), xung đột
+ * người CHỈ là cảnh báo mềm: Manager được phép duyệt CẢ HAI cuộc họp, người
+ * tham dự tự sắp xếp. Vì vậy màn chi tiết phải đưa đủ dữ liệu để Manager tự
+ * quyết (trùng với cuộc họp nào, ai trùng, có bắt buộc không) thay vì chỉ một
+ * câu "trùng lịch với một hoặc nhiều người tham dự bắt buộc" như trước.
+ *
+ * `participantConflictDetails` là check TƯƠI từ BE. `conflictCheckStatus ===
+ * 'warning'` là cờ cũ ghi lúc create() — giữ lại làm fallback để request tạo
+ * trước khi có API mới vẫn hiện cảnh báo (dù không liệt kê được ai).
+ */
+const MEETING_STATUS_LABELS = {
+    draft: 'Nháp',
+    pending_approval: 'Chờ duyệt',
+    scheduled: 'Đã lên lịch',
+    in_progress: 'Đang diễn ra',
+};
+
+const fmtTime = (v) => (v ? new Date(v).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--');
+const fmtDate = (v) => (v ? new Date(v).toLocaleDateString('vi-VN') : '');
+
+const getInitials = (name) => (name || '?')
+    .trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
+const getParticipantConflictInfo = (req) => {
+    const details = Array.isArray(req?.participantConflictDetails) ? req.participantConflictDetails : [];
+    // Cờ cũ: có trùng người nhưng BE chưa trả chi tiết (request tạo trước API mới).
+    const legacyOnly = details.length === 0 && req?.conflictCheckStatus === 'warning';
+    const summary = req?.participantConflictSummary || {
+        conflictedUserCount: 0,
+        requiredUserCount: 0,
+        meetingCount: details.length,
+    };
+    return {
+        details,
+        summary,
+        legacyOnly,
+        hasConflict: details.length > 0 || legacyOnly,
+    };
+};
+
+/** Thẻ mô tả 1 cuộc họp đang chiếm người — dùng chung modal chi tiết & modal duyệt. */
+const ConflictMeetingCard = ({ meeting, compact = false }) => (
+    <div className={`bg-white/70 rounded-lg border border-amber-200 ${compact ? 'px-2.5 py-2' : 'px-3 py-2.5'}`}>
+        <div className="flex items-start justify-between gap-2">
+            <span className="font-bold text-midnight-indigo text-xs leading-snug">
+                {meeting.meetingTitle || 'Cuộc họp khác'}
+            </span>
+            <span className="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+                {MEETING_STATUS_LABELS[meeting.meetingStatus] || meeting.meetingStatus || 'Khác'}
+            </span>
+        </div>
+        {meeting.meetingCode && (
+            <span className="block mt-0.5 text-[9.5px] font-mono font-bold text-amber-700/80">#{meeting.meetingCode}</span>
+        )}
+        <div className={`mt-1.5 grid ${compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'} gap-x-3 gap-y-1 text-[10.5px] text-amber-900/90`}>
+            <span className="inline-flex items-center gap-1.5">
+                <Clock className="w-3 h-3 shrink-0 opacity-70" />
+                {fmtDate(meeting.startTime)} · {fmtTime(meeting.startTime)} - {fmtTime(meeting.endTime)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+                <MapPin className="w-3 h-3 shrink-0 opacity-70" />
+                {meeting.roomName || 'Chưa gán phòng'}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+                <Users className="w-3 h-3 shrink-0 opacity-70" />
+                Chủ trì: {meeting.hostName || 'Không rõ'}
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-bold">
+                <UserX className="w-3 h-3 shrink-0 opacity-70" />
+                {meeting.participants?.length || 0} người bị trùng
+            </span>
+        </div>
+    </div>
+);
+
+/**
+ * Panel cảnh báo trùng người ở modal Chi tiết yêu cầu.
+ * Chỉ DANH SÁCH NGƯỜI có thanh cuộn riêng (max-h) — modal chi tiết không bị
+ * dài thêm khi cuộc họp có hàng chục người trùng.
+ */
+const ParticipantConflictPanel = ({ info }) => {
+    const { details, summary, legacyOnly } = info;
+    const [meetingFilter, setMeetingFilter] = useState('all');
+    const [query, setQuery] = useState('');
+    const [requiredOnly, setRequiredOnly] = useState(false);
+
+    // 1 dòng / (người × cuộc họp gây trùng) — 1 người bận ở 2 cuộc họp khác
+    // nhau thì hiện 2 dòng, mỗi dòng nói rõ đang bận ở đâu.
+    const rows = useMemo(
+        () => details.flatMap((m) => (m.participants || []).map((p) => ({ ...p, meeting: m }))),
+        [details],
+    );
+
+    const filteredRows = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return rows.filter((r) => {
+            if (meetingFilter !== 'all' && r.meeting.meetingId !== meetingFilter) return false;
+            if (requiredOnly && !r.isRequired) return false;
+            if (!q) return true;
+            return [r.fullName, r.email, r.employeeCode, r.departmentName]
+                .filter(Boolean)
+                .some((v) => String(v).toLowerCase().includes(q));
+        });
+    }, [rows, query, meetingFilter, requiredOnly]);
+
+    if (legacyOnly) {
+        return (
+            <div className="p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-800 flex gap-3">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600" />
+                <div className="text-xs space-y-1">
+                    <p className="font-bold">Cảnh báo trùng lịch người tham dự</p>
+                    <p className="leading-relaxed opacity-90">
+                        Khung giờ này trùng lịch với một hoặc nhiều người tham dự. Yêu cầu được tạo trước khi hệ thống
+                        lưu chi tiết nên không liệt kê được danh sách — bạn vẫn có thể duyệt bình thường.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 space-y-3">
+            <div className="flex gap-3">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600" />
+                <div className="text-xs space-y-1 flex-1">
+                    <p className="font-bold">Cảnh báo trùng lịch người tham dự</p>
+                    <p className="opacity-90 leading-relaxed">
+                        <strong>{summary.conflictedUserCount}</strong> người tham dự của cuộc họp này đang bận ở{' '}
+                        <strong>{summary.meetingCount}</strong> cuộc họp khác trong khung giờ được yêu cầu
+                        {summary.requiredUserCount > 0 && (
+                            <> — trong đó <strong>{summary.requiredUserCount}</strong> người thuộc diện bắt buộc</>
+                        )}.
+                    </p>
+                    <p className="flex items-start gap-1.5 text-[11px] text-amber-800/90 bg-amber-100/60 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                        <Info className="w-3.5 h-3.5 shrink-0 mt-px" />
+                        <span>
+                            Đây chỉ là <strong>cảnh báo mềm</strong>, không chặn phê duyệt. Bạn vẫn có thể duyệt cả hai
+                            cuộc họp — người tham dự sẽ tự sắp xếp hoặc cử người thay.
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            {/* Thông tin đầy đủ của các cuộc họp gây trùng */}
+            <div className="space-y-1.5">
+                <h5 className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                    Cuộc họp gây trùng ({details.length})
+                </h5>
+                <div className="space-y-1.5">
+                    {details.map((m) => (
+                        <ConflictMeetingCard key={m.meetingId} meeting={m} />
+                    ))}
+                </div>
+            </div>
+
+            {/* Danh sách người — có filter + vùng cuộn RIÊNG */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h5 className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                        Người bị trùng lịch ({filteredRows.length}/{rows.length})
+                    </h5>
+                    <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-500" />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Lọc theo tên, email, mã NV, phòng ban..."
+                            className="w-56 pl-8 pr-2.5 py-1.5 rounded-lg border border-amber-200 bg-white/80 text-[11px] text-midnight-indigo placeholder:text-amber-500/70 focus:outline-none focus:border-amber-400"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => setMeetingFilter('all')}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${meetingFilter === 'all'
+                            ? 'bg-amber-600 text-white border-amber-600'
+                            : 'bg-white/70 text-amber-800 border-amber-200 hover:bg-amber-100'
+                            }`}
+                    >
+                        Tất cả ({rows.length})
+                    </button>
+                    {details.map((m) => (
+                        <button
+                            key={m.meetingId}
+                            type="button"
+                            onClick={() => setMeetingFilter(m.meetingId)}
+                            title={m.meetingTitle || 'Cuộc họp khác'}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border max-w-[14rem] truncate transition-colors ${meetingFilter === m.meetingId
+                                ? 'bg-amber-600 text-white border-amber-600'
+                                : 'bg-white/70 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                }`}
+                        >
+                            {m.meetingTitle || 'Cuộc họp khác'} ({m.participants?.length || 0})
+                        </button>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => setRequiredOnly((v) => !v)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${requiredOnly
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : 'bg-white/70 text-rose-700 border-rose-200 hover:bg-rose-50'
+                            }`}
+                    >
+                        Chỉ người bắt buộc
+                    </button>
+                </div>
+
+                {/* CHỈ vùng này cuộn — modal chi tiết giữ nguyên chiều cao */}
+                <div className="max-h-52 overflow-y-auto rounded-lg border border-amber-200 bg-white/60 divide-y divide-amber-100">
+                    {filteredRows.length === 0 ? (
+                        <p className="px-3 py-6 text-[11px] text-center text-amber-700/80">
+                            Không có người nào khớp bộ lọc.
+                        </p>
+                    ) : (
+                        filteredRows.map((r) => (
+                            <div key={`${r.meeting.meetingId}-${r.userId}`} className="flex items-start gap-2.5 px-3 py-2">
+                                <div className="w-7 h-7 shrink-0 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center text-[10px] font-extrabold text-amber-700 overflow-hidden">
+                                    {r.avatarUrl
+                                        ? <img src={r.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                        : getInitials(r.fullName)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[11.5px] font-bold text-midnight-indigo truncate">
+                                            {r.fullName || 'Không rõ tên'}
+                                        </span>
+                                        {r.isRequired && (
+                                            <span className="px-1.5 py-px rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                                                Bắt buộc
+                                            </span>
+                                        )}
+                                        {r.conflictingRole === 'host' && (
+                                            <span className="px-1.5 py-px rounded text-[9px] font-bold bg-blue-50 text-action-blue border border-blue-200">
+                                                Chủ trì bên kia
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-blue truncate">
+                                        {[r.employeeCode, r.departmentName, r.email].filter(Boolean).join(' · ') || '—'}
+                                    </p>
+                                    <p className="text-[10px] text-amber-700 truncate">
+                                        Bận ở: <strong>{r.meeting.meetingTitle || 'Cuộc họp khác'}</strong>{' '}
+                                        ({fmtTime(r.meeting.startTime)} - {fmtTime(r.meeting.endTime)}
+                                        {r.meeting.roomName ? ` · ${r.meeting.roomName}` : ''})
+                                    </p>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const MeetingApprovals = () => {
@@ -71,6 +344,9 @@ const MeetingApprovals = () => {
     const [decisionNote, setDecisionNote] = useState('');
     const [rejectionReason, setRejectionReason] = useState('');
     const [submittingAction, setSubmittingAction] = useState(false);
+    // MKM-PCONF-01: Manager phải tick chấp nhận trước khi duyệt 1 yêu cầu
+    // trùng lịch NGƯỜI (trùng phòng thì BE chặn thẳng, không cần tick).
+    const [conflictAcknowledged, setConflictAcknowledged] = useState(false);
 
     // Fetch meeting requests
     const fetchRequests = useCallback(async () => {
@@ -128,6 +404,11 @@ const MeetingApprovals = () => {
         });
         return unsubscribe;
     }, []);
+
+    // Mỗi lần mở/đổi yêu cầu trong modal duyệt phải tick lại từ đầu.
+    useEffect(() => {
+        setConflictAcknowledged(false);
+    }, [approvalModalOpen, selectedRequest?.id]);
 
     // Close toast messages
     useEffect(() => {
@@ -187,6 +468,7 @@ const MeetingApprovals = () => {
                 setApprovalModalOpen(false);
                 setDetailModalOpen(false);
                 setDecisionNote('');
+                setConflictAcknowledged(false);
                 setSelectedRequest(null);
                 fetchRequests();
             } else {
@@ -422,6 +704,7 @@ const MeetingApprovals = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-cloud-mist/10">
                             {requests.map(req => {
                                 const conflictLevel = getRoomConflictLevel(req);
+                                const participantInfo = getParticipantConflictInfo(req);
                                 return (
                                     <div key={req.id} className="bg-white border border-platinum-tint/60 hover:border-action-blue/40 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 h-full">
                                         {/* Header: Request Code & Status */}
@@ -503,9 +786,20 @@ const MeetingApprovals = () => {
                                                     <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200" title="Trùng với yêu cầu khác đang chờ duyệt">
                                                         <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Trùng yêu cầu chờ duyệt
                                                     </span>
-                                                ) : (
+                                                ) : participantInfo.hasConflict ? null : (
                                                     <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                                                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Không trùng
+                                                    </span>
+                                                )}
+                                                {/* MKM-PCONF-01: badge RIÊNG cho trùng người — 1 yêu cầu có thể
+                                                    vừa trùng phòng vừa trùng người, không được nuốt mất cái nào. */}
+                                                {participantInfo.hasConflict && (
+                                                    <span
+                                                        className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200"
+                                                        title="Có người tham dự bận ở cuộc họp khác — vẫn duyệt được"
+                                                    >
+                                                        <UserX className="w-3.5 h-3.5 text-amber-600" />
+                                                        Trùng người{participantInfo.summary.conflictedUserCount > 0 ? ` (${participantInfo.summary.conflictedUserCount})` : ''}
                                                     </span>
                                                 )}
                                             </div>
@@ -571,6 +865,7 @@ const MeetingApprovals = () => {
                             <tbody>
                                 {requests.map(req => {
                                     const conflictLevel = getRoomConflictLevel(req);
+                                    const participantInfo = getParticipantConflictInfo(req);
                                     return (
                                         <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/10 transition-colors">
                                             {/* Code */}
@@ -620,9 +915,18 @@ const MeetingApprovals = () => {
                                                         <AlertTriangle className="w-3 h-3 text-amber-600" />
                                                         Trùng yêu cầu chờ duyệt
                                                     </span>
-                                                ) : (
+                                                ) : participantInfo.hasConflict ? null : (
                                                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-250">
                                                         Không trùng
+                                                    </span>
+                                                )}
+                                                {participantInfo.hasConflict && (
+                                                    <span
+                                                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200"
+                                                        title="Có người tham dự bận ở cuộc họp khác — vẫn duyệt được"
+                                                    >
+                                                        <UserX className="w-3 h-3 text-amber-600" />
+                                                        Trùng người{participantInfo.summary.conflictedUserCount > 0 ? ` (${participantInfo.summary.conflictedUserCount})` : ''}
                                                     </span>
                                                 )}
                                             </td>
@@ -806,63 +1110,84 @@ const MeetingApprovals = () => {
                                         // luôn là 'clear' vì lần ghi duy nhất nằm trong transaction bị
                                         // rollback ở approve(). Dùng field sai sẽ khiến banner đỏ không bao
                                         // giờ hiện dù conflictDetails có dữ liệu thật.
+                                        //
+                                        // MKM-PCONF-01: 'warning' (= trùng NGƯỜI) KHÔNG còn kéo banner đỏ
+                                        // "trùng phòng" nữa — nó có panel vàng riêng bên dưới với đầy đủ
+                                        // cuộc họp + danh sách người.
                                         const hasRoomConflict = selectedRequest.conflictDetails && selectedRequest.conflictDetails.length > 0;
-                                        const hasLegacyWarning = selectedRequest.conflictCheckStatus === 'warning' || selectedRequest.conflictCheckStatus === 'blocked';
+                                        const hasBlockedFlag = selectedRequest.conflictCheckStatus === 'blocked';
                                         // Nhóm F (2026-08-16): trùng với request PENDING khác (không phải booking
                                         // đã duyệt) — chỉ cảnh báo mềm, KHÔNG dùng chung banner đỏ với
                                         // hasRoomConflict để Manager không nhầm mức độ nghiêm trọng (duyệt vẫn
                                         // được, không bị BE chặn như trường hợp trùng booking đã APPROVED/ACTIVE).
-                                        const hasPendingConflict = !hasRoomConflict && !hasLegacyWarning && selectedRequest.pendingConflictDetails && selectedRequest.pendingConflictDetails.length > 0;
-                                        const showAlert = hasRoomConflict || hasLegacyWarning;
+                                        const hasPendingConflict = !hasRoomConflict && !hasBlockedFlag && selectedRequest.pendingConflictDetails && selectedRequest.pendingConflictDetails.length > 0;
+                                        const showAlert = hasRoomConflict || hasBlockedFlag;
+                                        const participantInfo = getParticipantConflictInfo(selectedRequest);
                                         return (
-                                            <div className={`p-4 rounded-xl border flex gap-3 ${showAlert
-                                                ? 'bg-rose-50 border-rose-200 text-rose-800'
-                                                : hasPendingConflict
-                                                    ? 'bg-amber-50 border-amber-200 text-amber-800'
-                                                    : 'bg-emerald-50 border-emerald-250 text-emerald-800'
-                                                }`}>
-                                                <AlertTriangle className={`w-5 h-5 shrink-0 ${showAlert ? 'text-red-600 animate-pulse' : hasPendingConflict ? 'text-amber-600' : 'text-emerald-600'
-                                                    }`} />
-                                                <div className="text-xs space-y-2 flex-1">
-                                                    <p className="font-bold">
-                                                        {showAlert ? 'Cảnh báo trùng lịch phòng họp!' : hasPendingConflict ? 'Trùng với yêu cầu khác đang chờ duyệt' : 'Phòng họp trống trong khung giờ này'}
-                                                    </p>
-                                                    {hasRoomConflict ? (
-                                                        <div className="space-y-1.5">
-                                                            <p className="opacity-90">Khung giờ này đã trùng với {selectedRequest.conflictDetails.length} cuộc họp khác đã được duyệt tại cùng phòng:</p>
-                                                            <ul className="space-y-1">
-                                                                {selectedRequest.conflictDetails.map((c, idx) => (
-                                                                    <li key={c.bookingId || idx} className="bg-white/60 rounded-lg px-2.5 py-1.5 border border-rose-100">
-                                                                        <span className="font-semibold">{c.meetingTitle || 'Cuộc họp khác'}</span>
-                                                                        {' — '}{c.roomName || 'phòng đã chọn'}
-                                                                        {' · '}{new Date(c.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}-{new Date(c.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                                                                        {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                            <p className="opacity-80 italic">Vui lòng cân nhắc từ chối yêu cầu này hoặc yêu cầu khác cho phù hợp.</p>
-                                                        </div>
-                                                    ) : hasLegacyWarning ? (
-                                                        <p className="leading-relaxed opacity-90">Khung giờ này trùng lịch với một hoặc nhiều người tham dự bắt buộc. Vui lòng cân nhắc trước khi duyệt.</p>
-                                                    ) : hasPendingConflict ? (
-                                                        <div className="space-y-1.5">
-                                                            <p className="opacity-90">Khung giờ này đang trùng với {selectedRequest.pendingConflictDetails.length} yêu cầu khác cũng đang chờ duyệt tại cùng phòng — chưa có booking nào được duyệt nên hệ thống KHÔNG chặn bạn duyệt, nhưng chỉ 1 trong các yêu cầu này nên được giữ phòng:</p>
-                                                            <ul className="space-y-1">
-                                                                {selectedRequest.pendingConflictDetails.map((c, idx) => (
-                                                                    <li key={c.bookingId || idx} className="bg-white/60 rounded-lg px-2.5 py-1.5 border border-amber-100">
-                                                                        <span className="font-semibold">{c.meetingTitle || 'Cuộc họp khác'}</span>
-                                                                        {' — '}{c.roomName || 'phòng đã chọn'}
-                                                                        {' · '}{new Date(c.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}-{new Date(c.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                                                                        {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                            <p className="opacity-80 italic">Nếu bạn duyệt yêu cầu này, các yêu cầu PENDING trùng giờ ở trên sẽ không tự động bị từ chối — khi có người duyệt tiếp yêu cầu đó, hệ thống sẽ báo lỗi trùng phòng (ROOM_CONFLICT) và cần từ chối thủ công.</p>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="leading-relaxed opacity-90">Không phát hiện bất kì lịch họp trùng nào cho phòng họp này trong khung giờ được yêu cầu.</p>
-                                                    )}
+                                            <div className="space-y-3">
+                                                <div className={`p-4 rounded-xl border flex gap-3 ${showAlert
+                                                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                                                    : hasPendingConflict
+                                                        ? 'bg-amber-50 border-amber-200 text-amber-800'
+                                                        : 'bg-emerald-50 border-emerald-250 text-emerald-800'
+                                                    }`}>
+                                                    <AlertTriangle className={`w-5 h-5 shrink-0 ${showAlert ? 'text-red-600 animate-pulse' : hasPendingConflict ? 'text-amber-600' : 'text-emerald-600'
+                                                        }`} />
+                                                    <div className="text-xs space-y-2 flex-1">
+                                                        <p className="font-bold">
+                                                            {showAlert ? 'Cảnh báo trùng lịch phòng họp!' : hasPendingConflict ? 'Trùng với yêu cầu khác đang chờ duyệt' : 'Phòng họp trống trong khung giờ này'}
+                                                        </p>
+                                                        {hasRoomConflict ? (
+                                                            <div className="space-y-1.5">
+                                                                <p className="opacity-90">Khung giờ này đã trùng với {selectedRequest.conflictDetails.length} cuộc họp khác đã được duyệt tại cùng phòng:</p>
+                                                                <ul className="space-y-1">
+                                                                    {selectedRequest.conflictDetails.map((c, idx) => (
+                                                                        <li key={c.bookingId || idx} className="bg-white/60 rounded-lg px-2.5 py-1.5 border border-rose-100">
+                                                                            <span className="font-semibold">{c.meetingTitle || 'Cuộc họp khác'}</span>
+                                                                            {' — '}{c.roomName || 'phòng đã chọn'}
+                                                                            {' · '}{fmtTime(c.startTime)}-{fmtTime(c.endTime)}
+                                                                            {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                                <p className="opacity-80 italic">Vui lòng cân nhắc từ chối yêu cầu này hoặc yêu cầu khác cho phù hợp.</p>
+                                                            </div>
+                                                        ) : hasBlockedFlag ? (
+                                                            <p className="leading-relaxed opacity-90">Lần duyệt trước đã bị hệ thống chặn vì trùng phòng. Vui lòng kiểm tra lại lịch phòng trước khi duyệt.</p>
+                                                        ) : hasPendingConflict ? (
+                                                            <div className="space-y-1.5">
+                                                                <p className="opacity-90">Khung giờ này đang trùng với {selectedRequest.pendingConflictDetails.length} yêu cầu khác cũng đang chờ duyệt tại cùng phòng — chưa có booking nào được duyệt nên hệ thống KHÔNG chặn bạn duyệt, nhưng chỉ 1 trong các yêu cầu này nên được giữ phòng:</p>
+                                                                <ul className="space-y-1">
+                                                                    {selectedRequest.pendingConflictDetails.map((c, idx) => (
+                                                                        <li key={c.bookingId || idx} className="bg-white/60 rounded-lg px-2.5 py-1.5 border border-amber-100">
+                                                                            <span className="font-semibold">{c.meetingTitle || 'Cuộc họp khác'}</span>
+                                                                            {' — '}{c.roomName || 'phòng đã chọn'}
+                                                                            {' · '}{fmtTime(c.startTime)}-{fmtTime(c.endTime)}
+                                                                            {c.hostName ? ` · Chủ trì: ${c.hostName}` : ''}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                                <p className="opacity-80 italic">Nếu bạn duyệt yêu cầu này, các yêu cầu PENDING trùng giờ ở trên sẽ không tự động bị từ chối — khi có người duyệt tiếp yêu cầu đó, hệ thống sẽ báo lỗi trùng phòng (ROOM_CONFLICT) và cần từ chối thủ công.</p>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="leading-relaxed opacity-90">Không phát hiện bất kì lịch họp trùng nào cho phòng họp này trong khung giờ được yêu cầu.</p>
+                                                        )}
+                                                    </div>
                                                 </div>
+
+                                                {/* MKM-PCONF-01 — xung đột NGƯỜI: panel riêng, đầy đủ thông tin
+                                                    cuộc họp gây trùng + danh sách người (lọc được, cuộn riêng). */}
+                                                {participantInfo.hasConflict ? (
+                                                    <ParticipantConflictPanel info={participantInfo} />
+                                                ) : (
+                                                    <div className="p-4 rounded-xl border bg-emerald-50 border-emerald-250 text-emerald-800 flex gap-3">
+                                                        <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
+                                                        <div className="text-xs space-y-1">
+                                                            <p className="font-bold">Người tham dự đều rảnh trong khung giờ này</p>
+                                                            <p className="leading-relaxed opacity-90">Không có người tham dự nào của cuộc họp đang bận ở một cuộc họp khác.</p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })()}
@@ -936,12 +1261,68 @@ const MeetingApprovals = () => {
                                 initial={{ scale: 0.95, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 0.95, opacity: 0 }}
-                                className="bg-white rounded-2xl border border-platinum-tint shadow-lg w-full max-w-md p-6"
+                                className="bg-white rounded-2xl border border-platinum-tint shadow-lg w-full max-w-md p-6 max-h-[85vh] overflow-y-auto"
                             >
                                 <h3 className="text-base font-bold text-midnight-indigo mb-2">Xác nhận phê duyệt đặt phòng</h3>
                                 <p className="text-xs text-slate-blue mb-4 leading-relaxed">
                                     Bạn chuẩn bị phê duyệt yêu cầu <strong className="text-midnight-indigo font-mono">{selectedRequest.requestCode}</strong> cho cuộc họp <strong>"{selectedRequest.meeting?.title}"</strong>.
                                 </p>
+
+                                {/* MKM-PCONF-01 — trùng NGƯỜI không chặn duyệt, nhưng Manager phải
+                                    thấy rõ đang duyệt chồng lên cuộc họp nào rồi mới xác nhận. Chi
+                                    tiết từng người xem ở modal Chi tiết yêu cầu (có filter + cuộn). */}
+                                {(() => {
+                                    const participantInfo = getParticipantConflictInfo(selectedRequest);
+                                    if (!participantInfo.hasConflict) return null;
+                                    const { details, summary, legacyOnly } = participantInfo;
+                                    return (
+                                        <div className="mb-4 p-3.5 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 space-y-2.5 text-left">
+                                            <div className="flex gap-2.5">
+                                                <AlertTriangle className="w-[18px] h-[18px] shrink-0 text-amber-600 mt-px" />
+                                                <div className="text-xs space-y-1">
+                                                    <p className="font-bold">Cuộc họp này trùng lịch người tham dự</p>
+                                                    {legacyOnly ? (
+                                                        <p className="opacity-90 leading-relaxed">
+                                                            Có người tham dự đang bận ở một cuộc họp khác trong khung giờ này.
+                                                        </p>
+                                                    ) : (
+                                                        <p className="opacity-90 leading-relaxed">
+                                                            <strong>{summary.conflictedUserCount}</strong> người tham dự đang bận ở{' '}
+                                                            <strong>{summary.meetingCount}</strong> cuộc họp khác
+                                                            {summary.requiredUserCount > 0 && (
+                                                                <> (<strong>{summary.requiredUserCount}</strong> người bắt buộc)</>
+                                                            )}.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {details.length > 0 && (
+                                                <div className="space-y-1.5">
+                                                    {details.map((m) => (
+                                                        <ConflictMeetingCard key={m.meetingId} meeting={m} compact />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <p className="text-[11px] leading-relaxed bg-amber-100/60 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                                                Hệ thống <strong>vẫn cho phép duyệt cả hai cuộc họp</strong> — trùng người không
+                                                chặn phê duyệt. Danh sách chi tiết từng người bị trùng xem ở màn{' '}
+                                                <strong>Chi tiết yêu cầu đặt phòng</strong>.
+                                            </p>
+
+                                            <label className="flex items-start gap-2 text-[11px] font-semibold cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={conflictAcknowledged}
+                                                    onChange={(e) => setConflictAcknowledged(e.target.checked)}
+                                                    className="mt-0.5 w-3.5 h-3.5 accent-amber-600 shrink-0"
+                                                />
+                                                <span>Tôi đã xem và chấp nhận duyệt dù có trùng lịch người tham dự.</span>
+                                            </label>
+                                        </div>
+                                    );
+                                })()}
 
                                 {error && (
                                     <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
@@ -966,6 +1347,7 @@ const MeetingApprovals = () => {
                                             onClick={() => {
                                                 setApprovalModalOpen(false);
                                                 setDecisionNote('');
+                                                setConflictAcknowledged(false);
                                             }}
                                             className="px-4 py-2 border border-platinum-tint hover:bg-cloud-mist rounded-xl text-xs font-bold text-slate-blue transition-colors"
                                         >
@@ -973,8 +1355,9 @@ const MeetingApprovals = () => {
                                         </button>
                                         <button
                                             onClick={handleApprove}
-                                            disabled={submittingAction}
-                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                            disabled={submittingAction || (getParticipantConflictInfo(selectedRequest).hasConflict && !conflictAcknowledged)}
+                                            title={getParticipantConflictInfo(selectedRequest).hasConflict && !conflictAcknowledged ? 'Vui lòng tích xác nhận chấp nhận trùng lịch người tham dự' : undefined}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
                                         >
                                             {submittingAction && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                                             Xác nhận phê duyệt

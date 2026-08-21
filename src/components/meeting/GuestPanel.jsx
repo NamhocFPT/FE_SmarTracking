@@ -30,7 +30,7 @@ const GuestPanel = ({ meetingId, onGuestsUpdate }) => {
             const guestList = gRes?.success ? (gRes.data || []) : [];
             setGuests(guestList);
             setLobby(guestList.filter(g => g.lobbyStatus === 'waiting'));
-            const admittedGuests = guestList.filter(g => g.inviteStatus === 'used');
+            const admittedGuests = guestList.filter(g => g.lobbyStatus === 'admitted');
             onGuestsUpdate?.(admittedGuests);
         } catch {
             /* bỏ qua lỗi mạng tạm thời */

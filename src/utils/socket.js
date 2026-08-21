@@ -10,6 +10,27 @@ const resolveToken = () => {
   return guestToken || getAccessToken() || null;
 };
 
+// [Fix realtime 2026-08-22 — B] Room ở server là per-connection: socket.io tự
+// reconnect khi rớt mạng/BE restart/máy sleep, nhưng connection MỚI không nằm
+// trong room nào cả. Trước đây FE chỉ emit `*:subscribe` 1 lần lúc component
+// mount ⇒ sau lần rớt đầu tiên client im lặng vĩnh viễn, phải F5 mới thấy dữ
+// liệu mới. Hai biến dưới đây là "ý định subscribe" bền vững của app, được
+// replay lại ở mỗi sự kiện 'connect'.
+//
+// meetingRoomRefs đếm số listener đang cần room `meeting:{id}` — vì
+// InMeetingRoom, MeetingAttendanceBoard và MinutesTabContent cùng subscribe 1
+// meetingId. Trước đây component nào unmount trước (đổi tab trong phòng họp)
+// sẽ emit `meeting:unsubscribe` và cắt luôn realtime của 2 component còn lại.
+const meetingRoomRefs = new Map();
+let wantsUserRoom = false;
+
+const replaySubscriptions = (s) => {
+  if (wantsUserRoom) s.emit('user:subscribe');
+  for (const meetingId of meetingRoomRefs.keys()) {
+    s.emit('meeting:subscribe', { meetingId });
+  }
+};
+
 // getSocket()/getGuestSocket() luôn được gọi từ trong phòng họp (sau khi người dùng đã
 // đăng nhập/điều hướng qua vài trang), tức là sau khi request() đã await backendReady ít
 // nhất 1 lần — nên đọc getWsBaseUrl() tại thời điểm gọi là đủ để đồng bộ đúng domain với
@@ -20,8 +41,16 @@ export const getSocket = () => {
       path: '/ws',
       transports: ['websocket'],
       autoConnect: true,
-      auth: { token: resolveToken() },
+      // [Fix realtime 2026-08-22 — A] auth PHẢI là callback, không phải object
+      // tĩnh. Access token chỉ sống 900s (auth.login trả expiresIn=900); nếu
+      // chốt cứng `auth: { token: resolveToken() }` thì mọi lần reconnect đều
+      // gửi lại đúng token cũ đã hết hạn ⇒ EventsGateway.resolveIdentity() trả
+      // null ⇒ `user:subscribe` bị từ chối ({ok:false}) và người dùng mất sạch
+      // realtime. Callback được socket.io gọi lại ở TỪNG lần (re)connect nên
+      // luôn lấy token vừa refresh trong localStorage.
+      auth: (cb) => cb({ token: resolveToken() }),
     });
+    socket.on('connect', () => replaySubscriptions(socket));
   }
   return socket;
 };
@@ -35,14 +64,28 @@ export const getGuestSocket = () => {
     path: '/ws',
     transports: ['websocket'],
     autoConnect: true,
-    auth: { token: guestToken },
+    auth: (cb) => cb({ token: sessionStorage.getItem('guestToken') }),
   });
 };
 
+// Có refcount: chỉ thực sự rời room khi listener CUỐI CÙNG của meetingId đó
+// cleanup. Xem chú thích meetingRoomRefs phía trên.
 export const subscribeToMeeting = (meetingId) => {
   const s = getSocket();
-  s.emit('meeting:subscribe', { meetingId });
+  const prev = meetingRoomRefs.get(meetingId) ?? 0;
+  meetingRoomRefs.set(meetingId, prev + 1);
+  if (prev === 0) s.emit('meeting:subscribe', { meetingId });
+
+  let released = false;
   return () => {
+    if (released) return;
+    released = true;
+    const count = (meetingRoomRefs.get(meetingId) ?? 1) - 1;
+    if (count > 0) {
+      meetingRoomRefs.set(meetingId, count);
+      return;
+    }
+    meetingRoomRefs.delete(meetingId);
     s.emit('meeting:unsubscribe', { meetingId });
   };
 };
@@ -54,6 +97,7 @@ export const subscribeToMeeting = (meetingId) => {
 // (logout/đóng tab) nên không cần rời tay.
 const ensureUserRoomJoined = () => {
   const s = getSocket();
+  wantsUserRoom = true;
   s.emit('user:subscribe');
   return s;
 };
@@ -80,4 +124,15 @@ export const subscribeToNotificationUpdates = (onCreate) => {
   return () => {
     s.off('notification.created', onCreate);
   };
+};
+
+// Gọi khi logout: huỷ socket đang mang token của người dùng cũ và xoá mọi ý
+// định subscribe, để phiên đăng nhập kế tiếp tạo socket mới với token mới.
+export const resetSocket = () => {
+  meetingRoomRefs.clear();
+  wantsUserRoom = false;
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 };

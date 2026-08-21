@@ -692,97 +692,93 @@ const BookMeeting = () => {
         XLSX.writeFile(wb, 'SmarTracking_Template_Them_Danh_Sach.xlsx');
     };
 
-    const handleExcelImport = (e) => {
+    const handleExcelImport = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-            try {
-                const bstr = evt.target.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        try {
+            const data = await file.arrayBuffer();
+            const wb = XLSX.read(data, { type: 'array' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-                const getCell = (row, key) => (key ? String(row[key] ?? '').trim() : '');
+            const getCell = (row, key) => (key ? String(row[key] ?? '').trim() : '');
 
-                const rawRows = rows
-                    .map((row, index) => {
-                        const keys = Object.keys(row);
-                        const findKey = (name) => keys.find(k => k.toLowerCase().trim() === name.toLowerCase());
-                        return {
-                            rowNumber: index + 2,
-                            email: getCell(row, findKey('Email')),
-                            employeeCode: getCell(row, findKey('Mã nhân viên')),
-                            fullName: getCell(row, findKey('Họ và tên')),
-                            organizationName: getCell(row, findKey('Tổ chức/Công ty')) || getCell(row, findKey('Phòng ban/Tổ chức')),
-                            phoneNumber: getCell(row, findKey('Số điện thoại')),
-                        };
-                    })
-                    .filter(r => r.email || r.employeeCode || r.fullName || r.organizationName || r.phoneNumber);
+            const rawRows = rows
+                .map((row, index) => {
+                    const keys = Object.keys(row);
+                    const findKey = (name) => keys.find(k => k.toLowerCase().trim() === name.toLowerCase());
+                    return {
+                        rowNumber: index + 2,
+                        email: getCell(row, findKey('Email')),
+                        employeeCode: getCell(row, findKey('Mã nhân viên')),
+                        fullName: getCell(row, findKey('Họ và tên')),
+                        organizationName: getCell(row, findKey('Tổ chức/Công ty')) || getCell(row, findKey('Phòng ban/Tổ chức')),
+                        phoneNumber: getCell(row, findKey('Số điện thoại')),
+                    };
+                })
+                .filter(r => r.email || r.employeeCode || r.fullName || r.organizationName || r.phoneNumber);
 
-                if (rawRows.length === 0) {
-                    toast.error('Tệp không có dữ liệu hoặc sai cấu trúc cột. Vui lòng tải lại file mẫu.');
-                    return;
+            if (rawRows.length === 0) {
+                toast.error('Tệp không có dữ liệu hoặc sai cấu trúc cột. Vui lòng tải lại file mẫu.');
+                return;
+            }
+
+            setImportProcessing(true);
+            const parsed = await Promise.all(rawRows.map(async (r) => {
+                let error = '';
+                if (!r.email && !r.employeeCode) {
+                    error = `Dòng ${r.rowNumber}: Cần có Email hoặc Mã nhân viên`;
+                } else if (r.email && !EMAIL_REGEX.test(r.email)) {
+                    error = `Dòng ${r.rowNumber}: Email "${r.email}" sai định dạng`;
                 }
 
-                setImportProcessing(true);
-                const parsed = await Promise.all(rawRows.map(async (r) => {
-                    let error = '';
-                    if (!r.email && !r.employeeCode) {
-                        error = `Dòng ${r.rowNumber}: Cần có Email hoặc Mã nhân viên`;
-                    } else if (r.email && !EMAIL_REGEX.test(r.email)) {
-                        error = `Dòng ${r.rowNumber}: Email "${r.email}" sai định dạng`;
-                    }
+                let resolvedUserId = null;
+                let type = 'external';
 
-                    let resolvedUserId = null;
-                    let type = 'external';
-
-                    if (!error) {
-                        const found = await resolveInternalUser(r.email, r.employeeCode);
-                        if (found) {
-                            resolvedUserId = found.id;
-                            type = 'internal';
-                        } else {
-                            if (!r.fullName) {
-                                error = `Dòng ${r.rowNumber}: Khách ngoài hệ thống cần nhập Họ và tên`;
-                            }
+                if (!error) {
+                    const found = await resolveInternalUser(r.email, r.employeeCode);
+                    if (found) {
+                        resolvedUserId = found.id;
+                        type = 'internal';
+                    } else {
+                        if (!r.fullName) {
+                            error = `Dòng ${r.rowNumber}: Khách ngoài hệ thống cần nhập Họ và tên`;
                         }
                     }
+                }
 
-                    return { ...r, type, error, resolvedUserId };
-                }));
+                return { ...r, type, error, resolvedUserId };
+            }));
 
-                // Phát hiện trùng trong cùng file
-                const seenInternal = new Set();
-                const seenExternal = new Set();
-                parsed.forEach(item => {
-                    if (item.error) return;
-                    if (item.type === 'internal' && item.resolvedUserId) {
-                        if (seenInternal.has(item.resolvedUserId)) {
-                            item.error = `Dòng ${item.rowNumber}: Trùng với một dòng khác trong file`;
-                        } else {
-                            seenInternal.add(item.resolvedUserId);
-                        }
-                    } else if (item.type === 'external' && item.email) {
-                        if (seenExternal.has(item.email)) {
-                            item.error = `Dòng ${item.rowNumber}: Trùng email với một dòng khác trong file`;
-                        } else {
-                            seenExternal.add(item.email);
-                        }
+            // Phát hiện trùng trong cùng file
+            const seenInternal = new Set();
+            const seenExternal = new Set();
+            parsed.forEach(item => {
+                if (item.error) return;
+                if (item.type === 'internal' && item.resolvedUserId) {
+                    if (seenInternal.has(item.resolvedUserId)) {
+                        item.error = `Dòng ${item.rowNumber}: Trùng với một dòng khác trong file`;
+                    } else {
+                        seenInternal.add(item.resolvedUserId);
                     }
-                });
+                } else if (item.type === 'external' && item.email) {
+                    if (seenExternal.has(item.email)) {
+                        item.error = `Dòng ${item.rowNumber}: Trùng email với một dòng khác trong file`;
+                    } else {
+                        seenExternal.add(item.email);
+                    }
+                }
+            });
 
-                setImportPreview(parsed);
-            } catch (err) {
-                console.error('Failed to parse excel file', err);
-                toast.error('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
-            } finally {
-                setImportProcessing(false);
-            }
-        };
-        reader.readAsBinaryString(file);
+            setImportPreview(parsed);
+        } catch (err) {
+            console.error('Failed to parse excel file', err);
+            toast.error('Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file.');
+        } finally {
+            setImportProcessing(false);
+        }
     };
 
     const handleManualImport = async () => {

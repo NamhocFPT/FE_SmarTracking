@@ -413,6 +413,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const reactionTimersRef = useRef([]);
     const participantsRef = useRef(null);
     const attendanceErrorRef = useRef(false);
+    // Debounce cho việc nạp lại ghi chú khi nhận `meeting.note.created` qua WS.
+    const noteRefreshTimerRef = useRef(null);
     const devicesErrorRef = useRef(false);
 
     // Clear all pending timers on unmount
@@ -838,6 +840,19 @@ const InMeetingRoom = ({ isPublic = false }) => {
             }
         };
 
+        // [2026-08-22] Ghi chú real-time: BE bắn `meeting.note.created` vào room
+        // meeting:{id} khi BẤT KỲ ai thêm ghi chú (live-meeting.service.ts).
+        // Payload CỐ Ý không kèm nội dung (room có cả socket khách ngoài công
+        // ty) nên ở đây nạp lại qua loadNotes() — endpoint đọc vốn đã lọc đúng
+        // quyền/visibility của từng người. Debounce nhẹ để nhiều người gõ liên
+        // tục không gọi API dồn dập, mirror MinutesTabContent.jsx.
+        const onNoteCreated = (payload) => {
+            if (payload?.meetingId && payload.meetingId !== id) return;
+            if (noteRefreshTimerRef.current) clearTimeout(noteRefreshTimerRef.current);
+            noteRefreshTimerRef.current = setTimeout(() => { loadNotes(); }, 400);
+        };
+
+        s.on('meeting.note.created', onNoteCreated);
         s.on('meeting.session.started', onSessionStarted);
         s.on('meeting.session.ended', onSessionEnded);
         s.on('agenda:presented', onAgendaPresented);
@@ -848,6 +863,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
         s.on('meeting.time.warning', onTimeWarning);
 
         return () => {
+            if (noteRefreshTimerRef.current) clearTimeout(noteRefreshTimerRef.current);
+            s.off('meeting.note.created', onNoteCreated);
             s.off('meeting.session.started', onSessionStarted);
             s.off('meeting.session.ended', onSessionEnded);
             s.off('agenda:presented', onAgendaPresented);

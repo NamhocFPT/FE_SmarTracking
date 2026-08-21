@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NOTIFICATION_BANNER_EVENT } from '../../utils/notificationBanner';
 
-const DURATION = 6000;
+const DURATION = 3000;
 const MAX_VISIBLE = 4;
 
 /**
