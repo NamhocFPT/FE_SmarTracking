@@ -6,7 +6,7 @@ import {
     RiCpuLine, RiHardDriveLine, RiMapLine,
     RiLoginBoxLine, RiCameraLine, RiCarLine, RiMapPinLine,
     RiAlertLine, RiEqualizerLine, RiShieldUserLine,
-    RiFileTextLine, RiMenuLine
+    RiFileTextLine, RiMenuLine, RiFileListLine
 } from 'react-icons/ri';
 
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -30,10 +30,12 @@ const STATIC_NAVIGATION_ITEMS = [
         children: [
             { label: 'Vai trò & Phân quyền',  to: '/system-admin/roles-permissions', icon: RiShieldLine },
             { label: 'Cấu hình hệ thống',     to: '/system-admin/settings',           icon: RiSettings2Line },
+            { label: 'Nhật ký kiểm toán',     to: '/system-admin/audit-logs',         icon: RiFileListLine },
+            { label: 'Quy tắc cảnh báo',      to: '/system-admin/alert-rules',        icon: RiEqualizerLine },
         ],
     },
     {
-        label: 'Hạ tầng & AI',
+        label: 'Hạ tầng',
         isDropdown: true,
         icon: RiCpuLine,
         children: [
@@ -52,7 +54,6 @@ const STATIC_NAVIGATION_ITEMS = [
             { label: 'Đăng ký phương tiện',           to: '/system-admin/vehicle-registrations',icon: RiFileTextLine },
             { label: 'Hành trình khuôn viên',         to: '/system-admin/user-journey',         icon: RiMapPinLine },
             { label: 'Cảnh báo an ninh',              to: '/system-admin/security-alerts',      icon: RiAlertLine },
-            { label: 'Quy tắc cảnh báo',              to: '/system-admin/alert-rules',          icon: RiEqualizerLine },
         ],
     },
 ];

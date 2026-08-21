@@ -393,7 +393,7 @@ export const stopVideoRecording = async (meetingId, sessionId) => {
 };
 
 export const getRoomDevices = async (roomId) => {
-    return await get(`/iot-devices?roomId=${roomId}`);
+    return await get(`/iot-devices?room_id=${roomId}`);
 };
 
 export const getAllNoShowCases = async (params = {}) => {

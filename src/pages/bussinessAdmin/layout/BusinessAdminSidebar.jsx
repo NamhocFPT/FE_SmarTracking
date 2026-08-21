@@ -114,7 +114,7 @@ const BusinessAdminSidebar = ({
                 ) : (
                     /* Khi mở rộng: logo dẫn về dashboard */
                     <NavLink
-                        to="/system-admin"
+                        to="/business-admin"
                         end
                         className="flex items-center gap-3 shrink-0 no-underline hover:opacity-80 transition-opacity"
                     >
@@ -128,7 +128,7 @@ const BusinessAdminSidebar = ({
                         SmarTracking
                     </p>
                     <p className="text-[11px] text-steel-gray font-semibold whitespace-nowrap">
-                        System Admin
+                        Business Admin
                     </p>
                 </div>
 
@@ -267,7 +267,7 @@ const BusinessAdminSidebar = ({
             <div className="shrink-0 border-t border-white/[0.08] px-2 py-2">
                 <div className={`flex items-center ${isMini ? 'justify-center' : 'gap-3 px-1.5'}`}>
                     <NotificationBell
-                        basePath="/system-admin"
+                        basePath="/business-admin"
                         dark
                         dropUp
                         dropdownAlign="left"
@@ -279,7 +279,7 @@ const BusinessAdminSidebar = ({
                     />
                     {!isMini && (
                         <NavLink
-                            to="/system-admin/notifications"
+                            to="/business-admin/notifications"
                             className="text-[14px] font-semibold text-white/70 hover:text-white select-none cursor-pointer no-underline"
                         >
                             Thông báo
@@ -361,7 +361,7 @@ const BusinessAdminSidebar = ({
                             {displayName}
                         </p>
                         <p className="text-[11.5px] text-steel-gray truncate">
-                            Quản trị hệ thống
+                            Quản trị kinh doanh
                         </p>
                     </div>
                     {!isMini && (

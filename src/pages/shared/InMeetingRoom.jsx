@@ -1,12 +1,14 @@
 import {
     AlertTriangle, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-    ClipboardList, Clock, Cpu, Download, ExternalLink, Eye, FileText, Film, Loader, Mic, MicOff,
+    ClipboardList, Clock, Cpu, Download, ExternalLink, Eye, FileText, Film, Loader, Mail, Mic, MicOff,
     MonitorUp, Play, Plus, RefreshCw, Shield, Smile,
     StickyNote, Timer, UserCheck, UserX, Users, Video as VideoIcon,
     VolumeX, X, Edit2
 } from 'lucide-react';
 import { IoMic, IoMicOff, IoHandLeft, IoVolumeHigh, IoHappy, IoTime, IoCall, IoArrowBack } from 'react-icons/io5';
 import React, { useState, useEffect, useRef } from 'react';
+import { renderAsync as renderDocxAsync } from 'docx-preview';
+import { PPTXViewer } from 'pptxviewjs';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from '../../assets/images/SmarTracking.png';
@@ -249,15 +251,59 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const [isRoomDevicesExpanded, setIsRoomDevicesExpanded] = useState(false);
     const [extensionModal, setExtensionModal] = useState({ isOpen: false, minutes: 15, reason: '' });
     const [pendingExtensions, setPendingExtensions] = useState([]);
+    const [extensionRejectedInfo, setExtensionRejectedInfo] = useState(null);
     const [noShowWarning, setNoShowWarning] = useState(null);
     const [meetingTimeLeft, setMeetingTimeLeft] = useState(null); // seconds until scheduled end
     const [meetingOverdue, setMeetingOverdue] = useState(false);  // true when past end time
     const [manualCheckInLoading, setManualCheckInLoading] = useState(null);
     const [isManualAttendanceExpanded, setIsManualAttendanceExpanded] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [sidebarWidth, setSidebarWidth] = useState(() => Math.round(window.innerWidth / 3));
+    const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+    const meetingLayoutRef = useRef(null);
+    const isResizingSidebarRef = useRef(false);
+
+    useEffect(() => {
+        const handlePointerMove = (e) => {
+            if (!isResizingSidebarRef.current || !meetingLayoutRef.current) return;
+            const rect = meetingLayoutRef.current.getBoundingClientRect();
+            const minWidth = 320;
+            const maxWidth = Math.max(minWidth, rect.width - 360);
+            const newWidth = Math.min(Math.max(rect.right - e.clientX, minWidth), maxWidth);
+            setSidebarWidth(newWidth);
+        };
+        const stopResizing = () => {
+            if (!isResizingSidebarRef.current) return;
+            isResizingSidebarRef.current = false;
+            setIsResizingSidebar(false);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', stopResizing);
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', stopResizing);
+        };
+    }, []);
+
+    const handleSidebarResizeStart = (e) => {
+        e.preventDefault();
+        isResizingSidebarRef.current = true;
+        setIsResizingSidebar(true);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    };
     const [agendaDocView, setAgendaDocView] = useState(null);
     const [agendaDocUrl, setAgendaDocUrl] = useState(null);
     const [agendaDocLoading, setAgendaDocLoading] = useState(false);
+    const [agendaDocxError, setAgendaDocxError] = useState(false);
+    const [agendaImgError, setAgendaImgError] = useState(false);
+    const [agendaPptxError, setAgendaPptxError] = useState(false);
+    const [agendaPptxSlides, setAgendaPptxSlides] = useState({ current: 0, total: 0 });
+    const agendaDocxContainerRef = useRef(null);
+    const agendaPptxCanvasRef = useRef(null);
+    const agendaPptxViewerRef = useRef(null);
     const [admittedGuests, setAdmittedGuests] = useState([]);
     const admittedGuestCount = admittedGuests.length;
     // agendaDocView: { agendaItem, selectedAttachmentIdx }
@@ -286,6 +332,77 @@ const InMeetingRoom = ({ isPublic = false }) => {
             .finally(() => { if (!cancelled) setAgendaDocLoading(false); });
         return () => { cancelled = true; };
     }, [agendaDocView]);
+
+    // Render Word (.doc/.docx) attachments client-side instead of relying on
+    // Microsoft's public Office Online Viewer, which cannot reach files served
+    // from a private/local backend (only the user's own browser can).
+    useEffect(() => {
+        setAgendaDocxError(false);
+        setAgendaImgError(false);
+        setAgendaPptxError(false);
+        setAgendaPptxSlides({ current: 0, total: 0 });
+        if (!agendaDocUrl || !agendaDocView) return;
+        const att = agendaDocView.agendaItem.attachments?.[agendaDocView.selectedAttachmentIdx ?? 0];
+        const ext = (att?.fileName || '').split('.').pop()?.toLowerCase();
+        if (!['doc', 'docx'].includes(ext)) return;
+        let cancelled = false;
+        fetch(agendaDocUrl)
+            .then(res => {
+                if (!res.ok) throw new Error('download failed');
+                return res.arrayBuffer();
+            })
+            .then(arrayBuffer => {
+                if (cancelled || !agendaDocxContainerRef.current) return;
+                agendaDocxContainerRef.current.innerHTML = '';
+                return renderDocxAsync(arrayBuffer, agendaDocxContainerRef.current);
+            })
+            .catch((err) => { console.error('[AgendaDocxPreview]', err); if (!cancelled) setAgendaDocxError(true); });
+        return () => { cancelled = true; };
+    }, [agendaDocUrl, agendaDocView]);
+
+    // Render PowerPoint (.ppt/.pptx) attachments client-side via HTML5 Canvas
+    // (pptxviewjs) — same reasoning as the Word renderer: no reliable inline
+    // preview service works with a non-public backend URL, so parse/render
+    // the file directly in the user's own browser instead.
+    useEffect(() => {
+        if (!agendaDocUrl || !agendaDocView) return;
+        const att = agendaDocView.agendaItem.attachments?.[agendaDocView.selectedAttachmentIdx ?? 0];
+        const ext = (att?.fileName || '').split('.').pop()?.toLowerCase();
+        if (!['ppt', 'pptx'].includes(ext)) return;
+        let cancelled = false;
+        fetch(agendaDocUrl)
+            .then(res => {
+                if (!res.ok) throw new Error('download failed');
+                return res.arrayBuffer();
+            })
+            .then(async arrayBuffer => {
+                if (cancelled || !agendaPptxCanvasRef.current) return;
+                const viewer = new PPTXViewer({ canvas: agendaPptxCanvasRef.current });
+                agendaPptxViewerRef.current = viewer;
+                await viewer.loadFile(arrayBuffer);
+                if (cancelled) return;
+                await viewer.render();
+                if (cancelled) return;
+                setAgendaPptxSlides({ current: 1, total: viewer.getSlideCount() });
+            })
+            .catch((err) => { console.error('[AgendaPptxPreview]', err); if (!cancelled) setAgendaPptxError(true); });
+        return () => {
+            cancelled = true;
+            agendaPptxViewerRef.current = null;
+        };
+    }, [agendaDocUrl, agendaDocView]);
+
+    const goToAgendaPptxSlide = async (delta) => {
+        const viewer = agendaPptxViewerRef.current;
+        if (!viewer) return;
+        try {
+            if (delta > 0) await viewer.nextSlide();
+            else await viewer.previousSlide();
+            setAgendaPptxSlides({ current: viewer.getCurrentSlideIndex() + 1, total: viewer.getSlideCount() });
+        } catch {
+            setAgendaPptxError(true);
+        }
+    };
 
     // Refs
     const speakingOverrideRef = useRef(null);
@@ -1247,12 +1364,17 @@ const InMeetingRoom = ({ isPublic = false }) => {
         setActionLoading(true);
         try {
             const res = await callWithFallback(requestEmployeeExtension, requestManagerExtension, id, {
-                requestedExtensionMinutes: Number(extensionModal.minutes),
+                extensionMinutes: Number(extensionModal.minutes),
                 reason: extensionModal.reason || 'Cần thêm thời gian để hoàn thành chương trình',
             });
             if (res?.success) {
-                showToast(`Đã gửi yêu cầu gia hạn ${extensionModal.minutes} phút.`, 'success');
+                const data = res.data || {};
                 setExtensionModal({ isOpen: false, minutes: 15, reason: '' });
+                if (data.status === 'rejected') {
+                    setExtensionRejectedInfo(data);
+                } else {
+                    showToast(`Đã gia hạn thêm ${extensionModal.minutes} phút.`, 'success');
+                }
             } else {
                 showToast(res?.error?.message || 'Lỗi khi gửi yêu cầu gia hạn', 'error');
             }
@@ -1268,7 +1390,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
         try {
             const res = await callWithFallback(decideEmployeeExtension, decideManagerExtension, id, requestId, {
                 decision,
-                decisionNote: decision === 'approved' ? 'Chủ tọa đã duyệt gia hạn' : 'Chủ tọa từ chối gia hạn',
+                reason: decision === 'approved' ? 'Đã duyệt gia hạn' : 'Từ chối gia hạn',
             });
             if (res?.success) {
                 setPendingExtensions(prev => prev.filter(r => r.id !== requestId));
@@ -1573,7 +1695,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
             {/* VIEW C: IN PROGRESS */}
             {meetingState.status === 'in_progress' && (
-                <div className="flex-1 flex flex-col lg:flex-row relative z-10 overflow-hidden">
+                <div ref={meetingLayoutRef} className="flex-1 flex flex-col lg:flex-row relative z-10 overflow-hidden" style={{ '--sidebar-w': `${sidebarWidth}px` }}>
 
                     {/* Left: Video Grid + Controls */}
                     <div className="flex-1 flex flex-col bg-slate-950 relative select-none overflow-hidden">
@@ -1685,8 +1807,6 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         const isWord = ['doc', 'docx'].includes(ext);
                                         const isPptx = ['ppt', 'pptx'].includes(ext);
 
-                                        const isMsOffice = isWord || isPptx;
-
                                         return (
                                             <div className="flex-1 overflow-hidden flex flex-col">
                                                 {agendaDocLoading ? (
@@ -1696,21 +1816,100 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                                     </div>
                                                 ) : agendaDocUrl ? (
                                                     isImage ? (
-                                                        <div className="flex-1 overflow-auto flex items-center justify-center p-4">
-                                                            <img src={agendaDocUrl} alt={att.fileName} className="max-w-full max-h-full object-contain rounded-xl" />
-                                                        </div>
+                                                        agendaImgError ? (
+                                                            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/60">
+                                                                <FileText className="w-12 h-12" />
+                                                                <p className="text-sm font-medium">{att.fileName}</p>
+                                                                <p className="text-xs text-white/40">Không thể tải ảnh này</p>
+                                                                <a
+                                                                    href={agendaDocUrl}
+                                                                    download={att.fileName}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="px-4 py-2 bg-action-blue text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-glacier-blue transition-colors"
+                                                                >
+                                                                    <Download className="w-4 h-4" /> Tải xuống
+                                                                </a>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+                                                                <img
+                                                                    src={agendaDocUrl}
+                                                                    alt={att.fileName}
+                                                                    onError={() => setAgendaImgError(true)}
+                                                                    className="max-w-full max-h-full object-contain rounded-xl"
+                                                                />
+                                                            </div>
+                                                        )
                                                     ) : isPdf ? (
                                                         <iframe
                                                             src={agendaDocUrl}
                                                             title={att.fileName}
                                                             className="flex-1 w-full border-0"
                                                         />
-                                                    ) : isMsOffice ? (
-                                                        <iframe
-                                                            src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(agendaDocUrl)}`}
-                                                            title={att.fileName}
-                                                            className="flex-1 w-full border-0"
-                                                        />
+                                                    ) : isWord ? (
+                                                        agendaDocxError ? (
+                                                            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/60">
+                                                                <FileText className="w-12 h-12" />
+                                                                <p className="text-sm font-medium">{att.fileName}</p>
+                                                                <p className="text-xs text-white/40">Không thể xem trước tài liệu này</p>
+                                                                <a
+                                                                    href={agendaDocUrl}
+                                                                    download={att.fileName}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="px-4 py-2 bg-action-blue text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-glacier-blue transition-colors"
+                                                                >
+                                                                    <Download className="w-4 h-4" /> Tải xuống
+                                                                </a>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex-1 overflow-auto bg-white p-4">
+                                                                <div ref={agendaDocxContainerRef} />
+                                                            </div>
+                                                        )
+                                                    ) : isPptx ? (
+                                                        agendaPptxError ? (
+                                                            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/60">
+                                                                <FileText className="w-12 h-12" />
+                                                                <p className="text-sm font-medium">{att.fileName}</p>
+                                                                <p className="text-xs text-white/40">Không thể xem trước tài liệu này</p>
+                                                                <a
+                                                                    href={agendaDocUrl}
+                                                                    download={att.fileName}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="px-4 py-2 bg-action-blue text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-glacier-blue transition-colors"
+                                                                >
+                                                                    <Download className="w-4 h-4" /> Tải xuống
+                                                                </a>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center gap-3 bg-slate-900 p-4">
+                                                                <canvas ref={agendaPptxCanvasRef} className="flex-1 w-full min-h-0 max-w-full object-contain rounded-xl shadow-lg" />
+                                                                {agendaPptxSlides.total > 0 && (
+                                                                    <div className="flex items-center gap-3 shrink-0">
+                                                                        <button
+                                                                            onClick={() => goToAgendaPptxSlide(-1)}
+                                                                            disabled={agendaPptxSlides.current <= 1}
+                                                                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+                                                                        >
+                                                                            <ChevronLeft className="w-4 h-4" />
+                                                                        </button>
+                                                                        <span className="text-[11px] text-white/60 font-medium">
+                                                                            Slide {agendaPptxSlides.current}/{agendaPptxSlides.total}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => goToAgendaPptxSlide(1)}
+                                                                            disabled={agendaPptxSlides.current >= agendaPptxSlides.total}
+                                                                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+                                                                        >
+                                                                            <ChevronRight className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )
                                                     ) : isVideo ? (
                                                         <div className="flex-1 flex items-center justify-center p-4">
                                                             <video src={agendaDocUrl} controls className="max-w-full max-h-full rounded-xl" />
@@ -1857,8 +2056,19 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         {isSidebarOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
                     </button>
 
+                    {/* Resize Handle */}
+                    {isSidebarOpen && (
+                        <div
+                            onPointerDown={handleSidebarResizeStart}
+                            className="hidden lg:block w-1.5 shrink-0 cursor-col-resize z-30 relative group bg-slate-900"
+                            title="Kéo để thay đổi kích thước"
+                        >
+                            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 group-hover:bg-action-blue/50 group-active:bg-action-blue transition-colors" />
+                        </div>
+                    )}
+
                     {/* Right: Room Panel */}
-                    <div className={`transition-all duration-300 overflow-hidden bg-white flex flex-col shrink-0 ${isSidebarOpen ? 'w-full h-[50vh] lg:h-auto lg:w-[420px] xl:w-[480px] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0 h-0 lg:h-auto'}`}>
+                    <div className={`overflow-hidden bg-white flex flex-col shrink-0 ${isResizingSidebar ? '' : 'transition-all duration-300'} ${isSidebarOpen ? 'w-full h-[50vh] lg:h-auto lg:w-[var(--sidebar-w)] border-t lg:border-t-0 lg:border-l border-platinum-tint' : 'w-0 h-0 lg:h-auto'}`}>
 
                         {/* Tabs — flex-1 chia đều, label viết tắt, whitespace-nowrap */}
                         <nav className="flex border-b border-platinum-tint shrink-0 bg-white">
@@ -2111,7 +2321,7 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             <div className="divide-y divide-platinum-tint max-h-[200px] overflow-y-auto">
                                                 {roomDevices.map((device, idx) => (
                                                     <div key={device.id || idx} className="flex items-center justify-between px-3 py-2 hover:bg-cloud-mist/30 transition-colors">
-                                                        <span className="text-xs text-midnight-indigo font-semibold truncate pr-2">{device.name || device.deviceName || `Thiết bị ${idx + 1}`}</span>
+                                                        <span className="text-xs text-midnight-indigo font-semibold truncate pr-2">{device.device_name || device.name || device.deviceName || `Thiết bị ${idx + 1}`}</span>
                                                         <span className={`text-[9px] px-2 py-0.5 rounded font-bold border shrink-0 ${device.status === 'online' || device.isOnline
                                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                             : 'bg-red-50 text-red-600 border-red-200'
@@ -2619,13 +2829,13 @@ const InMeetingRoom = ({ isPublic = false }) => {
                             <h3 className="text-base font-bold text-midnight-indigo flex items-center gap-2">
                                 <Timer className="w-5 h-5 text-action-blue" /> Yêu cầu gia hạn cuộc họp
                             </h3>
-                            <p className="text-xs text-slate-blue mt-1">Gửi yêu cầu gia hạn đến chủ tọa để phê duyệt.</p>
+                            <p className="text-xs text-slate-blue mt-1">Hệ thống tự động chấp nhận nếu không ảnh hưởng cuộc họp kế tiếp.</p>
                         </div>
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1.5">Gia hạn thêm (phút)</label>
-                                <div className="flex gap-2">
-                                    {[15, 30, 45, 60].map(m => (
+                                <div className="flex gap-2 mb-2">
+                                    {[15, 40, 60].map(m => (
                                         <button
                                             key={m}
                                             onClick={() => setExtensionModal(prev => ({ ...prev, minutes: m }))}
@@ -2638,6 +2848,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                         </button>
                                     ))}
                                 </div>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={240}
+                                    value={extensionModal.minutes}
+                                    onChange={e => setExtensionModal(prev => ({ ...prev, minutes: e.target.value ? Number(e.target.value) : '' }))}
+                                    placeholder="Hoặc nhập số phút tùy ý..."
+                                    className="w-full px-3 py-2 bg-cloud-mist border border-platinum-tint rounded-xl text-xs text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase tracking-wider mb-1.5">Lý do</label>
@@ -2660,6 +2879,55 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                 {actionLoading ? 'Đang gửi...' : `Gửi yêu cầu +${extensionModal.minutes}ph`}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EXTENSION REJECTED MODAL — vi phạm buffer trước cuộc họp kế tiếp */}
+            {extensionRejectedInfo && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-midnight-indigo/40 backdrop-blur-sm">
+                    <div className="bg-white border border-platinum-tint rounded-2xl p-6 w-full max-w-sm shadow-sm-3 space-y-4">
+                        <div className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="w-5 h-5" />
+                            <h3 className="text-base font-bold">Không thể gia hạn</h3>
+                        </div>
+                        <p className="text-sm text-midnight-indigo">
+                            Thời gian bạn xin thêm trùng vào khoảng đệm trước cuộc họp kế tiếp trong phòng này. Vui lòng liên hệ trực tiếp Host cuộc họp sau để thống nhất.
+                        </p>
+                        {extensionRejectedInfo.nextMeeting && (
+                            <div className="bg-cloud-mist border border-platinum-tint rounded-xl p-3 space-y-1">
+                                <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Cuộc họp kế tiếp</p>
+                                <p className="text-sm font-semibold text-midnight-indigo">{extensionRejectedInfo.nextMeeting.title}</p>
+                                <p className="text-xs text-slate-blue">
+                                    Bắt đầu lúc {new Date(extensionRejectedInfo.nextMeeting.startTime).toLocaleString('vi-VN')}
+                                    {extensionRejectedInfo.nextMeeting.roomName ? ` • ${extensionRejectedInfo.nextMeeting.roomName}` : ''}
+                                </p>
+                            </div>
+                        )}
+                        {extensionRejectedInfo.nextMeetingHost && (
+                            <div className="border border-platinum-tint rounded-xl p-3 space-y-2">
+                                <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Liên hệ Host cuộc họp sau</p>
+                                <p className="text-sm font-semibold text-midnight-indigo">{extensionRejectedInfo.nextMeetingHost.fullName}</p>
+                                <div className="flex flex-col gap-1.5">
+                                    {extensionRejectedInfo.nextMeetingHost.email && (
+                                        <a href={`mailto:${extensionRejectedInfo.nextMeetingHost.email}`} className="flex items-center gap-2 text-xs text-action-blue hover:underline">
+                                            <Mail className="w-3.5 h-3.5" /> {extensionRejectedInfo.nextMeetingHost.email}
+                                        </a>
+                                    )}
+                                    {extensionRejectedInfo.nextMeetingHost.phoneNumber && (
+                                        <a href={`tel:${extensionRejectedInfo.nextMeetingHost.phoneNumber}`} className="flex items-center gap-2 text-xs text-action-blue hover:underline">
+                                            <IoCall className="w-3.5 h-3.5" /> {extensionRejectedInfo.nextMeetingHost.phoneNumber}
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setExtensionRejectedInfo(null)}
+                            className="w-full py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-sm font-bold"
+                        >
+                            Đã hiểu
+                        </button>
                     </div>
                 </div>
             )}

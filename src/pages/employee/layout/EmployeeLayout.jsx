@@ -54,7 +54,7 @@ const STATIC_NAVIGATION_ITEMS = [
         icon: FileText
     },
     {
-        label: 'Thiết bị',
+        label: 'Báo hỏng thiết bị',
         to: '/employee/equipments',
         icon: Monitor
     },

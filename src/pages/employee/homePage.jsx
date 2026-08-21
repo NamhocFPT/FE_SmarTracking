@@ -192,7 +192,25 @@ const EmployeeHomePage = () => {
             .then(res => {
                 if (!isMounted) return;
                 if (res?.success && res.data) {
-                    setAnalyticsData(res.data);
+                    // BE trả KPI lồng trong `summary` (xem PersonalStatsResponseDto),
+                    // và tên field lệch với FE cho recentLate — chuẩn hóa về flat shape
+                    // mà phần render bên dưới đang dùng.
+                    const d = res.data;
+                    const summary = d.summary || {};
+                    setAnalyticsData({
+                        ...d,
+                        onTimeRate: summary.onTimeRate ?? 0,
+                        totalRequired: summary.totalRequired ?? 0,
+                        onTimeCount: summary.onTimeCount ?? 0,
+                        lateCount: summary.lateCount ?? 0,
+                        absentCount: summary.absentCount ?? 0,
+                        recentLate: (d.recentLate || []).map(item => ({
+                            meetingTitle: item.meetingTitle,
+                            scheduledTime: item.scheduledStartTime,
+                            checkinTime: item.checkInTime,
+                            lateMinutes: item.lateMinutes,
+                        })),
+                    });
                 } else {
                     setAnalyticsError(res?.message || 'Không thể tải dữ liệu thống kê.');
                 }
@@ -220,12 +238,6 @@ const EmployeeHomePage = () => {
             { name: 'Vắng mặt', value: analyticsData.absentCount ?? 0 },
         ].filter(d => d.value > 0);
     }, [analyticsData]);
-
-    const handleConsent = (meetingId, granted) => {
-        setUpcomingMeetings(prev =>
-            prev.map(m => m.id === meetingId ? { ...m, consentStatus: granted ? 'GRANTED' : 'REJECTED' } : m)
-        );
-    };
 
     return (
         <motion.div
@@ -498,40 +510,9 @@ const EmployeeHomePage = () => {
                                                         <span>Chủ trì: <strong>{meet.host}</strong></span>
                                                     </div>
                                                 </div>
-
-                                                {meet.recordingEnabled && (
-                                                    <div className="flex items-center gap-2 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-0 border-platinum-tint/40">
-                                                        {meet.consentStatus === 'PENDING' ? (
-                                                            <div className="flex items-center gap-2 w-full justify-between">
-                                                                <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
-                                                                    <AlertCircle className="w-3 h-3" /> Cần Consent
-                                                                </span>
-                                                                <div className="flex gap-1">
-                                                                    <button
-                                                                        onClick={() => handleConsent(meet.id, true)}
-                                                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors"
-                                                                    >
-                                                                        Đồng ý
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleConsent(meet.id, false)}
-                                                                        className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded transition-colors"
-                                                                    >
-                                                                        Từ chối
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ) : meet.consentStatus === 'GRANTED' ? (
-                                                            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
-                                                                <CheckCircle className="w-3.5 h-3.5" /> Đã đồng ý ghi hình
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded flex items-center gap-1">
-                                                                <AlertCircle className="w-3.5 h-3.5" /> Từ chối ghi hình
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                {/* Nút Consent ghi hình đã ẩn tạm: FE chưa có API/bảng lưu trạng thái
+                                                    consent theo participant ở BE, bấm chỉ set local state rồi mất khi
+                                                    reload. Bật lại khi có endpoint thật. */}
                                             </div>
                                         ))
                                     ) : (
