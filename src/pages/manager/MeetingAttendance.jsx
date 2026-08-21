@@ -1,7 +1,8 @@
-import { Activity, AlertTriangle, ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, RefreshCw, Search, Users, MapPin, ArrowRight } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowLeft, Calendar, Clock, RefreshCw, Search, Users, MapPin, ArrowRight } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { getMeetings } from '../../service/businessAdminServices';
 import MeetingPresenceIVSS from '../../components/meeting/MeetingPresenceIVSS';
+import Pagination from '../../components/common/Pagination';
 
 const formatDateTime = (iso) => {
     if (!iso) return '—';
@@ -48,9 +49,12 @@ const MeetingAttendance = () => {
                 page,
                 limit: ITEMS_PER_PAGE,
             };
-            if (fromDate) params.from = fromDate;
-            if (toDate) params.to = toDate;
-            if (search.trim()) params.q = search.trim();
+            // BE so sanh start_time >= from / <= to theo dung timestamp truyen len
+            // (khong tu suy ra ca ngay) — phai gui du gio, neu khong "to" se bi hieu
+            // la 00:00:00 va cat mat toan bo cuoc hop trong ngay hom do.
+            if (fromDate) params.from = `${fromDate}T00:00:00+07:00`;
+            if (toDate) params.to = `${toDate}T23:59:59+07:00`;
+            if (search.trim()) params.search = search.trim();
 
             const res = await getMeetings(params);
             if (res?.success) {
@@ -272,22 +276,11 @@ const MeetingAttendance = () => {
                         {totalPages > 1 && (
                             <div className="px-5 py-3 border-t border-platinum-tint flex items-center justify-between">
                                 <span className="text-[11px] text-slate-blue">Trang {page} / {totalPages}</span>
-                                <div className="flex items-center gap-1.5">
-                                    <button
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        disabled={page === 1}
-                                        className="p-1.5 border border-platinum-tint rounded-lg hover:bg-cloud-mist disabled:opacity-40 transition-colors"
-                                    >
-                                        <ChevronLeft className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={page === totalPages}
-                                        className="p-1.5 border border-platinum-tint rounded-lg hover:bg-cloud-mist disabled:opacity-40 transition-colors"
-                                    >
-                                        <ChevronRight className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPageChange={(p) => setPage(p)}
+                                />
                             </div>
                         )}
                     </>

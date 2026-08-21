@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Calendar, Clock, Users, FileText, StickyNote, Mic,
-    AlertTriangle, Loader2, CheckCircle, XCircle, RefreshCw
+    AlertTriangle, Loader2, CheckCircle, XCircle, RefreshCw, Download
 } from 'lucide-react';
 import { getGuestMeeting, clearGuestSession, getGuestToken } from '../../service/guestService';
 
@@ -197,14 +197,42 @@ const GuestMeeting = () => {
                             {meeting.agenda.map((item, i) => {
                                 const ag = AGENDA_STATUS[item.status] || AGENDA_STATUS.planned;
                                 return (
-                                    <div key={i} className="flex items-center gap-3 px-5 py-3">
-                                        <span className="text-[10px] font-bold text-slate-blue w-5 shrink-0">{item.order}.</span>
-                                        <span className={`flex-1 text-sm font-semibold ${item.status === 'skipped' ? 'line-through text-slate-blue' : 'text-midnight-indigo'}`}>
-                                            {item.title}
-                                        </span>
-                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${ag.cls}`}>
-                                            {ag.text}
-                                        </span>
+                                    <div key={i} className="px-5 py-3 space-y-2">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] font-bold text-slate-blue w-5 shrink-0">{item.order}.</span>
+                                            <span className={`flex-1 text-sm font-semibold ${item.status === 'skipped' ? 'line-through text-slate-blue' : 'text-midnight-indigo'}`}>
+                                                {item.title}
+                                            </span>
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${ag.cls}`}>
+                                                {ag.text}
+                                            </span>
+                                        </div>
+                                        {item.attachments?.length > 0 && (
+                                            <div className="pl-8 flex flex-col gap-1.5">
+                                                {item.attachments.map((att) => (
+                                                    att.downloadUrl ? (
+                                                        <a
+                                                            key={att.id}
+                                                            href={att.downloadUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="flex items-center gap-1.5 text-[11px] text-action-blue hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg w-max transition-colors"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5 shrink-0" />
+                                                            <span className="truncate max-w-[220px]">{att.fileName}</span>
+                                                        </a>
+                                                    ) : (
+                                                        <span
+                                                            key={att.id}
+                                                            className="flex items-center gap-1.5 text-[11px] text-slate-blue bg-cloud-mist px-2 py-1 rounded-lg w-max"
+                                                        >
+                                                            <FileText className="w-3.5 h-3.5 shrink-0" />
+                                                            <span className="truncate max-w-[220px]">{att.fileName}</span>
+                                                        </span>
+                                                    )
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

@@ -9,8 +9,7 @@ import { useSearchParams } from 'react-router-dom';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import { getUsers } from '../../service/businessAdminServices';
-import { getUserJourney } from '../../service/campusService';
-import { getMyGateAccessHistory } from '../../service/anprService';
+import { getUserJourney, getMyUserJourney } from '../../service/campusService';
 
 /* ─── helpers ─────────────────────────────────────────────── */
 const getVNTodayString = () => {
@@ -41,23 +40,6 @@ const formatDuration = (ms) => {
     const h = Math.floor(totalMin / 60);
     const m = totalMin % 60;
     return m > 0 ? `${h}g ${m}p` : `${h} giờ`;
-};
-
-// GateAccessHistoryItemDto (1 dòng = 1 phiên, có cả check_in_time và check_out_time) —
-// gọn thành 1 "event" gate để tái dùng renderEventIcon/renderEventCard sẵn có. Phiên chỉ có
-// check_out_time (không có check_in_time) là log 'leave' chưa ghép cặp (EX2 SRS GAH-001).
-const mapGateSessionToEvent = (s) => {
-    const hasCheckIn = !!s.check_in_time;
-    return {
-        type: 'gate',
-        direction: hasCheckIn ? 'enter' : 'leave',
-        time: s.check_in_time || s.check_out_time,
-        endTime: hasCheckIn ? s.check_out_time : null,
-        durationMs: s.duration_seconds ? s.duration_seconds * 1000 : null,
-        detail: s.zone_name ? `Ghi nhận tại ${s.zone_name}` : 'Ghi nhận ra/vào cổng',
-        plateNumber: s.plate_number,
-        sourceEventId: null,
-    };
 };
 
 /* ─── component ───────────────────────────────────────────── */
@@ -186,29 +168,18 @@ const UserJourney = () => {
     }, []);
 
     /* fetch journey */
-    // isSelfOnly (EMPLOYEE) không có quyền zones.gate_log.read (BE campus/user-journey) —
-    // dùng GET /gate-access/history (JWT-only, tự lọc theo user hiện tại, UC-113) thay thế,
-    // chỉ trả lịch sử ra/vào cổng (không có cuộc họp/khu vực giám sát như bản admin).
+    // isSelfOnly (EMPLOYEE) không có quyền zones.gate_log.read (BE campus/user-journey
+    // admin route) — dùng GET /campus/user-journey/me (JWT-only, tự lọc theo user hiện tại,
+    // userId lấy từ token) thay thế. Route "me" trả ĐẦY ĐỦ 3 nguồn (cổng/họp/khu vực) giống
+    // hệt bản admin, chỉ khác ở chỗ luôn tự khoá vào chính user đang đăng nhập.
     const fetchJourney = useCallback(async () => {
         if (!selectedUser) return;
         setLoading(true);
         setError(null);
         try {
-            if (isSelfOnly) {
-                const from = `${date}T00:00:00+07:00`;
-                const to = `${date}T23:59:59+07:00`;
-                const res = await getMyGateAccessHistory({ from, to, limit: 100 });
-                if (res?.success) {
-                    const events = (res.data || []).map(mapGateSessionToEvent);
-                    setJourneyData({ gateCount: res.meta?.total ?? events.length, meetingCount: 0, zoneCount: 0, events });
-                    setPage(1);
-                    setSearchParams({ userId: selectedUser.id || selectedUser.uuid, date });
-                } else {
-                    setError(res?.message || 'Không thể tải lịch sử ra/vào cổng.');
-                }
-                return;
-            }
-            const res = await getUserJourney({ userId: selectedUser.id || selectedUser.uuid, date });
+            const res = isSelfOnly
+                ? await getMyUserJourney({ date })
+                : await getUserJourney({ userId: selectedUser.id || selectedUser.uuid, date });
             if (res?.success) {
                 setJourneyData(res.data);
                 setPage(1);
@@ -393,10 +364,10 @@ const UserJourney = () => {
                             <Map className="w-3.5 h-3.5" />
                             Hành trình
                         </span>
-                        <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">{isSelfOnly ? 'Lịch sử ra/vào cổng' : 'Hành trình khuôn viên'}</h1>
+                        <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Hành trình khuôn viên</h1>
                         <p className="text-slate-blue text-sm mt-0.5">
                             {isSelfOnly
-                                ? 'Xem lại lịch sử ra/vào cổng (ANPR) của bạn trong ngày.'
+                                ? 'Xem lại hành trình di chuyển (ra/vào cổng, phòng họp, khu vực) của bạn trong ngày.'
                                 : 'Theo dõi lịch trình hoạt động tổng hợp của một nhân viên trong ngày.'}
                         </p>
                     </div>
@@ -590,38 +561,34 @@ const UserJourney = () => {
                 <div className="space-y-6">
 
                     {/* KPI cards */}
-                    <div className={`grid grid-cols-1 ${isSelfOnly ? '' : 'sm:grid-cols-3'} gap-4`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-1 flex items-center justify-between hover-lift">
                             <div>
-                                <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">{isSelfOnly ? 'Phiên ra/vào cổng' : 'Cổng ANPR (Xe)'}</p>
+                                <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Cổng ANPR (Xe)</p>
                                 <p className="text-2xl font-black text-midnight-indigo mt-1">{journeyData.gateCount || 0}</p>
                             </div>
                             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                                 <Car className="w-5 h-5" />
                             </div>
                         </div>
-                        {!isSelfOnly && (
-                            <>
-                                <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-1 flex items-center justify-between hover-lift">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Cuộc họp (FaceID)</p>
-                                        <p className="text-2xl font-black text-midnight-indigo mt-1">{journeyData.meetingCount || 0}</p>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
-                                        <CalendarCheck className="w-5 h-5" />
-                                    </div>
-                                </div>
-                                <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-1 flex items-center justify-between hover-lift">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Khu vực Giám sát</p>
-                                        <p className="text-2xl font-black text-midnight-indigo mt-1">{journeyData.zoneCount || 0}</p>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
-                                        <Eye className="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                        <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-1 flex items-center justify-between hover-lift">
+                            <div>
+                                <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Cuộc họp (FaceID)</p>
+                                <p className="text-2xl font-black text-midnight-indigo mt-1">{journeyData.meetingCount || 0}</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-action-blue flex items-center justify-center">
+                                <CalendarCheck className="w-5 h-5" />
+                            </div>
+                        </div>
+                        <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm-1 flex items-center justify-between hover-lift">
+                            <div>
+                                <p className="text-xs font-bold text-slate-blue uppercase tracking-wider">Khu vực Giám sát</p>
+                                <p className="text-2xl font-black text-midnight-indigo mt-1">{journeyData.zoneCount || 0}</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-royal-amethyst flex items-center justify-center">
+                                <Eye className="w-5 h-5" />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Timeline */}
@@ -646,18 +613,14 @@ const UserJourney = () => {
                                 <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0" />
                                 Ra cổng
                             </span>
-                            {!isSelfOnly && (
-                                <>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-action-blue shrink-0" />
-                                        Phòng họp
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-royal-amethyst shrink-0" />
-                                        Khu vực
-                                    </span>
-                                </>
-                            )}
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-action-blue shrink-0" />
+                                Phòng họp
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-royal-amethyst shrink-0" />
+                                Khu vực
+                            </span>
                         </div>
 
                         {/* vertical timeline */}

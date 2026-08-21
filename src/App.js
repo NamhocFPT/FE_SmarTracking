@@ -1,4 +1,5 @@
 import ToastContainer from "./components/common/ToastContainer";
+import NotificationBanner from "./components/common/NotificationBanner";
 import AllRouter from "./routers/AllRouter";
 
 // Handle auth expiry globally — full reload to /login clears all stale state
@@ -14,6 +15,7 @@ function App() {
     <>
       <AllRouter />
       <ToastContainer />
+      <NotificationBanner />
     </>
   );
 }

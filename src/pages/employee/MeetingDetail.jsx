@@ -1770,6 +1770,7 @@ const EmployeeMeetingDetail = () => {
                                     key={refreshTranscriptKey}
                                     meetingId={meeting.id}
                                     isHost={canManage}
+                                    mediaFiles={mediaFiles}
                                 />
                             </div>
                         ) : (
