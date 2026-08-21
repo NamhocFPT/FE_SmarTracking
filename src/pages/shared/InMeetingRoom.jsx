@@ -1224,15 +1224,22 @@ const InMeetingRoom = ({ isPublic = false }) => {
         }
     };
 
+    // [Việc B, tái đánh giá 2026-08-21] "Tôi vẫn đến" giờ gia hạn (snoozed, có hạn
+    // chót snoozeUntil), KHÔNG còn dismiss vĩnh viễn — banner giữ nguyên hiển thị,
+    // chỉ đổi sang trạng thái "đã xác nhận, đang chờ" thay vì tự đóng hẳn.
     const handleDismissNoShow = async () => {
         const caseId = noShowWarning?.caseId;
         if (!caseId) return;
         try {
-            await patch(`/no-show-cases/${caseId}`, { detectionStatus: 'dismissed' });
+            const res = await patch(`/no-show-cases/${caseId}`, { detectionStatus: 'snoozed' });
+            if (res?.success) {
+                setNoShowWarning((prev) => (prev ? { ...prev, kind: 'snoozed', snoozeUntil: res.data?.snoozeUntil ?? null } : null));
+            } else {
+                showToast(res?.error?.message || 'Không kịp — phòng có thể đã được giải phóng. Vui lòng kiểm tra lại.', 'error');
+            }
         } catch (err) {
-            showToast('Không thể xác nhận, vui lòng thử lại.', 'error');
+            showToast('Lỗi kết nối server, vui lòng thử lại.', 'error');
         }
-        setNoShowWarning(null);
     };
 
     const handleRequestExtension = async () => {
@@ -2667,14 +2674,18 @@ const InMeetingRoom = ({ isPublic = false }) => {
                         exit={{ opacity: 0, y: -20 }}
                         className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border text-sm font-semibold max-w-[480px] w-[90vw] pointer-events-auto ${noShowWarning.kind === 'warning'
                                 ? 'bg-amber-500 border-amber-400 text-white'
-                                : 'bg-midnight-indigo border-indigo-700 text-white'
+                                : noShowWarning.kind === 'snoozed'
+                                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                                    : 'bg-midnight-indigo border-indigo-700 text-white'
                             }`}
                     >
                         <AlertTriangle className="w-5 h-5 shrink-0" />
                         <span className="flex-1 leading-snug">
                             {noShowWarning.kind === 'warning'
                                 ? 'Hệ thống phát hiện bạn không có mặt. Xác nhận để giữ phòng.'
-                                : 'Phòng họp đã được giải phóng do không có người tham dự.'}
+                                : noShowWarning.kind === 'snoozed'
+                                    ? `Đã xác nhận — đang chờ tới ${noShowWarning.snoozeUntil ? new Date(noShowWarning.snoozeUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'hết hạn gia hạn'}.`
+                                    : 'Phòng họp đã được giải phóng do không có người tham dự.'}
                         </span>
                         {noShowWarning.kind === 'warning' ? (
                             <button

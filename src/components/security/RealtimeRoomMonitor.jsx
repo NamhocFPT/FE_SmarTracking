@@ -290,8 +290,9 @@ const RealtimeRoomMonitor = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className={`p-5 rounded-2xl border shadow-sm-1 transition-all ${
-                            room.noShowStatus && ['risk', 'warning_sent', 'confirmed'].includes(room.noShowStatus) ? 'bg-red-50/50 border-red-200' : 
-                            room.currentStatus === 'occupied' ? 'bg-blue-50/50 border-blue-200' : 
+                            room.noShowStatus && ['risk', 'warning_sent', 'confirmed'].includes(room.noShowStatus) ? 'bg-red-50/50 border-red-200' :
+                            room.noShowStatus === 'snoozed' ? 'bg-sky-50/50 border-sky-200' :
+                            room.currentStatus === 'occupied' ? 'bg-blue-50/50 border-blue-200' :
                             'bg-white border-platinum-tint'
                         }`}
                     >
@@ -306,6 +307,10 @@ const RealtimeRoomMonitor = () => {
                                                 room.noShowStatus === 'warning_sent' ? 'Đã gửi cảnh báo' :
                                                 'Đã xác nhận'
                                             })
+                                        </span>
+                                    ) : room.noShowStatus === 'snoozed' ? (
+                                        <span className="text-sky-600 flex items-center gap-1">
+                                            <Clock className="w-3.5 h-3.5"/> Đã gia hạn{room.noShowSnoozeUntil ? ` — chờ tới ${new Date(room.noShowSnoozeUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ''}
                                         </span>
                                     ) : (
                                         <>
@@ -331,6 +336,15 @@ const RealtimeRoomMonitor = () => {
                             >
                                 <Eye className="w-4 h-4" />
                                 Kiểm tra vi phạm No-show
+                            </button>
+                        )}
+                        {room.noShowStatus === 'snoozed' && (
+                            <button
+                                onClick={() => handleOpenNoShow({ roomId: room.roomId, roomName: room.roomName, noShowStatus: room.noShowStatus })}
+                                className="w-full mt-2 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <Eye className="w-4 h-4" />
+                                Xem chi tiết gia hạn
                             </button>
                         )}
                     </motion.div>
@@ -415,6 +429,7 @@ const RealtimeRoomMonitor = () => {
                                                 caseItem.status === 'warning_sent' ? 'bg-yellow-100 text-yellow-700' :
                                                 caseItem.status === 'released' ? 'bg-green-100 text-green-700' :
                                                 caseItem.status === 'dismissed' ? 'bg-slate-200 text-slate-700' :
+                                                caseItem.status === 'snoozed' ? 'bg-sky-100 text-sky-700' :
                                                 caseItem.status === 'resolved' ? 'bg-teal-100 text-teal-700' :
                                                 'bg-blue-100 text-blue-700'
                                             }`}>
@@ -423,6 +438,7 @@ const RealtimeRoomMonitor = () => {
                                                  caseItem.status === 'warning_sent' ? 'Đã gửi cảnh báo' :
                                                  caseItem.status === 'released' ? 'Đã giải phóng' :
                                                  caseItem.status === 'dismissed' ? 'Đã bỏ qua' :
+                                                 caseItem.status === 'snoozed' ? 'Đã gia hạn' :
                                                  caseItem.status === 'resolved' ? 'Đã giải quyết' :
                                                  caseItem.status}
                                             </span>
@@ -534,6 +550,7 @@ const RealtimeRoomMonitor = () => {
                                                      noShowDetail.status === 'warning_sent' ? 'Đã gửi cảnh báo' :
                                                      noShowDetail.status === 'released' ? 'Đã giải phóng' :
                                                      noShowDetail.status === 'dismissed' ? 'Đã bỏ qua' :
+                                                     noShowDetail.status === 'snoozed' ? 'Đã gia hạn' :
                                                      noShowDetail.status === 'resolved' ? 'Đã giải quyết' :
                                                      noShowDetail.status}
                                                 </span>

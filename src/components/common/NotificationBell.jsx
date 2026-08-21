@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, ShieldAlert, BellRing } from 'lucide-react';
 import { getNotifications } from '../../service/sysAdminServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
+import { patch } from '../../utils/request';
 
 const stripHtml = (html) => {
     if (!html) return '';
@@ -48,6 +49,9 @@ const NotificationBell = ({
     const [unreadCount, setUnreadCount] = useState(0);
     const [feedItems, setFeedItems] = useState([]);
     const containerRef = useRef(null);
+    // [Việc B mở rộng] Trạng thái nút "Tôi vẫn đến" theo từng no_show_cases.id — độc
+    // lập với read-state (localStorage) ở trên, không đụng vào unreadCount.
+    const [dismissState, setDismissState] = useState({});
 
     // EMPLOYEE không có permission security_alert.read (đúng thiết kế BE, xem Plan.md mục 1)
     // — gọi /security-alerts ở role này chỉ gây 403 vô ích, nên bỏ qua hẳn lời gọi.
@@ -67,12 +71,15 @@ const NotificationBell = ({
                 ? (notiRes.value.data || []).map((item) => ({
                     id: `noti-${item.id}`,
                     source: 'notification',
+                    notificationType: item.notificationType,
                     title: item.subject,
                     body: item.content,
                     timestamp: item.createdAt,
                     // [Nhóm E] payloadJson.conflictDetails/suggestedAlternatives — chỉ
                     // dùng cho notificationType = meeting_request_rejected khi có xung
                     // đột phòng, xem render phía dưới.
+                    // [Việc B mở rộng] payloadJson.noShowCaseId/kind — cho
+                    // notificationType = no_show_alert, dùng để hiện nút "Tôi vẫn đến".
                     payloadJson: item.payloadJson ?? null,
                 }))
                 : [];
@@ -153,6 +160,45 @@ const NotificationBell = ({
         navigate(`${basePath}/notifications`);
     };
 
+    /**
+     * [Việc B, tái đánh giá 2026-08-21] Nút "Tôi vẫn đến" trên item thông báo no-show —
+     * tái dùng đúng endpoint của InMeetingRoom.jsx (PATCH /no-show-cases/:id
+     * {detectionStatus:'snoozed'} — KHÔNG còn 'dismissed', case chỉ GIA HẠN có hạn
+     * chót, không terminal vĩnh viễn), cùng cách check res.success (fix B.1): thất bại
+     * (case đã terminal, hết quyền, mất mạng...) → KHÔNG âm thầm coi như thành công,
+     * hiện lỗi tại chỗ, KHÔNG đụng tới read-state/unreadCount phía trên. Backend đã tự
+     * giới hạn người nhận thông báo này = organizer/host của meeting (xem
+     * no-show-lifecycle.service.ts#notifyNoShow) nên không cần FE tự kiểm tra lại
+     * quyền — ai NHÌN THẤY thông báo này trong bell của chính họ đều là đúng người.
+     */
+    const handleDismissNoShowCase = async (caseId, event) => {
+        event.stopPropagation();
+        if (!caseId) return;
+        setDismissState((prev) => ({ ...prev, [caseId]: { status: 'loading' } }));
+        try {
+            const res = await patch(`/no-show-cases/${caseId}`, { detectionStatus: 'snoozed' });
+            if (res?.success) {
+                setDismissState((prev) => ({
+                    ...prev,
+                    [caseId]: { status: 'success', snoozeUntil: res.data?.snoozeUntil ?? null },
+                }));
+            } else {
+                setDismissState((prev) => ({
+                    ...prev,
+                    [caseId]: {
+                        status: 'error',
+                        message: res?.error?.message || 'Không thể xác nhận, vui lòng thử lại.',
+                    },
+                }));
+            }
+        } catch (err) {
+            setDismissState((prev) => ({
+                ...prev,
+                [caseId]: { status: 'error', message: 'Lỗi kết nối server, vui lòng thử lại.' },
+            }));
+        }
+    };
+
     return (
         <div ref={containerRef} className="relative">
             <button
@@ -201,6 +247,42 @@ const NotificationBell = ({
                                                 <span className="text-rose-600 font-medium"> — trùng với "{item.payloadJson.conflictDetails[0].meetingTitle}"</span>
                                             )}
                                         </p>
+                                        {/* [Việc B mở rộng] Nút "Tôi vẫn đến" — chỉ hiện khi thông báo còn ở
+                                            trạng thái non-terminal (kind='warning'; kind='released' nghĩa là
+                                            phòng đã bị thu hồi, dismiss lúc này chắc chắn vô nghĩa). */}
+                                        {item.notificationType === 'no_show_alert' &&
+                                            item.payloadJson?.kind === 'warning' &&
+                                            item.payloadJson?.noShowCaseId && (
+                                                (() => {
+                                                    const caseId = item.payloadJson.noShowCaseId;
+                                                    const state = dismissState[caseId];
+                                                    if (state?.status === 'success') {
+                                                        const untilStr = state.snoozeUntil
+                                                            ? new Date(state.snoozeUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                                                            : null;
+                                                        return (
+                                                            <p className="text-xs font-bold text-emerald-600 mt-1">
+                                                                {untilStr ? `✓ Đã xác nhận — đang chờ tới ${untilStr}` : '✓ Đã xác nhận, đang chờ'}
+                                                            </p>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleDismissNoShowCase(caseId, e)}
+                                                                disabled={state?.status === 'loading'}
+                                                                className="text-xs font-bold text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                                                            >
+                                                                {state?.status === 'loading' ? 'Đang xử lý...' : 'Tôi vẫn đến — giữ phòng'}
+                                                            </button>
+                                                            {state?.status === 'error' && (
+                                                                <p className="text-[11px] text-red-600 mt-1">{state.message}</p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()
+                                            )}
                                     </div>
                                 </div>
                             ))
