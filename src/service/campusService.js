@@ -12,6 +12,18 @@ export const getUserJourney = async (params = {}) => {
 };
 
 /**
+ * UC-TRACK-01 (own) — hành trình khuôn viên ĐẦY ĐỦ (cổng + họp + khu vực) của CHÍNH
+ * user đang đăng nhập, không cần quyền zones.gate_log.read (userId lấy từ JWT ở BE).
+ * GET /campus/user-journey/me
+ * @param {object} params - { date }
+ * @returns {Promise<object>} response envelope { success, data: { userId, fullName, date, gateCount, meetingCount, zoneCount, events: [...] } }
+ */
+export const getMyUserJourney = async (params = {}) => {
+    const query = buildQuery(params);
+    return await get(`/campus/user-journey/me${query}`);
+};
+
+/**
  * CDB-RS-001: Manager role-scoped dashboard summary
  * GET /campus-dashboard/manager-summary (MANAGER only, others 403)
  * @returns {Promise<object>} { success, data: { teamPresenceToday: {presentCount, totalCount}, pendingMeetingRequestsCount, onTimeRateThisWeek: {rate, sampleSize}, teamZoneSecurityAlerts: {value, note} } }

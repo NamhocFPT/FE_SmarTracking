@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import {
     getMeetingPresence,
     getUserPresence,
-    getMeetingPresenceReport
+    getMeetingPresenceReport,
+    getMeetingAttendance
 } from '../../service/managerServices';
 import ThumbnailImage from '../common/ThumbnailImage';
 import EventSnapshotModal from '../security/EventSnapshotModal';
@@ -46,6 +47,18 @@ const formatVietnameseTime = (isoString) => {
         });
     } catch { return '—'; }
 };
+
+const ATTENDANCE_STATUS_MAP = {
+    not_checked_in: { label: 'Chưa điểm danh', className: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' },
+    present: { label: 'Đã điểm danh', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+    late: { label: 'Điểm danh trễ', className: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+    left_early: { label: 'Về sớm', className: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+    absent: { label: 'Vắng mặt', className: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
+    pending_review: { label: 'Chờ xác minh', className: 'bg-violet-50 text-violet-700 border-violet-200', dot: 'bg-violet-500' },
+};
+
+const getAttendanceStatusInfo = (status) =>
+    ATTENDANCE_STATUS_MAP[status] || { label: 'Chưa điểm danh', className: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
 
 const getInitials = (name) => {
     if (!name) return '?';
@@ -497,6 +510,7 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [presenceSummary, setPresenceSummary] = useState(null);
+    const [attendanceByUserId, setAttendanceByUserId] = useState({});
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState('fullName');
     const [sortOrder, setSortOrder] = useState('asc');
@@ -525,6 +539,20 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
             setError(err.message || 'Lỗi hệ thống khi tải dữ liệu hiện diện camera.');
         } finally {
             setLoading(false);
+        }
+
+        // Tình trạng điểm danh chính thức đến từ attendance_records (module attendance,
+        // UC-APM-02), KHÔNG phải meeting_participants.attendance_status (cột này không
+        // bao giờ được ghi bởi luồng điểm danh thủ công/camera — luôn giữ giá trị mặc định).
+        // Tải riêng, lỗi ở đây không chặn phần hiện diện camera phía trên.
+        try {
+            const attRes = await getMeetingAttendance(meetingId, { pageSize: 100 });
+            const items = attRes?.data?.items || [];
+            const map = {};
+            items.forEach((it) => { map[it.userId] = it.attendanceStatus; });
+            setAttendanceByUserId(map);
+        } catch {
+            setAttendanceByUserId({});
         }
     }, [meetingId]);
 
@@ -591,7 +619,10 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
         );
     }
 
-    const participants = presenceSummary?.participants || [];
+    const participants = (presenceSummary?.participants || []).map((p) => ({
+        ...p,
+        attendanceStatus: attendanceByUserId[p.userId] || 'not_checked_in',
+    }));
     const unmatchedCount = presenceSummary?.meetingUnmatchedIdentityCount ?? 0;
     const countPresent = participants.filter(p => p.durationMs > 0).length;
     const countAbsent = participants.filter(p => p.durationMs === 0).length;
@@ -724,6 +755,7 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                                 <tr className="bg-cloud-mist border-b border-platinum-tint text-slate-blue font-bold text-[11px]">
                                     <SortHeader field="fullName" label="Nhân viên" />
                                     <SortHeader field="durationMs" label="Trạng thái" />
+                                    <SortHeader field="attendanceStatus" label="Tình trạng điểm danh" />
                                     <SortHeader field="durationMs" label="Thời lượng có mặt" />
                                     <SortHeader field="presentRatio" label="Tỉ lệ hiện diện" />
                                     <th className="p-3.5 text-center">Hành động</th>
@@ -773,6 +805,19 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                                                 </span>
                                             </td>
 
+                                            {/* Tình trạng điểm danh — nguồn attendance_records (module attendance), khác Trạng thái camera ở trên */}
+                                            <td className="p-3.5">
+                                                {(() => {
+                                                    const info = getAttendanceStatusInfo(user.attendanceStatus);
+                                                    return (
+                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${info.className}`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${info.dot}`} />
+                                                            {info.label}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </td>
+
                                             {/* Duration */}
                                             <td className="p-3.5 font-medium text-midnight-indigo whitespace-nowrap">
                                                 {formatDuration(user.durationMs)}
@@ -807,7 +852,7 @@ const MeetingPresenceIVSS = ({ meetingId, meetingStartTime, meetingEndTime }) =>
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan="5" className="p-10 text-center">
+                                        <td colSpan="6" className="p-10 text-center">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Users className="w-8 h-8 text-steel-gray" />
                                                 <p className="text-sm font-semibold text-midnight-indigo">Không tìm thấy người dùng phù hợp</p>

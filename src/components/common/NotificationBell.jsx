@@ -5,6 +5,9 @@ import { getNotifications } from '../../service/sysAdminServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import NoShowInlineAction from './NoShowInlineAction';
 
+import { subscribeToNotificationUpdates } from '../../utils/socket';
+import { emitNotificationBanner } from '../../utils/notificationBanner';
+
 const stripHtml = (html) => {
     if (!html) return '';
     return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
@@ -126,6 +129,33 @@ const NotificationBell = ({
     useEffect(() => {
         fetchFeed();
     }, [fetchFeed]);
+
+    // Realtime: BE đẩy 'notification.created' qua WS (NotificationsService.createNotification)
+    // ngay khi tạo notification mới cho user hiện tại — cập nhật badge + feed tại chỗ,
+    // không cần load lại trang, cộng thêm banner góc màn hình (NotificationBanner ở App.js).
+    useEffect(() => {
+        const unsubscribe = subscribeToNotificationUpdates((item) => {
+            const feedItem = {
+                id: `noti-${item.id}`,
+                source: 'notification',
+                title: item.subject,
+                body: item.content,
+                timestamp: item.createdAt,
+                payloadJson: item.payloadJson ?? null,
+            };
+            setFeedItems((prev) => (
+                prev.some((it) => it.id === feedItem.id) ? prev : [feedItem, ...prev].slice(0, 8)
+            ));
+            setUnreadCount((prev) => prev + 1);
+            emitNotificationBanner({
+                id: feedItem.id,
+                title: item.subject,
+                body: stripHtml(item.content),
+                basePath,
+            });
+        });
+        return unsubscribe;
+    }, [basePath]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {

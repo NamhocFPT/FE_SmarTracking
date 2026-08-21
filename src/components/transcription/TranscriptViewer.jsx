@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, FileText, CheckCircle, AlertTriangle,
-    RefreshCw, Edit3, Save, X, Loader2, Users, Trash2
+    RefreshCw, Edit3, Save, X, Loader2, Users, Trash2,
+    Play, Pause
 } from 'lucide-react';
 import toast from '../../utils/toast';
 import SpeakerMappingModal from './SpeakerMappingModal';
@@ -14,12 +15,30 @@ import {
     deleteTranscript
 } from '../../service/transcriptionServices';
 
-const TranscriptViewer = ({ meetingId, isHost }) => {
+const TranscriptViewer = ({ meetingId, isHost, mediaFiles }) => {
     const [status, setStatus] = useState('loading'); // loading, processing, ready, error, empty
     const [transcript, setTranscript] = useState(null);
     const [jobs, setJobs] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
-    
+
+    // Nghe lại đúng đoạn audio của 1 segment (hỗ trợ host đối chiếu khi sửa transcript).
+    // File audio phải đúng recording session đã sinh ra transcript này — 1 meeting có
+    // thể có nhiều audio track (session chính + track cá nhân từng người).
+    const audioRef = useRef(null);
+    const stopAtRef = useRef(null);
+    const [playingSegmentId, setPlayingSegmentId] = useState(null);
+    const audioUrl = useMemo(() => {
+        const audioFiles = (mediaFiles || []).filter(f =>
+            (f.fileType || f.type || f.file_type || '').toLowerCase() === 'audio' && f.downloadUrl
+        );
+        if (!audioFiles.length) return null;
+        const sessionId = transcript?.recordingSessionId;
+        const matched = sessionId && audioFiles.find(f => (f.recordingSessionId || f.recording_session_id) === sessionId);
+        // Fallback: track ghi âm chính (không phải track cá nhân) nếu không match được session.
+        const fallback = audioFiles.find(f => !f.channelUserId) || audioFiles[0];
+        return (matched || fallback)?.downloadUrl || null;
+    }, [mediaFiles, transcript?.recordingSessionId]);
+
     // Edit state
     const [editingSegmentId, setEditingSegmentId] = useState(null);
     const [editForm, setEditForm] = useState({ text: '', speakerLabel: '', revisionNote: '' });
@@ -115,6 +134,52 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
     // Toast auto-hide
     const showToast = (message, type = 'success') => {
         toast[type]?.(message) ?? toast.info(message);
+    };
+
+    // Tự dừng audio đúng lúc hết đoạn (endMs) thay vì phát tràn sang câu kế tiếp.
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        const stopIfPastSegment = () => {
+            if (stopAtRef.current != null && audio.currentTime >= stopAtRef.current) {
+                audio.pause();
+                setPlayingSegmentId(null);
+                stopAtRef.current = null;
+            }
+        };
+        const clearPlaying = () => { setPlayingSegmentId(null); stopAtRef.current = null; };
+        audio.addEventListener('timeupdate', stopIfPastSegment);
+        audio.addEventListener('ended', clearPlaying);
+        audio.addEventListener('pause', clearPlaying);
+        return () => {
+            audio.removeEventListener('timeupdate', stopIfPastSegment);
+            audio.removeEventListener('ended', clearPlaying);
+            audio.removeEventListener('pause', clearPlaying);
+        };
+    }, []);
+
+    // Nguồn audio đổi (vd transcript được refetch sau khi chạy STT lại) — dừng phát
+    // để không giữ state trỏ vào 1 segment đã không còn khớp file audio hiện tại.
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (audio && !audio.paused) audio.pause();
+        setPlayingSegmentId(null);
+        stopAtRef.current = null;
+    }, [audioUrl]);
+
+    const handlePlaySegment = (segment) => {
+        const audio = audioRef.current;
+        if (!audio || !audioUrl) return;
+        if (playingSegmentId === segment.segmentId) {
+            audio.pause(); // trigger 'pause' listener ở trên -> tự clear state
+            return;
+        }
+        const startSec = (segment.startMs || 0) / 1000;
+        const endSec = segment.endMs ? segment.endMs / 1000 : startSec + 5;
+        stopAtRef.current = endSec;
+        audio.currentTime = startSec;
+        setPlayingSegmentId(segment.segmentId);
+        audio.play().catch(() => { setPlayingSegmentId(null); stopAtRef.current = null; });
     };
 
     const handleEditClick = (segment) => {
@@ -253,6 +318,8 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
 
     return (
         <div className="bg-white rounded-3xl border border-platinum-tint shadow-sm-2 flex flex-col h-[600px] overflow-hidden relative">
+            {/* Player ẩn dùng chung để phát lại từng đoạn (nghe đối chiếu khi sửa transcript) */}
+            {audioUrl && <audio ref={audioRef} src={audioUrl} preload="none" className="hidden" />}
             {/* Header */}
             <div className="p-5 border-b border-platinum-tint flex flex-col sm:flex-row justify-between items-center gap-4 bg-cloud-mist/30">
                 <div className="flex items-center gap-3">
@@ -369,6 +436,21 @@ const TranscriptViewer = ({ meetingId, isHost }) => {
                                 )}
                                 
                                 <div className="flex items-center gap-2">
+                                    {audioUrl && (
+                                        <button
+                                            onClick={() => handlePlaySegment(segment)}
+                                            className={`p-1 rounded transition-colors ${
+                                                playingSegmentId === segment.segmentId
+                                                    ? 'text-action-blue bg-blue-50'
+                                                    : 'text-slate-blue hover:text-action-blue hover:bg-blue-50'
+                                            }`}
+                                            title={playingSegmentId === segment.segmentId ? 'Dừng' : 'Nghe lại đoạn này'}
+                                        >
+                                            {playingSegmentId === segment.segmentId
+                                                ? <Pause className="w-3.5 h-3.5" />
+                                                : <Play className="w-3.5 h-3.5" />}
+                                        </button>
+                                    )}
                                     <span className="text-[10px] text-slate-blue font-mono font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
                                         {timeStr}
                                     </span>

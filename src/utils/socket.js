@@ -47,16 +47,37 @@ export const subscribeToMeeting = (meetingId) => {
   };
 };
 
+// Room `user:{userId}` dùng chung cho nhiều listener độc lập (meeting-request
+// updates, notification bell, ...) trên cùng 1 socket. Chỉ join, KHÔNG bao giờ
+// tự emit 'user:unsubscribe' khi 1 listener cleanup — vì các listener khác
+// đang dùng chung room vẫn cần nhận event. Socket tự rời mọi room khi disconnect
+// (logout/đóng tab) nên không cần rời tay.
+const ensureUserRoomJoined = () => {
+  const s = getSocket();
+  s.emit('user:subscribe');
+  return s;
+};
+
 // Dùng ở /manager/meeting-approvals — nhận `meeting_request.updated` realtime
 // khi có yêu cầu mới/được duyệt/từ chối/hết hạn, thay vì phải bấm "Tải lại".
 // BE chỉ cho join room user:{userId} của chính người gọi (bỏ qua mọi userId
-// truyền lên) và yêu cầu quyền meeting_request.read — xem EventsGateway#handleUserSubscribe.
+// truyền lên) — xem EventsGateway#handleUserSubscribe.
 export const subscribeToMeetingRequestUpdates = (onUpdate) => {
-  const s = getSocket();
-  s.emit('user:subscribe');
+  const s = ensureUserRoomJoined();
   s.on('meeting_request.updated', onUpdate);
   return () => {
     s.off('meeting_request.updated', onUpdate);
-    s.emit('user:unsubscribe');
+  };
+};
+
+// Dùng ở chuông thông báo (NotificationBell) — nhận `notification.created`
+// realtime ngay khi BE tạo notification mới cho user hiện tại (NotificationsService.
+// createNotification → WebsocketService.emitToUser), để badge số lượng chưa đọc
+// và banner cập nhật ngay, không cần load lại trang.
+export const subscribeToNotificationUpdates = (onCreate) => {
+  const s = ensureUserRoomJoined();
+  s.on('notification.created', onCreate);
+  return () => {
+    s.off('notification.created', onCreate);
   };
 };
