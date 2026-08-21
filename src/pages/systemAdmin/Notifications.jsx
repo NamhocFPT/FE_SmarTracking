@@ -1,11 +1,12 @@
 import { AlertTriangle, Bell, Calendar, CheckCircle, CheckSquare, Clock, Eye, EyeOff, Info, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    getNotifications, 
-    markNotificationRead, 
-    markAllNotificationsRead 
+import {
+    getNotifications,
+    markNotificationRead,
+    markAllNotificationsRead
 } from '../../service/sysAdminServices';
+import NoShowInlineAction from '../../components/common/NoShowInlineAction';
 
 
 // Render notification body as HTML (BE intentionally sends <b>, <br/> markup).
@@ -238,6 +239,10 @@ const Notifications = () => {
                                             className="text-xs text-slate-blue leading-relaxed"
                                             dangerouslySetInnerHTML={{ __html: sanitizeBody(noti.body) }}
                                         />
+                                        {/* [Fix 2026-08-21, Bug 2] Cùng component NoShowInlineAction với
+                                            NotificationBell.jsx — trước fix, trang đầy đủ này KHÔNG có bất kỳ
+                                            xử lý riêng nào cho notificationType='no_show_alert', chỉ hiện text thô. */}
+                                        <NoShowInlineAction item={noti} />
                                         {noti.payloadJson?.conflictDetails?.length > 0 && (
                                             <div className="bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-2 text-[11px] text-rose-800 space-y-1 mt-1">
                                                 <p className="font-semibold">Xung đột với:</p>

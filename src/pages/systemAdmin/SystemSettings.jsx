@@ -43,7 +43,8 @@ const SystemSettings = () => {
         autoReleaseGraceMinutes: 5,
         autoReleaseEnabled: true,
         presenceConfirmSeconds: 30,
-        presenceNoiseToleranceSeconds: 5
+        presenceNoiseToleranceSeconds: 5,
+        confirmExtensionMinutes: 10
     });
     const [dbNoShowConfig, setDbNoShowConfig] = useState({
         thresholdMinutes: 15,
@@ -51,7 +52,8 @@ const SystemSettings = () => {
         autoReleaseGraceMinutes: 5,
         autoReleaseEnabled: true,
         presenceConfirmSeconds: 30,
-        presenceNoiseToleranceSeconds: 5
+        presenceNoiseToleranceSeconds: 5,
+        confirmExtensionMinutes: 10
     });
 
     // Cấu hình Security Alerts (nguồn riêng: GET/PUT /security-alerts-config)
@@ -153,7 +155,8 @@ const SystemSettings = () => {
                 autoReleaseGraceMinutes: nsData.autoReleaseGraceMinutes?.value ?? noShowConfig.autoReleaseGraceMinutes,
                 autoReleaseEnabled: nsData.autoReleaseEnabled?.value ?? noShowConfig.autoReleaseEnabled,
                 presenceConfirmSeconds: nsData.presenceConfirmSeconds?.value ?? noShowConfig.presenceConfirmSeconds,
-                presenceNoiseToleranceSeconds: nsData.presenceNoiseToleranceSeconds?.value ?? noShowConfig.presenceNoiseToleranceSeconds
+                presenceNoiseToleranceSeconds: nsData.presenceNoiseToleranceSeconds?.value ?? noShowConfig.presenceNoiseToleranceSeconds,
+                confirmExtensionMinutes: nsData.confirmExtensionMinutes?.value ?? noShowConfig.confirmExtensionMinutes
             };
             setNoShowConfig(mergedNoShow);
             setDbNoShowConfig(mergedNoShow);
@@ -288,6 +291,10 @@ const SystemSettings = () => {
             setError('Độ trễ chấp nhận nhiễu cảm biến không được âm.');
             return false;
         }
+        if (Number(noShow.confirmExtensionMinutes) <= 0) {
+            setError('Thời gian gia hạn khi bấm "Tôi vẫn đến" phải là số nguyên dương.');
+            return false;
+        }
         if (Number(data.recording_retention_days) <= 0) {
             setError('Thời gian lưu trữ ghi hình phải là số nguyên dương.');
             return false;
@@ -343,7 +350,8 @@ const SystemSettings = () => {
                     autoReleaseGraceMinutes: Number(noShowConfig.autoReleaseGraceMinutes),
                     autoReleaseEnabled: Boolean(noShowConfig.autoReleaseEnabled),
                     presenceConfirmSeconds: Number(noShowConfig.presenceConfirmSeconds),
-                    presenceNoiseToleranceSeconds: Number(noShowConfig.presenceNoiseToleranceSeconds)
+                    presenceNoiseToleranceSeconds: Number(noShowConfig.presenceNoiseToleranceSeconds),
+                    confirmExtensionMinutes: Number(noShowConfig.confirmExtensionMinutes)
                 }));
             }
 
@@ -881,6 +889,24 @@ const SystemSettings = () => {
                                                 className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
                                             />
                                             <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">giây</span>
+                                        </div>
+                                    </div>
+
+                                    {/* [Fix 2026-08-21, Bug 3] Confirm extension minutes — thiếu sót thuần FE,
+                                        BE (GET /no-show-config) đã trả field này từ trước, chỉ chưa có input. */}
+                                    <div className="p-4 bg-white border border-platinum-tint rounded-xl flex flex-col h-full">
+                                        <label className="block text-xs font-bold text-slate-blue uppercase">Thời gian gia hạn khi bấm "Tôi vẫn đến"</label>
+                                        <span className="text-xs text-steel-gray mt-1 block flex-1">Khi host/organizer xác nhận "Tôi vẫn đến" (trong app hoặc qua link email), phòng được giữ thêm bấy nhiêu phút trước khi hệ thống xét lại.</span>
+                                        <div className="mt-3 relative">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="1440"
+                                                value={noShowConfig.confirmExtensionMinutes}
+                                                onChange={(e) => handleNoShowChange('confirmExtensionMinutes', Number(e.target.value))}
+                                                className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm font-medium text-midnight-indigo focus:outline-none focus:border-action-blue"
+                                            />
+                                            <span className="absolute right-3 top-2 text-xs text-slate-blue font-semibold">phút</span>
                                         </div>
                                     </div>
                                 </div>
