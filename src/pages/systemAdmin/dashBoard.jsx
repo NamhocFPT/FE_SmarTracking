@@ -18,6 +18,7 @@ import {
 } from '../../service/sysAdminServices';
 import { getSecurityAlerts } from '../../service/securityAlertService';
 import { getBusinessAdminSummary } from '../../service/campusService';
+import { getAlertTypeLabel } from '../../constants/alertType';
 
 // ─── Design tokens (DESIGN.md — Sky Blueprint / Light Theme) ─────────────────
 
@@ -1085,7 +1086,7 @@ const DashBoard = () => {
                                                 </div>
                                                 <div style={{ minWidth: 0 }}>
                                                     <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {alert.alert_type?.replace(/_/g, ' ').toUpperCase()}
+                                                        {getAlertTypeLabel(alert.alert_type)}
                                                     </p>
                                                     <p style={{ fontSize: 11, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                         {alert.zone_name || 'Không xác định khu vực'}

@@ -13,6 +13,7 @@ import { getUserById } from '../../service/sysAdminServices';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import Pagination from '../../components/common/Pagination';
+import { getAlertTypeLabel } from '../../constants/alertType';
 
 // Biển số nằm ở payload_json gốc (được lưu ngay từ lần vi phạm đầu tiên, occurrence_count=1),
 // KHÔNG chỉ trong payload_json.occurrences[] (chỉ có từ lần vi phạm thứ 2 trở đi).
@@ -331,16 +332,6 @@ const SecurityAlerts = () => {
         return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     };
 
-    const ALERT_TYPE_VI = {
-        stranger:                'Người lạ',
-        crowd:                   'Đám đông',
-        intrusion:               'Xâm nhập',
-        person_watchlist_match:  'Đối tượng theo dõi',
-        unknown_vehicle:         'Xe lạ',
-        vehicle_control_match:   'Biển số theo dõi',
-        device_error:            'Lỗi thiết bị',
-    };
-
     const SEVERITY_VI = {
         // [FIX] 'critical' là mức mặc định của alert_type='intrusion' (BE DEFAULT_SEVERITY_BY_TYPE) —
         // trước đây KHÔNG có key này, mọi alert critical rơi vào fallback "Bình thường" màu xám dù
@@ -352,8 +343,6 @@ const SecurityAlerts = () => {
         medium: { label: 'Trung bình', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
         low:    { label: 'Thấp',      cls: 'bg-blue-50 text-blue-700 border-blue-200' },
     };
-
-    const getAlertTypeLabel = (type) => ALERT_TYPE_VI[type] || type?.replace(/_/g, ' ') || '—';
 
     const getSeverityMeta = (severity) => SEVERITY_VI[severity?.toLowerCase()] || { label: 'Bình thường', cls: 'bg-slate-50 text-slate-700 border-slate-200' };
 

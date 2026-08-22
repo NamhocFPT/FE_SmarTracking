@@ -26,6 +26,7 @@ import { getVehicleControlList } from '../../service/anprService';
 import { getBusinessAdminSummary } from '../../service/campusService';
 import { get } from '../../utils/request';
 import DashboardBanner from '../../components/common/DashboardBanner';
+import { getAlertTypeLabel } from '../../constants/alertType';
 
 // ─── Design tokens (Sky Blueprint — mirrored from sysadmin) ──────────────────
 
@@ -720,7 +721,7 @@ const DashBoard = () => {
                                                         </div>
                                                         <div style={{ minWidth: 0 }}>
                                                             <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                {alert.alert_type?.replace(/_/g, ' ').toUpperCase()}
+                                                                {getAlertTypeLabel(alert.alert_type)}
                                                             </p>
                                                             <p style={{ fontSize: 11, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                                 {alert.zone_name || 'Không xác định khu vực'}

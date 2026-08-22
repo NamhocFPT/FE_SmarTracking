@@ -7,6 +7,7 @@ import NoShowInlineAction from './NoShowInlineAction';
 
 import { subscribeToNotificationUpdates } from '../../utils/socket';
 import { emitNotificationBanner } from '../../utils/notificationBanner';
+import { getAlertTypeLabel } from '../../constants/alertType';
 
 const stripHtml = (html) => {
     if (!html) return '';
@@ -92,7 +93,7 @@ const NotificationBell = ({
                 ? (alertsRes.value.data || []).map((item) => ({
                     id: `alert-${item.id}`,
                     source: 'alert',
-                    title: item.alert_type,
+                    title: getAlertTypeLabel(item.alert_type),
                     body: item.zone_name || 'Không xác định khu vực',
                     timestamp: item.created_at,
                     severity: item.severity,
