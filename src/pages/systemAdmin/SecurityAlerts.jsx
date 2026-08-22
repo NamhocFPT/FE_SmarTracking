@@ -19,7 +19,13 @@ import { getAlertTypeLabel } from '../../constants/alertType';
 // KHÔNG chỉ trong payload_json.occurrences[] (chỉ có từ lần vi phạm thứ 2 trở đi).
 const getAlertPlateNumber = (alert) => alert?.payload_json?.plateNumber || null;
 
-// Extract all valid event snapshot IDs from an alert's payload and source
+// Extract all valid event snapshot IDs from an alert's payload and source.
+// [FIX] Loại trùng sourceEventId — BE (bumpOccurrence()) có thể ghi 2 entry trùng hệt
+// {userId, occurredAt, sourceEventId} cho CÙNG 1 sự kiện thật khi occurrence không có
+// userId (người lạ hoàn toàn — debounce chống trùng ở BE chỉ so khớp khi userId khác
+// null, xem AlertsService.bumpOccurrence(), KHÔNG sửa ở đây — ngoài phạm vi FE). Chưa
+// dedupe khiến cùng 1 ảnh hiện lặp lại trong stack + số đếm ở badge bị thổi phồng so
+// với số ảnh THẬT SỰ khác nhau.
 const getAlertImages = (alert) => {
     if (!alert) return [];
     const occurrences = alert.payload_json?.occurrences || [];
@@ -27,7 +33,7 @@ const getAlertImages = (alert) => {
     if (alert.source_event_id && !ids.includes(alert.source_event_id)) {
         ids.unshift(alert.source_event_id);
     }
-    return ids;
+    return [...new Set(ids)];
 };
 
 // Stack component to display stacked event snapshots
@@ -220,7 +226,12 @@ const SecurityAlerts = () => {
     }, [successMessage, error]);
 
     const handleFilterChange = (key, value) => {
-        setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+        // [FIX] Object literal { ...prev, [key]: value, page: 1 } — khi key='page' (đổi
+        // trang), 'page: 1' viết SAU '[key]: value' trong CÙNG object literal nên đè mất
+        // giá trị page vừa set (JS: key trùng trong 1 literal, giá trị SAU CÙNG thắng) →
+        // bấm "Sau"/số trang nào cũng bị kéo về trang 1. Chỉ ép page=1 khi đổi filter KHÁC
+        // page (status/alert_type/zone_id) — đổi chính page thì giữ nguyên giá trị mới.
+        setFilters(prev => ({ ...prev, [key]: value, ...(key !== 'page' ? { page: 1 } : {}) }));
         setSelectedIds([]); // reset selection when filter changes
     };
 
@@ -812,7 +823,9 @@ const SecurityAlerts = () => {
                                                     className="w-full h-full object-cover rounded-lg aspect-square border-0"
                                                     onClick={() => {
                                                         const occurrences = occurrencesModal.alert?.payload_json?.occurrences || [];
-                                                        const occImages = occurrences.map(o => o.sourceEventId).filter(Boolean);
+                                                        // [FIX] dedupe — mirror getAlertImages(), tránh lightbox next/prev
+                                                        // lặp lại đúng 1 ảnh do BE ghi trùng entry cho người lạ (userId=null).
+                                                        const occImages = [...new Set(occurrences.map(o => o.sourceEventId).filter(Boolean))];
                                                         setSnapshotEventIds(occImages);
                                                         setSnapshotEventId(occ.sourceEventId);
                                                         setIsSnapshotOpen(true);
