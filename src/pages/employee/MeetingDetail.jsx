@@ -14,8 +14,7 @@ import UserAvatar from '../../components/common/UserAvatar';
 import AudioUploader from '../../components/transcription/AudioUploader';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
-import AddExternalParticipantModal from '../../components/meeting/AddExternalParticipantModal';
-import AddInternalParticipantModal from '../../components/meeting/AddInternalParticipantModal';
+import AddParticipantsModal from '../../components/meeting/AddParticipantsModal';
 import { removeInternalParticipant, removeExternalParticipant } from '../../service/businessAdminServices';
 import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -283,10 +282,11 @@ const EmployeeMeetingDetail = () => {
 
 
     const handleJoinMeeting = () => {
+        const basePath = window.location.pathname.split('/')[1];
         const startVal = meeting.start_time || meeting.startTime;
         const endVal = meeting.end_time || meeting.endTime;
         if (!startVal || !endVal) {
-            navigate(`/employee/in-meeting/${meeting.id}`);
+            navigate(`/${basePath}/in-meeting/${meeting.id}`);
             return;
         }
 
@@ -313,7 +313,7 @@ const EmployeeMeetingDetail = () => {
             return;
         }
 
-        navigate(`/employee/in-meeting/${meeting.id}`);
+        navigate(`/${basePath}/in-meeting/${meeting.id}`);
     };
 
     const initEditStates = (data) => {
@@ -849,10 +849,13 @@ const EmployeeMeetingDetail = () => {
     // người tham dự khi status là 'scheduled' hoặc 'in_progress' — draft/pending_approval bị
     // BE từ chối 400 INVALID_MEETING_STATUS, nên phải ẩn nút thêm người ở các trạng thái đó.
     const canAddParticipants = canManage && (meeting.status === 'scheduled' || meeting.status === 'in_progress');
-    // Thêm khách ngoài yêu cầu permission 'meeting.participant.add.external' — EMPLOYEE không
-    // được cấp quyền này theo chủ đích (chỉ Manager/Admin), PermissionsGuard chặn 403 kể cả khi
-    // employee là host/organizer, nên nút "Khách" phải ẩn nếu thiếu quyền.
-    const canAddExternalParticipant = canAddParticipants && hasPermission('meeting.participant.add.external');
+    // [2026-08-23] Mời khách ngoài: BE (meetings.service.ts addExternalParticipant) cho phép
+    // khi `isOwner (organizer/host) HOẶC có permission meeting.participant.add.external` —
+    // controller không còn PermissionsGuard. Điều kiện hiển thị nút phải khớp đúng luật đó:
+    // Host/Organizer luôn mời được (đồng bộ với lúc đặt lịch), còn Business Admin không phải
+    // chủ cuộc họp thì KHÔNG (role này không được cấp permission trên) -> ẩn nút để tránh 403.
+    const canAddExternalParticipant = canAddParticipants
+        && (isHost || isOrganizer || hasPermission('meeting.participant.add.external'));
     const hostParticipant = meeting.participants?.find((participant) =>
         participant.id === (meeting.host_id || meeting.hostId)
         || participant.userId === (meeting.host_id || meeting.hostId)
@@ -2212,23 +2215,14 @@ const EmployeeMeetingDetail = () => {
                 )}
             </AnimatePresence>
 
-            {/* Add External Participant Modal */}
-            <AddExternalParticipantModal
-                meetingId={meeting.id}
-                open={showAddGuestModal}
-                onClose={() => setShowAddGuestModal(false)}
-                onSuccess={(msg) => {
-                    setSuccessMsg(msg);
-                    fetchMeeting();
-                }}
-            />
-
-            {/* Add Internal Participant Modal */}
+            {/* Thêm người tham dự — 1 modal, 3 tab: Nội bộ / Import Excel / Khách ngoài */}
             {meeting && (
-                <AddInternalParticipantModal
+                <AddParticipantsModal
                     meetingId={meeting.id}
-                    open={isImportModalOpen}
-                    onClose={() => setIsImportModalOpen(false)}
+                    open={isImportModalOpen || showAddGuestModal}
+                    initialTab={showAddGuestModal ? 'external' : 'manual'}
+                    canAddExternal={canAddExternalParticipant}
+                    onClose={() => { setIsImportModalOpen(false); setShowAddGuestModal(false); }}
                     users={users}
                     onSuccess={(msg) => {
                         setSuccessMsg(msg);

@@ -210,11 +210,11 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span className="text-xs text-slate-blue block">Họ tên</span>
-                                    <span className="font-semibold text-midnight-indigo">{detail.fullName || detail.user?.fullName || ""}</span>
+                                    <span className="font-semibold text-midnight-indigo">{detail.userFullName || detail.fullName || detail.user?.fullName || ""}</span>
                                 </div>
                                 <div>
                                     <span className="text-xs text-slate-blue block">Email</span>
-                                    <span className="font-semibold text-midnight-indigo">{detail.email || detail.user?.email || ""}</span>
+                                    <span className="font-semibold text-midnight-indigo">{detail.userEmail || detail.email || detail.user?.email || ""}</span>
                                 </div>
                                 <div>
                                     <span className="text-xs text-slate-blue block">Mã nhân viên</span>

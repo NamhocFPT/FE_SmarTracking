@@ -435,14 +435,18 @@ export const getMeetingAvailableRooms = async (meetingId, params = {}) => {
     return await get(`/meetings/${meetingId}/available-rooms${query}`);
 };
 
-// B-M8.3 — Tải template Excel import participant
+// B-M8.3 — Tải template Excel import participant.
+// Trả về { success, isBlob: true, data: Blob } (xem handleResponse trong utils/request.js)
+// — KHÔNG phải Blob trần, phải dùng res.data khi tạo object URL.
 export const downloadParticipantImportTemplate = async (meetingId) => {
-    return await get(`/meetings/${meetingId}/participants/import/template`, { responseType: 'blob' });
+    return await get(`/meetings/${meetingId}/participants/import/template`);
 };
 
-// B-M8.4 — Import participants từ file Excel (2-bước)
-export const importMeetingParticipants = async (meetingId, formData) => {
-    return await post(`/meetings/${meetingId}/participants/import`, formData);
+// B-M8.4 — Import participants từ file Excel (2 bước).
+// Bước 1 trả 422 kèm preview từng dòng -> caller cần truyền { skipToast: true } để tự
+// render preview thay vì bị toast đỏ báo lỗi.
+export const importMeetingParticipants = async (meetingId, formData, options = {}) => {
+    return await post(`/meetings/${meetingId}/participants/import`, formData, options);
 };
 
 // B-M8.5 — Thêm khách bên ngoài tổ chức

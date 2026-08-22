@@ -95,6 +95,7 @@ const Pagination = ({ current, total, onChange }) => {
 
 const EmployeeRecordings = () => {
     const navigate = useNavigate();
+    const basePath = window.location.pathname.split('/')[1];
 
     const [loading, setLoading]           = useState(true);
     const [recordings, setRecordings]     = useState([]);
@@ -452,7 +453,7 @@ const EmployeeRecordings = () => {
                                     {/* Actions */}
                                     <div className="space-y-2 mt-auto">
                                         <button
-                                            onClick={() => navigate(`/employee/meeting/${rec.meetingId}`)}
+                                            onClick={() => navigate(`/${basePath}/meeting/${rec.meetingId}`)}
                                             className="w-full py-2.5 bg-action-blue hover:bg-glacier-blue text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
                                         >
                                             <Play className="w-3.5 h-3.5 fill-white" /> Xem chi tiết & Transcript
@@ -477,7 +478,7 @@ const EmployeeRecordings = () => {
                                                 <span>Audio</span>
                                             </button>
                                             <button
-                                                onClick={() => navigate(`/employee/meeting/${rec.meetingId}?tab=minutes`)}
+                                                onClick={() => navigate(`/${basePath}/meeting/${rec.meetingId}?tab=minutes`)}
                                                 disabled={!rec.hasPublishedMinutes}
                                                 title={rec.hasPublishedMinutes ? 'Xem biên bản' : 'Biên bản chưa ban hành'}
                                                 className="py-2 border border-platinum-tint bg-white hover:bg-cloud-mist rounded-xl text-[10px] font-bold text-slate-blue hover:text-midnight-indigo transition-all flex flex-col items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed"

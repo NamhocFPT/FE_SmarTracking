@@ -1,9 +1,11 @@
-import { AlertTriangle, Clock, Cpu, History, MapPin, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench, Check } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { AlertTriangle, Bell, Clock, Cpu, History, MapPin, MapPinOff, Mic, Monitor, Package, Plus, RefreshCw, Search, Speaker, Trash2, Video, Wrench, Check } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
-import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, deleteEquipment, confirmEquipmentFault, resolveEquipmentFault, getEquipmentFaultHistory } from '../../service/equipmentServices';
+import { getEquipments, createEquipment, reportEquipmentFault, assignEquipment, unassignEquipment, deleteEquipment, confirmEquipmentFault, resolveEquipmentFault, getEquipmentFaultHistory, getRoomsMissingEquipment } from '../../service/equipmentServices';
 import { getRooms } from '../../service/businessAdminServices';
+
+const GAP_POLL_INTERVAL_MS = 30000;
 
 
 const EquipmentManagement = () => {
@@ -40,6 +42,16 @@ const EquipmentManagement = () => {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState(null);
 
+    const [isUnassignModalOpen, setIsUnassignModalOpen] = useState(false);
+    const [equipmentToUnassign, setEquipmentToUnassign] = useState(null);
+    const [isUnassigning, setIsUnassigning] = useState(false);
+
+    // Banner "phòng thiếu thiết bị" — cập nhật gần-thời-gian-thực bằng polling
+    const [gapRooms, setGapRooms] = useState([]);
+    const [gapLoading, setGapLoading] = useState(false);
+    const [isGapPanelOpen, setIsGapPanelOpen] = useState(false);
+    const gapPollRef = useRef(null);
+
     // Form states
     const [createForm, setCreateForm] = useState({
         equipmentName: '',
@@ -48,7 +60,9 @@ const EquipmentManagement = () => {
         serialNumber: '',
         brand: '',
         model: '',
-        purchaseDate: ''
+        purchaseDate: '',
+        roomId: '',
+        assignmentNote: ''
     });
 
     const [faultForm, setFaultForm] = useState({
@@ -105,10 +119,32 @@ const EquipmentManagement = () => {
         }
     };
 
+    const fetchGapRooms = useCallback(async () => {
+        setGapLoading(true);
+        try {
+            const res = await getRoomsMissingEquipment();
+            if (res?.success) {
+                setGapRooms(res.data || []);
+            }
+        } catch (err) {
+            console.error('Lỗi tải danh sách phòng thiếu thiết bị', err);
+        } finally {
+            setGapLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchEquipments();
         fetchRooms();
     }, [fetchEquipments]);
+
+    // Banner real-time: tải ngay khi vào trang + polling định kỳ để BA luôn thấy
+    // phòng mới phát sinh thiếu thiết bị (vd: phòng khác vừa được đăng ký có mic/cam/tivi).
+    useEffect(() => {
+        fetchGapRooms();
+        gapPollRef.current = setInterval(fetchGapRooms, GAP_POLL_INTERVAL_MS);
+        return () => clearInterval(gapPollRef.current);
+    }, [fetchGapRooms]);
 
     // Handle Create
     const handleCreateSubmit = async (e) => {
@@ -128,18 +164,24 @@ const EquipmentManagement = () => {
             );
             const res = await createEquipment(payload);
             if (res?.success) {
-                setSuccessMessage('Tạo mới thiết bị thành công!');
+                setSuccessMessage(
+                    payload.roomId
+                        ? 'Tạo mới thiết bị và gán vào phòng thành công!'
+                        : 'Tạo mới thiết bị thành công!'
+                );
                 setIsCreateModalOpen(false);
                 fetchEquipments();
+                fetchGapRooms();
                 setCreateForm({
-                    equipmentName: '', equipmentType: 'camera', equipmentCode: '', 
-                    serialNumber: '', brand: '', model: '', purchaseDate: ''
+                    equipmentName: '', equipmentType: 'camera', equipmentCode: '',
+                    serialNumber: '', brand: '', model: '', purchaseDate: '',
+                    roomId: '', assignmentNote: ''
                 });
             } else {
                 setError(res?.message || 'Tạo thiết bị thất bại.');
             }
         } catch (err) {
-            setError(err?.message || 'Lỗi khi tạo thiết bị.');
+            setError(err?.error?.message || err?.message || 'Lỗi khi tạo thiết bị.');
         }
     };
 
@@ -211,11 +253,41 @@ const EquipmentManagement = () => {
                 setSuccessMessage('Gán thiết bị vào phòng thành công!');
                 setIsAssignModalOpen(false);
                 fetchEquipments();
+                fetchGapRooms();
             } else {
                 setError(res?.message || 'Gán thiết bị thất bại.');
             }
         } catch (err) {
-            setError(err?.message || 'Lỗi khi gán thiết bị.');
+            setError(err?.error?.message || err?.message || 'Lỗi khi gán thiết bị.');
+        }
+    };
+
+    // Handle Unassign
+    const handleUnassignClick = (equipment) => {
+        setEquipmentToUnassign(equipment);
+        setIsUnassignModalOpen(true);
+    };
+
+    const handleConfirmUnassign = async () => {
+        if (!equipmentToUnassign) return;
+        setIsUnassigning(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await unassignEquipment(equipmentToUnassign.id);
+            if (res?.success) {
+                setSuccessMessage(`Đã gỡ thiết bị ${equipmentToUnassign.equipmentName} khỏi phòng.`);
+                setIsUnassignModalOpen(false);
+                fetchEquipments();
+                fetchGapRooms();
+            } else {
+                setError(res?.message || 'Gỡ thiết bị khỏi phòng thất bại.');
+            }
+        } catch (err) {
+            setError(err?.error?.message || err?.message || 'Lỗi khi gỡ thiết bị khỏi phòng.');
+        } finally {
+            setIsUnassigning(false);
+            setEquipmentToUnassign(null);
         }
     };
 
@@ -236,6 +308,7 @@ const EquipmentManagement = () => {
                 setSuccessMessage(`Đã xoá thiết bị ${equipmentToDelete.equipmentName} thành công.`);
                 setIsDeleteModalOpen(false);
                 fetchEquipments();
+                fetchGapRooms();
             } else {
                 setError(res?.message || 'Không thể xoá thiết bị này.');
             }
@@ -302,6 +375,24 @@ const EquipmentManagement = () => {
         return labels[type] || type;
     };
 
+    // Thiết bị mới tạo mặc định healthStatus = 'unknown' (chưa từng kiểm tra) — KHÔNG
+    // phải là lỗi. Trước đây badge coi mọi giá trị khác 'healthy'/'warning' là "Lỗi"
+    // (đỏ), khiến thiết bị vừa đăng ký hiển thị nhầm là hỏng.
+    const getHealthStatusMeta = (status) => {
+        switch (status) {
+            case 'healthy': return { label: 'Tốt', cls: 'bg-green-100 text-green-700' };
+            case 'warning': return { label: 'Cảnh báo', cls: 'bg-yellow-100 text-yellow-700' };
+            case 'faulty': return { label: 'Lỗi', cls: 'bg-red-100 text-red-700' };
+            case 'offline': return { label: 'Mất kết nối', cls: 'bg-red-100 text-red-700' };
+            default: return { label: 'Chưa xác định', cls: 'bg-gray-100 text-gray-600' };
+        }
+    };
+
+    // Chỉ coi la co "loi dang cho xu ly" (hien nut Xac nhan hong / Cap nhat sua xong)
+    // voi 3 trang thai that su bat thuong — KHONG bao gom 'unknown' (thiet bi moi,
+    // chua tung bao loi; backend cung tu choi 409 EQUIPMENT_NO_ACTIVE_FAULT neu bam).
+    const hasActiveFault = (status) => ['warning', 'faulty', 'offline'].includes(status);
+
     return (
         <div className="p-6 h-full flex flex-col bg-snow-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 animate-fade-in-up">
@@ -313,13 +404,32 @@ const EquipmentManagement = () => {
                     <h1 className="text-2xl font-bold text-midnight-indigo tracking-tight">Quản lý Trang thiết bị</h1>
                     <p className="text-sm text-slate-blue mt-1">Quản lý danh sách, điều phối phòng và theo dõi tình trạng thiết bị.</p>
                 </div>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="inline-flex items-center px-4 py-2.5 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
-                >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Thêm thiết bị
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsGapPanelOpen(true)}
+                        className={`relative inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all shadow-sm hover:shadow hover:-translate-y-0.5 ${
+                            gapRooms.length > 0
+                                ? 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100'
+                                : 'bg-white border-platinum-tint text-slate-blue hover:bg-cloud-mist'
+                        }`}
+                        title="Phòng đã đăng ký thiết bị nhưng chưa được gán đủ"
+                    >
+                        <Bell className={`w-4 h-4 mr-2 ${gapRooms.length > 0 ? 'animate-pulse' : ''}`} />
+                        Phòng thiếu thiết bị
+                        {gapRooms.length > 0 && (
+                            <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold shadow-sm">
+                                {gapRooms.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="inline-flex items-center px-4 py-2.5 bg-action-blue text-white rounded-xl text-sm font-semibold hover:bg-glacier-blue transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Thêm thiết bị
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -437,12 +547,8 @@ const EquipmentManagement = () => {
                                             {getTypeLabel(eq.equipmentType)}
                                         </td>
                                         <td className="p-4">
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold
-                                                ${eq.healthStatus === 'healthy' ? 'bg-green-100 text-green-700' : 
-                                                  eq.healthStatus === 'warning' ? 'bg-yellow-100 text-yellow-700' : 
-                                                  'bg-red-100 text-red-700'}`}
-                                            >
-                                                {eq.healthStatus === 'healthy' ? 'Tốt' : eq.healthStatus === 'warning' ? 'Cảnh báo' : 'Lỗi'}
+                                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${getHealthStatusMeta(eq.healthStatus).cls}`}>
+                                                {getHealthStatusMeta(eq.healthStatus).label}
                                             </span>
                                             {eq.assetStatus === 'maintenance' && (
                                                 <span className="inline-flex items-center px-2 py-1 ml-2 rounded-md text-xs font-semibold bg-gray-100 text-gray-700">
@@ -468,6 +574,15 @@ const EquipmentManagement = () => {
                                             >
                                                 <MapPin className="w-4 h-4" />
                                             </button>
+                                            {eq.currentRoomId && (
+                                                <button
+                                                    onClick={() => handleUnassignClick(eq)}
+                                                    className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-red-500 hover:bg-red-50 transition-colors mr-1"
+                                                    title="Gỡ khỏi phòng"
+                                                >
+                                                    <MapPinOff className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => { setSelectedEquipment(eq); setIsFaultModalOpen(true); }}
                                                 className="inline-flex p-1.5 rounded-lg text-slate-blue hover:text-orange-500 hover:bg-orange-50 transition-colors mr-1"
@@ -482,7 +597,7 @@ const EquipmentManagement = () => {
                                             >
                                                 <History className="w-4 h-4" />
                                             </button>
-                                            {eq.healthStatus !== 'healthy' && (
+                                            {hasActiveFault(eq.healthStatus) && (
                                                 <>
                                                     <button
                                                         onClick={() => {
@@ -593,6 +708,26 @@ const EquipmentManagement = () => {
                                     <input type="text" value={createForm.model} onChange={e => setCreateForm({...createForm, model: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" />
                                 </div>
                             </div>
+                            <div className="pt-3 border-t border-platinum-tint">
+                                <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Gán vào phòng ngay (không bắt buộc)</label>
+                                <select
+                                    value={createForm.roomId}
+                                    onChange={e => setCreateForm({...createForm, roomId: e.target.value})}
+                                    className="w-full px-3 py-2.5 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-action-blue/20 focus:border-action-blue bg-white text-midnight-indigo cursor-pointer shadow-sm"
+                                >
+                                    <option value="">-- Chưa gán phòng --</option>
+                                    {rooms.map(r => (
+                                        <option key={r.roomId} value={r.roomId}>{r.roomName}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[11px] text-slate-blue mt-1">Hệ thống sẽ chặn nếu phòng chưa đăng ký loại thiết bị này.</p>
+                            </div>
+                            {createForm.roomId && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Ghi chú cài đặt</label>
+                                    <input type="text" value={createForm.assignmentNote} onChange={e => setCreateForm({...createForm, assignmentNote: e.target.value})} className="w-full px-3 py-2 border border-platinum-tint rounded-xl text-sm" placeholder="VD: Gắn trên trần nhà" />
+                                </div>
+                            )}
                             <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-platinum-tint">
                                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-blue border border-platinum-tint rounded-xl hover:bg-cloud-mist">Hủy</button>
                                 <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-action-blue rounded-xl hover:bg-glacier-blue">Tạo mới</button>
@@ -795,6 +930,95 @@ const EquipmentManagement = () => {
                             >
                                 {isDeletingEquipment ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Xoá vĩnh viễn'}
                             </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* UNASSIGN CONFIRM MODAL */}
+            {isUnassignModalOpen && equipmentToUnassign && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-sm w-full flex flex-col overflow-hidden">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <MapPinOff className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-lg font-bold text-midnight-indigo mb-2">Gỡ thiết bị khỏi phòng</h3>
+                            <p className="text-sm text-slate-blue mb-1">
+                                Gỡ thiết bị <span className="font-bold text-midnight-indigo">{equipmentToUnassign.equipmentName}</span> khỏi phòng đang gán?
+                            </p>
+                            <p className="text-[11px] text-slate-blue bg-cloud-mist/50 p-2 rounded-lg mt-3 text-left">
+                                Thiết bị sẽ trở về trạng thái chưa gán phòng. Bạn có thể gán lại vào phòng khác bất cứ lúc nào.
+                            </p>
+                        </div>
+                        <div className="p-4 bg-cloud-mist/30 border-t border-platinum-tint flex justify-end gap-3">
+                            <button
+                                onClick={() => { setIsUnassignModalOpen(false); setEquipmentToUnassign(null); }}
+                                disabled={isUnassigning}
+                                className="px-4 py-2 bg-white border border-platinum-tint text-slate-blue font-semibold rounded-xl text-sm hover:bg-cloud-mist disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleConfirmUnassign}
+                                disabled={isUnassigning}
+                                className="inline-flex items-center justify-center px-4 py-2 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:opacity-50 min-w-[100px]"
+                            >
+                                {isUnassigning ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Gỡ khỏi phòng'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ROOMS MISSING EQUIPMENT PANEL */}
+            {isGapPanelOpen && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 backdrop-blur-xl p-4 animate-fade-in-up">
+                    <div className="bg-white rounded-2xl border border-platinum-tint shadow-xl max-w-lg w-full flex flex-col max-h-[85vh]">
+                        <div className="px-6 py-4 border-b border-platinum-tint flex items-center justify-between bg-orange-50">
+                            <div>
+                                <h3 className="font-bold text-orange-700 flex items-center gap-1.5">
+                                    <Bell className="w-4 h-4" /> Phòng thiếu thiết bị
+                                </h3>
+                                <p className="text-xs text-slate-blue mt-0.5">
+                                    Phòng đã đăng ký có camera/microphone/tivi nhưng chưa được gán đủ thiết bị thực tế
+                                </p>
+                            </div>
+                            <button onClick={() => setIsGapPanelOpen(false)} className="text-orange-700 hover:text-orange-900">✕</button>
+                        </div>
+                        <div className="p-6 overflow-y-auto">
+                            {gapLoading && gapRooms.length === 0 ? (
+                                <div className="space-y-3">
+                                    {Array(3).fill(0).map((_, idx) => (
+                                        <div key={idx} className="h-16 rounded-xl bg-cloud-mist animate-pulse" />
+                                    ))}
+                                </div>
+                            ) : gapRooms.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Check className="w-10 h-10 mb-3 mx-auto text-green-500" />
+                                    <p className="text-sm text-slate-blue">Tất cả phòng đã đăng ký thiết bị đều đã được gán đủ.</p>
+                                </div>
+                            ) : (
+                                <ul className="space-y-3">
+                                    {gapRooms.map((room) => (
+                                        <li key={room.roomId} className="p-3 rounded-xl border border-orange-100 bg-orange-50/60">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-bold text-midnight-indigo">{room.roomName}</span>
+                                                <span className="text-[11px] text-slate-blue">{room.roomCode}</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                                {(room.missingTypeLabels || []).map((label) => (
+                                                    <span key={label} className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                                                        Thiếu {label}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </div>
                 </div>,

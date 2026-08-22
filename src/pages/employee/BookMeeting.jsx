@@ -624,41 +624,61 @@ const BookMeeting = () => {
     };
 
     // --- Import guest actions ---
-    // Bộ cột khớp với template chuẩn của BE (IMPORT_PARTICIPANTS_HEADERS trong
-    // participant-import.service.ts) để người dùng chỉ cần học 1 định dạng file
-    // duy nhất trong toàn hệ thống (BookMeeting và MeetingDetail dùng chung layout).
+    // Bộ cột khớp CHÍNH XÁC template chuẩn của BE (IMPORT_PARTICIPANTS_COLUMNS trong
+    // meetings/constants/import-participants.constants.ts) để người dùng chỉ cần học 1
+    // định dạng file duy nhất: file tải ở đây upload thẳng vào modal "Thêm người tham dự"
+    // của Meeting Detail được và ngược lại. Đổi cột ở đây thì PHẢI đổi cả bên BE.
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Tra cứu nhân viên nội bộ theo email/mã nhân viên: ưu tiên tìm trong dữ liệu
     // đã có sẵn (usersById), nếu chưa có thì gọi GET /users?search= (server search
     // theo tên/email) — không còn phụ thuộc vào việc tải sẵn toàn bộ danh sách nhân viên.
-    const resolveInternalUser = async (email, employeeCode) => {
+    //
+    // Trả về { user, ineligible }:
+    //   - user: nhân viên được phép mời họp (đã lọc meetingEligibleOnly).
+    //   - ineligible: true khi email/mã KHỚP một tài khoản có thật nhưng là
+    //     Business Admin / System Admin — BE chặn thẳng cả POST /meetings với
+    //     PARTICIPANT_ROLE_NOT_ALLOWED, nên phải báo lỗi ngay ở bước preview thay vì
+    //     để người dùng bấm "Đặt lịch" rồi hỏng cả form. Chỉ tra thêm lượt thứ 2 khi
+    //     dòng đó thực sự mơ hồ (checkIneligible) để không tốn request cho khách ngoài.
+    const resolveInternalUser = async (email, employeeCode, checkIneligible = false) => {
         const emailKey = (email || '').trim().toLowerCase();
         const codeKey = (employeeCode || '').trim();
-
-        let found = users.find(u =>
+        const matchIn = (list) => list.find(u =>
             (emailKey && (u.email || '').toLowerCase() === emailKey)
             || (codeKey && (u.employeeCode || u.employee_code) === codeKey)
         );
-        if (found) return found;
+
+        const cached = matchIn(users);
+        if (cached) return { user: cached, ineligible: false };
 
         const query = email || employeeCode;
-        if (!query) return null;
+        if (!query) return { user: null, ineligible: false };
 
+        let found = null;
         try {
-            const res = await getUsers({ search: query, limit: 5 });
+            const res = await getUsers({ search: query, limit: 5, meetingEligibleOnly: true });
             if (res?.success) {
                 const list = res.data || [];
                 mergeUsers(list);
-                found = list.find(u =>
-                    (emailKey && (u.email || '').toLowerCase() === emailKey)
-                    || (codeKey && (u.employeeCode || u.employee_code) === codeKey)
-                );
+                found = matchIn(list);
             }
         } catch (err) {
-            console.error('Failed to resolve internal user', email || employeeCode, err);
+            console.error('Failed to resolve internal user', query, err);
         }
-        return found || null;
+        if (found) return { user: found, ineligible: false };
+
+        if (checkIneligible) {
+            try {
+                const res = await getUsers({ search: query, limit: 5 });
+                if (res?.success && matchIn(res.data || [])) {
+                    return { user: null, ineligible: true };
+                }
+            } catch (err) {
+                console.error('Failed to check ineligible account', query, err);
+            }
+        }
+        return { user: null, ineligible: false };
     };
 
     const downloadSampleExcel = () => {
@@ -684,6 +704,8 @@ const BookMeeting = () => {
             ['Họ và tên', 'Khách ngoài: bắt buộc'],
             ['Tổ chức/Công ty', 'Khách ngoài: tùy chọn'],
             ['Số điện thoại', 'Khách ngoài: tùy chọn'],
+            ['Cách nhận diện', 'Hệ thống tự tra Email/Mã nhân viên: khớp một tài khoản trong hệ thống = nhân viên nội bộ; không khớp = khách ngoài (bắt buộc điền Họ và tên).'],
+            ['Lưu ý', 'Chỉ tài khoản vai trò Nhân viên (Employee) hoặc Quản lý (Manager) mới được mời họp. Tài khoản Business Admin / System Admin sẽ bị từ chối.'],
         ];
         const guideWs = XLSX.utils.aoa_to_sheet(guideRows);
         guideWs['!cols'] = [{ wch: 20 }, { wch: 72 }];
@@ -738,14 +760,16 @@ const BookMeeting = () => {
                 let type = 'external';
 
                 if (!error) {
-                    const found = await resolveInternalUser(r.email, r.employeeCode);
+                    const { user: found, ineligible } = await resolveInternalUser(
+                        r.email, r.employeeCode, !r.fullName,
+                    );
                     if (found) {
                         resolvedUserId = found.id;
                         type = 'internal';
-                    } else {
-                        if (!r.fullName) {
-                            error = `Dòng ${r.rowNumber}: Khách ngoài hệ thống cần nhập Họ và tên`;
-                        }
+                    } else if (ineligible) {
+                        error = `Dòng ${r.rowNumber}: Tài khoản quản trị (Business/System Admin) không được mời tham dự cuộc họp`;
+                    } else if (!r.fullName) {
+                        error = `Dòng ${r.rowNumber}: Khách ngoài hệ thống cần nhập Họ và tên`;
                     }
                 }
 
@@ -801,10 +825,12 @@ const BookMeeting = () => {
                 let resolvedUserId = null;
 
                 if (!error) {
-                    const found = await resolveInternalUser(email, '');
+                    const { user: found, ineligible } = await resolveInternalUser(email, '', true);
                     if (found) {
                         resolvedUserId = found.id;
                         type = 'internal';
+                    } else if (ineligible) {
+                        error = `Dòng ${rowNumber}: Tài khoản quản trị (Business/System Admin) không được mời tham dự cuộc họp`;
                     } else {
                         type = 'external';
                     }

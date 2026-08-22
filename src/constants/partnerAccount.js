@@ -1,8 +1,11 @@
 // ID cố định của department "Đối tác" — không đổi, dùng để nhận diện tài khoản đối tác
 export const PARTNER_DEPARTMENT_ID = '7c3e2f1a-4b6a-4f2e-9d8c-1a2b3c4d5e6f';
 
+// user.departmentId (ManageUserItemDto, danh sách) hoặc user.department.id
+// (UserDetailResponseDto, modal chi tiết) — 2 shape khác nhau tuỳ endpoint.
 export const isPartnerAccount = (user) =>
-    user?.departmentId === PARTNER_DEPARTMENT_ID;
+    user?.departmentId === PARTNER_DEPARTMENT_ID ||
+    user?.department?.id === PARTNER_DEPARTMENT_ID;
 
 // Trả 'active' | 'expiring_soon' | 'expired' | null
 export const getExpiryStatus = (accountExpiresAt) => {
@@ -12,6 +15,11 @@ export const getExpiryStatus = (accountExpiresAt) => {
     if (diffMs <= 24 * 60 * 60 * 1000) return 'expiring_soon';
     return 'active';
 };
+
+// Tài khoản đối tác đã hết hạn đăng nhập (accountStatus vẫn 'active' trong DB,
+// nhưng login đã bị BE chặn vì accountExpiresAt đã qua — xem LoginService).
+export const isAccountExpired = (user) =>
+    isPartnerAccount(user) && getExpiryStatus(user?.accountExpiresAt) === 'expired';
 
 export const getExpiryLabel = (accountExpiresAt) => {
     if (!accountExpiresAt) return null;
