@@ -12,7 +12,7 @@ export const getEquipments = async (params = {}) => {
 
 /**
  * Thêm mới thiết bị
- * @param {object} data - { equipmentName, equipmentType, equipmentCode, serialNumber, brand, model, purchaseDate, specification, healthStatus }
+ * @param {object} data - { equipmentName, equipmentType, equipmentCode, serialNumber, brand, model, purchaseDate, specification, healthStatus, roomId, assignmentNote }
  * @returns {Promise<object>} response envelope
  */
 export const createEquipment = async (data) => {
@@ -37,6 +37,25 @@ export const reportEquipmentFault = async (equipmentId, data) => {
  */
 export const assignEquipment = async (equipmentId, data) => {
     return await patch(`/equipments/${equipmentId}/assignment`, data);
+};
+
+/**
+ * Gỡ thiết bị khỏi phòng đang gán
+ * BE: DELETE /equipments/:id/assignment
+ * @param {string|number} equipmentId
+ * @returns {Promise<object>} response envelope
+ */
+export const unassignEquipment = async (equipmentId) => {
+    return await dele(`/equipments/${equipmentId}/assignment`);
+};
+
+/**
+ * Danh sách phòng đã đăng ký có thiết bị (camera/mic/tivi) nhưng chưa được gán đủ thiết bị thực tế
+ * BE: GET /equipments/rooms-missing-equipment
+ * @returns {Promise<object>} response envelope — data: [{ roomId, roomCode, roomName, missingTypes, missingTypeLabels }], meta: { totalRoomsMissing }
+ */
+export const getRoomsMissingEquipment = async () => {
+    return await get('/equipments/rooms-missing-equipment');
 };
 
 /**

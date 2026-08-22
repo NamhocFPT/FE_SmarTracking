@@ -1,4 +1,4 @@
-import { Activity, BarChart2, Calendar, ChevronDown, Clock, Car, FileCheck, Home, PlusCircle, Menu, X } from 'lucide-react';
+import { Activity, Archive, BarChart2, Calendar, ChevronDown, Clock, Car, FileCheck, FileText, Home, MapPin, Monitor, PlusCircle, Menu, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { logout, getCurrentUser } from '../../../service/authService';
@@ -31,6 +31,12 @@ const STATIC_NAVIGATION_ITEMS = [
         icon: Calendar,
         children: [
             {
+                label: 'Lịch cá nhân',
+                to: '/manager/schedule',
+                icon: Calendar,
+                requiredPermission: 'schedule.read.self',
+            },
+            {
                 label: 'Đăng ký họp',
                 to: '/manager/book',
                 icon: PlusCircle,
@@ -41,7 +47,27 @@ const STATIC_NAVIGATION_ITEMS = [
                 icon: FileCheck,
                 requiredPermission: 'meeting_request.read',
             },
+            {
+                label: 'Kho biên bản',
+                to: '/manager/minutes',
+                icon: Archive,
+            },
         ],
+    },
+    {
+        label: 'Tài liệu họp',
+        to: '/manager/recordings',
+        icon: FileText,
+    },
+    {
+        label: 'Báo hỏng thiết bị',
+        to: '/manager/equipments',
+        icon: Monitor,
+    },
+    {
+        label: 'Hành trình',
+        to: '/manager/user-journey',
+        icon: MapPin,
     },
     {
         label: 'Báo cáo',

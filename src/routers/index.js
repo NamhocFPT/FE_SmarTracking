@@ -42,6 +42,7 @@ import ManagerLayout from '../pages/manager/layout/ManagerLayout';
 import ManagerHomePage from '../pages/manager/homePage';
 import ManagerMeetingApprovals from '../pages/manager/MeetingApprovals';
 import ManagerMeetingAttendance from '../pages/manager/MeetingAttendance';
+import ManagerFaceRegistration from '../pages/manager/FaceRegistration';
 import BiometricSubmissionsReview from '../pages/bussinessAdmin/BiometricSubmissionsReview';
 
 // Employee Layout + Pages
@@ -253,8 +254,28 @@ export const router = [
                 element: <BookMeeting />
             },
             {
+                path: 'schedule',
+                element: (
+                    <ProtectedRoute requiredPermission="schedule.read.self">
+                        <PersonalCalendar />
+                    </ProtectedRoute>
+                )
+            },
+            {
                 path: 'profile',
                 element: <Profile />
+            },
+            {
+                path: 'face-register',
+                element: <ManagerFaceRegistration />
+            },
+            {
+                path: 'meeting/:id',
+                element: <EmployeeMeetingDetail />
+            },
+            {
+                path: 'in-meeting/:id',
+                element: <InMeetingRoom />
             },
             {
                 path: 'meeting-approvals',
@@ -267,6 +288,26 @@ export const router = [
             {
                 path: 'notifications',
                 element: <Notifications />
+            },
+            {
+                path: 'recordings',
+                element: <EmployeeRecordings />
+            },
+            {
+                path: 'rooms',
+                element: <BusinessRoomManagement readOnly />
+            },
+            {
+                path: 'equipments',
+                element: <EmployeeEquipmentReport />
+            },
+            {
+                path: 'minutes',
+                element: <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-action-blue border-t-transparent rounded-full animate-spin"/></div>}><DocumentArchive scope="self" /></Suspense>
+            },
+            {
+                path: 'user-journey',
+                element: <UserJourney />
             },
             {
                 path: 'attendance-analytics',

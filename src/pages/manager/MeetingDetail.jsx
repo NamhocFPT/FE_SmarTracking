@@ -13,9 +13,8 @@ import UserAvatar from '../../components/common/UserAvatar';
 import MeetingAttendanceBoard from '../../components/meeting/MeetingAttendanceBoard';
 import MeetingPresenceIVSS from '../../components/meeting/MeetingPresenceIVSS';
 import NotificationActionsPanel from '../../components/common/NotificationActionsPanel';
-import AddInternalParticipantModal from '../../components/meeting/AddInternalParticipantModal';
+import AddParticipantsModal from '../../components/meeting/AddParticipantsModal';
 import MinutesTabContent from '../../components/minutes/MinutesTabContent';
-import AddExternalParticipantModal from '../../components/meeting/AddExternalParticipantModal';
 import { removeInternalParticipant, removeExternalParticipant } from '../../service/businessAdminServices';
 import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
 import TranscriptViewer from '../../components/transcription/TranscriptViewer';
@@ -803,7 +802,10 @@ const ManagerMeetingDetail = () => {
     // người tham dự khi status là 'scheduled' hoặc 'in_progress' — draft/pending_approval bị
     // BE từ chối 400 INVALID_MEETING_STATUS, nên phải ẩn nút thêm người ở các trạng thái đó.
     const canAddParticipants = canManage && (meeting.status === 'scheduled' || meeting.status === 'in_progress');
-    const canAddExternalParticipant = canAddParticipants && hasPermission('meeting.participant.add.external');
+    // [2026-08-23] Khớp đúng luật của BE: isOwner (host/organizer) HOẶC có permission.
+    const isOrganizer = currentUser?.id === (meeting.organizer_id || meeting.organizerId);
+    const canAddExternalParticipant = canAddParticipants
+        && (isHost || isOrganizer || hasPermission('meeting.participant.add.external'));
     const hostParticipant = meeting.participants?.find((participant) =>
         participant.id === (meeting.host_id || meeting.hostId)
         || participant.userId === (meeting.host_id || meeting.hostId)
@@ -1929,26 +1931,16 @@ const ManagerMeetingDetail = () => {
                 )}
             </AnimatePresence>
 
-            {/* M8 — Modal Import Người tham dự */}
+            {/* M8 — Thêm người tham dự: 1 modal, 3 tab (Nội bộ / Import Excel / Khách ngoài) */}
             {meeting && (
-                <AddInternalParticipantModal
+                <AddParticipantsModal
                     meetingId={meeting.id}
-                    open={isImportModalOpen}
-                    onClose={() => setIsImportModalOpen(false)}
+                    open={isImportModalOpen || showAddGuestModal}
+                    initialTab={showAddGuestModal ? 'external' : 'manual'}
+                    canAddExternal={canAddExternalParticipant}
+                    onClose={() => { setIsImportModalOpen(false); setShowAddGuestModal(false); }}
                     users={users}
                     onSuccess={(msg) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(null), 4000); fetchMeeting(); }}
-                />
-            )}
-            {/* Add External Participant Modal */}
-            {meeting && (
-                <AddExternalParticipantModal
-                    meetingId={meeting.id}
-                    open={showAddGuestModal}
-                    onClose={() => setShowAddGuestModal(false)}
-                    onSuccess={(msg) => {
-                        setSuccessMsg(msg);
-                        fetchMeeting();
-                    }}
                 />
             )}
             {/* MODAL: Participant Detail */}

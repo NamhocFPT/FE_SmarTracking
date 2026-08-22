@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, Calendar, CheckCircle, CheckCircle2, Clock, Download, FileText, PieChart as PieIcon, RefreshCw, Sliders, TrendingUp, XCircle } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -25,8 +25,32 @@ import {
 } from '../../service/managerServices';
 import { getManagerSummary } from '../../service/campusService';
 import DashboardBanner from '../../components/common/DashboardBanner';
+import { subscribeToMeetingRequestUpdates } from '../../utils/socket';
 
 const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
+
+/**
+ * Xung đột (phòng HOẶC người) cho badge gọn ở dashboard — dùng dữ liệu check
+ * TƯƠI (conflictDetails/pendingConflictDetails/participantConflictDetails,
+ * tính lại mỗi lần GET /meeting-requests) thay vì `conflictCheckStatus`
+ * (cờ ghi 1 lần lúc tạo request, không bao giờ được tính lại — nếu 1 trong 2
+ * request trùng nhau bị từ chối, cờ cũ vẫn còn "warning"/"blocked" mãi mãi dù
+ * xung đột thực tế đã hết). Chỉ fallback về cờ cũ khi request được tạo trước
+ * khi BE trả các field mới (không có field nào cả).
+ */
+const getRequestHasConflict = (req) => {
+    const hasRoomConflict = Array.isArray(req?.conflictDetails) && req.conflictDetails.length > 0;
+    const hasPendingRoomConflict = Array.isArray(req?.pendingConflictDetails) && req.pendingConflictDetails.length > 0;
+    const hasParticipantConflict = Array.isArray(req?.participantConflictDetails) && req.participantConflictDetails.length > 0;
+    if (hasRoomConflict || hasPendingRoomConflict || hasParticipantConflict) return true;
+
+    const hasAnyLiveField = req?.conflictDetails !== undefined
+        || req?.pendingConflictDetails !== undefined
+        || req?.participantConflictDetails !== undefined;
+    if (hasAnyLiveField) return false;
+
+    return req?.conflictCheckStatus === 'warning' || req?.conflictCheckStatus === 'blocked';
+};
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -112,10 +136,12 @@ const ManagerHomePage = () => {
             const res = await approveMeetingRequest(selectedRequest.id, decisionNote);
             if (res?.success) {
                 setSuccessMsg('Đã phê duyệt yêu cầu đặt phòng họp thành công!');
-                setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
                 setApprovalModalOpen(false);
                 setDecisionNote('');
                 setSelectedRequest(null);
+                // Load lại từ BE (không chỉ filter cục bộ) để các yêu cầu còn
+                // trùng lịch với request vừa duyệt được tính lại xung đột tươi.
+                fetchPendingRequests();
             } else {
                 throw new Error(res?.error?.message || 'Thao tác phê duyệt thất bại, vui lòng thử lại.');
             }
@@ -138,10 +164,12 @@ const ManagerHomePage = () => {
             const res = await rejectMeetingRequest(selectedRequest.id, rejectionReason);
             if (res?.success) {
                 setSuccessMsg('Đã từ chối yêu cầu đặt phòng họp.');
-                setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
                 setRejectionModalOpen(false);
                 setRejectionReason('');
                 setSelectedRequest(null);
+                // Load lại từ BE (không chỉ filter cục bộ) để yêu cầu còn lại
+                // từng bị trùng với request vừa từ chối hết hiện badge "Bị trùng lịch".
+                fetchPendingRequests();
             } else {
                 throw new Error(res?.error?.message || 'Thao tác từ chối thất bại, vui lòng thử lại.');
             }
@@ -350,6 +378,20 @@ const ManagerHomePage = () => {
         };
         loadContext();
     }, [fetchPendingRequests]);
+
+    // Realtime: BE bắn `meeting_request.updated` khi có yêu cầu mới/được
+    // duyệt/từ chối/hết hạn — load lại để badge "Bị trùng lịch" của các yêu
+    // cầu còn lại (vd trùng với request vừa bị từ chối) hết ngay, không cần
+    // bấm nút "Tải lại". Dùng ref để giữ fetchPendingRequests mới nhất.
+    const fetchPendingRequestsRef = useRef(fetchPendingRequests);
+    fetchPendingRequestsRef.current = fetchPendingRequests;
+
+    useEffect(() => {
+        const unsubscribe = subscribeToMeetingRequestUpdates(() => {
+            fetchPendingRequestsRef.current();
+        });
+        return unsubscribe;
+    }, []);
 
     // Load campus dashboard summary (team presence, on-time rate this week)
     useEffect(() => {
@@ -565,8 +607,8 @@ const ManagerHomePage = () => {
                                     </div>
                                 </div>
 
-                                <div 
-                                    onClick={() => navigate('/manager/room-analytics')}
+                                <div
+                                    onClick={() => navigate('/manager/rooms')}
                                     className="group bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl text-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
                                 >
                                     <div className="flex justify-between items-start mb-4">
@@ -661,7 +703,7 @@ const ManagerHomePage = () => {
                                         </thead>
                                         <tbody>
                                             {pendingRequests.slice(0, 5).map(req => {
-                                                const hasConflict = req.conflictCheckStatus === 'warning' || req.conflictCheckStatus === 'blocked';
+                                                const hasConflict = getRequestHasConflict(req);
                                                 return (
                                                     <tr key={req.id} className="border-b border-platinum-tint/60 text-sm hover:bg-cloud-mist/20 transition-colors">
                                                         <td className="p-4 font-mono text-xs text-midnight-indigo font-bold">{req.requestCode}</td>

@@ -33,6 +33,7 @@ import { adminRegisterVehicle } from '../../service/anprService';
 import {
     PARTNER_DEPARTMENT_ID,
     isPartnerAccount,
+    isAccountExpired,
     getExpiryStatus,
     getExpiryLabel,
     buildPartnerFormData,
@@ -784,6 +785,7 @@ const UserManagement = ({ mode = 'business-admin' }) => {
                         <option value="locked">Bị khóa</option>
                         <option value="inactive">Tạm dừng</option>
                         <option value="pending_reset">Chờ đổi mật khẩu</option>
+                        <option value="expired">Hết hạn</option>
                     </select>
                 </div>
             </div>
@@ -884,14 +886,16 @@ const UserManagement = ({ mode = 'business-admin' }) => {
                                                 </td>
                                                 <td className="py-4 px-6 whitespace-nowrap">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${(user.accountStatus === 'locked' || user.locked) ? 'bg-red-50 text-red-700' :
-                                                        user.accountStatus === 'inactive' ? 'bg-slate-100 text-slate-600' :
-                                                            user.accountStatus === 'pending_reset' ? 'bg-amber-50 text-amber-700' :
-                                                                'bg-green-50 text-green-700'
+                                                        isAccountExpired(user) ? 'bg-orange-50 text-orange-700' :
+                                                            user.accountStatus === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                                                                user.accountStatus === 'pending_reset' ? 'bg-amber-50 text-amber-700' :
+                                                                    'bg-green-50 text-green-700'
                                                         }`}>
                                                         {(user.accountStatus === 'locked' || user.locked) ? 'Bị khóa' :
-                                                            user.accountStatus === 'inactive' ? 'Tạm dừng' :
-                                                                user.accountStatus === 'pending_reset' ? 'Chờ đổi mk' :
-                                                                    'Hoạt động'}
+                                                            isAccountExpired(user) ? 'Hết hạn' :
+                                                                user.accountStatus === 'inactive' ? 'Tạm dừng' :
+                                                                    user.accountStatus === 'pending_reset' ? 'Chờ đổi mk' :
+                                                                        'Hoạt động'}
                                                     </span>
                                                 </td>
                                                 <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
@@ -1577,9 +1581,17 @@ const UserManagement = ({ mode = 'business-admin' }) => {
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                                             <div>
                                                 <span className="text-slate-blue block text-xs">Trạng thái hoạt động:</span>
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${selectedUserDetail.accountStatus === 'active' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${(selectedUserDetail.accountStatus === 'locked' || selectedUserDetail.locked) ? 'bg-red-50 text-red-700' :
+                                                    isAccountExpired(selectedUserDetail) ? 'bg-orange-50 text-orange-700' :
+                                                        selectedUserDetail.accountStatus === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                                                            selectedUserDetail.accountStatus === 'pending_reset' ? 'bg-amber-50 text-amber-700' :
+                                                                'bg-green-50 text-green-700'
                                                     }`}>
-                                                    {selectedUserDetail.accountStatus === 'active' ? 'Hoạt động' : 'Bị khóa'}
+                                                    {(selectedUserDetail.accountStatus === 'locked' || selectedUserDetail.locked) ? 'Bị khóa' :
+                                                        isAccountExpired(selectedUserDetail) ? 'Hết hạn' :
+                                                            selectedUserDetail.accountStatus === 'inactive' ? 'Tạm dừng' :
+                                                                selectedUserDetail.accountStatus === 'pending_reset' ? 'Chờ đổi mật khẩu' :
+                                                                    'Hoạt động'}
                                                 </span>
                                             </div>
                                             <div>
@@ -1591,11 +1603,17 @@ const UserManagement = ({ mode = 'business-admin' }) => {
                                             <div>
                                                 <span className="text-slate-blue block text-xs">Hồ sơ khuôn mặt (FaceID):</span>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${selectedUserDetail.hasFaceProfile ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${selectedUserDetail.biometricReviewStatus === 'approved' ? 'bg-green-50 text-green-700' :
+                                                        selectedUserDetail.biometricReviewStatus === 'pending_review' ? 'bg-amber-50 text-amber-700' :
+                                                            selectedUserDetail.biometricReviewStatus === 'rejected' ? 'bg-red-50 text-red-700' :
+                                                                'bg-slate-100 text-slate-500'
                                                         }`}>
-                                                        {selectedUserDetail.hasFaceProfile ? 'Đã hợp lệ' : 'Chưa đăng ký'}
+                                                        {selectedUserDetail.biometricReviewStatus === 'approved' ? 'Đã hợp lệ' :
+                                                            selectedUserDetail.biometricReviewStatus === 'pending_review' ? 'Đang chờ duyệt' :
+                                                                selectedUserDetail.biometricReviewStatus === 'rejected' ? 'Bị từ chối' :
+                                                                    'Chưa nộp ảnh'}
                                                     </span>
-                                                    {selectedUserDetail.hasFaceProfile && (
+                                                    {selectedUserDetail.biometricReviewStatus === 'approved' && (
                                                         <button
                                                             type="button"
                                                             disabled={isResyncing}
@@ -1609,6 +1627,18 @@ const UserManagement = ({ mode = 'business-admin' }) => {
                                                     )}
                                                 </div>
                                             </div>
+                                            {isPartnerAccount(selectedUserDetail) && selectedUserDetail.accountExpiresAt && (
+                                                <div>
+                                                    <span className="text-slate-blue block text-xs">Hạn sử dụng tài khoản:</span>
+                                                    <span className={`font-semibold block mt-1 ${
+                                                        getExpiryStatus(selectedUserDetail.accountExpiresAt) === 'expired' ? 'text-red-600' :
+                                                        getExpiryStatus(selectedUserDetail.accountExpiresAt) === 'expiring_soon' ? 'text-amber-600' :
+                                                        'text-midnight-indigo'
+                                                    }`}>
+                                                        {new Date(selectedUserDetail.accountExpiresAt).toLocaleString('vi-VN')}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
