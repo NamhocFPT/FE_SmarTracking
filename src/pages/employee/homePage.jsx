@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, Info, LogIn, PlusCircle, ShieldAlert, TrendingUp, User, Video } from 'lucide-react';
+import { AlertCircle, ArrowRight, Award, BarChart2, BookOpen, Calendar, Car, CheckCircle, Clock, LogIn, PlusCircle, ShieldAlert, TrendingUp, User, Video } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,23 +14,6 @@ const toVNTime = (iso) => {
     if (!iso) return '—';
     try { return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }); }
     catch { return '—'; }
-};
-
-// Placeholder data hiển thị trong lúc BE phát triển API. Xóa và bỏ __dev__ trước khi merge.
-const DEV_STUB = {
-    __dev__: true,
-    onTimeRate: 87.5, totalRequired: 16, onTimeCount: 14, lateCount: 2, absentCount: 0,
-    departmentAvg: { onTimeRate: 82.3 },
-    recentLate: [
-        { meetingTitle: 'Họp dự án Alpha', scheduledTime: '2026-08-10T08:00:00+07:00', checkinTime: '2026-08-10T08:12:00+07:00', lateMinutes: 12 },
-        { meetingTitle: 'Daily Standup', scheduledTime: '2026-08-08T09:00:00+07:00', checkinTime: '2026-08-08T09:07:00+07:00', lateMinutes: 7 },
-    ],
-    trend: [
-        { period: '2026-07-21', onTimeCount: 4, lateCount: 1, absentCount: 0 },
-        { period: '2026-07-28', onTimeCount: 3, lateCount: 0, absentCount: 1 },
-        { period: '2026-08-04', onTimeCount: 5, lateCount: 1, absentCount: 0 },
-        { period: '2026-08-11', onTimeCount: 2, lateCount: 0, absentCount: 0 },
-    ],
 };
 
 const containerVariants = {
@@ -78,8 +61,9 @@ const EmployeeHomePage = () => {
 
     // Analytics tab state
     const [analyticsPreset, setAnalyticsPreset] = useState('month');
-    const [analyticsData, setAnalyticsData] = useState(DEV_STUB);
-    const [analyticsLoading, setAnalyticsLoading] = useState(false);
+    const [analyticsData, setAnalyticsData] = useState(null);
+    // Bắt đầu ở trạng thái loading để tab thống kê không nhấp nháy khoảng trắng trước khi fetch xong.
+    const [analyticsLoading, setAnalyticsLoading] = useState(true);
     const [analyticsError, setAnalyticsError] = useState(null);
 
 
@@ -212,11 +196,13 @@ const EmployeeHomePage = () => {
                         })),
                     });
                 } else {
+                    setAnalyticsData(null);
                     setAnalyticsError(res?.message || 'Không thể tải dữ liệu thống kê.');
                 }
             })
             .catch(err => {
                 if (!isMounted) return;
+                setAnalyticsData(null);
                 setAnalyticsError(err?.error?.message || err?.message || 'Lỗi kết nối khi tải thống kê.');
             })
             .finally(() => { if (isMounted) setAnalyticsLoading(false); });
@@ -559,14 +545,6 @@ const EmployeeHomePage = () => {
                         transition={{ duration: 0.2 }}
                         className="space-y-5"
                     >
-                        {/* Dev banner */}
-                        {analyticsData?.__dev__ && !analyticsLoading && (
-                            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-                                <Info className="w-3.5 h-3.5 shrink-0" />
-                                Đang hiển thị dữ liệu thử nghiệm — API thống kê cá nhân đang phát triển, sẽ thay bằng dữ liệu thật trước khi merge.
-                            </div>
-                        )}
-
                         {/* Preset filter */}
                         <div className="flex items-center gap-2">
                             {[
@@ -626,6 +604,18 @@ const EmployeeHomePage = () => {
                             </div>
                         ) : analyticsData ? (
                             <div className="space-y-5">
+                                {/* Ngưỡng “đúng giờ” của trang này (graceMinutes) khác với báo cáo cấp
+                                    phòng ban, nên phải nói rõ để người dùng không tưởng số liệu bị sai. */}
+                                {analyticsData.graceMinutes != null && (
+                                    <p className="text-[11px] text-slate-blue bg-cloud-mist/60 border border-platinum-tint rounded-xl px-3 py-2">
+                                        Cách tính: được xem là <b>đúng giờ</b> nếu điểm danh muộn không quá{' '}
+                                        <b>{analyticsData.graceMinutes} phút</b> so với giờ bắt đầu cuộc họp.
+                                        {analyticsData.period && (
+                                            <> · Kỳ thống kê: {analyticsData.period.from} → {analyticsData.period.to}</>
+                                        )}
+                                    </p>
+                                )}
+
                                 {/* Row 1 — 4 KPI cards */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div className="bg-white p-5 rounded-2xl border border-platinum-tint shadow-sm space-y-1">
@@ -735,7 +725,13 @@ const EmployeeHomePage = () => {
                                     </div>
                                 )}
                             </div>
-                        ) : null}
+                        ) : (
+                            <div className="flex flex-col items-center justify-center min-h-[360px] bg-white rounded-2xl border border-platinum-tint shadow-sm p-10 text-center">
+                                <BarChart2 className="w-10 h-10 text-slate-blue/30 mb-3" />
+                                <h3 className="text-sm font-bold text-midnight-indigo mb-1">Chưa có dữ liệu thống kê</h3>
+                                <p className="text-xs text-slate-blue max-w-xs leading-relaxed">Chọn một kỳ khác hoặc quay lại sau khi bạn đã tham dự cuộc họp.</p>
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
