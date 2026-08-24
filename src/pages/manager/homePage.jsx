@@ -29,6 +29,38 @@ import { subscribeToMeetingRequestUpdates } from '../../utils/socket';
 
 const COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
 
+// BE trả về status dạng enum tiếng Anh -> hiển thị nhãn tiếng Việt cho người dùng.
+const MEETING_STATUS_LABEL = {
+    scheduled: 'Đã lên lịch',
+    completed: 'Đã diễn ra',
+    cancelled: 'Đã huỷ',
+    no_show: 'Vắng mặt',
+    draft: 'Nháp',
+    in_progress: 'Đang diễn ra',
+    pending_approval: 'Chờ duyệt',
+};
+const meetingStatusLabel = (v) => MEETING_STATUS_LABEL[v] || v;
+
+// `requestedStartTime` chỉ khác null khi yêu cầu xin ĐỔI giờ; yêu cầu duyệt thường để null.
+// `new Date(null)` cho ra 1/1/1970 nên phải fallback về giờ hiện tại của cuộc họp.
+const formatRequestTime = (req) => {
+    const raw = req?.requestedStartTime ?? req?.meeting?.startTime;
+    if (!raw) return '—';
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('vi-VN');
+};
+
+// Mặc định bộ lọc = tháng hiện tại theo giờ máy người dùng (không hard-code tháng cố định).
+const pad2 = (n) => String(n).padStart(2, '0');
+const toDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const monthRange = () => {
+    const now = new Date();
+    return {
+        from: toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
+        to: toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+};
+
 /**
  * Xung đột (phòng HOẶC người) cho badge gọn ở dashboard — dùng dữ liệu check
  * TƯƠI (conflictDetails/pendingConflictDetails/participantConflictDetails,
@@ -183,8 +215,8 @@ const ManagerHomePage = () => {
     // ==========================================
     // ANALYTICS STATE & LOGIC (UC-158)
     // ==========================================
-    const [fromDate, setFromDate] = useState('2026-06-01');
-    const [toDate, setToDate] = useState('2026-06-30');
+    const [fromDate, setFromDate] = useState(() => monthRange().from);
+    const [toDate, setToDate] = useState(() => monthRange().to);
     const [stats, setStats] = useState({
         meetingCount: 0,
         activeRooms: 0,
@@ -203,7 +235,7 @@ const ManagerHomePage = () => {
     });
     const [meetingsTrend, setMeetingsTrend] = useState([]);
     const [statusBreakdown, setStatusBreakdown] = useState([]);
-    const [avgDuration, setAvgDuration] = useState({ averageMinutes: 0 });
+    const [avgDuration, setAvgDuration] = useState({});
     const [cancelRateStats, setCancelRateStats] = useState({ cancelRate: 0 });
     const [noShowTrend, setNoShowTrend] = useState([]);
     const [isExporting, setIsExporting] = useState(false);
@@ -290,9 +322,10 @@ const ManagerHomePage = () => {
             }
 
             if (durationRes.status === 'fulfilled' && durationRes.value?.success) {
-                setAvgDuration(durationRes.value.data);
+                // MeetingAverageDurationResponseDto: KPI nằm trong `summary`, không phải ở gốc.
+                setAvgDuration(durationRes.value.data?.summary ?? {});
             } else {
-                setAvgDuration({ averageMinutes: 0 });
+                setAvgDuration({});
             }
 
             if (cancelRes.status === 'fulfilled' && cancelRes.value?.success) {
@@ -302,7 +335,8 @@ const ManagerHomePage = () => {
             }
 
             if (noShowRes.status === 'fulfilled' && noShowRes.value?.success) {
-                setNoShowTrend(noShowRes.value.data.byRoom || []);
+                // NoShowRateResponseDto: xếp hạng nằm ở `ranking.items`, item = { id, name, noShowRate }.
+                setNoShowTrend(noShowRes.value.data?.ranking?.items || []);
             } else {
                 setNoShowTrend([]);
             }
@@ -711,9 +745,9 @@ const ManagerHomePage = () => {
                                                             {req.meeting?.title || 'Cuộc họp phòng ban'}
                                                         </td>
                                                         <td className="p-4 text-slate-blue font-medium">{req.requestedBy?.fullName || 'Nhân viên'}</td>
-                                                        <td className="p-4 font-medium text-midnight-indigo">{req.targetRoom?.roomName}</td>
+                                                        <td className="p-4 font-medium text-midnight-indigo">{req.targetRoom?.roomName || '—'}</td>
                                                         <td className="p-4 text-xs text-slate-blue font-medium">
-                                                            {new Date(req.requestedStartTime).toLocaleString('vi-VN')}
+                                                            {formatRequestTime(req)}
                                                         </td>
                                                         <td className="p-4">
                                                             {hasConflict ? (
@@ -846,7 +880,9 @@ const ManagerHomePage = () => {
                                         </div>
                                         <div className="mt-4">
                                             <h3 className="text-2xl font-bold text-midnight-indigo">{stats.meetingCount} cuộc</h3>
-                                            <p className="text-xs text-slate-blue mt-1">Thời lượng trung bình: {avgDuration.averageMinutes}p</p>
+                                            <p className="text-xs text-slate-blue mt-1">
+                                                Thời lượng trung bình: {avgDuration.actualAverageMinutes ?? avgDuration.plannedAverageMinutes ?? 0}p
+                                            </p>
                                             <div className="mt-2 pt-2 border-t border-platinum-tint/40 flex justify-between text-[11px] text-slate-blue font-medium">
                                                 <span>Huỷ: {cancelRateStats.cancelRate}%</span>
                                             </div>
@@ -931,7 +967,8 @@ const ManagerHomePage = () => {
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <PieChart>
                                                     <Pie
-                                                        data={statusBreakdown}
+                                                        data={statusBreakdown.map(i => ({ ...i, label: meetingStatusLabel(i.status) }))}
+                                                        nameKey="label"
                                                         cx="50%"
                                                         cy="50%"
                                                         innerRadius={50}
@@ -951,8 +988,8 @@ const ManagerHomePage = () => {
                                             {statusBreakdown.map((item, idx) => (
                                                 <div key={item.status} className="flex items-center gap-1.5">
                                                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                                                    <span className="text-slate-blue truncate w-full" title={`${item.status}`}>
-                                                        {item.status}: {item.count}
+                                                    <span className="text-slate-blue truncate w-full" title={meetingStatusLabel(item.status)}>
+                                                        {meetingStatusLabel(item.status)}: {item.count}
                                                     </span>
                                                 </div>
                                             ))}
@@ -960,15 +997,18 @@ const ManagerHomePage = () => {
 
                                         <div className="mt-4 pt-3 border-t border-platinum-tint/60 space-y-2">
                                             <span className="text-[11px] font-bold text-slate-blue uppercase block tracking-wider">Tỷ lệ vắng mặt theo phòng</span>
+                                            {noShowTrend.length === 0 && (
+                                                <p className="text-[11px] text-slate-400">Chưa có dữ liệu vắng mặt trong kỳ này</p>
+                                            )}
                                             {noShowTrend.slice(0, 3).map((room) => (
-                                                <div key={room.roomName} className="space-y-1">
+                                                <div key={room.id ?? room.name} className="space-y-1">
                                                     <div className="flex justify-between text-[11px] font-semibold">
-                                                        <span className="text-midnight-indigo truncate max-w-[70%]">{room.roomName}</span>
+                                                        <span className="text-midnight-indigo truncate max-w-[70%]">{room.name}</span>
                                                         <span className="text-red-600">{room.noShowRate}%</span>
                                                     </div>
                                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                                         <div
-                                                            style={{ width: `${room.noShowRate * 8}%` }}
+                                                            style={{ width: `${Math.min(Math.max(room.noShowRate ?? 0, 0), 100)}%` }}
                                                             className="bg-red-500 h-full rounded-full"
                                                         />
                                                     </div>

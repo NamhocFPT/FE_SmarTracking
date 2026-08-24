@@ -121,6 +121,10 @@ const useInView = (threshold = 0.12) => {
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
+        // Khi tab đang ẩn, trình duyệt tạm dừng vòng render nên IntersectionObserver có thể
+        // không bao giờ báo — khối nội dung sẽ kẹt ở opacity-0 và KPI kẹt ở 0. Bỏ qua hiệu
+        // ứng trong trường hợp đó, ưu tiên hiển thị đúng dữ liệu hơn là animation.
+        if (typeof document !== 'undefined' && document.hidden) { setInView(true); return; }
         const obs = new IntersectionObserver(
             ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
             { threshold }
@@ -136,6 +140,15 @@ const useCountUp = (target, active, duration = 750) => {
     const rafRef = useRef(null);
     useEffect(() => {
         if (!active || typeof target !== 'number') return;
+
+        // requestAnimationFrame bị trình duyệt tạm dừng khi tab đang ẩn. Nếu KPI được
+        // tải trong lúc tab ở nền thì animation không bao giờ chạy và số liệu sẽ kẹt ở 0
+        // — hiển thị sai hoàn toàn. Trường hợp đó gán thẳng giá trị thật, bỏ animation.
+        if (typeof document !== 'undefined' && document.hidden) {
+            setDisplay(target);
+            return;
+        }
+
         const startTime = performance.now();
         const tick = (now) => {
             const progress = Math.min((now - startTime) / duration, 1);
@@ -144,7 +157,15 @@ const useCountUp = (target, active, duration = 750) => {
             if (progress < 1) rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(rafRef.current);
+
+        // Nếu người dùng chuyển tab giữa chừng, chốt luôn giá trị cuối để không đứng dở.
+        const settle = () => { if (document.hidden) { cancelAnimationFrame(rafRef.current); setDisplay(target); } };
+        document.addEventListener('visibilitychange', settle);
+
+        return () => {
+            cancelAnimationFrame(rafRef.current);
+            document.removeEventListener('visibilitychange', settle);
+        };
     }, [active, target, duration]);
     return display;
 };
@@ -438,6 +459,12 @@ const DashBoard = () => {
         const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
         const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Analytics API dùng chuỗi ngày YYYY-MM-DD theo giờ địa phương; toISOString() sẽ
+        // đổi sang UTC và làm lệch ngày (VN = UTC+7).
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const toDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+        const monthStartStr = toDateStr(monthStart);
+        const todayStr = toDateStr(now);
 
         const [
             summaryRes, devicesRes, alertsRes, trafficRes,
@@ -451,14 +478,8 @@ const DashBoard = () => {
                 to:   todayEnd.toISOString(),
                 group_by: 'hour',
             }),
-            getRoomAnalytics({
-                from: monthStart.toISOString(),
-                to:   todayEnd.toISOString(),
-            }),
-            getAttendanceAnalytics({
-                from: monthStart.toISOString().split('T')[0],
-                to:   todayEnd.toISOString().split('T')[0],
-            }),
+            getRoomAnalytics({ from: monthStartStr, to: todayStr }),
+            getAttendanceAnalytics({ from: monthStartStr, to: todayStr }),
             getSecurityAlertsDailyTrend({ days: 7 }),
             getAuditActivityHourly(),
         ]);
@@ -556,7 +577,9 @@ const DashBoard = () => {
                 rooms.slice(0, 8)
                     .map(r => ({
                         name: (r.roomName || r.room_name || '').replace(/^Phòng\s+/i, '') || '—',
-                        rate: +(parseFloat(r.utilizationRate || r.utilization_rate || 0).toFixed(1)),
+                        rate: +(parseFloat(r.reservationUtilizationRate ?? r.utilizationRate ?? 0).toFixed(1)),
+                        bookedHours: r.bookedHours ?? 0,
+                        actualHours: r.actualHours ?? 0,
                     }))
                     .filter(r => r.name !== '—')
             );
