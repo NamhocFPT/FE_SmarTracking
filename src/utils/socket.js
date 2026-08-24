@@ -24,20 +24,10 @@ const resolveToken = () => {
 const meetingRoomRefs = new Map();
 let wantsUserRoom = false;
 
-// B2 (Zone realtime, gate ZONE_REALTIME_ENABLED ở BE — mặc định OFF): refcount
-// theo zoneId, mirror ĐÚNG meetingRoomRefs ở trên — ZoneAccessLogCard/
-// ZoneTimelineCard có thể cùng cần room `zone:{id}` tại các thời điểm khác
-// nhau khi đổi tab, không để component nào cleanup trước cắt mất room của
-// component còn lại.
-const zoneRoomRefs = new Map();
-
 const replaySubscriptions = (s) => {
   if (wantsUserRoom) s.emit('user:subscribe');
   for (const meetingId of meetingRoomRefs.keys()) {
     s.emit('meeting:subscribe', { meetingId });
-  }
-  for (const zoneId of zoneRoomRefs.keys()) {
-    s.emit('zone:subscribe', { zoneId });
   }
 };
 
@@ -136,44 +126,10 @@ export const subscribeToNotificationUpdates = (onCreate) => {
   };
 };
 
-// Dùng ở ZoneManagement (ZoneAccessLogCard/ZoneTimelineCard) — nhận
-// `zone.presence.updated` realtime khi BE bật ZONE_REALTIME_ENABLED (mặc định
-// OFF — khi tắt, subscribe vẫn join room bình thường nhưng không bao giờ
-// nhận event, KHÔNG lỗi gì; polling silent 2s/2s/6s ở FE vẫn là nguồn cập
-// nhật chính, đây chỉ là lớp "tăng tốc" tuỳ chọn). Lọc theo zoneId trong
-// payload — BE emit đúng room `zone:{zoneId}` nhưng lọc thêm ở client để an
-// toàn nếu 1 socket đang join nhiều zone room cùng lúc.
-export const subscribeToZonePresence = (zoneId, onUpdate) => {
-  const s = getSocket();
-  const prev = zoneRoomRefs.get(zoneId) ?? 0;
-  zoneRoomRefs.set(zoneId, prev + 1);
-  if (prev === 0) s.emit('zone:subscribe', { zoneId });
-
-  const handler = (payload) => {
-    if (payload?.zoneId === zoneId) onUpdate(payload);
-  };
-  s.on('zone.presence.updated', handler);
-
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    s.off('zone.presence.updated', handler);
-    const count = (zoneRoomRefs.get(zoneId) ?? 1) - 1;
-    if (count > 0) {
-      zoneRoomRefs.set(zoneId, count);
-      return;
-    }
-    zoneRoomRefs.delete(zoneId);
-    s.emit('zone:unsubscribe', { zoneId });
-  };
-};
-
 // Gọi khi logout: huỷ socket đang mang token của người dùng cũ và xoá mọi ý
 // định subscribe, để phiên đăng nhập kế tiếp tạo socket mới với token mới.
 export const resetSocket = () => {
   meetingRoomRefs.clear();
-  zoneRoomRefs.clear();
   wantsUserRoom = false;
   if (socket) {
     socket.disconnect();
