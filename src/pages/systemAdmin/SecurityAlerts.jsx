@@ -182,8 +182,8 @@ const SecurityAlerts = () => {
         }
     };
 
-    const fetchAlerts = useCallback(async (currentFilters = filters) => {
-        setLoading(true);
+    const fetchAlerts = useCallback(async (currentFilters = filters, silent = false) => {
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const res = await getSecurityAlerts(currentFilters);
@@ -196,7 +196,7 @@ const SecurityAlerts = () => {
         } catch (err) {
             setError(err?.message || 'Lỗi kết nối khi tải dữ liệu.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [filters]);
 
@@ -207,10 +207,10 @@ const SecurityAlerts = () => {
     useEffect(() => {
         fetchAlerts(filters);
 
-        // Polling every 10 seconds for new alerts
+        // Polling every 1 second for new alerts (silent — không giật icon/nút Làm mới)
         const intervalId = setInterval(() => {
-            fetchAlerts(filters);
-        }, 10000);
+            fetchAlerts(filters, true);
+        }, 1000);
 
         return () => clearInterval(intervalId);
     }, [filters, fetchAlerts]);
@@ -394,14 +394,17 @@ const SecurityAlerts = () => {
                         <Download className="w-4 h-4" />
                         Xuất báo cáo
                     </button>
-                    <button
-                        onClick={() => fetchAlerts()}
-                        disabled={loading}
-                        className="inline-flex items-center justify-center p-2.5 text-slate-blue bg-cloud-mist/50 rounded-xl hover:bg-cloud-mist transition-colors"
-                        title="Làm mới"
-                    >
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="flex flex-col items-center gap-1">
+                        <button
+                            onClick={() => fetchAlerts()}
+                            disabled={loading}
+                            className="inline-flex items-center justify-center p-2.5 text-slate-blue bg-cloud-mist/50 rounded-xl hover:bg-cloud-mist transition-colors"
+                            title="Làm mới"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">Tự động cập nhật mỗi 1s</span>
+                    </div>
                     {selectedIds.length > 0 && (
                         <button
                             onClick={handleBulkAcknowledge}
