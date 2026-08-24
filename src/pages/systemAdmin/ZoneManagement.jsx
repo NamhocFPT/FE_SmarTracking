@@ -7,6 +7,7 @@ import {
     deleteZone
 } from '../../service/zoneServices';
 import { getZoneAccessLog, getZonePresenceTimeline } from '../../service/sysAdminServices';
+import { subscribeToZonePresence } from '../../utils/socket';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 
@@ -69,9 +70,9 @@ const ZoneAccessLogCard = ({ zoneId }) => {
 
     useEffect(() => { setPage(1); }, [date]);
 
-    const fetchLog = useCallback(async () => {
+    const fetchLog = useCallback(async (silent = false) => {
         if (!zoneId) return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const res = await getZoneAccessLog(zoneId, date, { page, limit: ZONE_LOG_LIMIT });
@@ -93,11 +94,30 @@ const ZoneAccessLogCard = ({ zoneId }) => {
         } catch (err) {
             setError(err?.message || 'Lỗi khi tải nhật ký ra vào.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [zoneId, date, page]);
 
     useEffect(() => { fetchLog(); }, [fetchLog]);
+
+    // silent polling — tự động cập nhật nhật ký ra/vào mỗi 2s
+    useEffect(() => {
+        const id = setInterval(() => fetchLog(true), 2000);
+        return () => clearInterval(id);
+    }, [fetchLog]);
+
+    // B2 (Zone realtime, gate ZONE_REALTIME_ENABLED ở BE — mặc định OFF): khi BE
+    // bật, nhận 'zone.presence.updated' để refetch ngay thay vì đợi vòng poll kế
+    // tiếp. Polling 2s ở trên VẪN CHẠY SONG SONG không đổi — lưới an toàn khi
+    // socket rớt/lỡ event hoặc lúc flag đang tắt. Ref giữ fetchLog mới nhất
+    // (có date/page hiện tại) để effect chỉ resubscribe khi ĐỔI ZONE, không phải
+    // mỗi lần đổi ngày/trang.
+    const fetchLogRef = useRef(fetchLog);
+    useEffect(() => { fetchLogRef.current = fetchLog; }, [fetchLog]);
+    useEffect(() => {
+        if (!zoneId) return;
+        return subscribeToZonePresence(zoneId, () => fetchLogRef.current(true));
+    }, [zoneId]);
 
     const openSnapshot = (eventId) => {
         setSnapshotEventId(eventId);
@@ -133,8 +153,9 @@ const ZoneAccessLogCard = ({ zoneId }) => {
                             className="pl-8 pr-3 py-1.5 border border-platinum-tint rounded-xl text-xs font-semibold text-midnight-indigo bg-white hover:border-action-blue/50 focus:outline-none focus:border-action-blue focus:ring-2 focus:ring-action-blue/10 transition-all cursor-pointer"
                         />
                     </div>
+                    <span className="text-[10px] text-slate-400">Tự động cập nhật mỗi 2s</span>
                     <button
-                        onClick={fetchLog}
+                        onClick={() => fetchLog()}
                         className="p-1.5 text-slate-blue hover:text-action-blue hover:bg-blue-50 rounded-lg transition-colors"
                         title="Làm mới"
                     >
@@ -289,7 +310,7 @@ const ZoneTimelineCard = ({ zoneId }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const fetchTimeline = useCallback(async () => {
+    const fetchTimeline = useCallback(async (silent = false) => {
         if (!zoneId) return;
         const fromMs = new Date(fromDate).getTime();
         const toMs = new Date(toDate).getTime();
@@ -301,9 +322,11 @@ const ZoneTimelineCard = ({ zoneId }) => {
             setError(`Khoảng thời gian tối đa ${MAX_TIMELINE_DAYS} ngày.`);
             return;
         }
-        setLoading(true);
+        if (!silent) {
+            setLoading(true);
+            setData(null);
+        }
         setError(null);
-        setData(null);
         try {
             const res = await getZonePresenceTimeline(zoneId, {
                 from: buildIso(fromDate, false),
@@ -317,7 +340,7 @@ const ZoneTimelineCard = ({ zoneId }) => {
         } catch (err) {
             setError(err?.error?.message || err?.message || 'Lỗi khi tải timeline.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [zoneId, fromDate, toDate]);
 
@@ -327,6 +350,24 @@ const ZoneTimelineCard = ({ zoneId }) => {
         setError(null);
         fetchTimeline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zoneId]);
+
+    // silent polling — tự động cập nhật timeline mỗi 6s
+    useEffect(() => {
+        const id = setInterval(() => fetchTimeline(true), 6000);
+        return () => clearInterval(id);
+    }, [fetchTimeline]);
+
+    // B2 (Zone realtime, gate ZONE_REALTIME_ENABLED ở BE — mặc định OFF): khi BE
+    // bật, nhận 'zone.presence.updated' để refetch ngay thay vì đợi vòng poll kế
+    // tiếp. Polling 6s ở trên VẪN CHẠY SONG SONG không đổi — lưới an toàn khi
+    // socket rớt/lỡ event hoặc lúc flag đang tắt. Ref giữ fetchTimeline mới nhất
+    // (có fromDate/toDate hiện tại) để effect chỉ resubscribe khi ĐỔI ZONE.
+    const fetchTimelineRef = useRef(fetchTimeline);
+    useEffect(() => { fetchTimelineRef.current = fetchTimeline; }, [fetchTimeline]);
+    useEffect(() => {
+        if (!zoneId) return;
+        return subscribeToZonePresence(zoneId, () => fetchTimelineRef.current(true));
     }, [zoneId]);
 
     // Aggregate events by VN hour (0–23) cho BarChart
@@ -375,8 +416,9 @@ const ZoneTimelineCard = ({ zoneId }) => {
                             className="px-2 py-1 border border-platinum-tint rounded-lg text-xs text-midnight-indigo focus:outline-none focus:border-action-blue"
                         />
                     </div>
+                    <span className="text-[10px] text-slate-400">Tự động cập nhật mỗi 6s</span>
                     <button
-                        onClick={fetchTimeline}
+                        onClick={() => fetchTimeline()}
                         disabled={loading}
                         title="Tải lại"
                         className="p-1.5 rounded-lg text-slate-blue hover:text-action-blue hover:bg-blue-50 transition-colors disabled:opacity-50"
@@ -572,8 +614,8 @@ const ZoneManagement = () => {
     });
 
 
-    const fetchZones = useCallback(async () => {
-        setLoading(true);
+    const fetchZones = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const res = await getZones({ limit: 100 });
@@ -585,12 +627,18 @@ const ZoneManagement = () => {
         } catch (err) {
             setError(err?.message || 'Lỗi khi tải dữ liệu hệ thống.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
         fetchZones();
+    }, [fetchZones]);
+
+    // silent polling — tự động cập nhật danh sách khu vực mỗi 2s
+    useEffect(() => {
+        const id = setInterval(() => fetchZones(true), 2000);
+        return () => clearInterval(id);
     }, [fetchZones]);
 
     useEffect(() => {
@@ -852,6 +900,7 @@ const ZoneManagement = () => {
                                     className="w-full pl-9 pr-4 py-2 border border-platinum-tint rounded-xl text-sm focus:outline-none focus:border-action-blue bg-white"
                                 />
                             </div>
+                            <p className="text-[10px] text-slate-400 mt-2">Tự động cập nhật mỗi 2s</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
