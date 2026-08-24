@@ -98,14 +98,24 @@ const Notifications = () => {
         }
     };
 
+    // [FIX] Key cũ (APPROVAL_REQUEST/NO_SHOW_ALERT/DEVICE_FAULT/SECURITY_ALERT) là
+    // SCREAMING_CASE — enum thật của BE (NotificationType, notification.entity.ts) toàn bộ
+    // là snake_case, không khớp key nào → icon/màu luôn rơi vào default. Đổi sang đúng giá
+    // trị thật, gom nhóm theo ý nghĩa gần nhất với 4 nhóm UI cũ (chờ duyệt / cảnh báo thiết
+    // bị-vắng mặt / cảnh báo an ninh):
     const getIcon = (type) => {
         switch (type) {
-            case 'APPROVAL_REQUEST':
+            case 'meeting_request_created':
                 return <Clock className="w-5 h-5 text-action-blue" />;
-            case 'NO_SHOW_ALERT':
-            case 'DEVICE_FAULT':
+            case 'no_show_alert':
+            case 'equipment_fault_reported':
+            case 'equipment_fault_confirmed':
                 return <AlertTriangle className="w-5 h-5 text-sunset-gold" />;
-            case 'SECURITY_ALERT':
+            case 'unknown_face_alert':
+            case 'vehicle_control_list_match':
+            case 'unknown_vehicle_alert':
+            case 'vehicle_unauthorized_alert':
+            case 'person_watchlist_match':
                 return <Info className="w-5 h-5 text-red-600" />;
             default:
                 return <Bell className="w-5 h-5 text-slate-blue" />;
@@ -115,12 +125,17 @@ const Notifications = () => {
     const getBgColor = (type, read) => {
         if (read) return 'bg-white border-platinum-tint';
         switch (type) {
-            case 'APPROVAL_REQUEST':
+            case 'meeting_request_created':
                 return 'bg-blue-50/40 border-blue-150';
-            case 'NO_SHOW_ALERT':
-            case 'DEVICE_FAULT':
+            case 'no_show_alert':
+            case 'equipment_fault_reported':
+            case 'equipment_fault_confirmed':
                 return 'bg-yellow-50/40 border-yellow-150';
-            case 'SECURITY_ALERT':
+            case 'unknown_face_alert':
+            case 'vehicle_control_list_match':
+            case 'unknown_vehicle_alert':
+            case 'vehicle_unauthorized_alert':
+            case 'person_watchlist_match':
                 return 'bg-red-50/40 border-red-150';
             default:
                 return 'bg-cloud-mist/40 border-outline-gray';

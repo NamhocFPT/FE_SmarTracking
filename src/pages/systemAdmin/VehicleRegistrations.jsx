@@ -157,7 +157,13 @@ const VehicleRegistrations = () => {
 
     const closeOwnerModal = () => { setIsOwnerModalOpen(false); setSelectedOwner(null); setOwnerDetail(null); };
 
-    const handleFilterChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+    // [FIX] Object literal { ...prev, [key]: value, page: 1 } — khi key='page' (đổi
+    // trang), 'page: 1' viết SAU '[key]: value' trong CÙNG object literal nên đè mất
+    // giá trị page vừa set (JS: key trùng trong 1 literal, giá trị SAU CÙNG thắng) →
+    // bấm "Sau"/số trang nào cũng bị kéo về trang 1. Chỉ ép page=1 khi đổi filter KHÁC
+    // page — đổi chính page thì giữ nguyên giá trị mới. Mirror fix đã áp dụng ở
+    // SecurityAlerts.jsx.
+    const handleFilterChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value, ...(key !== 'page' ? { page: 1 } : {}) }));
 
     // ── render ──────────────────────────────────────────────────────────────
 

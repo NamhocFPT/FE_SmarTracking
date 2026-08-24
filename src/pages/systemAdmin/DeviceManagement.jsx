@@ -739,7 +739,7 @@ const DeviceManagement = () => {
                             >
                                 <option value="">Tất cả phòng</option>
                                 {rooms.map(room => (
-                                    <option key={room.id} value={room.id}>{room.roomName}</option>
+                                    <option key={room.roomId} value={room.roomId}>{room.roomName}</option>
                                 ))}
                             </select>
                             <select

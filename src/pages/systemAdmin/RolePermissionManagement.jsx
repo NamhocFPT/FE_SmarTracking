@@ -10,6 +10,11 @@ import { PERMISSION_MODULE_STATUS } from '../../config/permissionModuleStatus';
 import { PERMISSION_DEPENDENCIES } from '../../config/permissionDependencies';
 
 
+// [FIX] Bổ sung đầy đủ moduleCode thật — đọc trực tiếp từ dữ liệu seed thật
+// (migrations/*.ts, cột module_code bảng permissions) + MODULE_CODE_ALLOWLIST
+// (accounts/constants/permission-module-allowlist.constant.ts, danh sách validate khi tạo
+// permission mới). Giữ nguyên 20 key cũ (không xóa — 1 số như 'zone_management' có thể vẫn
+// khớp permission cũ chưa kiểm hết), chỉ THÊM các moduleCode thật còn thiếu.
 const MODULE_TRANSLATIONS = {
     'system_management': 'Quản trị hệ thống',
     'gate_access': 'Kiểm soát ra vào',
@@ -30,7 +35,31 @@ const MODULE_TRANSLATIONS = {
     'face': 'Nhận diện khuôn mặt',
     'departments': 'Quản lý phòng ban',
     'media': 'Quản lý phương tiện',
-    'other': 'Các quyền khác'
+    'other': 'Các quyền khác',
+    // Xác nhận thật qua seed migrations (module_code cột permissions):
+    'audit': 'Nhật ký hệ thống',
+    'face_access': 'Nhận diện khuôn mặt (kiểm soát ra vào)',
+    'rooms': 'Quản lý phòng họp',
+    'campus_dashboard': 'Bảng điều khiển tổng quan',
+    'equipment': 'Quản lý thiết bị phòng họp',
+    'attendance': 'Điểm danh',
+    'scheduling': 'Lịch đặt phòng',
+    'minutes': 'Biên bản họp',
+    'notifications': 'Thông báo',
+    'analytics': 'Thống kê phân tích',
+    'transcription': 'Ghi chép tự động (Transcription)',
+    'zones': 'Quản lý khu vực',
+    // Xác nhận thật qua MODULE_CODE_ALLOWLIST (validator tạo permission mới):
+    'auth': 'Hệ thống xác thực',
+    'meeting_requests': 'Yêu cầu đặt phòng họp',
+    'approvals': 'Phê duyệt',
+    'presence': 'Hiện diện (Presence)',
+    'utilization': 'Tỷ lệ sử dụng phòng',
+    'live_meeting': 'Cuộc họp trực tiếp',
+    'administration': 'Quản trị hệ thống',
+    'admin': 'Quản trị',
+    'internal': 'Nội bộ hệ thống',
+    'system': 'Hệ thống'
 };
 
 const ROLE_TRANSLATIONS = {

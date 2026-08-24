@@ -11,21 +11,33 @@ import { getAuditLogs, exportAuditLogs, getUserById, getAuditLogActionTypes } fr
  * Displays security audit trails, sensitive actor actions, IP sources, and database entity transitions.
  */
 // Localization dictionaries for professional Vietnamese translation
+// [FIX] Key cũ toàn bộ SCREAMING_CASE — action_type thật ghi vào audit_logs KHÔNG đồng nhất
+// 1 kiểu case (đọc trực tiếp từ BE service ghi log, không đoán): 'login'/'logout' (lowercase,
+// auth-audit.repository.ts), 'ACCOUNT_CREATE'/'ACCOUNT_UPDATE'/'ACCOUNT_LOCK'/'ACCOUNT_UNLOCK'/
+// 'ACCOUNT_DELETE' (SCREAMING_CASE có tiền tố ACCOUNT_, users.service.ts — khớp ĐÚNG case gốc
+// vì đây là giá trị lưu thật trong DB, không tự ý hạ thường), 'export_users'
+// (reports/user-export.service.ts), 'system_config_update' (administration/system-config.service.ts).
+// BỎ 4 key không đổi được an toàn:
+// - LOGIN_FAILED: không tìm thấy nơi nào ghi audit_logs cho đăng nhập thất bại (AuthAuditRepository
+//   chỉ có logLoginSuccess/logLogoutSuccess) — không có giá trị thật để map, không đoán.
+// - REGISTER_DEVICE/UPDATE_DEVICE/REMOVE_DEVICE: giá trị thật ở iot-audit.repository.ts là verb
+//   CHUNG ('create'/'update'/'disable') — KHÔNG ring riêng cho thiết bị, cùng verb này còn được
+//   nhiều entity khác dùng (department/room/equipment/meeting đều có action_type='create'/'update').
+//   Thêm các key này sẽ dán nhầm nhãn "Đăng ký/Cập nhật/Vô hiệu hóa thiết bị" lên MỌI dòng log
+//   create/update/disable của bất kỳ entity nào khác — gây sai lệch mới còn tệ hơn hiện trạng
+//   (rơi vào formatter chung, không có nhãn sai). Giữ nguyên DEVICE_OFFLINE (map đúng
+//   'auto_offline' — action riêng cho thiết bị, an toàn).
 const ACTION_TRANSLATIONS = {
-    'LOGIN': 'Đăng nhập',
-    'LOGIN_FAILED': 'Đăng nhập thất bại',
-    'LOGOUT': 'Đăng xuất',
-    'CREATE_USER': 'Thêm tài khoản',
-    'UPDATE_USER': 'Cập nhật tài khoản',
-    'LOCK_USER': 'Khóa tài khoản',
-    'UNLOCK_USER': 'Mở khóa tài khoản',
-    'DELETE_USER': 'Xóa tài khoản',
-    'REGISTER_DEVICE': 'Đăng ký thiết bị',
-    'UPDATE_DEVICE': 'Cập nhật thiết bị',
-    'REMOVE_DEVICE': 'Vô hiệu hóa thiết bị',
-    'DEVICE_OFFLINE': 'Thiết bị mất kết nối',
-    'EXPORT_USERS': 'Xuất tệp nhân viên',
-    'UPDATE_CONFIG': 'Cập nhật cấu hình hệ thống'
+    'login': 'Đăng nhập',
+    'logout': 'Đăng xuất',
+    'ACCOUNT_CREATE': 'Thêm tài khoản',
+    'ACCOUNT_UPDATE': 'Cập nhật tài khoản',
+    'ACCOUNT_LOCK': 'Khóa tài khoản',
+    'ACCOUNT_UNLOCK': 'Mở khóa tài khoản',
+    'ACCOUNT_DELETE': 'Xóa tài khoản',
+    'auto_offline': 'Thiết bị mất kết nối',
+    'export_users': 'Xuất tệp nhân viên',
+    'system_config_update': 'Cập nhật cấu hình hệ thống'
 };
 
 const formatActionName = (action) => {
@@ -43,12 +55,42 @@ const formatActionName = (action) => {
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
+// [FIX] Đọc trực tiếp mọi giá trị entity_type thật đang được ghi vào audit_logs trên toàn BE
+// (grep entityType/entity_type qua tất cả module) — 2 key cũ SAI ĐỊNH DẠNG hoàn toàn
+// ('iot-devices' → thật là 'iot_devices' gạch dưới; 'system-configurations' → thật là
+// 'system_configs') nên không bao giờ khớp, cộng thêm bổ sung đầy đủ các entity_type thật còn
+// thiếu (trước chỉ phủ 5/30+ giá trị thật).
 const ENTITY_TRANSLATIONS = {
     'auth': 'Hệ thống xác thực',
     'users': 'Quản lý tài khoản',
-    'iot-devices': 'Giám sát thiết bị IoT',
+    'iot_devices': 'Giám sát thiết bị IoT',
     'rooms': 'Quản lý phòng họp',
-    'system-configurations': 'Cấu hình hệ thống'
+    'room': 'Phòng họp',
+    'room_booking': 'Đặt phòng họp',
+    'system_configs': 'Cấu hình hệ thống',
+    'face_profile': 'Hồ sơ khuôn mặt',
+    'face_profiles': 'Hồ sơ khuôn mặt',
+    'role': 'Vai trò',
+    'role_permission': 'Phân quyền vai trò',
+    'permission': 'Quyền hạn',
+    'department': 'Phòng ban',
+    'background_jobs': 'Tác vụ nền',
+    'meeting': 'Cuộc họp',
+    'meetings': 'Cuộc họp',
+    'meeting_minutes': 'Biên bản họp',
+    'meeting_request': 'Yêu cầu đặt phòng họp',
+    'meeting_participant': 'Thành viên cuộc họp',
+    'meeting_external_participant': 'Khách mời ngoài công ty',
+    'meeting_agenda': 'Chương trình họp',
+    'meeting_booking': 'Đặt lịch phòng họp',
+    'equipment': 'Thiết bị phòng họp',
+    'no_show_case': 'Trường hợp vắng mặt',
+    'no_show_cases': 'Trường hợp vắng mặt',
+    'security_alerts': 'Cảnh báo an ninh',
+    'attendance_records': 'Bản ghi điểm danh',
+    'analytics_dashboard': 'Bảng thống kê',
+    'audit_logs': 'Nhật ký hệ thống',
+    'zones': 'Khu vực giám sát'
 };
 
 const TRANSLATED_KEYS = {
@@ -329,10 +371,22 @@ const AuditLogs = () => {
         return 'bg-slate-50 text-slate-700 border-slate-200';
     };
 
+    // [FIX] severity thật (audit-log.entity.ts AuditLogSeverity) là info/warning/error/critical.
+    // Trước đây check 'success' (không phải giá trị thật nào cả — 'info' luôn rơi else → đỏ sai
+    // màu) và gộp chung error+critical vào cùng 1 nhãn/màu "Thất bại" — critical (mức nghiêm
+    // trọng nhất) không phân biệt được với error thường. Tách riêng cả 4 mức.
     const getStatusBadge = (status) => {
-        if (status === 'success') return 'bg-green-100 text-green-800';
+        if (status === 'info') return 'bg-green-100 text-green-800';
         if (status === 'warning') return 'bg-amber-100 text-amber-800';
+        if (status === 'critical') return 'bg-red-200 text-red-900';
         return 'bg-red-100 text-red-800';
+    };
+
+    const getStatusLabel = (status) => {
+        if (status === 'info') return 'Thành công';
+        if (status === 'warning') return 'Cảnh báo';
+        if (status === 'critical') return 'Nghiêm trọng';
+        return 'Thất bại';
     };
 
     return (
@@ -576,7 +630,7 @@ const AuditLogs = () => {
                                             </td>
                                             <td className="py-4 px-6">
                                                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${getStatusBadge(log.severity || log.status)}`}>
-                                                    {(log.severity === 'info' || log.status === 'success') ? 'Thành công' : (log.severity === 'warning' || log.status === 'warning') ? 'Cảnh báo' : 'Thất bại'}
+                                                    {getStatusLabel(log.severity || log.status)}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-center">
@@ -662,7 +716,7 @@ const AuditLogs = () => {
                                             {formatActionName(selectedLog.actionType || selectedLog.action)}
                                         </span>
                                         <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusBadge(selectedLog.severity || selectedLog.status)}`}>
-                                            {(selectedLog.severity === 'info' || selectedLog.status === 'success') ? 'Thành công' : (selectedLog.severity === 'warning' || selectedLog.status === 'warning') ? 'Cảnh báo' : 'Thất bại'}
+                                            {getStatusLabel(selectedLog.severity || selectedLog.status)}
                                         </span>
                                     </div>
                                 </div>

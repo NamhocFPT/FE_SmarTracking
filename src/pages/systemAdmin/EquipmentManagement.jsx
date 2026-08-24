@@ -837,7 +837,7 @@ const EquipmentManagement = () => {
                         <form onSubmit={handleConfirmFaultSubmit} className="p-6 space-y-4">
                             <div className="p-3 bg-cloud-mist/30 rounded-xl mb-4 text-xs">
                                 <p className="text-sm font-bold text-midnight-indigo">{selectedEquipment.equipmentName}</p>
-                                <p className="text-xs text-slate-blue mt-0.5">Mã: {selectedEquipment.equipmentCode} • Trạng thái lỗi: <span className="text-red-500 font-semibold">{selectedEquipment.healthStatus}</span></p>
+                                <p className="text-xs text-slate-blue mt-0.5">Mã: {selectedEquipment.equipmentCode} • Trạng thái lỗi: <span className="text-red-500 font-semibold">{getHealthStatusMeta(selectedEquipment.healthStatus).label}</span></p>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-blue uppercase mb-1">Ghi chú xác nhận lỗi (Không bắt buộc)</label>
