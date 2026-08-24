@@ -415,6 +415,8 @@ const InMeetingRoom = ({ isPublic = false }) => {
     const attendanceErrorRef = useRef(false);
     // Debounce cho việc nạp lại ghi chú khi nhận `meeting.note.created` qua WS.
     const noteRefreshTimerRef = useRef(null);
+    // Debounce cho việc nạp lại điểm danh khi nhận `meeting.attendance.updated` qua WS.
+    const attendanceRefreshTimerRef = useRef(null);
     const devicesErrorRef = useRef(false);
 
     // Clear all pending timers on unmount
@@ -852,7 +854,20 @@ const InMeetingRoom = ({ isPublic = false }) => {
             noteRefreshTimerRef.current = setTimeout(() => { loadNotes(); }, 400);
         };
 
+        // BE bắn `meeting.attendance.updated` vào room meeting:{id} khi có check-in MỚI
+        // qua camera (face-attendance.service.ts, [FIX 2026-08-16]) — hiện CHỈ phủ nhánh
+        // check-in camera, chưa phủ check-out/điểm danh thủ công. Nạp lại qua
+        // loadAttendance() (đã dùng cho polling 15s + sau handleManualCheckIn/
+        // handleInvalidateAttendance) thay vì tự vá state từ payload, để mọi nơi đọc
+        // attendance đều đi qua 1 nguồn nhất quán. Debounce mirror ĐÚNG onNoteCreated.
+        const onAttendanceUpdated = (payload) => {
+            if (payload?.meetingId && payload.meetingId !== id) return;
+            if (attendanceRefreshTimerRef.current) clearTimeout(attendanceRefreshTimerRef.current);
+            attendanceRefreshTimerRef.current = setTimeout(() => { loadAttendance(); }, 400);
+        };
+
         s.on('meeting.note.created', onNoteCreated);
+        s.on('meeting.attendance.updated', onAttendanceUpdated);
         s.on('meeting.session.started', onSessionStarted);
         s.on('meeting.session.ended', onSessionEnded);
         s.on('agenda:presented', onAgendaPresented);
@@ -864,7 +879,9 @@ const InMeetingRoom = ({ isPublic = false }) => {
 
         return () => {
             if (noteRefreshTimerRef.current) clearTimeout(noteRefreshTimerRef.current);
+            if (attendanceRefreshTimerRef.current) clearTimeout(attendanceRefreshTimerRef.current);
             s.off('meeting.note.created', onNoteCreated);
+            s.off('meeting.attendance.updated', onAttendanceUpdated);
             s.off('meeting.session.started', onSessionStarted);
             s.off('meeting.session.ended', onSessionEnded);
             s.off('agenda:presented', onAgendaPresented);
@@ -1472,7 +1489,6 @@ const InMeetingRoom = ({ isPublic = false }) => {
             isMuted: true
         }))
     ];
-    const uncheckedParticipants = (meetingState.participants || []).filter(p => !isCheckedIn(p));
 
     // fullLabel dùng cho tooltip title, label ngắn để hiển thị trong tab (tránh xuống dòng)
     const tabs = [
@@ -2179,28 +2195,47 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                     </div>
                                     {isManualAttendanceExpanded && (
                                         <div className="divide-y divide-platinum-tint max-h-44 overflow-y-auto">
-                                            {uncheckedParticipants.length === 0 ? (
-                                                <p className="text-[11px] text-slate-blue italic text-center py-3">Tất cả đã điểm danh.</p>
+                                            {(meetingState.participants || []).length === 0 ? (
+                                                <p className="text-[11px] text-slate-blue italic text-center py-3">Không có người tham gia.</p>
                                             ) : (
-                                                uncheckedParticipants.map(p => (
-                                                    <div key={p.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-cloud-mist transition-colors">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <UserAvatar user={p} className="w-6 h-6 rounded-full shrink-0 text-[9px] font-bold" />
-                                                            <span className="text-xs font-semibold text-midnight-indigo truncate">{p.fullName}</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleManualCheckIn(p)}
-                                                            disabled={manualCheckInLoading === p.id}
-                                                            className="ml-2 shrink-0 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-[9px] font-extrabold flex items-center gap-1 transition-all"
-                                                        >
-                                                            {manualCheckInLoading === p.id ? (
-                                                                <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                (meetingState.participants || []).map(p => {
+                                                    const checked = isCheckedIn(p);
+                                                    return (
+                                                        <div key={p.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-cloud-mist transition-colors">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <div className="relative shrink-0">
+                                                                    <UserAvatar user={p} className="w-6 h-6 rounded-full text-[9px] font-bold" />
+                                                                    {checked && (
+                                                                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
+                                                                            <Check className="w-1.5 h-1.5 text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-xs font-semibold text-midnight-indigo truncate">{p.fullName}</span>
+                                                            </div>
+                                                            {checked ? (
+                                                                <span
+                                                                    className="ml-2 shrink-0 w-5 h-5 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center"
+                                                                    title="Đã điểm danh"
+                                                                >
+                                                                    <Check className="w-3 h-3 text-emerald-600" />
+                                                                </span>
                                                             ) : (
-                                                                <><UserCheck className="w-3 h-3" /> Điểm danh</>
+                                                                <button
+                                                                    onClick={() => handleManualCheckIn(p)}
+                                                                    disabled={manualCheckInLoading === p.id}
+                                                                    className="ml-2 shrink-0 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-[9px] font-extrabold flex items-center gap-1 transition-all"
+                                                                >
+                                                                    {manualCheckInLoading === p.id ? (
+                                                                        <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                                    ) : (
+                                                                        <><UserCheck className="w-3 h-3" /> Điểm danh</>
+                                                                    )}
+                                                                </button>
                                                             )}
-                                                        </button>
-                                                    </div>
-                                                ))
+                                                        </div>
+                                                    );
+                                                })
                                             )}
                                         </div>
                                     )}
