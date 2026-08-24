@@ -255,9 +255,9 @@ const RoomAccessLogs = () => {
 
     useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
-    // silent polling 30s
+    // silent polling 1s
     useEffect(() => {
-        const id = setInterval(() => fetchLogs(true), 30000);
+        const id = setInterval(() => fetchLogs(true), 1000);
         return () => clearInterval(id);
     }, [fetchLogs]);
 
@@ -327,13 +327,16 @@ const RoomAccessLogs = () => {
                     <h1 className="text-2xl font-extrabold text-midnight-indigo tracking-tight">Kiểm soát ra vào cổng</h1>
                     <p className="text-slate-blue text-sm mt-1">Đối soát an ninh ra/vào dựa trên camera AI nhận diện khuôn mặt (IVSS)</p>
                 </div>
-                <button
-                    onClick={fetchLogs}
-                    disabled={logsLoading}
-                    className="self-start flex items-center gap-2 px-4 py-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo rounded-xl hover:bg-cloud-mist transition-colors text-sm font-semibold disabled:opacity-50"
-                >
-                    <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} /> Làm mới
-                </button>
+                <div className="self-start flex flex-col items-end gap-1">
+                    <button
+                        onClick={() => fetchLogs()}
+                        disabled={logsLoading}
+                        className="flex items-center gap-2 px-4 py-2 border border-platinum-tint bg-white text-slate-blue hover:text-midnight-indigo rounded-xl hover:bg-cloud-mist transition-colors text-sm font-semibold disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} /> Làm mới
+                    </button>
+                    <span className="text-[10px] text-slate-400">Tự động cập nhật mỗi 1s</span>
+                </div>
             </div>
 
             {/* ── Stat cards ── */}
@@ -353,7 +356,7 @@ const RoomAccessLogs = () => {
                             <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                             <span className="font-semibold">{error}</span>
                         </div>
-                        <button onClick={fetchLogs} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold flex-shrink-0">Thử lại</button>
+                        <button onClick={() => fetchLogs()} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold flex-shrink-0">Thử lại</button>
                     </motion.div>
                 )}
             </AnimatePresence>
