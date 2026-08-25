@@ -19,7 +19,7 @@ import { removeInternalParticipant, removeExternalParticipant } from '../../serv
 import ParticipantDetailModal from '../../components/meeting/ParticipantDetailModal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import toast from '../../utils/toast';
-import { getUserPresence } from '../../service/managerServices';
+import { getUserPresence, getMeetingPresence } from '../../service/managerServices';
 import ThumbnailImage from '../../components/common/ThumbnailImage';
 import EventSnapshotModal from '../../components/security/EventSnapshotModal';
 import MeetingAttendanceBoard from '../../components/meeting/MeetingAttendanceBoard';
@@ -162,6 +162,13 @@ const EmployeeMeetingDetail = () => {
     const [presenceData, setPresenceData] = useState(null);
     const [presenceLoading, setPresenceLoading] = useState(false);
     const [presenceError, setPresenceError] = useState(null);
+    // Host xem thời lượng tham dự của TẤT CẢ participant (không chỉ chính mình) — danh sách
+    // tổng hợp qua getMeetingPresence(), rồi bấm 1 người để xem chi tiết (tái dùng presenceData
+    // ở trên qua getUserPresence(meetingId, participant.userId), KHÔNG tạo state chi tiết riêng.
+    const [hostPresenceList, setHostPresenceList] = useState(null);
+    const [hostPresenceLoading, setHostPresenceLoading] = useState(false);
+    const [hostPresenceError, setHostPresenceError] = useState(null);
+    const [selectedPresenceUser, setSelectedPresenceUser] = useState(null);
 
     // States for snapshot fullscreen viewing
     const [snapshotEventId, setSnapshotEventId] = useState(null);
@@ -894,8 +901,28 @@ const EmployeeMeetingDetail = () => {
 
     const handleOpenPresenceTab = async () => {
         setActiveRightTab('presence');
-        if (presenceData || presenceLoading) return;
         if (!currentUser?.id || !meeting?.id) return;
+        // Host: tải danh sách TẤT CẢ participant (thay vì chỉ chính mình).
+        if (isHost) {
+            if (hostPresenceList || hostPresenceLoading) return;
+            setHostPresenceLoading(true);
+            setHostPresenceError(null);
+            try {
+                const res = await getMeetingPresence(meeting.id);
+                if (res?.success && res.data) {
+                    setHostPresenceList(res.data.participants || []);
+                } else {
+                    throw new Error(res?.error?.message || res?.message || 'Không có dữ liệu hiện diện từ IVSS.');
+                }
+            } catch (err) {
+                setHostPresenceError(err.message || 'Lỗi khi tải dữ liệu thời lượng tham dự.');
+            } finally {
+                setHostPresenceLoading(false);
+            }
+            return;
+        }
+        // Không phải host: hành vi CŨ y hệt — chỉ tự xem chính mình.
+        if (presenceData || presenceLoading) return;
         setPresenceLoading(true);
         setPresenceError(null);
         try {
@@ -910,6 +937,34 @@ const EmployeeMeetingDetail = () => {
         } finally {
             setPresenceLoading(false);
         }
+    };
+
+    // Host bấm 1 participant trong danh sách → tải chi tiết thời lượng+timeline của NGƯỜI ĐÓ,
+    // tái dùng NGUYÊN state presenceData/UI chi tiết đã có bên dưới (chỉ đổi userId nguồn).
+    const handleSelectHostParticipant = async (participant) => {
+        if (!meeting?.id || !participant?.userId) return;
+        setSelectedPresenceUser(participant);
+        setPresenceData(null);
+        setPresenceLoading(true);
+        setPresenceError(null);
+        try {
+            const res = await getUserPresence(meeting.id, participant.userId);
+            if (res?.success && res.data) {
+                setPresenceData(res.data);
+            } else {
+                throw new Error(res?.error?.message || res?.message || 'Không có dữ liệu hiện diện từ IVSS.');
+            }
+        } catch (err) {
+            setPresenceError(err.message || 'Lỗi khi tải dữ liệu thời lượng tham dự.');
+        } finally {
+            setPresenceLoading(false);
+        }
+    };
+
+    const handleBackToHostPresenceList = () => {
+        setSelectedPresenceUser(null);
+        setPresenceData(null);
+        setPresenceError(null);
     };
 
     // removed mock filteredTranscript
@@ -1416,7 +1471,7 @@ const EmployeeMeetingDetail = () => {
                                 onClick={handleOpenPresenceTab}
                                 className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${activeRightTab === 'presence' ? 'border-action-blue text-action-blue' : 'border-transparent text-slate-blue hover:text-midnight-indigo'}`}
                             >
-                                Thời lượng tham dự
+                                {isHost ? 'Thời lượng tham dự (Host)' : 'Thời lượng tham dự'}
                             </button>
                         )}
                         {isCompleted && (
@@ -1431,6 +1486,75 @@ const EmployeeMeetingDetail = () => {
 
                     {activeRightTab === 'presence' ? (
                         <div className="space-y-4">
+                            {isHost && !selectedPresenceUser ? (
+                                <div className="bg-white rounded-2xl border border-platinum-tint overflow-hidden">
+                                    <div className="px-5 py-3 border-b border-platinum-tint bg-cloud-mist/30">
+                                        <p className="text-[11px] text-slate-blue font-semibold">
+                                            Bạn là chủ trì cuộc họp — xem được thời lượng tham dự của tất cả người tham dự. Bấm vào 1 người để xem chi tiết.
+                                        </p>
+                                    </div>
+                                    {hostPresenceLoading ? (
+                                        <div className="p-8 flex flex-col items-center gap-3 animate-pulse">
+                                            <div className="w-8 h-8 border-2 border-action-blue border-t-transparent rounded-full animate-spin"></div>
+                                            <span className="text-xs text-slate-blue font-semibold">Đang tải dữ liệu từ IVSS...</span>
+                                        </div>
+                                    ) : hostPresenceError ? (
+                                        <div className="p-6 flex flex-col items-center gap-3 text-center">
+                                            <AlertTriangle className="w-8 h-8 text-red-500" />
+                                            <p className="text-xs text-red-700 font-semibold">{hostPresenceError}</p>
+                                            <button
+                                                onClick={handleOpenPresenceTab}
+                                                className="text-xs font-bold text-action-blue hover:underline"
+                                            >
+                                                Thử lại
+                                            </button>
+                                        </div>
+                                    ) : hostPresenceList && hostPresenceList.length > 0 ? (
+                                        <div className="divide-y divide-platinum-tint">
+                                            {hostPresenceList.map((p) => (
+                                                <button
+                                                    key={p.userId}
+                                                    type="button"
+                                                    onClick={() => handleSelectHostParticipant(p)}
+                                                    className="w-full px-5 py-3 flex items-center justify-between gap-3 text-left hover:bg-cloud-mist/30 transition-colors"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-midnight-indigo truncate">{p.fullName || 'Không tên'}</p>
+                                                        <p className="text-[10px] text-slate-blue truncate">{p.departmentName || '—'}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <span className="text-[10px] font-semibold text-midnight-indigo">{formatPresenceDuration(p.durationMs)}</span>
+                                                        <span className={`text-[10px] font-bold ${((p.presentRatio || 0) * 100) >= 80 ? 'text-emerald-600' : ((p.presentRatio || 0) * 100) >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                                                            {((p.presentRatio || 0) * 100).toFixed(1)}%
+                                                        </span>
+                                                        <ChevronRight className="w-3.5 h-3.5 text-slate-blue" />
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="py-10 text-center text-slate-400">
+                                            <p className="text-xs">Không có dữ liệu hiện diện nào cho cuộc họp này.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                            <>
+                            {isHost && selectedPresenceUser && (
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        type="button"
+                                        onClick={handleBackToHostPresenceList}
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-action-blue hover:underline"
+                                    >
+                                        <ChevronLeft className="w-3.5 h-3.5" />
+                                        Quay lại danh sách người tham dự
+                                    </button>
+                                    <p className="text-xs font-bold text-midnight-indigo">
+                                        {selectedPresenceUser.fullName || 'Không tên'}
+                                    </p>
+                                </div>
+                            )}
                             {presenceLoading ? (
                                 <div className="bg-white rounded-2xl border border-platinum-tint p-8 flex flex-col items-center gap-3 animate-pulse">
                                     <div className="w-8 h-8 border-2 border-action-blue border-t-transparent rounded-full animate-spin"></div>
@@ -1442,6 +1566,10 @@ const EmployeeMeetingDetail = () => {
                                     <p className="text-xs text-red-700 font-semibold">{presenceError}</p>
                                     <button
                                         onClick={async () => {
+                                        if (isHost && selectedPresenceUser) {
+                                            await handleSelectHostParticipant(selectedPresenceUser);
+                                            return;
+                                        }
                                         setPresenceData(null); setPresenceError(null);
                                         setPresenceLoading(true);
                                         try {
@@ -1663,6 +1791,8 @@ const EmployeeMeetingDetail = () => {
                                     })()}
                                 </div>
                             ) : null}
+                            </>
+                            )}
                         </div>
                     ) : activeRightTab === 'attendance' ? (
                         <MeetingAttendanceBoard meetingId={meeting.id} />
