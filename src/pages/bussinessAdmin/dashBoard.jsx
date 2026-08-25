@@ -70,6 +70,29 @@ const ALERT_TYPE_LABELS = ['Xâm nhập', 'Khuôn mặt lạ', 'Tụ tập', 'Xe
 const ALERT_TYPE_COLORS = ['#ef4444', '#f97316', '#ffa600', '#006BFF'];
 const STATUS_COLORS = ['#006BFF', '#7F3DFF', '#FFAE00', '#FF3B30'];
 
+// BE tra ve status dang enum tieng Anh -> hien thi nhan tieng Viet cho nguoi dung.
+const MEETING_STATUS_LABEL = {
+    scheduled: 'Đã lên lịch',
+    completed: 'Đã diễn ra',
+    cancelled: 'Đã huỷ',
+    no_show:   'Vắng mặt',
+    draft:     'Nháp',
+    in_progress: 'Đang diễn ra',
+    pending_approval: 'Chờ duyệt',
+};
+const meetingStatusLabel = (s) => MEETING_STATUS_LABEL[s] || s;
+
+// Mac dinh bo loc = thang hien tai theo gio may nguoi dung (khong hard-code thang co dinh).
+const pad2 = (n) => String(n).padStart(2, '0');
+const toDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const monthRange = () => {
+    const now = new Date();
+    return {
+        from: toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
+        to:   toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+};
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 const useInView = (threshold = 0.12) => {
@@ -78,6 +101,10 @@ const useInView = (threshold = 0.12) => {
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
+        // Khi tab đang ẩn, trình duyệt tạm dừng vòng render nên IntersectionObserver có thể
+        // không bao giờ báo — khối nội dung sẽ kẹt ở opacity-0 và KPI kẹt ở 0. Bỏ qua hiệu
+        // ứng trong trường hợp đó, ưu tiên hiển thị đúng dữ liệu hơn là animation.
+        if (typeof document !== 'undefined' && document.hidden) { setInView(true); return; }
         const obs = new IntersectionObserver(
             ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
             { threshold }
@@ -93,6 +120,15 @@ const useCountUp = (target, active, duration = 750) => {
     const rafRef = useRef(null);
     useEffect(() => {
         if (!active || typeof target !== 'number') return;
+
+        // requestAnimationFrame bị trình duyệt tạm dừng khi tab đang ẩn. Nếu KPI được
+        // tải trong lúc tab ở nền thì animation không bao giờ chạy và số liệu sẽ kẹt ở 0
+        // — hiển thị sai hoàn toàn. Trường hợp đó gán thẳng giá trị thật, bỏ animation.
+        if (typeof document !== 'undefined' && document.hidden) {
+            setDisplay(target);
+            return;
+        }
+
         const startTime = performance.now();
         const tick = (now) => {
             const progress = Math.min((now - startTime) / duration, 1);
@@ -101,7 +137,15 @@ const useCountUp = (target, active, duration = 750) => {
             if (progress < 1) rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(rafRef.current);
+
+        // Nếu người dùng chuyển tab giữa chừng, chốt luôn giá trị cuối để không đứng dở.
+        const settle = () => { if (document.hidden) { cancelAnimationFrame(rafRef.current); setDisplay(target); } };
+        document.addEventListener('visibilitychange', settle);
+
+        return () => {
+            cancelAnimationFrame(rafRef.current);
+            document.removeEventListener('visibilitychange', settle);
+        };
     }, [active, target, duration]);
     return display;
 };
@@ -288,8 +332,8 @@ const DashBoard = () => {
 
     // ── Meeting / Room data ───────────────────────────────────────────────────
     const [meetLoading, setMeetLoading] = useState(true);
-    const [fromDate, setFromDate] = useState('2026-06-01');
-    const [toDate,   setToDate]   = useState('2026-06-30');
+    const [fromDate, setFromDate] = useState(() => monthRange().from);
+    const [toDate,   setToDate]   = useState(() => monthRange().to);
     const [selectedDept,     setSelectedDept]     = useState('');
     const [departmentsList,  setDepartmentsList]  = useState([]);
     const [stats,            setStats]            = useState({ meetingCount: 0, activeRooms: 0, utilizationRate: 0, noShowRate: 0, onTimeRate: 0 });
@@ -417,9 +461,8 @@ const DashBoard = () => {
     const fetchMeetingData = useCallback(async () => {
         setMeetLoading(true);
         const params = { from: fromDate, to: toDate, departmentId: selectedDept || undefined };
-        const monthStart = new Date(); monthStart.setDate(1);
-        const monthEnd   = new Date(); monthEnd.setHours(23, 59, 59, 999);
-        const attParams  = { from: monthStart.toISOString().split('T')[0], to: monthEnd.toISOString().split('T')[0] };
+        // Thong ke diem danh luon theo thang hien tai (doc lap voi bo loc from/to o tren).
+        const attParams  = monthRange();
 
         const [overviewRes, roomRes, attendanceRes, trendRes, breakdownRes, durationRes, cancelRes, noShowRes] =
             await Promise.allSettled([
@@ -554,6 +597,15 @@ const DashBoard = () => {
             sections: prev.sections.includes(key) ? prev.sections.filter(s => s !== key) : [...prev.sections, key],
         }));
     };
+
+    // Nhan xet ty le dung gio phai bam theo so lieu that, khong hard-code "dat chi tieu".
+    const onTimeAssessment = (() => {
+        const r = stats.onTimeRate;
+        if (meetLoading || r == null) return { text: 'Đang tính…', color: D.muted };
+        if (r >= 80) return { text: '↑ Đạt chỉ tiêu tốt', color: '#059669' };
+        if (r >= 50) return { text: '→ Cần cải thiện', color: D.amber };
+        return { text: '↓ Dưới mức mong đợi', color: D.red };
+    })();
 
     const onlinePct = kpi.devicesTotal > 0 ? (kpi.devicesOnline / kpi.devicesTotal) * 100 : 0;
     const zonePct   = kpi.zonesTotal   > 0 ? (kpi.zonesActive   / kpi.zonesTotal)   * 100 : 0;
@@ -782,7 +834,7 @@ const DashBoard = () => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <KpiTile delay={0}   icon={Calendar}      label="Tổng cuộc họp"           value={meetLoading ? '—' : stats.meetingCount}    sub={`TB: ${avgDuration.actualAverageMinutes ?? avgDuration.plannedAverageMinutes ?? 0}m · Huỷ: ${cancelRateStats.cancelRate ?? 0}%`} iconColor={D.blue} />
                         <KpiTile delay={60}  icon={TrendingUp}    label="Hiệu suất phòng"           value={meetLoading ? '—' : `${stats.utilizationRate}%`} sub="Sử dụng trung bình" iconColor={D.purple} />
-                        <KpiTile delay={120} icon={Clock}         label="Tham gia đúng giờ"         value={meetLoading ? '—' : `${stats.onTimeRate}%`}  sub="↑ Đạt chỉ tiêu tốt" iconColor={D.green} subColor="#059669" />
+                        <KpiTile delay={120} icon={Clock}         label="Tham gia đúng giờ"         value={meetLoading ? '—' : `${stats.onTimeRate}%`}  sub={onTimeAssessment.text} iconColor={D.green} subColor={onTimeAssessment.color} />
                         <KpiTile delay={180} icon={AlertTriangle} label="Tỷ lệ đặt phòng vắng mặt" value={meetLoading ? '—' : `${stats.noShowRate}%`}   sub="Phòng tự giải phóng" iconColor={D.red} />
                     </div>
 
@@ -819,7 +871,7 @@ const DashBoard = () => {
                                     <>
                                         <ResponsiveContainer width="100%" height={200}>
                                             <PieChart>
-                                                <Pie data={statusBreakdown} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="count" animationBegin={100} animationDuration={900}>
+                                                <Pie data={statusBreakdown.map(i => ({ ...i, label: meetingStatusLabel(i.status) }))} nameKey="label" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="count" animationBegin={100} animationDuration={900}>
                                                     {statusBreakdown.map((_, idx) => <Cell key={idx} fill={STATUS_COLORS[idx % STATUS_COLORS.length]} />)}
                                                 </Pie>
                                                 <Tooltip />
@@ -829,7 +881,7 @@ const DashBoard = () => {
                                             {statusBreakdown.map((item, idx) => (
                                                 <div key={item.status} className="flex items-center gap-1.5">
                                                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: STATUS_COLORS[idx % STATUS_COLORS.length] }} />
-                                                    <span style={{ color: D.muted, fontSize: 11 }} className="truncate">{item.status}: {item.count}</span>
+                                                    <span style={{ color: D.muted, fontSize: 11 }} className="truncate">{meetingStatusLabel(item.status)}: {item.count}</span>
                                                 </div>
                                             ))}
                                         </div>
