@@ -62,6 +62,7 @@ import MinutesTabContent from '../../components/minutes/MinutesTabContent';
 import GuestPanel from '../../components/meeting/GuestPanel';
 import RecordingsTab from '../../components/meeting/RecordingsTab';
 import { startRecordingMarker, createLiveSpeakerTag } from '../../service/transcriptionServices';
+import { LIVE_SPEAKER_TAGGING_ENABLED } from '../../config/featureFlags';
 
 const customStyles = `
 @keyframes floatUp {
@@ -1169,10 +1170,15 @@ const InMeetingRoom = ({ isPublic = false }) => {
                 setRecordingSessionId(res.data?.recordingSessionId);
                 setRecordingStartedAt(new Date());
                 showToast('Đang khởi động ghi hình...', 'info');
-                // GA-30: Đóng dấu mốc t=0 cho live speaker tag — không await để không chặn UI
-                startRecordingMarker(id).catch(err =>
-                    console.error('[LiveTag] Không ghi được mốc bắt đầu, live speaker tag sẽ không hoạt động:', err)
-                );
+                // GA-30: Đóng dấu mốc t=0 cho live speaker tag — không await để không chặn UI.
+                // Mốc này CHỈ phục vụ live speaker tag (BE chỉ đọc nó cho event tagSource='live'),
+                // nên tắt kèm theo cờ; gán người nói sau họp neo theo recording_sessions.started_at,
+                // không dùng mốc này. Xem src/config/featureFlags.js.
+                if (LIVE_SPEAKER_TAGGING_ENABLED) {
+                    startRecordingMarker(id).catch(err =>
+                        console.error('[LiveTag] Không ghi được mốc bắt đầu, live speaker tag sẽ không hoạt động:', err)
+                    );
+                }
             } else {
                 showToast('Lỗi khi bắt đầu ghi hình', 'error');
             }
@@ -2324,8 +2330,10 @@ const InMeetingRoom = ({ isPublic = false }) => {
                                             </div>
                                         )}
 
-                                        {/* GA-32: Live Speaker Tag — chỉ hiện với Host khi đang ghi hình */}
-                                        {isHost && ['recording', 'paused'].includes(recordingStatus) && (
+                                        {/* GA-32: Live Speaker Tag — TẮT theo LIVE_SPEAKER_TAGGING_ENABLED
+                                            (xem src/config/featureFlags.js). Handler + API service giữ nguyên,
+                                            chỉ không render. Gán người nói SAU cuộc họp không bị ảnh hưởng. */}
+                                        {LIVE_SPEAKER_TAGGING_ENABLED && isHost && ['recording', 'paused'].includes(recordingStatus) && (
                                             <div className="flex flex-col gap-2 border-t border-platinum-tint/60 pt-3 mt-1">
                                                 <div className="text-[10px] font-bold text-slate-blue uppercase tracking-wider flex items-center gap-1">
                                                     <Mic className="w-3 h-3 text-action-blue" />

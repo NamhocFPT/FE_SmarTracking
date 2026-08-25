@@ -9,6 +9,7 @@ import {
     getAvatarDownloadUrl,
     approveAvatarSubmission,
     rejectAvatarSubmission,
+    deleteAvatarSubmission,
 } from "../../service/avatarReviewService";
 import { getDepartments } from "../../service/sysAdminServices";
 import { getUserById } from "../../service/businessAdminServices";
@@ -32,6 +33,7 @@ const ERROR_MAP = {
     BIOMETRIC_DOWNLOAD_URL_FAILED: "Không thể tải ảnh lúc này. Vui lòng thử lại.",
     BIOMETRIC_APPROVE_FAILED: "Không thể duyệt ảnh này. Vui lòng thử lại.",
     BIOMETRIC_REJECT_FAILED: "Không thể từ chối ảnh này. Vui lòng thử lại.",
+    BIOMETRIC_DELETE_FAILED: "Không thể xoá ảnh này. Vui lòng thử lại.",
     FORBIDDEN: "Bạn không có quyền thực hiện hành động này.",
 };
 
@@ -136,6 +138,35 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
         } finally {
             setActionLoading(false);
         }
+    };
+
+    const handleDelete = () => {
+        setConfirm({
+            message: "Bạn có chắc chắn muốn xoá ảnh sinh trắc học đã đăng ký này? Người dùng sẽ cần nộp lại ảnh mới để tiếp tục sử dụng FaceGate.",
+            onConfirm: async () => {
+                setActionLoading(true);
+                setActionError(null);
+                try {
+                    const res = await deleteAvatarSubmission(faceProfileId);
+                    if (res?.success) {
+                        setTimeout(() => {
+                            onActionComplete?.();
+                            onClose();
+                        }, 1000);
+                    }
+                } catch (err) {
+                    const code = err?.error?.code;
+                    if (code === "BIOMETRIC_SUBMISSION_NOT_FOUND") {
+                        setActionError("Yêu cầu này đã bị xoá trước đó.");
+                        setTimeout(() => { onActionComplete?.(); onClose(); }, 1500);
+                    } else {
+                        setActionError(ERROR_MAP[code] || err?.error?.message || "Không thể xoá ảnh này.");
+                    }
+                } finally {
+                    setActionLoading(false);
+                }
+            },
+        });
     };
 
     const formatBytes = (bytes) => {
@@ -308,6 +339,18 @@ const BiometricSubmissionDetailModal = ({ faceProfileId, onClose, onActionComple
                                             </button>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {(detail.status === "active" || detail.status === "approved" || detail.status === "rejected") && (
+                                <div className="border-t border-platinum-tint pt-4">
+                                    <button
+                                        onClick={handleDelete}
+                                        disabled={actionLoading}
+                                        className="w-full py-2 border border-red-300 text-red-600 hover:bg-red-50 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                                    >
+                                        {actionLoading ? "Đang xử lý..." : "Xoá ảnh đã đăng ký"}
+                                    </button>
                                 </div>
                             )}
                         </>

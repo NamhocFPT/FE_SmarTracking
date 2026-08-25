@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Mic, Square, Loader2, UserPlus, X, Check } from 'lucide-react';
+import { Mic, Square, Pause, Play, Loader2, UserPlus, X, Check } from 'lucide-react';
 import { useStationRecording } from '../../hooks/useStationRecording';
+import { LIVE_SPEAKER_TAGGING_ENABLED } from '../../config/featureFlags';
 
 const StationRecorder = ({ meetingId, meetingTitle, participants, onUploadSuccess }) => {
     const [showParticipantSelect, setShowParticipantSelect] = useState(false);
@@ -9,11 +10,14 @@ const StationRecorder = ({ meetingId, meetingTitle, participants, onUploadSucces
 
     const {
         isRecording,
+        isPaused,
         isProcessing,
         error,
         recordingTime,
         marksCount,
         startRecording,
+        pauseRecording,
+        resumeRecording,
         stopAndUpload,
         addSpeakerMark
     } = useStationRecording(meetingId, meetingTitle);
@@ -59,21 +63,61 @@ const StationRecorder = ({ meetingId, meetingTitle, participants, onUploadSucces
                         Bắt đầu ghi âm
                     </button>
                 ) : (
-                    <div className="flex items-center gap-2 w-full p-2 bg-red-50/60 border border-red-100 rounded-lg">
-                        <div className="flex-1 flex items-center justify-center gap-2">
-                            <span className="relative flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    <div className={`flex flex-col gap-2 w-full p-2 border rounded-lg ${isPaused ? 'bg-amber-50/60 border-amber-100' : 'bg-red-50/60 border-red-100'}`}>
+                        <div className="flex items-center justify-center gap-2">
+                            {isPaused ? (
+                                <span className="inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                            ) : (
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                                </span>
+                            )}
+                            <span className={`font-mono font-bold text-sm tracking-wide ${isPaused ? 'text-amber-600' : 'text-red-600'}`}>
+                                {formatTime(recordingTime)}
                             </span>
-                            <span className="font-mono text-red-600 font-bold text-sm tracking-wide">{formatTime(recordingTime)}</span>
+                            {isPaused && (
+                                <span className="text-[9px] font-extrabold text-amber-600 uppercase tracking-wider">Tạm dừng</span>
+                            )}
                         </div>
-                        <button
-                            onClick={handleStop}
-                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-md text-xs font-bold transition-colors shadow-sm"
-                        >
-                            <Square className="w-3 h-3" fill="currentColor" />
-                            Dừng
-                        </button>
+
+                        {/* Tạm dừng / Tiếp tục — dùng MediaRecorder.pause()/resume() nên
+                            cả phiên vẫn chỉ tạo ra MỘT file ghi âm duy nhất khi bấm Dừng. */}
+                        <div className="flex items-center gap-1.5 w-full">
+                            {isPaused ? (
+                                <button
+                                    onClick={resumeRecording}
+                                    disabled={isProcessing}
+                                    className="flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-md text-[11px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                                >
+                                    <Play className="w-3 h-3 shrink-0" fill="currentColor" />
+                                    <span className="truncate">Tiếp tục</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={pauseRecording}
+                                    disabled={isProcessing}
+                                    className="flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-md text-[11px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                                >
+                                    <Pause className="w-3 h-3 shrink-0" fill="currentColor" />
+                                    <span className="truncate">Tạm dừng</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={handleStop}
+                                disabled={isProcessing}
+                                className="flex-1 min-w-0 flex items-center justify-center gap-1 px-2 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-md text-[11px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                            >
+                                {isProcessing
+                                    ? <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
+                                    : <Square className="w-3 h-3 shrink-0" fill="currentColor" />}
+                                <span className="truncate">Dừng</span>
+                            </button>
+                        </div>
+
+                        <p className="text-[9px] text-slate-blue font-medium text-center leading-tight">
+                            Tạm dừng rồi ghi tiếp vẫn chỉ ra <span className="font-extrabold">một file ghi âm duy nhất</span>.
+                        </p>
                     </div>
                 )}
             </div>
@@ -85,8 +129,10 @@ const StationRecorder = ({ meetingId, meetingTitle, participants, onUploadSucces
                 </div>
             )}
 
-            {/* Speaker Marker Section */}
-            {isRecording && (
+            {/* Speaker Marker Section — TẮT theo LIVE_SPEAKER_TAGGING_ENABLED (xem
+                src/config/featureFlags.js). Code + API giữ nguyên, chỉ không render.
+                Việc gán người nói SAU cuộc họp không bị ảnh hưởng. */}
+            {LIVE_SPEAKER_TAGGING_ENABLED && isRecording && (
                 <div className="flex flex-col gap-2 border-t border-platinum-tint/60 pt-3">
                     <div className="flex items-center justify-between">
                         <div className="text-[10px] font-bold text-slate-blue uppercase tracking-wider">

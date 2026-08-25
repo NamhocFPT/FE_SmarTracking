@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { uploadAudio, uploadStationSpeakerMarks } from '../service/transcriptionServices';
+import { LIVE_SPEAKER_TAGGING_ENABLED } from '../config/featureFlags';
 
 // Helpers cho IndexedDB để chống mất dữ liệu khi browser crash
 const DB_NAME = 'SmarTrackingRecordingDB';
@@ -60,6 +61,7 @@ const slugifyMeetingTitle = (title) => {
 
 export const useStationRecording = (meetingId, meetingTitle) => {
     const [isRecording, setIsRecording] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState('');
     const [startTime, setStartTime] = useState(null);
@@ -70,6 +72,16 @@ export const useStationRecording = (meetingId, meetingTitle) => {
     const streamRef = useRef(null);
     const marksRef = useRef([]); // Lưu các mốc gán tên: { offsetSeconds, speakerUserId/externalParticipantId, displayName }
     const timerRef = useRef(null);
+    // Thời lượng ĐÃ GHI THẬT (ms), KHÔNG tính các quãng đang tạm dừng — đây mới là
+    // trục thời gian của file audio cuối cùng, vì MediaRecorder.pause() không ghi gì
+    // trong lúc tạm dừng nên file không chứa khoảng trống tương ứng.
+    const recordedMsRef = useRef(0);
+    // Mốc bắt đầu của đoạn đang ghi; null khi đang tạm dừng hoặc đã dừng hẳn.
+    const segmentStartedAtRef = useRef(null);
+
+    const getRecordedMs = () =>
+        recordedMsRef.current +
+        (segmentStartedAtRef.current ? Date.now() - segmentStartedAtRef.current : 0);
 
     const initDB = async () => {
         if (!dbRef.current) {
@@ -98,18 +110,49 @@ export const useStationRecording = (meetingId, meetingTitle) => {
             // Cắt chunk mỗi 30s
             mediaRecorder.start(30000);
             setIsRecording(true);
+            setIsPaused(false);
             const now = Date.now();
             setStartTime(now);
             marksRef.current = [];
             setRecordingTime(0);
+            recordedMsRef.current = 0;
+            segmentStartedAtRef.current = now;
 
+            // Đồng hồ bám theo thời lượng đã ghi thật → đứng yên trong lúc tạm dừng.
             timerRef.current = setInterval(() => {
-                setRecordingTime(Math.floor((Date.now() - now) / 1000));
+                setRecordingTime(Math.floor(getRecordedMs() / 1000));
             }, 1000);
 
         } catch (err) {
             setError('Lỗi khởi tạo micro (Vui lòng cấp quyền micro): ' + err.message);
         }
+    }, []);
+
+    /**
+     * Tạm dừng ghi âm bằng MediaRecorder.pause() của trình duyệt: vẫn chỉ MỘT file
+     * audio duy nhất khi dừng hẳn (không bị cắt thành nhiều file rời), phần tạm dừng
+     * đơn giản là không có mặt trong file. Mic được giữ nguyên (không stop track) để
+     * bấm "Tiếp tục" là ghi lại ngay, không phải xin quyền lại.
+     */
+    const pauseRecording = useCallback(() => {
+        const recorder = mediaRecorderRef.current;
+        if (!recorder || recorder.state !== 'recording') return;
+        recorder.pause();
+        if (segmentStartedAtRef.current) {
+            recordedMsRef.current += Date.now() - segmentStartedAtRef.current;
+            segmentStartedAtRef.current = null;
+        }
+        setRecordingTime(Math.floor(recordedMsRef.current / 1000));
+        setIsPaused(true);
+    }, []);
+
+    /** Ghi tiếp vào đúng file đang ghi dở (xem chú thích ở pauseRecording). */
+    const resumeRecording = useCallback(() => {
+        const recorder = mediaRecorderRef.current;
+        if (!recorder || recorder.state !== 'paused') return;
+        recorder.resume();
+        segmentStartedAtRef.current = Date.now();
+        setIsPaused(false);
     }, []);
 
     const stopAndUpload = useCallback(async () => {
@@ -122,7 +165,12 @@ export const useStationRecording = (meetingId, meetingTitle) => {
             // Stop recording
             mediaRecorderRef.current.onstop = async () => {
                 clearInterval(timerRef.current);
+                if (segmentStartedAtRef.current) {
+                    recordedMsRef.current += Date.now() - segmentStartedAtRef.current;
+                    segmentStartedAtRef.current = null;
+                }
                 setIsRecording(false);
+                setIsPaused(false);
                 setStartTime(null);
 
                 // Dừng các track của stream
@@ -143,8 +191,9 @@ export const useStationRecording = (meetingId, meetingTitle) => {
                     
                     const sessionId = uploadRes.data?.recordingSessionId || uploadRes.data?.id;
                     
-                    // Upload marks nếu có
-                    if (marksRef.current.length > 0 && sessionId) {
+                    // Upload marks nếu có — bỏ qua khi tính năng gán người nói trong
+                    // lúc họp đang tắt (LIVE_SPEAKER_TAGGING_ENABLED=false).
+                    if (LIVE_SPEAKER_TAGGING_ENABLED && marksRef.current.length > 0 && sessionId) {
                         try {
                             await uploadStationSpeakerMarks(meetingId, sessionId, marksRef.current);
                         } catch (markErr) {
@@ -199,7 +248,9 @@ export const useStationRecording = (meetingId, meetingTitle) => {
 
     const addSpeakerMark = useCallback((participant) => {
         if (!isRecording || !startTime) return;
-        const offsetSeconds = Math.max(0, (Date.now() - startTime) / 1000);
+        // Offset phải tính theo thời lượng ĐÃ GHI (trừ các quãng tạm dừng) vì đó mới
+        // là trục thời gian của file audio mà BE dùng để khớp mốc vào transcript.
+        const offsetSeconds = Math.max(0, getRecordedMs() / 1000);
         
         // Chỉ dựa vào cờ tường minh isExternal — không suy đoán qua role (role hiện là chuỗi
         // tiếng Việt 'Chủ tọa'/'Thành viên'/'Khách mời', không phải mã định danh ổn định).
@@ -215,11 +266,14 @@ export const useStationRecording = (meetingId, meetingTitle) => {
 
     return {
         isRecording,
+        isPaused,
         isProcessing,
         error,
         recordingTime,
         marksCount: marksRef.current.length,
         startRecording,
+        pauseRecording,
+        resumeRecording,
         stopAndUpload,
         addSpeakerMark
     };
