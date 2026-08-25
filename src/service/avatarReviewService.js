@@ -1,4 +1,4 @@
-import { get, post } from '../utils/request';
+import { get, post, dele } from '../utils/request';
 
 /** GET /api/v1/admin/biometric-submissions */
 export const getAvatarSubmissions = async (params = {}) => {
@@ -20,3 +20,6 @@ export const approveAvatarSubmission = async (id) => post(`/admin/biometric-subm
 
 /** POST /api/v1/admin/biometric-submissions/:id/reject  body: { reason } */
 export const rejectAvatarSubmission = async (id, reason) => post(`/admin/biometric-submissions/${id}/reject`, { reason });
+
+/** DELETE /api/v1/admin/biometric-submissions/:id */
+export const deleteAvatarSubmission = async (id) => dele(`/admin/biometric-submissions/${id}`);
